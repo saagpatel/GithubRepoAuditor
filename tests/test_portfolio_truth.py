@@ -2831,6 +2831,147 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
     assert not list(output_dir.glob("portfolio-truth-*.json"))
 
 
+def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import contextmanager
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    nested_observed_at = now - timedelta(hours=24) + timedelta(milliseconds=500)
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    receipt_path = output_dir / "github-security-coverage-latest.json"
+    receipt_truth = {
+        "projects": [
+            {
+                "identity": {"repo_full_name": "d/Alpha"},
+                "derived": {"attention_state": "active-product"},
+            }
+        ]
+    }
+    receipt = collect_security_coverage(
+        receipt_truth,
+        token=None,
+        expected_cohort_count=1,
+        now=now,
+        producer_commit="a" * 40,
+    )
+    alpha_receipt = receipt["repositories"]["d/Alpha"]
+    alpha_receipt["providers"]["dependabot"] = _provider_result(
+        "dependabot",
+        state="observed",
+        observed_at=nested_observed_at.isoformat(),
+        http_status=200,
+        pagination_complete=True,
+        counts={"critical": 0, "high": 0, "medium": 0, "low": 0},
+    )
+    alpha_receipt["repository"] = _remote_repository_result(
+        state="observed",
+        observed_at=nested_observed_at.isoformat(),
+        default_branch="main",
+        head_sha="b" * 40,
+        archived=False,
+    )
+    write_security_coverage_receipt(
+        receipt,
+        receipt_path,
+        expected_cohort_count=1,
+    )
+    loaded = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now,
+    )
+    at_boundary = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now + timedelta(milliseconds=500),
+    )
+    reloaded = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now + timedelta(seconds=1),
+    )
+    assert loaded.receipt_state == at_boundary.receipt_state == "fresh"
+    assert reloaded.receipt_state == "fresh"
+    assert loaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
+        "state"
+    ] == "observed"
+    assert reloaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
+        "state"
+    ] == "stale"
+    assert at_boundary.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
+        "state"
+    ] == "observed"
+    assert loaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
+        "observed"
+    )
+    assert reloaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
+        "stale"
+    )
+    assert at_boundary.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
+        "observed"
+    )
+
+    binding = loaded.binding()
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": loaded.schema_version,
+        "produced_at": loaded.produced_at,
+        "state": loaded.receipt_state,
+        "age_hours": loaded.age_hours,
+        "producer_commit": loaded.producer_commit,
+        "cohort_policy": loaded.cohort_policy,
+        "cohort_repository_count": len(loaded.cohort_repositories),
+        "path": loaded.source_path,
+        "receipt_id": loaded.receipt_id,
+        "content_sha256": loaded.content_sha256,
+    }
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    registry_output.write_text("sentinel-registry\n")
+    report_output.write_text("sentinel-report\n")
+
+    @contextmanager
+    def reloaded_guard(_binding: SecurityCoverageReceiptBinding):
+        yield reloaded
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
+        reloaded_guard,
+    )
+
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="normalized evidence changed after it was loaded",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_alerts_by_name=loaded.entries_by_full_name,
+            security_coverage_metadata=metadata,
+            security_receipt_binding=binding,
+            now=now,
+        )
+
+    assert registry_output.read_text() == "sentinel-registry\n"
+    assert report_output.read_text() == "sentinel-report\n"
+    assert not (output_dir / "portfolio-truth-latest.json").exists()
+    assert not list(output_dir.glob("portfolio-truth-*.json"))
+
+
 def test_publish_requires_producer_evidence_before_touching_outputs(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
