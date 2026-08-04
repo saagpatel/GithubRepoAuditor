@@ -437,6 +437,7 @@
           "head": "f0880b359ae6df38b4ea8eae386c6eca43085e5cfe95ccb0814289e3427cbac2",
           "path": "/demo-workspace/lab/quartz-signal",
           "upstream": "origin/main",
+          "upstream_branch": "main",
           "upstream_observation_source": "local_tracking_ref"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
@@ -477,6 +478,7 @@
             "path": "/demo-workspace/lab/quartz-signal",
             "state": "observed",
             "upstream": "origin/main",
+            "upstream_branch": "main",
             "upstream_observation_source": "local_tracking_ref"
           }
         ]
@@ -778,6 +780,7 @@
           "head": "f88738445f00c41b9915812a478d50676b4a5a3a9902d61950cc26be60d266d4",
           "path": "/demo-workspace/lab/solstice-cairn",
           "upstream": "origin/main",
+          "upstream_branch": "main",
           "upstream_observation_source": "local_tracking_ref"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
@@ -813,6 +816,7 @@
             "path": "/demo-workspace/lab/solstice-cairn",
             "state": "observed",
             "upstream": "origin/main",
+            "upstream_branch": "main",
             "upstream_observation_source": "local_tracking_ref"
           }
         ]
@@ -1065,6 +1069,7 @@
           "head": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
           "path": "/demo-workspace/platform/dovetail-forge",
           "upstream": "origin/main",
+          "upstream_branch": "main",
           "upstream_observation_source": "local_tracking_ref"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
@@ -1108,6 +1113,7 @@
             "path": "/demo-workspace/platform/dovetail-forge",
             "state": "observed",
             "upstream": "origin/main",
+            "upstream_branch": "main",
             "upstream_observation_source": "local_tracking_ref"
           }
         ]
@@ -1422,6 +1428,7 @@
           "head": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
           "path": "/demo-workspace/studio/kestrel-loom",
           "upstream": "origin/main",
+          "upstream_branch": "main",
           "upstream_observation_source": "local_tracking_ref"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
@@ -1465,6 +1472,7 @@
             "path": "/demo-workspace/studio/kestrel-loom",
             "state": "observed",
             "upstream": "origin/main",
+            "upstream_branch": "main",
             "upstream_observation_source": "local_tracking_ref"
           }
         ]

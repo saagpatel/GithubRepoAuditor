@@ -682,6 +682,7 @@ def _repository_state(
         "dirty": False,
         "dirty_path_count": 0,
         "upstream": "origin/main",
+        "upstream_branch": "main",
         "upstream_observation_source": "local_tracking_ref",
         "ahead": 0,
         "behind": 0,
