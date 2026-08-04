@@ -35,7 +35,10 @@ from src.portfolio_truth_validate import (
     validate_truth_snapshot,
     validate_truth_snapshot_payload,
 )
-from src.producer_preflight import ProducerEvidence
+from src.producer_preflight import (
+    ProducerEvidence,
+    producer_evidence_receipt_id,
+)
 
 
 def test_committed_contract_artifacts_match_the_deterministic_generator() -> None:
@@ -193,6 +196,43 @@ def test_observed_provider_requires_response_bound_reason() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+def test_kestrel_rejects_coherently_fabricated_not_found_reason() -> None:
+    fixture = build_contract_fixture()
+    kestrel = next(
+        project
+        for project in fixture["projects"]
+        if project["identity"]["display_name"] == "Kestrel Loom"
+    )
+    provider = kestrel["security"]["providers"]["code_scanning"]
+    assert (provider["state"], provider["http_status"]) == ("not_found", 404)
+    provider["reason"] = "fabricated_reason"
+    provider["http_classification"] = "fabricated_reason"
+
+    with pytest.raises(ValueError, match="producer reason domain"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_kestrel_rejects_fabricated_partial_remote_reason() -> None:
+    fixture = build_contract_fixture()
+    kestrel = next(
+        project
+        for project in fixture["projects"]
+        if project["identity"]["display_name"] == "Kestrel Loom"
+    )
+    remote = kestrel["repository_state"]["remote_default_branch"]
+    remote.update(
+        state="partial",
+        reason_code="default_branch_head_unavailable",
+        reason="fabricated_reason",
+        default_branch=None,
+        head_sha=None,
+        archived=False,
+    )
+
+    with pytest.raises(ValueError, match="producer reason domain"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def test_contract_fixture_uses_the_shared_producer_coverage_envelope() -> None:
     fixture = build_contract_fixture()
 
@@ -269,6 +309,14 @@ def test_generic_snapshot_validation_rejects_synthetic_mixed_receipt_batch() -> 
 def test_contract_rejects_tampered_synthetic_matrix_marker() -> None:
     fixture = build_contract_fixture()
     fixture["contract_fixture"]["deterministic"] = False
+
+    with pytest.raises(ValueError, match="source time is inconsistent"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_matrix_marker_does_not_auto_enable_with_producer_evidence() -> None:
+    fixture = build_contract_fixture()
+    fixture["producer"] = _valid_producer_evidence()
 
     with pytest.raises(ValueError, match="source time is inconsistent"):
         validate_truth_snapshot_payload(fixture)
@@ -410,6 +458,21 @@ def test_contract_validation_rejects_top_level_envelope_drift(
         validate_truth_snapshot_payload(fixture)
 
 
+@pytest.mark.parametrize(
+    ("reason", "count"),
+    (("fabricated", 1), ("scratch-container", 0)),
+)
+def test_contract_rejects_nonproducer_exclusion_counts(
+    reason: str,
+    count: int,
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["exclusions"]["counts"] = {reason: count}
+
+    with pytest.raises(ValueError, match="exclusion counts"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def test_contract_validation_rejects_cross_envelope_notion_drift() -> None:
     fixture = build_contract_fixture()
     observed_at = (GENERATED_AT - timedelta(hours=1)).isoformat()
@@ -453,7 +516,7 @@ def test_contract_rejects_partial_github_security_input(
     fixture = build_contract_fixture()
     fixture["inputs"]["github_security"] = github_security
 
-    with pytest.raises(ValueError, match="GitHub security input fields"):
+    with pytest.raises(ValueError, match="GitHub security input"):
         validate_truth_snapshot_payload(fixture)
 
 
@@ -465,7 +528,17 @@ def test_contract_requires_github_security_input_for_receipt_rows() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+@pytest.mark.parametrize("missing", ("receipt_id", "content_sha256"))
+def test_portable_contract_requires_security_receipt_binding(missing: str) -> None:
+    fixture = build_contract_fixture()
+    fixture["inputs"]["github_security"].pop(missing)
+
+    with pytest.raises(ValueError, match="requires both receipt_id"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def _valid_producer_evidence() -> dict[str, object]:
+    verified_at = GENERATED_AT.isoformat()
     return ProducerEvidence(
         repository="saagpatel/GithubRepoAuditor",
         commit="a" * 40,
@@ -475,7 +548,14 @@ def _valid_producer_evidence() -> dict[str, object]:
         worktree_clean=True,
         dirty_path_count=0,
         verified_at=GENERATED_AT,
-        receipt_id="sha256:" + "b" * 64,
+        receipt_id=producer_evidence_receipt_id(
+            repository="saagpatel/GithubRepoAuditor",
+            commit="a" * 40,
+            ref="refs/heads/main",
+            checkout_role="canonical-producer",
+            checkout_path="/demo-workspace/producer",
+            verified_at=verified_at,
+        ),
     ).to_dict()
 
 
@@ -483,7 +563,7 @@ def test_contract_accepts_canonical_producer_evidence_shape() -> None:
     fixture = build_contract_fixture()
     fixture["producer"] = _valid_producer_evidence()
 
-    validate_truth_snapshot_payload(fixture)
+    validate_truth_snapshot_payload(fixture, allow_synthetic_security_matrix=True)
 
 
 def test_contract_rejects_future_producer_evidence() -> None:
@@ -492,7 +572,9 @@ def test_contract_rejects_future_producer_evidence() -> None:
     fixture["producer"]["verified_at"] = (GENERATED_AT + timedelta(seconds=1)).isoformat()
 
     with pytest.raises(ValueError, match="future-dated"):
-        validate_truth_snapshot_payload(fixture)
+        validate_truth_snapshot_payload(
+            fixture, allow_synthetic_security_matrix=True
+        )
 
 
 def test_contract_binds_github_security_commit_to_producer_evidence() -> None:
@@ -508,10 +590,14 @@ def test_contract_binds_github_security_commit_to_producer_evidence() -> None:
         "cohort_policy": "portfolio-default-attention-v1",
         "cohort_repository_count": 2,
         "path": "/demo-workspace/github-security.json",
+        "receipt_id": "sha256:" + "b" * 64,
+        "content_sha256": "b" * 64,
     }
 
     with pytest.raises(ValueError, match="differs from producer evidence"):
-        validate_truth_snapshot_payload(fixture)
+        validate_truth_snapshot_payload(
+            fixture, allow_synthetic_security_matrix=True
+        )
 
 
 @pytest.mark.parametrize(
@@ -536,7 +622,9 @@ def test_contract_rejects_malformed_producer_evidence(
     mutation(fixture["producer"])
 
     with pytest.raises(ValueError, match=message):
-        validate_truth_snapshot_payload(fixture)
+        validate_truth_snapshot_payload(
+            fixture, allow_synthetic_security_matrix=True
+        )
 
 
 def test_contract_rejects_forged_supplementary_project_key() -> None:
@@ -1356,6 +1444,14 @@ def test_portable_repository_state_rejects_private_observation_failure_reason() 
         (
             ("repository_state", "remote_default_branch", "reason"),
             r"C:\Users\d\private-reason",
+        ),
+        (
+            ("repository_state", "remote_default_branch", "reason"),
+            "/private/var/folders/zz/private-reason",
+        ),
+        (
+            ("repository_state", "remote_default_branch", "reason"),
+            r"C:\Documents and Settings\d\private-reason",
         ),
         (("declared", "notes"), "owner@example.com"),
         (("declared", "notes"), "owner@localhost"),

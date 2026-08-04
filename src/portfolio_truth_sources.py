@@ -107,6 +107,19 @@ ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"
 
 
 WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
+WORKSPACE_EXCLUSION_REASONS = frozenset(
+    {
+        "backup-container",
+        "generated-evidence",
+        "generated-reports",
+        "linked-worktree-container",
+        "nested-content",
+        "operator-excluded",
+        "preserved-artifacts",
+        "scratch-container",
+        "temporary-checkout",
+    }
+)
 MAX_NOTION_SNAPSHOT_AGE_HOURS = 30
 
 

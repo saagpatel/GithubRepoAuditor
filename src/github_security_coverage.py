@@ -94,6 +94,60 @@ _REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _RECEIPT_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+_PROVIDER_NOT_REQUESTED_REASONS = frozenset(
+    {
+        "authentication_missing",
+        "base_request_limit",
+        "collection_halted",
+        "fixture_not_requested",
+        "quota_reserve",
+        "quota_reserve_before_pagination_complete",
+        "rate_limited",
+        "total_request_limit",
+    }
+)
+_REMOTE_REASON_DOMAINS = {
+    "observed": frozenset({None}),
+    "partial": frozenset({"default_branch_head_unavailable"}),
+    "not_requested": frozenset(
+        {
+            "authentication_missing",
+            "base_request_limit",
+            "quota_reserve",
+            "rate_limited",
+            "remote_observation_not_in_receipt",
+            "total_request_limit",
+        }
+    ),
+    "credential_unavailable": frozenset(
+        {
+            "github_authentication_missing",
+            "github_graphql_authentication_missing",
+        }
+    ),
+    "forbidden": frozenset(
+        {"github_forbidden", "github_graphql_forbidden"}
+    ),
+    "not_found": frozenset(
+        {"github_graphql_repository_not_found", "repository_not_returned"}
+    ),
+    "rate_limited": frozenset(
+        {"github_graphql_rate_limited", "github_rate_limit"}
+    ),
+    "transient_error": frozenset({"network_error"}),
+    "malformed": frozenset(
+        {
+            "github_gone",
+            "github_graphql_error",
+            "github_not_found",
+            "non_object_payload",
+            "repository_archived_state_invalid",
+            "repository_identity_mismatch",
+        }
+    ),
+    "stale": frozenset({"receipt_stale"}),
+}
+
 
 def _valid_git_oid(value: Any) -> bool:
     """Return whether *value* is a nonzero full lowercase SHA-1 or SHA-256 id."""
@@ -442,6 +496,150 @@ def _remote_reason_code(state: str) -> str:
     }[state]
 
 
+def _validate_provider_reason_domain(
+    provider: str,
+    *,
+    state: str,
+    http_status: int | None,
+    reason: str | None,
+    conditional_result: str,
+) -> None:
+    valid = False
+    if state in {"observed", "stale"}:
+        return
+    if state == "not_requested":
+        valid = reason in _PROVIDER_NOT_REQUESTED_REASONS
+    elif state == "credential_unavailable":
+        valid = reason == "github_authentication_missing"
+    elif state == "forbidden":
+        valid = reason == "github_forbidden"
+    elif state == "feature_unavailable":
+        valid = (
+            provider == "code_scanning"
+            and http_status == 403
+            and reason == "code_scanning_not_enabled"
+        ) or (
+            provider in {"code_scanning", "secret_scanning"}
+            and http_status == 200
+            and reason == ELIGIBILITY_REASON
+        )
+    elif state == "not_found":
+        valid = reason == "github_not_found"
+    elif state == "gone":
+        valid = reason == "github_gone"
+    elif state == "rate_limited":
+        valid = reason == "github_rate_limit"
+    elif state == "transient_error":
+        valid = reason == "network_error" if http_status is None else (
+            http_status >= 500 and reason == f"github_http_{http_status}"
+        )
+    elif state == "malformed":
+        valid = (
+            http_status == 200
+            and reason == "non_list_or_invalid_alert_payload"
+            and conditional_result == "malformed"
+        ) or (
+            http_status == 304
+            and reason == "conditional_response_without_observed_prior"
+            and conditional_result == "invalid_prior"
+        ) or (
+            http_status is not None
+            and http_status < 500
+            and http_status not in {200, 304, 401, 403, 404, 410, 429}
+            and reason == f"unexpected_http_{http_status}"
+        )
+    if not valid:
+        raise SecurityCoverageError(
+            f"{provider}.{state} reason is outside the producer reason domain"
+        )
+
+
+def _validate_remote_reason_domain(state: str, reason: Any) -> None:
+    domain = _REMOTE_REASON_DOMAINS[state]
+    valid = reason in domain
+    if state == "transient_error" and isinstance(reason, str):
+        match = re.fullmatch(r"github_http_(\d+)", reason)
+        valid = valid or (match is not None and int(match.group(1)) >= 500)
+    elif state == "malformed" and isinstance(reason, str):
+        match = re.fullmatch(r"unexpected_http_(-?\d+)", reason)
+        valid = valid or (
+            match is not None
+            and int(match.group(1)) < 500
+            and int(match.group(1))
+            not in {200, 304, 401, 403, 404, 410, 429}
+        )
+    if not valid:
+        raise SecurityCoverageError(
+            f"repository.{state} reason is outside the producer reason domain"
+        )
+
+
+def _validate_normalized_remote_repository(value: dict[str, Any]) -> None:
+    required = {
+        "source",
+        "state",
+        "reason_code",
+        "reason",
+        "observed_at",
+        "default_branch",
+        "head_sha",
+        "archived",
+    }
+    if set(value) != required:
+        raise SecurityCoverageError(
+            "normalized repository observation fields are invalid"
+        )
+    if value.get("source") != REMOTE_REPOSITORY_SOURCE:
+        raise SecurityCoverageError("repository observation source is invalid")
+    state = _text(value.get("state"))
+    if state not in REMOTE_REPOSITORY_STATES:
+        raise SecurityCoverageError(
+            f"repository observation state is invalid: {state!r}"
+        )
+    if value.get("reason_code") != _remote_reason_code(state):
+        raise SecurityCoverageError(
+            "repository observation reason_code does not match state"
+        )
+    _validate_remote_reason_domain(state, value.get("reason"))
+
+    observed_at = value.get("observed_at")
+    if observed_at is not None:
+        _parse_datetime(observed_at, field_name="repository.observed_at")
+    default_branch = value.get("default_branch")
+    head_sha = value.get("head_sha")
+    archived = value.get("archived")
+    if state == "observed":
+        if observed_at is None:
+            raise SecurityCoverageError(
+                "repository.observed_at is required when observed"
+            )
+        if not _valid_git_branch(default_branch):
+            raise SecurityCoverageError(
+                "repository.default_branch is invalid when observed"
+            )
+        if not _valid_git_oid(head_sha):
+            raise SecurityCoverageError(
+                "repository.head_sha is invalid when observed"
+            )
+        if not isinstance(archived, bool):
+            raise SecurityCoverageError(
+                "repository.archived must be boolean when observed"
+            )
+    elif state == "partial":
+        if observed_at is None or not isinstance(archived, bool):
+            raise SecurityCoverageError(
+                "partial repository observation requires timestamp and archived state"
+            )
+        if default_branch is not None or head_sha is not None:
+            raise SecurityCoverageError(
+                "partial repository observation cannot claim branch or head"
+            )
+    elif any(item is not None for item in (default_branch, head_sha, archived)):
+        raise SecurityCoverageError(
+            "unobserved repository state cannot claim remote values"
+        )
+
+
 def _provider_result(
     provider: str,
     *,
@@ -611,6 +809,13 @@ def validate_normalized_security_provider(
         raise SecurityCoverageError(f"{provider}.reason must be a string or null")
     if state not in {"observed", "stale"} and not _text(reason):
         raise SecurityCoverageError(f"{provider}.reason is required for {state}")
+    _validate_provider_reason_domain(
+        provider,
+        state=state,
+        http_status=http_status,
+        reason=reason,
+        conditional_result=conditional["result"],
+    )
     for field_name in ("etag", "last_modified"):
         field_value = value.get(field_name)
         if field_value is not None and not isinstance(field_value, str):
@@ -1284,7 +1489,7 @@ def _remote_repository_result(
 ) -> dict[str, Any]:
     if state not in REMOTE_REPOSITORY_STATES:
         raise SecurityCoverageError(f"invalid remote repository state: {state}")
-    return {
+    result = {
         "source": REMOTE_REPOSITORY_SOURCE,
         "state": state,
         "reason_code": _remote_reason_code(state),
@@ -1294,6 +1499,8 @@ def _remote_repository_result(
         "head_sha": head_sha if state == "observed" else None,
         "archived": archived if state in {"observed", "partial"} else None,
     }
+    _validate_normalized_remote_repository(result)
+    return result
 
 
 def _remote_failure_results(
@@ -1471,7 +1678,7 @@ def _collect_remote_repository_observations(
                 observed_at=now_iso,
                 reason="repository_archived_state_invalid",
             )
-        elif not default_branch or not re.fullmatch(r"[0-9a-f]{40,64}", head_sha):
+        elif not _valid_git_branch(default_branch) or not _valid_git_oid(head_sha):
             results[expected_repo] = _remote_repository_result(
                 state="partial",
                 observed_at=now_iso,
@@ -2065,6 +2272,7 @@ def _validate_remote_repository(
         raise SecurityCoverageError(
             "unobserved repository state cannot claim remote values"
         )
+    _validate_remote_reason_domain(state, data.get("reason"))
 
     if state in {"observed", "partial"} and observed_at is not None:
         observation_age_hours = (current - observed_at).total_seconds() / 3600
@@ -2073,7 +2281,7 @@ def _validate_remote_repository(
             default_branch = None
             head_sha = None
             archived = None
-    return {
+    normalized = {
         "source": REMOTE_REPOSITORY_SOURCE,
         "state": state,
         "reason_code": _remote_reason_code(state),
@@ -2083,6 +2291,8 @@ def _validate_remote_repository(
         "head_sha": head_sha,
         "archived": archived,
     }
+    _validate_normalized_remote_repository(normalized)
+    return normalized
 
 
 def validate_security_coverage_receipt(

@@ -110,13 +110,180 @@ def test_normalized_provider_state_fixture_matches_production_constructor(
     state: str,
 ) -> None:
     assert set(NORMALIZED_PROVIDER_STATE_FIXTURES) == set(PROVIDER_STATES)
+    provider_name = "code_scanning" if state == "feature_unavailable" else "dependabot"
     provider = _provider_result(
-        "dependabot",
+        provider_name,
         state=state,
         **NORMALIZED_PROVIDER_STATE_FIXTURES[state],
     )
 
-    assert validate_normalized_security_provider("dependabot", provider) == provider
+    assert validate_normalized_security_provider(provider_name, provider) == provider
+
+
+@pytest.mark.parametrize(
+    ("provider", "state", "kwargs"),
+    (
+        *(
+            ("dependabot", "not_requested", {"reason": reason})
+            for reason in (
+                "authentication_missing",
+                "base_request_limit",
+                "collection_halted",
+                "fixture_not_requested",
+                "quota_reserve",
+                "rate_limited",
+                "total_request_limit",
+            )
+        ),
+        (
+            "dependabot",
+            "not_requested",
+            {
+                "observed_at": NOW.isoformat(),
+                "reason": "quota_reserve_before_pagination_complete",
+                "conditional_request": True,
+                "conditional_result": "incomplete",
+            },
+        ),
+        (
+            "dependabot",
+            "credential_unavailable",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 401,
+                "reason": "github_authentication_missing",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "dependabot",
+            "forbidden",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 403,
+                "reason": "github_forbidden",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "code_scanning",
+            "feature_unavailable",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 403,
+                "reason": "code_scanning_not_enabled",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "secret_scanning",
+            "feature_unavailable",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 200,
+                "http_classification": "eligibility",
+                "reason": "private_user_repo_plan_unavailable",
+            },
+        ),
+        (
+            "dependabot",
+            "not_found",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 404,
+                "reason": "github_not_found",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "dependabot",
+            "gone",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 410,
+                "reason": "github_gone",
+                "conditional_result": "failed",
+            },
+        ),
+        *(
+            (
+                "dependabot",
+                "rate_limited",
+                {
+                    "observed_at": NOW.isoformat(),
+                    "http_status": status,
+                    "reason": "github_rate_limit",
+                    "conditional_result": "failed",
+                },
+            )
+            for status in (403, 429)
+        ),
+        (
+            "dependabot",
+            "transient_error",
+            {
+                "observed_at": NOW.isoformat(),
+                "reason": "network_error",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "dependabot",
+            "transient_error",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 503,
+                "reason": "github_http_503",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "dependabot",
+            "malformed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 304,
+                "reason": "conditional_response_without_observed_prior",
+                "conditional_request": True,
+                "conditional_result": "invalid_prior",
+            },
+        ),
+        (
+            "dependabot",
+            "malformed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 418,
+                "reason": "unexpected_http_418",
+                "conditional_result": "failed",
+            },
+        ),
+    ),
+)
+def test_production_provider_reason_matrix_is_constructor_validated(
+    provider: str,
+    state: str,
+    kwargs: dict[str, Any],
+) -> None:
+    result = _provider_result(provider, state=state, **kwargs)
+
+    assert validate_normalized_security_provider(provider, result) == result
+
+
+def test_provider_rejects_coherently_fabricated_failure_reason() -> None:
+    provider = _provider_result(
+        "code_scanning",
+        state="not_found",
+        observed_at=NOW.isoformat(),
+        http_status=404,
+        reason="github_not_found",
+        conditional_result="failed",
+    )
+    provider["reason"] = "fabricated_reason"
+    provider["http_classification"] = "fabricated_reason"
+
+    with pytest.raises(SecurityCoverageError, match="producer reason domain"):
+        validate_normalized_security_provider("code_scanning", provider)
 
 
 @pytest.mark.parametrize(
@@ -420,7 +587,7 @@ def _remote_graphql_response(count: int) -> _Response:
             "isArchived": False,
             "defaultBranchRef": {
                 "name": "main",
-                "target": {"oid": f"{index:040x}"},
+                "target": {"oid": f"{index + 1:040x}"},
             },
         }
         for index in range(count)
@@ -638,6 +805,50 @@ def test_remote_repository_accepts_canonical_git_tokens(
         loaded.entries_by_full_name["owner/repo-00"]["repository"]["head_sha"]
         == head_sha
     )
+
+
+@pytest.mark.parametrize(
+    ("state", "reason"),
+    (
+        ("partial", "default_branch_head_unavailable"),
+        ("not_requested", "authentication_missing"),
+        ("not_requested", "base_request_limit"),
+        ("not_requested", "quota_reserve"),
+        ("not_requested", "rate_limited"),
+        ("not_requested", "remote_observation_not_in_receipt"),
+        ("not_requested", "total_request_limit"),
+        ("credential_unavailable", "github_authentication_missing"),
+        ("credential_unavailable", "github_graphql_authentication_missing"),
+        ("forbidden", "github_forbidden"),
+        ("forbidden", "github_graphql_forbidden"),
+        ("not_found", "github_graphql_repository_not_found"),
+        ("not_found", "repository_not_returned"),
+        ("rate_limited", "github_graphql_rate_limited"),
+        ("rate_limited", "github_rate_limit"),
+        ("transient_error", "network_error"),
+        ("transient_error", "github_http_503"),
+        ("malformed", "github_gone"),
+        ("malformed", "github_graphql_error"),
+        ("malformed", "github_not_found"),
+        ("malformed", "non_object_payload"),
+        ("malformed", "repository_archived_state_invalid"),
+        ("malformed", "repository_identity_mismatch"),
+        ("malformed", "unexpected_http_418"),
+        ("stale", "receipt_stale"),
+    ),
+)
+def test_production_remote_reason_matrix_is_constructor_validated(
+    state: str,
+    reason: str,
+) -> None:
+    result = _remote_repository_result(
+        state=state,
+        reason=reason,
+        observed_at=NOW.isoformat() if state != "not_requested" else None,
+        archived=False if state == "partial" else None,
+    )
+
+    assert result["reason"] == reason
 
 
 @pytest.mark.parametrize(

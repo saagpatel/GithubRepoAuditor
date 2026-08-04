@@ -11,6 +11,7 @@ from src.producer_preflight import (
     ProducerEvidence,
     inspect_canonical_producer,
     load_producer_evidence,
+    producer_evidence_receipt_id,
     verify_evidence_still_current,
 )
 
@@ -100,6 +101,15 @@ def test_evidence_rejects_head_change(tmp_path: Path) -> None:
 
 def test_load_producer_evidence_accepts_passing_receipt(tmp_path: Path) -> None:
     path = tmp_path / "producer.json"
+    verified_at = "2026-07-10T12:00:00Z"
+    receipt_id = producer_evidence_receipt_id(
+        repository="saagpatel/GithubRepoAuditor",
+        commit="a" * 40,
+        ref="refs/remotes/origin/main",
+        checkout_role="canonical-automation",
+        checkout_path=str(tmp_path / "producer-repo"),
+        verified_at=verified_at,
+    )
     path.write_text(
         __import__("json").dumps(
             {
@@ -112,8 +122,8 @@ def test_load_producer_evidence_accepts_passing_receipt(tmp_path: Path) -> None:
                 "checkout_path": str(tmp_path / "producer-repo"),
                 "worktree_clean": True,
                 "dirty_path_count": 0,
-                "verified_at": "2026-07-10T12:00:00Z",
-                "receipt_id": "sha256:" + "a" * 64,
+                "verified_at": verified_at,
+                "receipt_id": receipt_id,
                 "checks": {},
             }
         )
@@ -123,6 +133,61 @@ def test_load_producer_evidence_accepts_passing_receipt(tmp_path: Path) -> None:
 
     assert evidence.commit == "a" * 40
     assert evidence.verified_at.tzinfo is not None
+    assert evidence.to_dict()["verified_at"] == verified_at
+    assert evidence.to_dict()["receipt_id"] == receipt_id
+
+
+def test_producer_evidence_preserves_non_utc_serialized_timestamp() -> None:
+    verified_at = "2026-07-10T17:30:00+05:30"
+    payload = {
+        "repository": "saagpatel/GithubRepoAuditor",
+        "commit": "a" * 40,
+        "ref": "refs/remotes/origin/main",
+        "checkout_role": "canonical-automation",
+        "checkout_path": "/demo-workspace/producer",
+        "worktree_clean": True,
+        "dirty_path_count": 0,
+        "verified_at": verified_at,
+        "receipt_id": producer_evidence_receipt_id(
+            repository="saagpatel/GithubRepoAuditor",
+            commit="a" * 40,
+            ref="refs/remotes/origin/main",
+            checkout_role="canonical-automation",
+            checkout_path="/demo-workspace/producer",
+            verified_at=verified_at,
+        ),
+    }
+
+    evidence = ProducerEvidence.from_dict(payload)
+
+    assert evidence.to_dict() == payload
+    assert evidence.verified_at.utcoffset().total_seconds() == 0
+
+
+def test_producer_evidence_rejects_receipt_after_repository_tamper() -> None:
+    verified_at = "2026-07-10T12:00:00+00:00"
+    payload = {
+        "repository": "saagpatel/GithubRepoAuditor",
+        "commit": "a" * 40,
+        "ref": "refs/remotes/origin/main",
+        "checkout_role": "canonical-automation",
+        "checkout_path": "/demo-workspace/producer",
+        "worktree_clean": True,
+        "dirty_path_count": 0,
+        "verified_at": verified_at,
+        "receipt_id": producer_evidence_receipt_id(
+            repository="saagpatel/GithubRepoAuditor",
+            commit="a" * 40,
+            ref="refs/remotes/origin/main",
+            checkout_role="canonical-automation",
+            checkout_path="/demo-workspace/producer",
+            verified_at=verified_at,
+        ),
+    }
+    payload["repository"] = "attacker/other-repository"
+
+    with pytest.raises(ValueError, match="receipt_id does not match"):
+        ProducerEvidence.from_dict(payload)
 
 
 def test_load_producer_evidence_rejects_nonpassing_receipt(tmp_path: Path) -> None:

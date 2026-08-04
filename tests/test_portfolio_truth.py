@@ -3247,9 +3247,14 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     from types import SimpleNamespace
 
     from src.app.portfolio_truth import run_portfolio_truth_mode
-    from src.producer_preflight import PREFLIGHT_SCHEMA_VERSION
+    from src.producer_preflight import (
+        PREFLIGHT_SCHEMA_VERSION,
+        producer_evidence_receipt_id,
+    )
 
     receipt = tmp_path / "producer.json"
+    checkout_path = str(tmp_path / "producer-repo")
+    verified_at = "2026-07-10T12:00:00Z"
     receipt.write_text(
         json.dumps(
             {
@@ -3259,11 +3264,18 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
                 "commit": "a" * 40,
                 "ref": "refs/remotes/origin/main",
                 "checkout_role": "canonical-automation",
-                "checkout_path": str(tmp_path / "producer-repo"),
+                "checkout_path": checkout_path,
                 "worktree_clean": True,
                 "dirty_path_count": 0,
-                "verified_at": "2026-07-10T12:00:00Z",
-                "receipt_id": "sha256:" + "a" * 64,
+                "verified_at": verified_at,
+                "receipt_id": producer_evidence_receipt_id(
+                    repository="saagpatel/GithubRepoAuditor",
+                    commit="a" * 40,
+                    ref="refs/remotes/origin/main",
+                    checkout_role="canonical-automation",
+                    checkout_path=checkout_path,
+                    verified_at=verified_at,
+                ),
                 "checks": {},
             }
         )

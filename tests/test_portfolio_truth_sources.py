@@ -12,6 +12,7 @@ import subprocess
 from datetime import datetime, timezone
 
 from src.portfolio_truth_sources import (
+    WORKSPACE_EXCLUSION_REASONS,
     _dedupe_checkouts_by_origin,
     _is_ignored_project_dir,
     discover_workspace_projects,
@@ -118,6 +119,26 @@ def test_ignore_predicate_matches_transient_dirs() -> None:
     assert workspace_exclusion_reason("packets") is None
     assert workspace_exclusion_reason("packets", nested=True) == "nested-content"
     assert workspace_exclusion_reason("prompts", nested=True) == "nested-content"
+
+
+def test_workspace_exclusion_reason_domain_matches_every_policy_branch() -> None:
+    cases = (
+        ("Codex Backups", False),
+        ("_preserved-local-artifacts", False),
+        ("scratch", False),
+        ("sweep-reports", False),
+        ("_fable-worktrees", False),
+        ("packets", True),
+        ("Misc:NoGoPRJs", False),
+        ("auraforge-smoke-export", False),
+        ("repo-tmp-1776063720", False),
+    )
+    observed = {
+        workspace_exclusion_reason(name, nested=nested)
+        for name, nested in cases
+    }
+
+    assert observed == WORKSPACE_EXCLUSION_REASONS
 
 
 def test_ignore_predicate_keeps_real_projects() -> None:

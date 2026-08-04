@@ -41,6 +41,7 @@ from src.portfolio_truth_metadata import (
 )
 from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
 from src.portfolio_truth_render import registry_project_labels
+from src.portfolio_truth_sources import WORKSPACE_EXCLUSION_REASONS
 from src.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
     SCHEMA_VERSION,
@@ -652,10 +653,10 @@ def _validate_snapshot_exclusions(exclusions: Any) -> None:
     counts = exclusions.get("counts")
     if not isinstance(counts, dict) or any(
         not isinstance(key, str)
-        or not key
+        or key not in WORKSPACE_EXCLUSION_REASONS
         or not isinstance(value, int)
         or isinstance(value, bool)
-        or value < 0
+        or value <= 0
         for key, value in counts.items()
     ):
         raise ValueError("PortfolioTruth exclusion counts are invalid.")
@@ -1484,7 +1485,21 @@ def validate_truth_snapshot_payload(
                 "synthetic-cross-receipt-state-matrix"
             ),
         }
+        and payload.get("producer") == {}
     )
+    github_security = (
+        payload.get("inputs", {}).get("github_security")
+        if isinstance(payload.get("inputs"), Mapping)
+        else None
+    )
+    if isinstance(github_security, Mapping) and (
+        github_security.get("receipt_id") is None
+        or github_security.get("content_sha256") is None
+    ):
+        raise ValueError(
+            "Portable PortfolioTruth GitHub security input requires both receipt_id "
+            "and content_sha256."
+        )
     canonical = canonicalize_truth_snapshot_payload(
         payload,
         security_max_age_hours=security_max_age_hours,
@@ -1555,6 +1570,18 @@ def _contains_private_identity(value: Any) -> bool:
         return (
             re.search(
                 r"(?:^|[/\\])(?:users|home|root)[/\\]", value, re.IGNORECASE
+            )
+            is not None
+            or re.search(
+                r"(?:^|[/\\])private[/\\]var[/\\]folders(?:[/\\]|$)",
+                value,
+                re.IGNORECASE,
+            )
+            is not None
+            or re.search(
+                r"(?:^|[/\\])documents and settings[/\\]",
+                value,
+                re.IGNORECASE,
             )
             is not None
             or re.search(
