@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import Iterator
 
 from src.github_security_coverage import (
+    DEFAULT_ATTENTION_STATES,
     SecurityCoverageError,
     SecurityCoverageReceiptBinding,
+    derive_default_attention_cohort,
     verified_security_coverage_receipt_binding,
 )
 from src.portfolio_truth_reconcile import (
@@ -55,6 +57,7 @@ class _PriorSecurityEvidence:
     path: Path
     content_sha256: str | None
     alerts_by_full_name: dict[str, dict]
+    final_cohort_repositories: tuple[str, ...] | None
 
 
 class PortfolioTruthPublishError(RuntimeError):
@@ -79,7 +82,7 @@ def _load_prior_security_alerts(
     current_security_metadata: dict[str, object],
     security_max_age_hours: int,
 ) -> _PriorSecurityEvidence:
-    """Load validated prior receipt evidence for independent cohort derivation."""
+    """Load validated prior receipt and final-cohort evidence."""
     try:
         content = latest_path.read_bytes()
     except FileNotFoundError:
@@ -87,6 +90,7 @@ def _load_prior_security_alerts(
             path=latest_path,
             content_sha256=None,
             alerts_by_full_name={},
+            final_cohort_repositories=None,
         )
     except OSError as exc:
         raise PortfolioTruthPublishError(
@@ -107,6 +111,23 @@ def _load_prior_security_alerts(
         ) from exc
 
     projects = canonical.get("projects") or []
+    prior_final_cohort_count = sum(
+        (project.get("derived") or {}).get("attention_state")
+        in DEFAULT_ATTENTION_STATES
+        and not str((project.get("identity") or {}).get("project_key") or "").startswith(
+            "supp:"
+        )
+        for project in projects
+    )
+    try:
+        final_cohort_repositories = derive_default_attention_cohort(
+            canonical,
+            expected_count=prior_final_cohort_count,
+        )
+    except SecurityCoverageError as exc:
+        raise PortfolioTruthPublishError(
+            f"Prior PortfolioTruth final security cohort is invalid: {exc}"
+        ) from exc
     receipt_projects = [
         project
         for project in projects
@@ -158,6 +179,7 @@ def _load_prior_security_alerts(
         path=latest_path,
         content_sha256=hashlib.sha256(content).hexdigest(),
         alerts_by_full_name=alerts,
+        final_cohort_repositories=final_cohort_repositories,
     )
 
 
@@ -402,6 +424,11 @@ def _publish_portfolio_truth_locked(
         security_coverage_metadata=security_coverage_metadata,
         prior_security_alerts_by_name=(
             prior_security_evidence.alerts_by_full_name
+            if prior_security_evidence is not None
+            else None
+        ),
+        prior_security_cohort_repositories=(
+            prior_security_evidence.final_cohort_repositories
             if prior_security_evidence is not None
             else None
         ),

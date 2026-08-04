@@ -1771,6 +1771,7 @@ repos:
             security_alerts_by_name=security,
             security_coverage_metadata=metadata,
             prior_security_alerts_by_name=security,
+            prior_security_cohort_repositories=("d/Old",),
         )
 
     catalog_path.write_text(
@@ -1808,6 +1809,7 @@ repos:
             security_alerts_by_name=replacement_security,
             security_coverage_metadata=metadata,
             prior_security_alerts_by_name=security,
+            prior_security_cohort_repositories=("d/Old",),
             repo_status_by_name={
                 "Old": {"source": "github_api", "archived": True}
             },
@@ -2419,6 +2421,151 @@ repos:
                 "Active": {"source": "audit_report", "archived": False}
             },
         )
+
+    confirmed_archive_without_live_status = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
+        security_coverage_metadata=metadata,
+        prior_security_alerts_by_name={
+            "d/Active": receipt_entry(archived=True)
+        },
+        # The prior canonical truth kept this identity in its final cohort because
+        # live GitHub status contradicted the receipt's archive claim.
+        prior_security_cohort_repositories=("d/Active",),
+    )
+    confirmed = confirmed_archive_without_live_status.snapshot.projects[0]
+    assert confirmed.derived.archived is True
+    assert confirmed.derived.attention_state == "archived"
+
+
+def test_receipt_publication_preserves_prior_final_membership_when_live_status_drops(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "Active"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# Active\n\nPrior final cohort fixture.\n")
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Active.git"],
+        cwd=project,
+        capture_output=True,
+        check=True,
+    )
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Active:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+"""
+    )
+
+    def security_entry(observed_at: datetime) -> dict:
+        return {
+            "repo_full_name": "d/Active",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at.isoformat(),
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=observed_at.isoformat(),
+                default_branch="main",
+                head_sha="b" * 40,
+                archived=True,
+            ),
+            "providers": {
+                "dependabot": _provider_result(
+                    "dependabot",
+                    state="observed",
+                    observed_at=observed_at.isoformat(),
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"critical": 0, "high": 0, "medium": 0, "low": 0},
+                ),
+                "code_scanning": _provider_result(
+                    "code_scanning",
+                    state="observed",
+                    observed_at=observed_at.isoformat(),
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"critical": 0, "high": 0, "warning": 0, "note": 0},
+                ),
+                "secret_scanning": _provider_result(
+                    "secret_scanning",
+                    state="observed",
+                    observed_at=observed_at.isoformat(),
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"open": 0},
+                ),
+            },
+        }
+
+    def metadata(observed_at: datetime, marker: str) -> dict:
+        return {
+            "source_id": "github-security-coverage-receipt",
+            "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "produced_at": observed_at.isoformat(),
+            "state": "fresh",
+            "age_hours": 0.0,
+            "producer_commit": "a" * 40,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "cohort_repository_count": 1,
+            "path": f"/evidence/security-{marker}.json",
+            "receipt_id": "sha256:" + marker * 64,
+            "content_sha256": marker * 64,
+        }
+
+    output_dir = tmp_path / "output"
+    registry_output = workspace / "project-registry.md"
+    report_output = workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    first_at = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    first = publish_portfolio_truth(
+        workspace_root=workspace,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=report_output,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=first_at,
+        security_alerts_by_name={"d/Active": security_entry(first_at)},
+        security_coverage_metadata=metadata(first_at, "a"),
+        repo_status_by_name={
+            "Active": {"source": "github_api", "archived": False}
+        },
+    )
+    first_payload = json.loads(first.latest_path.read_text())
+    first_project = first_payload["projects"][0]
+    assert first_project["derived"]["archived"] is False
+    assert first_project["derived"]["attention_state"] == "active-infra"
+    assert first_project["repository_state"]["remote_default_branch"]["archived"] is True
+
+    second_at = first_at + timedelta(hours=1)
+    second = publish_portfolio_truth(
+        workspace_root=workspace,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=report_output,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=second_at,
+        security_alerts_by_name={"d/Active": security_entry(second_at)},
+        security_coverage_metadata=metadata(second_at, "b"),
+    )
+    second_payload = json.loads(second.latest_path.read_text())
+    second_project = second_payload["projects"][0]
+    assert second_project["derived"]["archived"] is True
+    assert second_project["derived"]["attention_state"] == "archived"
 
 
 def test_receipt_publication_uses_bound_prior_risk_for_resolution(

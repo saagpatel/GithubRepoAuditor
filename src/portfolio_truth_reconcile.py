@@ -355,6 +355,29 @@ def _is_verified_security_cohort_departure(
     return observed_resolution or observed_archive
 
 
+def _candidate_prior_security_alerts(
+    prior_security_alerts_by_name: dict[str, dict],
+    prior_security_cohort_repositories: tuple[str, ...] | None,
+) -> dict[str, dict]:
+    """Keep prior final members from being removed by contradicted archive evidence."""
+    if prior_security_cohort_repositories is None:
+        return prior_security_alerts_by_name
+
+    prior_final_members = set(prior_security_cohort_repositories)
+    candidate_alerts: dict[str, dict] = {}
+    for repository, entry in prior_security_alerts_by_name.items():
+        candidate_entry = dict(entry)
+        remote_repository = dict(candidate_entry.get("repository") or {})
+        if (
+            repository in prior_final_members
+            and remote_repository.get("archived") is True
+        ):
+            remote_repository.pop("archived")
+            candidate_entry["repository"] = remote_repository
+        candidate_alerts[repository] = candidate_entry
+    return candidate_alerts
+
+
 def build_portfolio_truth_snapshot(
     *,
     workspace_root: Path,
@@ -367,6 +390,7 @@ def build_portfolio_truth_snapshot(
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, Any] | None = None,
     prior_security_alerts_by_name: dict[str, dict] | None = None,
+    prior_security_cohort_repositories: tuple[str, ...] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
     producer: dict[str, Any] | None = None,
     prior_notion_generated_at: str | None = None,
@@ -429,6 +453,10 @@ def build_portfolio_truth_snapshot(
         ]
 
     prior_security_alerts = prior_security_alerts_by_name or {}
+    candidate_prior_security_alerts = _candidate_prior_security_alerts(
+        prior_security_alerts,
+        prior_security_cohort_repositories,
+    )
     candidate_repo_status_by_name = {
         name: status
         for name, status in (repo_status_by_name or {}).items()
@@ -436,7 +464,7 @@ def build_portfolio_truth_snapshot(
     }
     candidate_projects = (
         materialize_projects(
-            prior_security_alerts,
+            candidate_prior_security_alerts,
             # Current status may only expand candidate membership. A fresh GitHub
             # unarchive therefore forces receipt coverage, while archive status is
             # applied only to the final projects and must be corroborated by the
