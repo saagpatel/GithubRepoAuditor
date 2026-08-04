@@ -29,6 +29,7 @@ from src.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
 )
+from src.producer_preflight import ProducerEvidence, producer_evidence_receipt_id
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_render import (
     render_portfolio_report_markdown,
@@ -2899,6 +2900,8 @@ def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
         expected_producer_commit="a" * 40,
         now=now + timedelta(seconds=1),
     )
+    assert loaded.receipt_id == at_boundary.receipt_id == reloaded.receipt_id
+    assert loaded.content_sha256 == at_boundary.content_sha256 == reloaded.content_sha256
     assert loaded.receipt_state == at_boundary.receipt_state == "fresh"
     assert reloaded.receipt_state == "fresh"
     assert loaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
@@ -2934,15 +2937,64 @@ def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
         "receipt_id": loaded.receipt_id,
         "content_sha256": loaded.content_sha256,
     }
+    producer_repo_root = tmp_path / "producer-repo"
+    verified_at = now.isoformat()
+    producer_evidence = ProducerEvidence(
+        repository="saagpatel/GithubRepoAuditor",
+        expected_repository="saagpatel/GithubRepoAuditor",
+        commit="a" * 40,
+        ref="refs/heads/main",
+        checkout_role="canonical-producer",
+        checkout_path=str(producer_repo_root),
+        worktree_clean=True,
+        dirty_path_count=0,
+        verified_at=now,
+        receipt_id=producer_evidence_receipt_id(
+            repository="saagpatel/GithubRepoAuditor",
+            expected_repository="saagpatel/GithubRepoAuditor",
+            commit="a" * 40,
+            ref="refs/heads/main",
+            checkout_role="canonical-producer",
+            checkout_path=str(producer_repo_root),
+            verified_at=verified_at,
+        ),
+    )
     registry_output = portfolio_workspace / "project-registry.md"
     report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
     registry_output.write_text("sentinel-registry\n")
     report_output.write_text("sentinel-report\n")
 
+    clock = {"now": now}
+    events: list[str] = []
+    verification_count = 0
+
+    def advance_during_final_producer_verification(
+        _repo_root: Path,
+        _evidence: ProducerEvidence,
+    ) -> None:
+        nonlocal verification_count
+        verification_count += 1
+        events.append(f"verify-{verification_count}")
+        if verification_count == 2:
+            clock["now"] = now + timedelta(seconds=1)
+
     @contextmanager
     def reloaded_guard(_binding: SecurityCoverageReceiptBinding):
-        yield reloaded
+        events.append("guard-enter")
+        try:
+            yield load_security_coverage_receipt(
+                receipt_path,
+                expected_cohort_count=1,
+                expected_producer_commit="a" * 40,
+                now=clock["now"],
+            )
+        finally:
+            events.append("guard-exit")
 
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.verify_evidence_still_current",
+        advance_during_final_producer_verification,
+    )
     monkeypatch.setattr(
         "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
         reloaded_guard,
@@ -2963,13 +3015,17 @@ def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
             security_alerts_by_name=loaded.entries_by_full_name,
             security_coverage_metadata=metadata,
             security_receipt_binding=binding,
+            producer_evidence=producer_evidence,
+            producer_repo_root=producer_repo_root,
             now=now,
         )
 
+    assert events == ["verify-1", "verify-2", "guard-enter", "guard-exit"]
     assert registry_output.read_text() == "sentinel-registry\n"
     assert report_output.read_text() == "sentinel-report\n"
     assert not (output_dir / "portfolio-truth-latest.json").exists()
     assert not list(output_dir.glob("portfolio-truth-*.json"))
+    assert not list(output_dir.glob("*.tmp"))
 
 
 def test_publish_requires_producer_evidence_before_touching_outputs(
