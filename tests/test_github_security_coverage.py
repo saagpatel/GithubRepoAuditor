@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -13,12 +14,15 @@ from src.github_security_coverage import (
     DEFAULT_BASE_REQUEST_LIMIT,
     DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     GITHUB_SECURITY_RECEIPT_FILENAME,
+    PROVIDER_STATES,
     SecurityCoverageError,
+    _provider_result,
     collect_security_coverage,
     derive_default_attention_cohort,
     load_security_coverage_receipt,
     main,
     security_coverage_receipt_writer,
+    validate_normalized_security_provider,
     validate_security_coverage_receipt,
     verified_security_coverage_receipt_binding,
     write_security_coverage_receipt,
@@ -35,6 +39,136 @@ OUTCOME_FIXTURES = json.loads(
         / "outcomes.json"
     ).read_text()
 )
+
+NORMALIZED_PROVIDER_STATE_FIXTURES = {
+    "observed": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 200,
+        "pagination_complete": True,
+        "counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    },
+    "not_requested": {"reason": "collection_halted"},
+    "credential_unavailable": {
+        "observed_at": NOW.isoformat(),
+        "reason": "github_authentication_missing",
+    },
+    "forbidden": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 403,
+        "reason": "github_forbidden",
+        "conditional_result": "failed",
+    },
+    "feature_unavailable": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 403,
+        "reason": "code_scanning_not_enabled",
+        "conditional_result": "failed",
+    },
+    "not_found": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 404,
+        "reason": "github_not_found",
+        "conditional_result": "failed",
+    },
+    "gone": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 410,
+        "reason": "github_gone",
+        "conditional_result": "failed",
+    },
+    "rate_limited": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 429,
+        "reason": "github_rate_limit",
+        "conditional_result": "failed",
+    },
+    "transient_error": {
+        "observed_at": NOW.isoformat(),
+        "reason": "network_error",
+        "conditional_result": "failed",
+    },
+    "malformed": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 200,
+        "reason": "non_list_or_invalid_alert_payload",
+        "conditional_result": "malformed",
+    },
+    "stale": {
+        "observed_at": NOW.isoformat(),
+        "http_status": 200,
+        "reason": "receipt_stale",
+        "pagination_complete": True,
+    },
+}
+
+
+@pytest.mark.parametrize("state", sorted(PROVIDER_STATES))
+def test_normalized_provider_state_fixture_matches_production_constructor(
+    state: str,
+) -> None:
+    assert set(NORMALIZED_PROVIDER_STATE_FIXTURES) == set(PROVIDER_STATES)
+    provider = _provider_result(
+        "dependabot",
+        state=state,
+        **NORMALIZED_PROVIDER_STATE_FIXTURES[state],
+    )
+
+    assert validate_normalized_security_provider("dependabot", provider) == provider
+
+
+@pytest.mark.parametrize(
+    ("state", "mutation", "message"),
+    (
+        (
+            "not_found",
+            lambda value: value.update(
+                http_status=200,
+                http_classification="success",
+            ),
+            "not_found requires HTTP 404",
+        ),
+        (
+            "not_found",
+            lambda value: value.pop("conditional"),
+            "missing fields",
+        ),
+        (
+            "stale",
+            lambda value: value.update(observed_at=None),
+            "observed_at is required",
+        ),
+        (
+            "not_found",
+            lambda value: value.update(observed_at="not-a-timestamp"),
+            "observed_at is invalid",
+        ),
+        (
+            "not_found",
+            lambda value: value.update(http_classification="success"),
+            "http_classification",
+        ),
+        (
+            "not_found",
+            lambda value: value.update(pagination_complete=True),
+            "cannot claim complete pagination",
+        ),
+    ),
+)
+def test_normalized_provider_state_machine_rejects_impossible_envelopes(
+    state: str,
+    mutation: Any,
+    message: str,
+) -> None:
+    provider = _provider_result(
+        "dependabot",
+        state=state,
+        **NORMALIZED_PROVIDER_STATE_FIXTURES[state],
+    )
+    tampered = deepcopy(provider)
+    mutation(tampered)
+
+    with pytest.raises(SecurityCoverageError, match=message):
+        validate_normalized_security_provider("dependabot", tampered)
 
 
 def _truth(count: int = 16) -> dict[str, Any]:

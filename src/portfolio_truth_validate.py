@@ -11,9 +11,9 @@ from typing import Any
 from src.github_security_coverage import (
     GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
     PROVIDER_NAMES,
-    PROVIDER_STATES,
-    _COUNT_KEYS,
-    _provider_reason_code,
+    SecurityCoverageError,
+    _validate_remote_repository,
+    validate_normalized_security_provider,
 )
 from src.portfolio_pathing import (
     VALID_MATURITY_PROGRAMS,
@@ -134,10 +134,20 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         doctor_std = project.declared.doctor_standard
         if doctor_std and doctor_std not in VALID_DOCTOR_STANDARDS:
             raise ValueError(f"Invalid doctor standard for {key}: {doctor_std}")
-        _validate_security_fields(project.security, key)
+        _validate_security_fields(project.security, key, snapshot.generated_at)
+        _validate_repository_state(
+            project.repository_state,
+            project.security,
+            key,
+            snapshot.generated_at,
+        )
 
 
-def _validate_security_fields(security: SecurityFields, project_key: str) -> None:
+def _validate_security_fields(
+    security: SecurityFields,
+    project_key: str,
+    generated_at: datetime,
+) -> None:
     """Validate receipt-backed provider envelopes after receipt normalization."""
     providers = security.providers
     if not isinstance(providers, Mapping):
@@ -151,6 +161,10 @@ def _validate_security_fields(security: SecurityFields, project_key: str) -> Non
         or security.receipt_state in {"fresh", "stale"}
     )
     if not has_receipt_evidence:
+        if providers:
+            raise ValueError(
+                f"Security providers for {project_key} require receipt evidence."
+            )
         return
     if security.receipt_schema_version != GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION:
         raise ValueError(
@@ -162,7 +176,7 @@ def _validate_security_fields(security: SecurityFields, project_key: str) -> Non
             f"Invalid security receipt state for {project_key}: "
             f"{security.receipt_state}"
         )
-    _parse_datetime(
+    produced_at = _parse_datetime(
         security.source_produced_at,
         f"projects[{project_key}].security.source_produced_at",
     )
@@ -186,107 +200,27 @@ def _validate_security_fields(security: SecurityFields, project_key: str) -> Non
         },
         "secret_scanning": {"open": "secret_scanning_open"},
     }
-    required_envelope_fields = {
-        "state",
-        "reason_code",
-        "observed_at",
-        "http_status",
-        "http_classification",
-        "reason",
-        "etag",
-        "last_modified",
-        "conditional",
-        "pagination_complete",
-        "completed",
-        "zero_findings",
-        "counts",
-    }
     for name in PROVIDER_NAMES:
         provider = providers[name]
-        if not isinstance(provider, Mapping):
+        try:
+            validate_normalized_security_provider(
+                name,
+                provider,
+                produced_at=produced_at,
+                current=generated_at,
+            )
+        except SecurityCoverageError as exc:
             raise ValueError(
-                f"Security provider {name} for {project_key} must be an object."
-            )
-        missing = sorted(required_envelope_fields - provider.keys())
-        if missing:
+                f"Invalid security provider for {project_key}/{name}: {exc}"
+            ) from exc
+        state = str(provider["state"])
+        states[name] = state
+        counts = provider["counts"]
+        if security.receipt_state == "stale" and state == "observed":
             raise ValueError(
-                f"Security provider {name} for {project_key} is missing fields: "
-                f"{missing}"
+                f"Stale security receipt for {project_key} cannot retain "
+                f"an observed {name} provider."
             )
-        state = provider.get("state")
-        if state not in PROVIDER_STATES:
-            raise ValueError(
-                f"Invalid security provider state for {project_key}/{name}: {state}"
-            )
-        states[name] = str(state)
-        if provider.get("reason_code") != _provider_reason_code(str(state)):
-            raise ValueError(
-                f"Security provider reason_code for {project_key}/{name} "
-                "does not match state."
-            )
-        if state in {"observed", "stale"}:
-            http_status = provider.get("http_status")
-            expected_classification = (
-                "success"
-                if http_status == 200
-                else "not_modified"
-                if http_status == 304
-                else None
-            )
-            if (
-                expected_classification is None
-                or provider.get("http_classification") != expected_classification
-            ):
-                raise ValueError(
-                    f"Security provider classification for {project_key}/{name} "
-                    "does not match its observed HTTP response."
-                )
-        counts = provider.get("counts")
-        if state == "observed":
-            if security.receipt_state == "stale":
-                raise ValueError(
-                    f"Stale security receipt for {project_key} cannot retain "
-                    f"an observed {name} provider."
-                )
-            if (
-                not isinstance(counts, Mapping)
-                or set(counts) != set(_COUNT_KEYS[name])
-                or any(
-                    not isinstance(value, int)
-                    or isinstance(value, bool)
-                    or value < 0
-                    for value in counts.values()
-                )
-            ):
-                raise ValueError(
-                    f"Observed security provider counts for {project_key}/{name} "
-                    "are invalid."
-                )
-            if provider.get("completed") is not True or provider.get(
-                "pagination_complete"
-            ) is not True:
-                raise ValueError(
-                    f"Observed security provider {project_key}/{name} must be "
-                    "complete."
-                )
-            if provider.get("zero_findings") is not (sum(counts.values()) == 0):
-                raise ValueError(
-                    f"Observed security provider {project_key}/{name} has an "
-                    "invalid zero_findings value."
-                )
-        else:
-            if counts is not None:
-                raise ValueError(
-                    f"Non-observed security provider {project_key}/{name} must "
-                    "clear counts."
-                )
-            if provider.get("completed") is not False or provider.get(
-                "zero_findings"
-            ) is not None:
-                raise ValueError(
-                    f"Non-observed security provider {project_key}/{name} cannot "
-                    "claim a completed observation."
-                )
 
         for count_name, field_name in count_fields[name].items():
             expected = counts[count_name] if state == "observed" else None
@@ -314,6 +248,57 @@ def _validate_security_fields(security: SecurityFields, project_key: str) -> Non
     if security.alerts_available is not (expected_coverage == "complete"):
         raise ValueError(
             f"Security alerts_available for {project_key} does not match coverage."
+        )
+
+
+def _validate_repository_state(
+    repository_state: dict[str, Any],
+    security: SecurityFields,
+    project_key: str,
+    generated_at: datetime,
+) -> None:
+    if not isinstance(repository_state, Mapping):
+        raise ValueError(
+            f"Repository state for {project_key} must be an object."
+        )
+    has_receipt_evidence = bool(security.receipt_schema_version)
+    if not has_receipt_evidence:
+        return
+    if repository_state.get("state") not in {
+        "observed",
+        "unknown",
+        "not_a_repository",
+    }:
+        raise ValueError(f"Invalid repository state for {project_key}.")
+    _parse_datetime(
+        repository_state.get("observed_at"),
+        f"projects[{project_key}].repository_state.observed_at",
+    )
+    remote = repository_state.get("remote_default_branch")
+    if not isinstance(remote, dict):
+        raise ValueError(
+            f"Repository state for {project_key} requires remote_default_branch."
+        )
+    produced_at = _parse_datetime(
+        security.source_produced_at,
+        f"projects[{project_key}].security.source_produced_at",
+    )
+    try:
+        normalized = _validate_remote_repository(
+            remote,
+            receipt_is_stale=security.receipt_state == "stale",
+            produced_at=produced_at,
+            current=generated_at,
+            max_age_hours=24,
+        )
+    except SecurityCoverageError as exc:
+        raise ValueError(
+            f"Invalid remote default branch for {project_key}: {exc}"
+        ) from exc
+    if remote != normalized:
+        raise ValueError(
+            f"Remote default branch for {project_key} differs from production "
+            "normalization."
         )
 
 
