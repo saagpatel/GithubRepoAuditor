@@ -269,7 +269,7 @@
         "next_recommended_move_present": true,
         "path_confidence": "medium",
         "path_override": "",
-        "path_rationale": "Stable path is maintain from explicit operating path.",
+        "path_rationale": "Stable path is Maintain from explicit operating path.",
         "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 1174,
@@ -293,7 +293,140 @@
         "section_marker": "lab/",
         "top_level_dir": "lab"
       },
-      "provenance": {},
+      "provenance": {
+        "declared.category": {
+          "detail": "learning",
+          "source": "demo-fixture"
+        },
+        "declared.criticality": {
+          "detail": "medium",
+          "source": "demo-fixture"
+        },
+        "declared.doctor_standard": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.intended_disposition": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.lifecycle_state": {
+          "detail": "dormant",
+          "source": "demo-fixture"
+        },
+        "declared.maturity_program": {
+          "detail": "maintain",
+          "source": "demo-fixture"
+        },
+        "declared.notes": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.operating_path": {
+          "detail": "explicit-operating-path",
+          "source": "normalized"
+        },
+        "declared.owner": {
+          "detail": "demo-operator",
+          "source": "demo-fixture"
+        },
+        "declared.purpose": {
+          "detail": "Exploratory prototype kept for reference only.",
+          "source": "demo-fixture"
+        },
+        "declared.review_cadence": {
+          "detail": "monthly",
+          "source": "demo-fixture"
+        },
+        "declared.target_maturity": {
+          "detail": "operating",
+          "source": "demo-fixture"
+        },
+        "declared.team": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.tool_provenance": {
+          "detail": "claude-code",
+          "source": "demo-fixture"
+        },
+        "derived.activity_status": {
+          "detail": "stale",
+          "source": "demo-fixture"
+        },
+        "derived.archived": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.attention_state": {
+          "detail": "parked",
+          "source": "demo-fixture"
+        },
+        "derived.context_files": {
+          "detail": "1",
+          "source": "demo-fixture"
+        },
+        "derived.context_quality": {
+          "detail": "minimum-viable",
+          "source": "demo-fixture"
+        },
+        "derived.current_state_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.known_risks_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.last_meaningful_activity_at": {
+          "detail": "2026-01-23T00:00:00+00:00",
+          "source": "demo-fixture"
+        },
+        "derived.next_recommended_move_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.path_confidence": {
+          "detail": "medium",
+          "source": "normalized"
+        },
+        "derived.path_override": {
+          "detail": "",
+          "source": "normalized"
+        },
+        "derived.path_rationale": {
+          "detail": "Stable path is Maintain from explicit operating path.",
+          "source": "normalized"
+        },
+        "derived.primary_context_file": {
+          "detail": "AGENTS.md",
+          "source": "demo-fixture"
+        },
+        "derived.project_summary_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.run_instructions_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.stack": {
+          "detail": "Python",
+          "source": "demo-fixture"
+        },
+        "derived.stack_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "risk.doctor_gap": {
+          "detail": "false",
+          "source": "derived"
+        },
+        "risk.risk_tier": {
+          "detail": "baseline",
+          "source": "derived"
+        }
+      },
       "repository_state": {
         "local": {
           "ahead": 0,
@@ -475,9 +608,9 @@
         "known_risks_present": false,
         "last_meaningful_activity_at": "2026-07-11T00:00:00+00:00",
         "next_recommended_move_present": false,
-        "path_confidence": "medium",
-        "path_override": "",
-        "path_rationale": "Stable path is maintain from explicit operating path.",
+        "path_confidence": "low",
+        "path_override": "investigate",
+        "path_rationale": "Stable path is Maintain from explicit operating path. Context quality is still too weak for path guidance to stand on its own. Treat this repo as investigate until path confidence improves.",
         "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 1311,
@@ -501,7 +634,140 @@
         "section_marker": "lab/",
         "top_level_dir": "lab"
       },
-      "provenance": {},
+      "provenance": {
+        "declared.category": {
+          "detail": "learning",
+          "source": "demo-fixture"
+        },
+        "declared.criticality": {
+          "detail": "medium",
+          "source": "demo-fixture"
+        },
+        "declared.doctor_standard": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.intended_disposition": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.lifecycle_state": {
+          "detail": "manual-only",
+          "source": "demo-fixture"
+        },
+        "declared.maturity_program": {
+          "detail": "maintain",
+          "source": "demo-fixture"
+        },
+        "declared.notes": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.operating_path": {
+          "detail": "explicit-operating-path",
+          "source": "normalized"
+        },
+        "declared.owner": {
+          "detail": "demo-operator",
+          "source": "demo-fixture"
+        },
+        "declared.purpose": {
+          "detail": "Exploratory prototype kept for reference only.",
+          "source": "demo-fixture"
+        },
+        "declared.review_cadence": {
+          "detail": "monthly",
+          "source": "demo-fixture"
+        },
+        "declared.target_maturity": {
+          "detail": "operating",
+          "source": "demo-fixture"
+        },
+        "declared.team": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.tool_provenance": {
+          "detail": "codex",
+          "source": "demo-fixture"
+        },
+        "derived.activity_status": {
+          "detail": "recent",
+          "source": "demo-fixture"
+        },
+        "derived.archived": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.attention_state": {
+          "detail": "manual-only",
+          "source": "demo-fixture"
+        },
+        "derived.context_files": {
+          "detail": "1",
+          "source": "demo-fixture"
+        },
+        "derived.context_quality": {
+          "detail": "boilerplate",
+          "source": "demo-fixture"
+        },
+        "derived.current_state_present": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.known_risks_present": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.last_meaningful_activity_at": {
+          "detail": "2026-07-11T00:00:00+00:00",
+          "source": "demo-fixture"
+        },
+        "derived.next_recommended_move_present": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.path_confidence": {
+          "detail": "low",
+          "source": "normalized"
+        },
+        "derived.path_override": {
+          "detail": "investigate",
+          "source": "normalized"
+        },
+        "derived.path_rationale": {
+          "detail": "Stable path is Maintain from explicit operating path. Context quality is still too weak for path guidance to stand on its own. Treat this repo as investigate until path confidence improves.",
+          "source": "normalized"
+        },
+        "derived.primary_context_file": {
+          "detail": "AGENTS.md",
+          "source": "demo-fixture"
+        },
+        "derived.project_summary_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.run_instructions_present": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.stack": {
+          "detail": "C",
+          "source": "demo-fixture"
+        },
+        "derived.stack_present": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "risk.doctor_gap": {
+          "detail": "false",
+          "source": "derived"
+        },
+        "risk.risk_tier": {
+          "detail": "elevated",
+          "source": "derived"
+        }
+      },
       "repository_state": {
         "local": {
           "ahead": 0,
@@ -554,13 +820,14 @@
       "risk": {
         "context_risk": true,
         "doctor_gap": false,
-        "path_risk": false,
+        "path_risk": true,
         "risk_factors": [
           "weak-context-active",
+          "investigate-override",
           "no-run-instructions"
         ],
-        "risk_summary": "2 risk factor(s): weak context quality, run instructions missing.",
-        "risk_tier": "moderate",
+        "risk_summary": "3 risk factor(s): weak context quality, investigate override active, run instructions missing.",
+        "risk_tier": "elevated",
         "security_risk": false
       },
       "security": {
@@ -628,9 +895,9 @@
         "known_risks_present": true,
         "last_meaningful_activity_at": "2026-07-30T00:00:00+00:00",
         "next_recommended_move_present": true,
-        "path_confidence": "medium",
+        "path_confidence": "high",
         "path_override": "",
-        "path_rationale": "Stable path is maintain from explicit operating path.",
+        "path_rationale": "Stable path is Maintain from explicit operating path.",
         "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 900,
@@ -654,7 +921,140 @@
         "section_marker": "platform/",
         "top_level_dir": "platform"
       },
-      "provenance": {},
+      "provenance": {
+        "declared.category": {
+          "detail": "infrastructure",
+          "source": "demo-fixture"
+        },
+        "declared.criticality": {
+          "detail": "medium",
+          "source": "demo-fixture"
+        },
+        "declared.doctor_standard": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.intended_disposition": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.lifecycle_state": {
+          "detail": "active",
+          "source": "demo-fixture"
+        },
+        "declared.maturity_program": {
+          "detail": "maintain",
+          "source": "demo-fixture"
+        },
+        "declared.notes": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.operating_path": {
+          "detail": "explicit-operating-path",
+          "source": "normalized"
+        },
+        "declared.owner": {
+          "detail": "demo-operator",
+          "source": "demo-fixture"
+        },
+        "declared.purpose": {
+          "detail": "Shared platform service other demo projects depend on.",
+          "source": "demo-fixture"
+        },
+        "declared.review_cadence": {
+          "detail": "monthly",
+          "source": "demo-fixture"
+        },
+        "declared.target_maturity": {
+          "detail": "operating",
+          "source": "demo-fixture"
+        },
+        "declared.team": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.tool_provenance": {
+          "detail": "claude-code",
+          "source": "demo-fixture"
+        },
+        "derived.activity_status": {
+          "detail": "active",
+          "source": "demo-fixture"
+        },
+        "derived.archived": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.attention_state": {
+          "detail": "active-infra",
+          "source": "demo-fixture"
+        },
+        "derived.context_files": {
+          "detail": "3",
+          "source": "demo-fixture"
+        },
+        "derived.context_quality": {
+          "detail": "full",
+          "source": "demo-fixture"
+        },
+        "derived.current_state_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.known_risks_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.last_meaningful_activity_at": {
+          "detail": "2026-07-30T00:00:00+00:00",
+          "source": "demo-fixture"
+        },
+        "derived.next_recommended_move_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.path_confidence": {
+          "detail": "high",
+          "source": "normalized"
+        },
+        "derived.path_override": {
+          "detail": "",
+          "source": "normalized"
+        },
+        "derived.path_rationale": {
+          "detail": "Stable path is Maintain from explicit operating path.",
+          "source": "normalized"
+        },
+        "derived.primary_context_file": {
+          "detail": "AGENTS.md",
+          "source": "demo-fixture"
+        },
+        "derived.project_summary_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.run_instructions_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.stack": {
+          "detail": "Go",
+          "source": "demo-fixture"
+        },
+        "derived.stack_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "risk.doctor_gap": {
+          "detail": "false",
+          "source": "derived"
+        },
+        "risk.risk_tier": {
+          "detail": "baseline",
+          "source": "derived"
+        }
+      },
       "repository_state": {
         "local": {
           "ahead": 0,
@@ -852,9 +1252,9 @@
         "known_risks_present": true,
         "last_meaningful_activity_at": "2026-07-11T00:00:00+00:00",
         "next_recommended_move_present": true,
-        "path_confidence": "medium",
+        "path_confidence": "high",
         "path_override": "",
-        "path_rationale": "Stable path is finish from explicit operating path.",
+        "path_rationale": "Stable path is Finish from explicit operating path.",
         "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 1037,
@@ -878,7 +1278,140 @@
         "section_marker": "studio/",
         "top_level_dir": "studio"
       },
-      "provenance": {},
+      "provenance": {
+        "declared.category": {
+          "detail": "fun",
+          "source": "demo-fixture"
+        },
+        "declared.criticality": {
+          "detail": "medium",
+          "source": "demo-fixture"
+        },
+        "declared.doctor_standard": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.intended_disposition": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.lifecycle_state": {
+          "detail": "active",
+          "source": "demo-fixture"
+        },
+        "declared.maturity_program": {
+          "detail": "maintain",
+          "source": "demo-fixture"
+        },
+        "declared.notes": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.operating_path": {
+          "detail": "explicit-operating-path",
+          "source": "normalized"
+        },
+        "declared.owner": {
+          "detail": "demo-operator",
+          "source": "demo-fixture"
+        },
+        "declared.purpose": {
+          "detail": "Product experiment maintained on a manual cadence.",
+          "source": "demo-fixture"
+        },
+        "declared.review_cadence": {
+          "detail": "monthly",
+          "source": "demo-fixture"
+        },
+        "declared.target_maturity": {
+          "detail": "operating",
+          "source": "demo-fixture"
+        },
+        "declared.team": {
+          "detail": "",
+          "source": "demo-fixture"
+        },
+        "declared.tool_provenance": {
+          "detail": "codex",
+          "source": "demo-fixture"
+        },
+        "derived.activity_status": {
+          "detail": "recent",
+          "source": "demo-fixture"
+        },
+        "derived.archived": {
+          "detail": "false",
+          "source": "demo-fixture"
+        },
+        "derived.attention_state": {
+          "detail": "decision-needed",
+          "source": "demo-fixture"
+        },
+        "derived.context_files": {
+          "detail": "2",
+          "source": "demo-fixture"
+        },
+        "derived.context_quality": {
+          "detail": "standard",
+          "source": "demo-fixture"
+        },
+        "derived.current_state_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.known_risks_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.last_meaningful_activity_at": {
+          "detail": "2026-07-11T00:00:00+00:00",
+          "source": "demo-fixture"
+        },
+        "derived.next_recommended_move_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.path_confidence": {
+          "detail": "high",
+          "source": "normalized"
+        },
+        "derived.path_override": {
+          "detail": "",
+          "source": "normalized"
+        },
+        "derived.path_rationale": {
+          "detail": "Stable path is Finish from explicit operating path.",
+          "source": "normalized"
+        },
+        "derived.primary_context_file": {
+          "detail": "AGENTS.md",
+          "source": "demo-fixture"
+        },
+        "derived.project_summary_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.run_instructions_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "derived.stack": {
+          "detail": "Ruby",
+          "source": "demo-fixture"
+        },
+        "derived.stack_present": {
+          "detail": "true",
+          "source": "demo-fixture"
+        },
+        "risk.doctor_gap": {
+          "detail": "false",
+          "source": "derived"
+        },
+        "risk.risk_tier": {
+          "detail": "moderate",
+          "source": "derived"
+        }
+      },
       "repository_state": {
         "local": {
           "ahead": 0,
@@ -1036,8 +1569,8 @@
     "risk_tier_counts": {
       "baseline": 2,
       "deferred": 0,
-      "elevated": 0,
-      "moderate": 2
+      "elevated": 1,
+      "moderate": 1
     },
     "security": {
       "code_scanning_observed_count": 1,

@@ -34,6 +34,7 @@ from src.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
@@ -474,6 +475,9 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     alpha = projects["Alpha"]
     beta = projects["Beta"]
     gamma = projects["Calibrate"]
+
+    for project in projects.values():
+        assert REQUIRED_PROJECT_PROVENANCE_KEYS <= project.provenance.keys()
 
     assert alpha.identity.project_key == "Alpha"
     assert alpha.declared.owner == "d"
@@ -3248,6 +3252,7 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
 
     from src.app.portfolio_truth import run_portfolio_truth_mode
     from src.producer_preflight import (
+        PREFLIGHT_PASS_CHECKS,
         PREFLIGHT_SCHEMA_VERSION,
         producer_evidence_receipt_id,
     )
@@ -3261,6 +3266,7 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
                 "schema_version": PREFLIGHT_SCHEMA_VERSION,
                 "state": "pass",
                 "repository": "saagpatel/GithubRepoAuditor",
+                "expected_repository": "saagpatel/GithubRepoAuditor",
                 "commit": "a" * 40,
                 "ref": "refs/remotes/origin/main",
                 "checkout_role": "canonical-automation",
@@ -3270,13 +3276,14 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
                 "verified_at": verified_at,
                 "receipt_id": producer_evidence_receipt_id(
                     repository="saagpatel/GithubRepoAuditor",
+                    expected_repository="saagpatel/GithubRepoAuditor",
                     commit="a" * 40,
                     ref="refs/remotes/origin/main",
                     checkout_role="canonical-automation",
                     checkout_path=checkout_path,
                     verified_at=verified_at,
                 ),
-                "checks": {},
+                "checks": PREFLIGHT_PASS_CHECKS,
             }
         )
     )

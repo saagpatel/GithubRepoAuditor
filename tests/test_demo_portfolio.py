@@ -33,6 +33,8 @@ from src.github_security_coverage import (
     PROVIDER_NAMES,
     _provider_result,
 )
+from src.portfolio_pathing import build_operating_path_entry
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
     TRUTH_LATEST_FILENAME,
@@ -178,6 +180,68 @@ def test_every_project_uses_known_enum_values() -> None:
             "baseline",
             "deferred",
         }
+
+
+def test_every_demo_path_matches_the_production_path_helper() -> None:
+    for project in _snapshot()["projects"]:
+        declared = project["declared"]
+        derived = project["derived"]
+        expected = build_operating_path_entry(
+            {**declared, "has_explicit_entry": True},
+            context_quality=derived["context_quality"],
+            archived=derived["archived"],
+        )
+
+        assert expected["operating_path_source"] == "explicit-operating-path"
+        assert declared["operating_path"] == expected["operating_path"]
+        assert derived["path_override"] == expected["path_override"]
+        assert derived["path_confidence"] == expected["path_confidence"]
+        assert derived["path_rationale"] == expected["path_rationale"]
+
+
+def test_demo_path_matrix_covers_low_and_high_confidence_semantics() -> None:
+    projects = {
+        project["identity"]["display_name"]: project
+        for project in _snapshot()["projects"]
+    }
+    dovetail = projects["Dovetail Forge"]
+    quartz = projects["Quartz Signal"]
+
+    assert dovetail["derived"]["context_quality"] == "boilerplate"
+    assert dovetail["derived"]["path_confidence"] == "low"
+    assert dovetail["derived"]["path_override"] == "investigate"
+    assert dovetail["risk"]["path_risk"] is True
+    assert quartz["derived"]["context_quality"] == "full"
+    assert quartz["derived"]["path_confidence"] == "high"
+    assert quartz["derived"]["path_override"] == ""
+    assert quartz["risk"]["path_risk"] is False
+
+
+def test_every_demo_row_carries_meaningful_production_shaped_provenance() -> None:
+    for project in _snapshot()["projects"]:
+        provenance = project["provenance"]
+        assert REQUIRED_PROJECT_PROVENANCE_KEYS <= provenance.keys()
+        assert all(
+            provenance[key]["source"].strip()
+            for key in REQUIRED_PROJECT_PROVENANCE_KEYS
+        )
+        assert (
+            provenance["derived.activity_status"]["detail"]
+            == project["derived"]["activity_status"]
+        )
+        assert provenance["derived.archived"]["detail"] == str(
+            project["derived"]["archived"]
+        ).lower()
+        assert (
+            provenance["derived.context_quality"]["detail"]
+            == project["derived"]["context_quality"]
+        )
+        assert provenance["derived.context_files"]["detail"] == str(
+            len(project["derived"]["context_files"])
+        )
+        assert provenance["derived.stack"]["detail"] == ", ".join(
+            project["derived"]["stack"]
+        )
 
 
 def test_coverage_states_span_the_whole_receipt_model() -> None:
