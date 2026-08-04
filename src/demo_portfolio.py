@@ -831,13 +831,10 @@ def build_snapshot(
         "derivation_policy_version": DERIVATION_POLICY_VERSION,
         "generated_at": _iso(generated_at),
         "workspace_root": DEMO_WORKSPACE_ROOT,
-        "producer": {
-            "repository": f"{DEMO_ORG}/portfolio-auditor",
-            "checkout_role": "demo-fixture",
-            "worktree_clean": True,
-            "dirty_path_count": 0,
-            "verified_at": _iso(generated_at),
-        },
+        # Synthetic demo output is not emitted by an attested producer checkout.
+        # Canonical truth represents absent evidence as an empty object; partial
+        # invented evidence would fail the publication contract.
+        "producer": {},
         "source_summary": {
             "workspace_root": DEMO_WORKSPACE_ROOT,
             "project_count": len(projects),
