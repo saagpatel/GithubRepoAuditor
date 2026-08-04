@@ -37,6 +37,7 @@ from src.portfolio_truth_types import (
     TRUTH_LATEST_FILENAME,
     VALID_ACTIVITY_STATUS,
     VALID_ATTENTION_STATES,
+    VALID_CATEGORY_TAGS,
     VALID_CONTEXT_QUALITY,
 )
 from src.portfolio_truth_reconcile import _build_security_fields
@@ -144,6 +145,11 @@ def test_every_project_uses_known_enum_values() -> None:
         assert derived["attention_state"] in VALID_ATTENTION_STATES
         assert derived["activity_status"] in VALID_ACTIVITY_STATUS
         assert derived["context_quality"] in VALID_CONTEXT_QUALITY
+        assert project["declared"]["category"] in VALID_CATEGORY_TAGS
+        if derived["attention_state"] == "active-infra":
+            assert project["declared"]["category"] == "infrastructure"
+        if derived["attention_state"] == "active-product":
+            assert project["declared"]["category"] == "commercial"
         assert project["risk"]["risk_tier"] in {
             "elevated",
             "moderate",

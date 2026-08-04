@@ -416,6 +416,22 @@ _GROUP_LABELS = {
     "archive": "Archived",
 }
 
+_GROUP_CATEGORIES = {
+    "flagship": "commercial",
+    "platform": "infrastructure",
+    "studio": "fun",
+    "lab": "learning",
+    "archive": "it-work",
+}
+
+
+def _category_for(spec: DemoProject) -> str:
+    if spec.attention == "active-infra":
+        return "infrastructure"
+    if spec.attention == "active-product":
+        return "commercial"
+    return _GROUP_CATEGORIES[spec.group]
+
 _PURPOSES = {
     "flagship": "Operator-facing product surface with an active release lane.",
     "platform": "Shared platform service other demo projects depend on.",
@@ -448,7 +464,7 @@ def _observed_provider(
         "reason": "observed",
         "reason_code": "observed",
         "http_status": 200,
-        "http_classification": "ok",
+        "http_classification": "success",
         "conditional": {"requested": True, "result": "modified"},
         "etag": None,
         "last_modified": None,
@@ -761,7 +777,7 @@ def build_projects(
                 },
                 "declared": {
                     "operating_path": operating_path,
-                    "category": spec.group,
+                    "category": _category_for(spec),
                     "tool_provenance": "codex" if index % 2 else "claude-code",
                     "lifecycle_state": lifecycle_state,
                     "purpose": _PURPOSES[spec.group],
