@@ -259,12 +259,22 @@ def _validate_security_receipt_cohort_identity(
         set(receipt_repositories) - set(final_repositories),
         key=str.lower,
     )
+
+    def final_project_is_archived(repository: str) -> bool:
+        matches = [
+            project
+            for project in projects
+            if project.identity.repo_full_name == repository
+        ]
+        return len(matches) == 1 and matches[0].derived.archived is True
+
     unresolved_departures = [
         repository
         for repository in departed
         if not _is_verified_security_cohort_departure(
             prior_security_alerts_by_name.get(repository),
             security_alerts_by_name.get(repository),
+            final_project_archived=final_project_is_archived(repository),
         )
     ]
     if unresolved_departures:
@@ -310,6 +320,8 @@ def _derive_project_security_cohort(
 def _is_verified_security_cohort_departure(
     prior_entry: dict[str, Any] | None,
     current_entry: dict[str, Any] | None,
+    *,
+    final_project_archived: bool,
 ) -> bool:
     prior = dict(prior_entry or {})
     current = dict(current_entry or {})
@@ -335,7 +347,8 @@ def _is_verified_security_cohort_departure(
         and current_counts.get("critical") == 0
     )
     observed_archive = (
-        current.get("receipt_state") == "fresh"
+        final_project_archived
+        and current.get("receipt_state") == "fresh"
         and current_repository.get("state") == "observed"
         and current_repository.get("archived") is True
     )
@@ -398,6 +411,8 @@ def build_portfolio_truth_snapshot(
 
     def materialize_projects(
         security_lookup: dict[str, dict] | None,
+        *,
+        repo_status_lookup: dict[str, dict] | None,
     ) -> list[PortfolioTruthProject]:
         return [
             _build_truth_project(
@@ -408,19 +423,34 @@ def build_portfolio_truth_snapshot(
                 now=now,
                 release_count_by_name=release_count_by_name,
                 security_alerts_by_name=security_lookup,
-                repo_status_by_name=repo_status_by_name,
+                repo_status_by_name=repo_status_lookup,
             )
             for raw_project in workspace_projects
         ]
 
     prior_security_alerts = prior_security_alerts_by_name or {}
+    candidate_repo_status_by_name = {
+        name: status
+        for name, status in (repo_status_by_name or {}).items()
+        if status.get("source") == "github_api" and status.get("archived") is False
+    }
     candidate_projects = (
-        materialize_projects(prior_security_alerts)
+        materialize_projects(
+            prior_security_alerts,
+            # Current status may only expand candidate membership. A fresh GitHub
+            # unarchive therefore forces receipt coverage, while archive status is
+            # applied only to the final projects and must be corroborated by the
+            # receipt before it can authorize a departure.
+            repo_status_lookup=candidate_repo_status_by_name,
+        )
         if security_coverage_metadata is not None
         and security_alerts_by_name is not None
         else None
     )
-    projects = materialize_projects(security_alerts_by_name)
+    projects = materialize_projects(
+        security_alerts_by_name,
+        repo_status_lookup=repo_status_by_name,
+    )
     if security_coverage_metadata is not None and security_alerts_by_name is not None:
         _validate_security_receipt_cohort_identity(
             projects=projects,

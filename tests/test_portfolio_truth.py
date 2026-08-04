@@ -1773,6 +1773,46 @@ repos:
             prior_security_alerts_by_name=security,
         )
 
+    catalog_path.write_text(
+        """
+repos:
+  Old:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+  New:
+    owner: d
+    lifecycle_state: manual-only
+    review_cadence: weekly
+    operating_path: finish
+    category: vanity
+"""
+    )
+    replacement_security = {
+        "d/New": {**security["d/Old"], "repo_full_name": "d/New"}
+    }
+    with pytest.raises(
+        ValueError,
+        match=(
+            "receipt cohort differs from freshly derived pre-security default attention: "
+            "receipt_only=\\['d/New'\\]; derived_only=\\['d/Old'\\]"
+        ),
+    ):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name=replacement_security,
+            security_coverage_metadata=metadata,
+            prior_security_alerts_by_name=security,
+            repo_status_by_name={
+                "Old": {"source": "github_api", "archived": True}
+            },
+        )
+
 
 def test_security_cohort_identity_skips_repo_less_supplementary() -> None:
     from types import SimpleNamespace
@@ -2200,6 +2240,28 @@ repos:
             prior_security_alerts_by_name=prior_security,
         )
 
+    contradictory_archive = receipt_entry(high=0, state="not_requested")
+    contradictory_archive["repository"] = _remote_repository_result(
+        state="observed",
+        observed_at=now.isoformat(),
+        default_branch="main",
+        head_sha="b" * 40,
+        archived=True,
+    )
+    with pytest.raises(ValueError, match="without fresh observed Dependabot"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name={"d/Manual": contradictory_archive},
+            security_coverage_metadata=metadata,
+            prior_security_alerts_by_name=prior_security,
+            repo_status_by_name={
+                "Manual": {"source": "github_api", "archived": False}
+            },
+        )
+
 
 def test_security_cohort_uses_prior_archive_state_and_allows_observed_exit(
     tmp_path: Path,
@@ -2267,8 +2329,12 @@ repos:
         "cohort_repository_count": 1,
         "path": "/evidence/github-security-coverage-latest.json",
     }
+    live_archived_status = {
+        "Active": {"source": "github_api", "archived": True}
+    }
+    prior_active_security = {"d/Active": receipt_entry(archived=False)}
 
-    with pytest.raises(ValueError, match="expected 1, observed 0"):
+    with pytest.raises(ValueError, match="without fresh observed Dependabot"):
         build_portfolio_truth_snapshot(
             workspace_root=workspace,
             catalog_path=catalog_path,
@@ -2276,9 +2342,8 @@ repos:
             now=now,
             security_alerts_by_name={"d/Active": receipt_entry(archived=False)},
             security_coverage_metadata=metadata,
-            repo_status_by_name={
-                "Active": {"source": "audit_report", "archived": True}
-            },
+            prior_security_alerts_by_name=prior_active_security,
+            repo_status_by_name=live_archived_status,
         )
 
     result = build_portfolio_truth_snapshot(
@@ -2288,18 +2353,72 @@ repos:
         now=now,
         security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
         security_coverage_metadata=metadata,
-        prior_security_alerts_by_name={
-            "d/Active": receipt_entry(archived=False)
-        },
+        prior_security_alerts_by_name=prior_active_security,
+        repo_status_by_name=live_archived_status,
     )
 
     active = result.snapshot.projects[0]
     assert active.security.cohort_member is True
     assert active.derived.attention_state == "archived"
+    assert active.provenance["github.archived"] == {
+        "source": "github_api",
+        "detail": "true",
+    }
     assert (
         derive_default_attention_cohort(result.snapshot.to_dict(), expected_count=0)
         == ()
     )
+
+    unarchived = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name={"d/Active": receipt_entry(archived=False)},
+        security_coverage_metadata=metadata,
+        prior_security_alerts_by_name={
+            "d/Active": receipt_entry(archived=True)
+        },
+        repo_status_by_name={
+            "Active": {"source": "github_api", "archived": False}
+        },
+    )
+    reactivated = unarchived.snapshot.projects[0]
+    assert reactivated.derived.archived is False
+    assert reactivated.derived.attention_state == "active-infra"
+
+    empty_metadata = {**metadata, "cohort_repository_count": 0}
+    with pytest.raises(ValueError, match="expected 0, observed 1"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name={},
+            security_coverage_metadata=empty_metadata,
+            prior_security_alerts_by_name={
+                "d/Active": receipt_entry(archived=True)
+            },
+            repo_status_by_name={
+                "Active": {"source": "github_api", "archived": False}
+            },
+        )
+
+    with pytest.raises(ValueError, match="post-receipt attention contains"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name={},
+            security_coverage_metadata=empty_metadata,
+            prior_security_alerts_by_name={
+                "d/Active": receipt_entry(archived=True)
+            },
+            repo_status_by_name={
+                "Active": {"source": "audit_report", "archived": False}
+            },
+        )
 
 
 def test_receipt_publication_uses_bound_prior_risk_for_resolution(
