@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,22 @@ from urllib.parse import urlparse
 
 
 PREFLIGHT_SCHEMA_VERSION = "ghra_producer_preflight.v2"
+
+
+def producer_evidence_receipt_id(
+    *,
+    repository: str,
+    commit: str,
+    ref: str,
+    checkout_role: str,
+    checkout_path: str,
+    verified_at: str,
+) -> str:
+    """Bind producer evidence to its exact serialized identity material."""
+    material = "\n".join(
+        (repository, commit, ref, checkout_role, checkout_path, verified_at)
+    )
+    return f"sha256:{hashlib.sha256(material.encode()).hexdigest()}"
 
 
 @dataclass(frozen=True)
@@ -25,8 +41,10 @@ class ProducerEvidence:
     dirty_path_count: int
     verified_at: datetime
     receipt_id: str
+    _verified_at_text: str | None = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
+        verified_at = self._verified_at_text or self.verified_at.isoformat()
         return {
             "repository": self.repository,
             "commit": self.commit,
@@ -35,7 +53,7 @@ class ProducerEvidence:
             "checkout_path": self.checkout_path,
             "worktree_clean": self.worktree_clean,
             "dirty_path_count": self.dirty_path_count,
-            "verified_at": self.verified_at.isoformat(),
+            "verified_at": verified_at,
             "receipt_id": self.receipt_id,
         }
 
@@ -55,7 +73,8 @@ class ProducerEvidence:
         missing = sorted(required - payload.keys())
         if missing:
             raise ValueError(f"Producer evidence is missing fields: {missing}")
-        verified_at = str(payload["verified_at"])
+        verified_at_text = str(payload["verified_at"])
+        verified_at = verified_at_text
         if verified_at.endswith("Z"):
             verified_at = f"{verified_at[:-1]}+00:00"
         try:
@@ -71,6 +90,18 @@ class ProducerEvidence:
             raise ValueError("Producer evidence must declare a clean worktree.")
         if payload["dirty_path_count"] != 0:
             raise ValueError("Clean producer evidence must declare dirty_path_count=0.")
+        expected_receipt_id = producer_evidence_receipt_id(
+            repository=str(payload["repository"]),
+            commit=commit,
+            ref=str(payload["ref"]),
+            checkout_role=str(payload["checkout_role"]),
+            checkout_path=str(payload["checkout_path"]),
+            verified_at=verified_at_text,
+        )
+        if payload["receipt_id"] != expected_receipt_id:
+            raise ValueError(
+                "Producer evidence receipt_id does not match its serialized material."
+            )
         return cls(
             repository=str(payload["repository"]),
             commit=commit,
@@ -80,7 +111,8 @@ class ProducerEvidence:
             worktree_clean=True,
             dirty_path_count=0,
             verified_at=parsed_verified_at.astimezone(UTC),
-            receipt_id=str(payload["receipt_id"]),
+            receipt_id=expected_receipt_id,
+            _verified_at_text=verified_at_text,
         )
 
 
@@ -136,19 +168,25 @@ def inspect_canonical_producer(
     state = "pass" if all(value == "pass" for value in checks.values()) else "fail"
     verified_at = now or datetime.now(UTC)
     dirty_path_count = len(status.splitlines()) if status else 0
-    receipt_material = "\n".join(
-        (repository, commit, expected_ref, checkout_role, str(repo_root.resolve()), verified_at.isoformat())
-    )
+    checkout_path = str(repo_root.resolve())
+    verified_at_text = verified_at.isoformat()
     evidence = ProducerEvidence(
         repository=repository,
         commit=commit,
         ref=expected_ref,
         checkout_role=checkout_role,
-        checkout_path=str(repo_root.resolve()),
+        checkout_path=checkout_path,
         worktree_clean=not status,
         dirty_path_count=dirty_path_count,
         verified_at=verified_at,
-        receipt_id=f"sha256:{hashlib.sha256(receipt_material.encode()).hexdigest()}",
+        receipt_id=producer_evidence_receipt_id(
+            repository=repository,
+            commit=commit,
+            ref=expected_ref,
+            checkout_role=checkout_role,
+            checkout_path=checkout_path,
+            verified_at=verified_at_text,
+        ),
     )
     return ProducerPreflightResult(state=state, checks=checks, evidence=evidence)
 
