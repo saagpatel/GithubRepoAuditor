@@ -135,6 +135,8 @@
         "section_marker": "platform/",
         "top_level_dir": "platform"
       },
+      "provenance": {},
+      "repository_state": {},
       "risk": {
         "context_risk": false,
         "doctor_gap": false,
@@ -228,7 +230,8 @@
         "receipt_state": "fresh",
         "secret_scanning_open": 0,
         "source_produced_at": "2026-08-01T00:00:00+00:00"
-      }
+      },
+      "warnings": []
     },
     {
       "advisory": {
@@ -300,6 +303,8 @@
         "section_marker": "studio/",
         "top_level_dir": "studio"
       },
+      "provenance": {},
+      "repository_state": {},
       "risk": {
         "context_risk": false,
         "doctor_gap": false,
@@ -388,7 +393,8 @@
         "receipt_state": "fresh",
         "secret_scanning_open": null,
         "source_produced_at": "2026-08-01T00:00:00+00:00"
-      }
+      },
+      "warnings": []
     },
     {
       "advisory": {
@@ -459,6 +465,8 @@
         "section_marker": "lab/",
         "top_level_dir": "lab"
       },
+      "provenance": {},
+      "repository_state": {},
       "risk": {
         "context_risk": true,
         "doctor_gap": false,
@@ -489,7 +497,8 @@
         "receipt_state": "stale",
         "secret_scanning_open": null,
         "source_produced_at": "2026-08-01T00:00:00+00:00"
-      }
+      },
+      "warnings": []
     },
     {
       "advisory": {
@@ -560,6 +569,8 @@
         "section_marker": "lab/",
         "top_level_dir": "lab"
       },
+      "provenance": {},
+      "repository_state": {},
       "risk": {
         "context_risk": true,
         "doctor_gap": false,
@@ -590,7 +601,8 @@
         "receipt_state": "unknown",
         "secret_scanning_open": null,
         "source_produced_at": ""
-      }
+      },
+      "warnings": []
     }
   ],
   "rollups": {
@@ -605,14 +617,30 @@
       "moderate": 2
     },
     "security": {
+      "code_scanning_observed_count": 1,
+      "code_scanning_zero_finding_count": 1,
+      "cohort_complete_count": 1,
+      "cohort_partial_count": 1,
+      "cohort_repository_count": 3,
+      "cohort_stale_count": 1,
+      "cohort_unknown_count": 0,
       "complete_repo_count": 1,
       "coverage_state": "partial",
+      "dependabot_observed_count": 2,
+      "dependabot_zero_finding_count": 0,
       "partial_repo_count": 1,
+      "remote_default_branch_observed_count": 0,
+      "remote_default_branch_partial_count": 0,
+      "remote_default_branch_stale_count": 0,
+      "remote_default_branch_unavailable_count": 4,
       "repos_with_open_high_critical": 1,
       "scanned_count": 1,
+      "secret_scanning_observed_count": 1,
+      "secret_scanning_zero_finding_count": 1,
       "stale_count": 1,
       "total_open_critical": 0,
       "total_open_high": 3,
+      "unavailable_count": 3,
       "unknown_count": 1
     }
   },

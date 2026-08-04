@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
@@ -110,8 +111,65 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
 
 
 def validate_truth_snapshot_payload(payload: Mapping[str, Any]) -> None:
-    """Construct and fully validate the serialized canonical truth contract."""
-    validate_truth_snapshot(_snapshot_from_payload(payload))
+    """Fully validate serialized truth, including canonical byte-shape fidelity."""
+    canonical = canonicalize_truth_snapshot_payload(payload)
+    supplied = _without_documented_contract_canaries(payload)
+    mismatch = _first_payload_mismatch(supplied, canonical)
+    if mismatch is not None:
+        raise ValueError(
+            "Serialized PortfolioTruth snapshot differs from canonical "
+            f"reconstruction at {mismatch}."
+        )
+
+
+def canonicalize_truth_snapshot_payload(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the canonical serializer output for one raw truth snapshot."""
+    snapshot = _snapshot_from_payload(payload)
+    validate_truth_snapshot(snapshot)
+    return snapshot.to_dict()
+
+
+def _without_documented_contract_canaries(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Remove only the two additive paths documented by the fixture manifest."""
+    supplied = deepcopy(dict(payload))
+    supplied.pop("contract_fixture", None)
+    projects = supplied.get("projects")
+    if projects and isinstance(projects, list) and isinstance(projects[0], dict):
+        projects[0].pop("additive_contract_canary", None)
+    return supplied
+
+
+def _first_payload_mismatch(
+    supplied: object,
+    canonical: object,
+    path: str = "$",
+) -> str | None:
+    if isinstance(supplied, dict) and isinstance(canonical, dict):
+        for key in sorted(set(supplied) | set(canonical)):
+            child = f"{path}.{key}"
+            if key not in supplied or key not in canonical:
+                return child
+            mismatch = _first_payload_mismatch(supplied[key], canonical[key], child)
+            if mismatch is not None:
+                return mismatch
+        return None
+    if isinstance(supplied, list) and isinstance(canonical, list):
+        if len(supplied) != len(canonical):
+            return path
+        for index, (supplied_item, canonical_item) in enumerate(
+            zip(supplied, canonical, strict=True)
+        ):
+            mismatch = _first_payload_mismatch(
+                supplied_item, canonical_item, f"{path}[{index}]"
+            )
+            if mismatch is not None:
+                return mismatch
+        return None
+    return None if supplied == canonical else path
 
 
 def _snapshot_from_payload(payload: Mapping[str, Any]) -> PortfolioTruthSnapshot:

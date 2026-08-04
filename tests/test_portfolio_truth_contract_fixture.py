@@ -110,6 +110,53 @@ def test_canonical_payload_validation_rejects_invalid_project_row() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+def test_canonical_payload_validation_rejects_deleted_rollups() -> None:
+    fixture = build_contract_fixture()
+    del fixture["rollups"]
+
+    with pytest.raises(ValueError, match=r"canonical reconstruction at \$\.rollups"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_tampered_rollup_count() -> None:
+    fixture = build_contract_fixture()
+    fixture["rollups"]["security"]["complete_repo_count"] += 1
+
+    with pytest.raises(
+        ValueError,
+        match=r"canonical reconstruction at \$\.rollups\.security\.complete_repo_count",
+    ):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_tampered_project_rollup() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["security"]["open_high_critical"] += 1
+
+    with pytest.raises(
+        ValueError,
+        match=r"canonical reconstruction at \$\.projects\[0\]\.security\.open_high_critical",
+    ):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("section", "field"),
+    ((None, "repository_state"), ("security", "cohort_member")),
+)
+def test_canonical_payload_validation_rejects_missing_project_fields(
+    section: str | None,
+    field: str,
+) -> None:
+    fixture = build_contract_fixture()
+    project = fixture["projects"][0]
+    target = project if section is None else project[section]
+    del target[field]
+
+    with pytest.raises(ValueError, match="canonical reconstruction"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def test_fixture_contains_only_public_safe_synthetic_identity() -> None:
     raw = fixture_bytes().decode().lower()
     _forbidden_extra = [
