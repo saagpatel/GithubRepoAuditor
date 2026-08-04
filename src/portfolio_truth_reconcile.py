@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from src.github_security_coverage import (
+    DEFAULT_ATTENTION_STATES,
+    SecurityCoverageError,
+    derive_default_attention_cohort,
+)
 from src.portfolio_catalog import (
     catalog_entry_for_repo,
     group_entry_for_path,
@@ -188,6 +193,54 @@ class PortfolioTruthBuildResult:
     legacy_rows: dict[str, dict[str, str]]
 
 
+def _validate_security_receipt_cohort_identity(
+    *,
+    projects: list[PortfolioTruthProject],
+    security_alerts_by_name: dict[str, dict],
+) -> None:
+    """Require receipt membership to match freshly derived default attention."""
+    receipt_repositories = tuple(sorted(security_alerts_by_name, key=str.lower))
+    try:
+        derived_repositories = derive_default_attention_cohort(
+            {
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": project.identity.project_key,
+                            "repo_full_name": project.identity.repo_full_name,
+                        },
+                        "derived": {
+                            "attention_state": project.derived.attention_state,
+                        },
+                    }
+                    for project in projects
+                ]
+            },
+            expected_count=len(receipt_repositories),
+        )
+    except SecurityCoverageError as exc:
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt cohort cannot match freshly "
+            f"derived default attention: {exc}."
+        ) from exc
+
+    if receipt_repositories == derived_repositories:
+        return
+
+    receipt_only = sorted(
+        set(receipt_repositories) - set(derived_repositories),
+        key=str.lower,
+    )
+    derived_only = sorted(
+        set(derived_repositories) - set(receipt_repositories),
+        key=str.lower,
+    )
+    raise ValueError(
+        "PortfolioTruth GitHub security receipt cohort differs from freshly derived "
+        f"default attention: receipt_only={receipt_only}; derived_only={derived_only}."
+    )
+
+
 def build_portfolio_truth_snapshot(
     *,
     workspace_root: Path,
@@ -253,6 +306,11 @@ def build_portfolio_truth_snapshot(
         )
         for raw_project in workspace_projects
     ]
+    if security_coverage_metadata is not None and security_alerts_by_name is not None:
+        _validate_security_receipt_cohort_identity(
+            projects=projects,
+            security_alerts_by_name=security_alerts_by_name,
+        )
     projects.sort(
         key=lambda item: (
             item.identity.section_marker.lower(),
@@ -774,11 +832,11 @@ def _build_truth_project(
         security_high_alerts=security.dependabot_high or 0,
         security_critical_alerts=security.dependabot_critical or 0,
     )
-    if not security.receipt_schema_version and attention_state in {
-        "active-product",
-        "active-infra",
-        "decision-needed",
-    } and not identity.project_key.startswith("supp:"):
+    if (
+        not security.receipt_schema_version
+        and attention_state in DEFAULT_ATTENTION_STATES
+        and not identity.project_key.startswith("supp:")
+    ):
         security = replace(
             security,
             cohort_member=True,

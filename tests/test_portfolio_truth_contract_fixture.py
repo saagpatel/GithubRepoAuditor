@@ -757,6 +757,20 @@ def test_contract_rejects_forged_supplementary_project_key() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+def test_contract_rejects_repo_backed_supplementary_identity() -> None:
+    fixture = build_contract_fixture()
+    identity = fixture["projects"][0]["identity"]
+    identity["project_key"] = "supp:repo-backed"
+    identity["path"] = "supp:repo-backed"
+    identity["repo_full_name"] = "d/repo-backed"
+
+    with pytest.raises(
+        ValueError,
+        match="supplementary project identity cannot declare a repository",
+    ):
+        validate_truth_snapshot_payload(fixture)
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     (
@@ -850,6 +864,7 @@ def _append_hidden_duplicate(fixture: dict[str, object]) -> None:
     duplicate = deepcopy(projects[0])
     duplicate["identity"]["project_key"] = "supp:duplicate-hidden"
     duplicate["identity"]["path"] = "supp:duplicate-hidden"
+    duplicate["identity"]["repo_full_name"] = ""
     projects.append(duplicate)
 
 

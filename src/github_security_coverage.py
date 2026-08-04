@@ -31,7 +31,7 @@ REMOTE_REPOSITORY_SOURCE = "github-graphql-default-branch-head-v1"
 DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
-DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 9
+DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 11
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
 ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
 ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"
@@ -431,19 +431,23 @@ def derive_default_attention_cohort(
     *,
     expected_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
 ) -> tuple[str, ...]:
-    """Return the repo-backed default-attention cohort, failing on expansion."""
+    """Return the repo-backed default-attention cohort, failing on size drift."""
     repos: list[str] = []
     for project in portfolio_truth.get("projects") or []:
         if not isinstance(project, dict):
             continue
+        identity = _mapping(project.get("identity"))
+        project_key = _text(identity.get("project_key"))
+        repo_full_name = _text(identity.get("repo_full_name"))
+        if project_key.startswith("supp:") and repo_full_name:
+            raise SecurityCoverageError(
+                "supplementary project identity cannot declare a repository: "
+                f"{project_key}"
+            )
         derived = _mapping(project.get("derived"))
         if derived.get("attention_state") not in DEFAULT_ATTENTION_STATES:
             continue
-        identity = _mapping(project.get("identity"))
-        repo_full_name = identity.get("repo_full_name")
-        if not _text(repo_full_name) and _text(identity.get("project_key")).startswith(
-            "supp:"
-        ):
+        if project_key.startswith("supp:"):
             # Supplementary projects such as personal-ops are real portfolio
             # identities, but they do not have a GitHub repository to query.
             continue

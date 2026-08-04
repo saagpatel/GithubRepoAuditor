@@ -17,6 +17,7 @@ from src.github_security_coverage import (
     _provider_result,
     _remote_repository_result,
     collect_security_coverage,
+    derive_default_attention_cohort,
     load_security_coverage_receipt,
     write_security_coverage_receipt,
 )
@@ -704,6 +705,90 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     )
 
 
+def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    expected_repositories = {
+        "agent-permission-diff-bot": "saagpatel/agent-permission-diff-bot",
+        "AIGCCore": "saagpatel/AIGCCore",
+        "bridge-db": "saagpatel/bridge-db",
+        "GithubRepoAuditor": "saagpatel/GithubRepoAuditor",
+        "mcp-trust": "saagpatel/mcp-trust",
+        "MCPAudit": "saagpatel/MCPAudit",
+        "operant-public": "saagpatel/operant",
+        "operator-os-explainer": "saagpatel/operator-os-explainer",
+        "portfolio-index": "saagpatel/portfolio-index",
+        "PortfolioCommandCenter": "saagpatel/PortfolioCommandCenter",
+        "proof-pr": "saagpatel/proof-pr",
+    }
+    excluded_egress_repositories = {
+        "cross-provider-egress-guard": (
+            "saagpatel/cross-provider-egress-guard-private"
+        ),
+        "egress-guard-oss": "saagpatel/cross-provider-egress-guard",
+    }
+
+    for name, remote in {
+        **expected_repositories,
+        **excluded_egress_repositories,
+    }.items():
+        project = workspace / name
+        project.mkdir()
+        readme = project / "README.md"
+        _write(readme, f"# {name}\n\nCurrent cohort fixture.\n")
+        observed_at = (
+            now - timedelta(days=31)
+            if name in {"agent-permission-diff-bot", "proof-pr"}
+            or name in excluded_egress_repositories
+            else now
+        )
+        _set_mtime(readme, observed_at.timestamp())
+        subprocess.run(
+            ["git", "init"],
+            cwd=project,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "remote",
+                "add",
+                "origin",
+                f"https://github.com/{remote}.git",
+            ],
+            cwd=project,
+            capture_output=True,
+            check=True,
+        )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=now,
+    )
+    by_display_name = {
+        project.identity.display_name: project for project in result.snapshot.projects
+    }
+
+    for name in excluded_egress_repositories:
+        assert by_display_name[name].derived.attention_state == "manual-only"
+    assert (
+        by_display_name["egress-guard-oss"]
+        .provenance["declared.lifecycle_state"]["detail"]
+        == "cross-provider-egress-guard"
+    )
+    for name in ("agent-permission-diff-bot", "proof-pr"):
+        assert by_display_name[name].derived.attention_state == "decision-needed"
+    assert derive_default_attention_cohort(
+        result.snapshot.to_dict(), expected_count=11
+    ) == tuple(sorted(expected_repositories.values(), key=str.lower))
+
+
 def test_discovered_personal_ops_replaces_supplementary_registry_identity(
     tmp_path: Path,
 ) -> None:
@@ -825,6 +910,41 @@ repos:
     assert alpha.provenance["declared.operating_path"]["detail"] == (
         "explicit-operating-path"
     )
+
+
+def test_finish_attention_flips_exactly_at_31_day_activity_boundary() -> None:
+    from zoneinfo import ZoneInfo
+
+    from src.portfolio_truth_decisions import derive_attention_state
+    from src.portfolio_truth_reconcile import _activity_status_for
+
+    last_activity = datetime(2026, 7, 4, 7, 44, 49, tzinfo=timezone.utc)
+    before_boundary = last_activity + timedelta(days=31) - timedelta(microseconds=1)
+    at_boundary = last_activity + timedelta(days=31)
+
+    assert _activity_status_for(last_activity, now=before_boundary) == "recent"
+    assert _activity_status_for(last_activity, now=at_boundary) == "stale"
+    assert (
+        _activity_status_for(
+            last_activity.astimezone(ZoneInfo("America/Los_Angeles")),
+            now=at_boundary.astimezone(ZoneInfo("America/Los_Angeles")),
+        )
+        == "stale"
+    )
+
+    def attention_at(now: datetime) -> str:
+        return derive_attention_state(
+            activity_status=_activity_status_for(last_activity, now=now),
+            archived=False,
+            lifecycle_state="active",
+            operating_path="finish",
+            category="vanity",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+
+    assert attention_at(before_boundary) == "manual-only"
+    assert attention_at(at_boundary) == "decision-needed"
 
 
 def test_attention_state_classifier_separates_activity_from_operator_attention() -> (
@@ -1565,6 +1685,425 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
     result.snapshot.inputs["github_security"].pop("content_sha256")
     with pytest.raises(ValueError, match="requires both receipt_id"):
         validate_truth_snapshot(result.snapshot)
+
+
+def test_security_receipt_rejects_same_count_identity_rollover(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Old:
+    owner: d
+    lifecycle_state: manual-only
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+  New:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: finish
+    category: vanity
+"""
+    )
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    for name in ("Old", "New"):
+        project = workspace / name
+        project.mkdir()
+        readme = project / "README.md"
+        _write(readme, f"# {name}\n\nCohort rollover fixture.\n")
+        _set_mtime(readme, (now - timedelta(days=31)).timestamp())
+        subprocess.run(
+            ["git", "init"], cwd=project, capture_output=True, check=True
+        )
+        subprocess.run(
+            [
+                "git",
+                "remote",
+                "add",
+                "origin",
+                f"https://github.com/d/{name}.git",
+            ],
+            cwd=project,
+            capture_output=True,
+            check=True,
+        )
+
+    observed_at = now.isoformat()
+    security = {
+        "d/Old": {
+            "repo_full_name": "d/Old",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at,
+            "providers": {},
+        }
+    }
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": observed_at,
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "receipt cohort differs from freshly derived default attention: "
+            "receipt_only=\\['d/Old'\\]; derived_only=\\['d/New'\\]"
+        ),
+    ):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name=security,
+            security_coverage_metadata=metadata,
+        )
+
+
+def test_security_cohort_identity_skips_repo_less_supplementary() -> None:
+    from types import SimpleNamespace
+
+    from src.portfolio_truth_reconcile import (
+        _validate_security_receipt_cohort_identity,
+    )
+
+    projects = [
+        SimpleNamespace(
+            identity=SimpleNamespace(
+                project_key="alpha",
+                repo_full_name="d/Alpha",
+            ),
+            derived=SimpleNamespace(attention_state="active-infra"),
+        ),
+        SimpleNamespace(
+            identity=SimpleNamespace(
+                project_key="supp:repo-less",
+                repo_full_name="",
+            ),
+            derived=SimpleNamespace(attention_state="active-infra"),
+        ),
+    ]
+
+    _validate_security_receipt_cohort_identity(
+        projects=projects,
+        security_alerts_by_name={"d/Alpha": {}},
+    )
+
+
+def test_security_cohort_identity_rejects_repo_backed_supplementary() -> None:
+    from types import SimpleNamespace
+
+    from src.portfolio_truth_reconcile import (
+        _validate_security_receipt_cohort_identity,
+    )
+
+    project = SimpleNamespace(
+        identity=SimpleNamespace(
+            project_key="supp:repo-backed",
+            repo_full_name="d/Supp",
+        ),
+        derived=SimpleNamespace(attention_state="active-infra"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="supplementary project identity cannot declare a repository",
+    ):
+        _validate_security_receipt_cohort_identity(
+            projects=[project],
+            security_alerts_by_name={"d/Supp": {}},
+        )
+
+
+def test_empty_security_metadata_cannot_bypass_cohort_identity(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text("repos: {}\n")
+
+    with pytest.raises(ValueError, match="expected 1, observed 0"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=datetime(2026, 8, 4, 12, tzinfo=timezone.utc),
+            security_alerts_by_name={"d/Stale": {}},
+            security_coverage_metadata={},
+        )
+
+
+def test_receipt_backed_snapshot_excludes_repo_less_supplementary_from_cohort(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    alpha = workspace / "Alpha"
+    alpha.mkdir(parents=True)
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    _write(alpha / "README.md", "# Alpha\n\nReceipt-backed cohort fixture.\n")
+    _set_mtime(alpha / "README.md", now.timestamp())
+    subprocess.run(["git", "init"], cwd=alpha, capture_output=True, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/d/Alpha.git",
+        ],
+        cwd=alpha,
+        capture_output=True,
+        check=True,
+    )
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Alpha:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+  personal-ops:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+"""
+    )
+    observed_at = now.isoformat()
+    zero_counts = {
+        "dependabot": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+        "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0},
+        "secret_scanning": {"open": 0},
+    }
+    security = {
+        "d/Alpha": {
+            "repo_full_name": "d/Alpha",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at,
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=observed_at,
+                default_branch="main",
+                head_sha="b" * 40,
+                archived=False,
+            ),
+            "providers": {
+                provider: _provider_result(
+                    provider,
+                    state="observed",
+                    observed_at=observed_at,
+                    http_status=200,
+                    pagination_complete=True,
+                    counts=counts,
+                )
+                for provider, counts in zero_counts.items()
+            },
+        }
+    }
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": observed_at,
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+    )
+    validate_truth_snapshot(result.snapshot)
+    projects = {
+        project.identity.display_name: project for project in result.snapshot.projects
+    }
+
+    assert projects["Alpha"].security.cohort_member is True
+    assert projects["personal-ops"].identity.project_key == "supp:personal-ops"
+    assert projects["personal-ops"].identity.repo_full_name == ""
+    assert projects["personal-ops"].security.cohort_member is False
+    assert result.snapshot.rollups.security["cohort_repository_count"] == 1
+
+
+def test_security_cohort_identity_rejects_case_only_drift() -> None:
+    from types import SimpleNamespace
+
+    from src.portfolio_truth_reconcile import (
+        _validate_security_receipt_cohort_identity,
+    )
+
+    project = SimpleNamespace(
+        identity=SimpleNamespace(project_key="alpha", repo_full_name="d/Alpha"),
+        derived=SimpleNamespace(attention_state="active-product"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "receipt_only=\\['D/Alpha'\\]; derived_only=\\['d/Alpha'\\]"
+        ),
+    ):
+        _validate_security_receipt_cohort_identity(
+            projects=[project],
+            security_alerts_by_name={"D/Alpha": {}},
+        )
+
+
+@pytest.mark.parametrize(
+    ("receipt_repositories", "derived_repositories", "expected_message"),
+    (
+        (("d/Alpha",), ("d/Alpha", "d/Beta"), "expected 1, observed 2"),
+        (("d/Alpha", "d/Beta"), ("d/Alpha",), "expected 2, observed 1"),
+    ),
+)
+def test_security_cohort_identity_rejects_expansion_and_contraction(
+    receipt_repositories: tuple[str, ...],
+    derived_repositories: tuple[str, ...],
+    expected_message: str,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.portfolio_truth_reconcile import (
+        _validate_security_receipt_cohort_identity,
+    )
+
+    projects = [
+        SimpleNamespace(
+            identity=SimpleNamespace(
+                project_key=repository.rsplit("/", 1)[-1],
+                repo_full_name=repository,
+            ),
+            derived=SimpleNamespace(attention_state="active-product"),
+        )
+        for repository in derived_repositories
+    ]
+
+    with pytest.raises(ValueError, match=expected_message):
+        _validate_security_receipt_cohort_identity(
+            projects=projects,
+            security_alerts_by_name={
+                repository: {} for repository in receipt_repositories
+            },
+        )
+
+
+def test_security_cohort_identity_rejects_missing_repository_name() -> None:
+    from types import SimpleNamespace
+
+    from src.portfolio_truth_reconcile import (
+        _validate_security_receipt_cohort_identity,
+    )
+
+    project = SimpleNamespace(
+        identity=SimpleNamespace(project_key="missing", repo_full_name=""),
+        derived=SimpleNamespace(attention_state="active-infra"),
+    )
+
+    with pytest.raises(ValueError, match="invalid canonical repository name"):
+        _validate_security_receipt_cohort_identity(
+            projects=[project],
+            security_alerts_by_name={},
+        )
+
+
+def test_security_cohort_identity_accepts_receipt_risk_driven_attention(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "Manual"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# Manual\n\nRisk feedback fixture.\n")
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Manual.git"],
+        cwd=project,
+        capture_output=True,
+        check=True,
+    )
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Manual:
+    owner: d
+    lifecycle_state: manual-only
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+"""
+    )
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    observed_at = now.isoformat()
+    security = {
+        "d/Manual": {
+            "repo_full_name": "d/Manual",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at,
+            "providers": {
+                "dependabot": {
+                    "state": "observed",
+                    "observed_at": observed_at,
+                    "pagination_complete": True,
+                    "counts": {"critical": 0, "high": 1, "medium": 0, "low": 0},
+                }
+            },
+        }
+    }
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": observed_at,
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+    )
+    manual = result.snapshot.projects[0]
+
+    assert manual.declared.lifecycle_state == "manual-only"
+    assert manual.security.dependabot_high == 1
+    assert manual.derived.attention_state == "decision-needed"
 
 
 def test_security_overlay_absent_leaves_repos_unscanned(
@@ -2733,6 +3272,14 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now = datetime.now(timezone.utc).replace(microsecond=0)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     receipt_path = output_dir / "github-security-coverage-latest.json"
@@ -2842,6 +3389,14 @@ def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
     from contextlib import contextmanager
 
     now = datetime.now(timezone.utc).replace(microsecond=0)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
     nested_observed_at = now - timedelta(hours=24) + timedelta(milliseconds=500)
     output_dir = tmp_path / "output"
     output_dir.mkdir()

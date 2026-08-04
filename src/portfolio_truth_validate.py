@@ -108,6 +108,11 @@ def validate_truth_snapshot(
             raise ValueError(
                 f"Project key for {key} must exactly match its identity path."
             )
+        if key.startswith("supp:") and project.identity.repo_full_name:
+            raise ValueError(
+                "PortfolioTruth supplementary project identity cannot declare "
+                f"a repository: {key}."
+            )
         required_identity = (
             project.identity.project_key,
             project.identity.display_name,

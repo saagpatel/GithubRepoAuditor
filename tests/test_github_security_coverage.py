@@ -759,8 +759,8 @@ def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
 
     assert len(cohort) == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     assert "owner/parked" not in cohort
-    with pytest.raises(SecurityCoverageError, match="expected 9, observed 10"):
-        derive_default_attention_cohort(_truth(10))
+    with pytest.raises(SecurityCoverageError, match="expected 11, observed 12"):
+        derive_default_attention_cohort(_truth(12))
 
 
 def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
@@ -774,6 +774,28 @@ def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
 
     with pytest.raises(
         SecurityCoverageError, match="invalid canonical repository name"
+    ):
+        derive_default_attention_cohort(truth)
+
+
+@pytest.mark.parametrize("attention_state", ("active-infra", "parked"))
+def test_repo_backed_supplementary_identity_fails_closed_regardless_attention(
+    attention_state: str,
+) -> None:
+    truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    truth["projects"].append(
+        {
+            "identity": {
+                "project_key": "supp:repo-backed",
+                "repo_full_name": "owner/repo-backed",
+            },
+            "derived": {"attention_state": attention_state},
+        }
+    )
+
+    with pytest.raises(
+        SecurityCoverageError,
+        match="supplementary project identity cannot declare a repository",
     ):
         derive_default_attention_cohort(truth)
 
@@ -828,13 +850,17 @@ def test_valid_prior_for_old_cohort_is_ignored_during_contraction() -> None:
         cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     )
 
-    assert receipt["cohort"]["repository_count"] == 9
-    assert len(session.calls) == 28
+    provider_request_count = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT * 3
+    assert (
+        receipt["cohort"]["repository_count"]
+        == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    )
+    assert len(session.calls) == provider_request_count + 1
     assert all(
         kwargs.get("headers") == {}
-        for _, kwargs in session.calls[:27]
+        for _, kwargs in session.calls[:provider_request_count]
     )
-    assert "headers" not in session.calls[27][1]
+    assert "headers" not in session.calls[provider_request_count][1]
 
 
 def test_invalid_prior_for_old_cohort_still_fails_closed() -> None:
@@ -902,10 +928,11 @@ def test_collector_is_serial_count_only_and_bounded_to_48_base_requests() -> Non
     )
 
 
-def test_current_nine_repository_cut_binds_remote_branch_and_head() -> None:
+def test_current_eleven_repository_cut_binds_remote_branch_and_head() -> None:
+    provider_request_count = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT * 3
     session = _Session(
         [
-            *[_Response() for _ in range(27)],
+            *[_Response() for _ in range(provider_request_count)],
             _remote_graphql_response(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT),
         ]
     )
@@ -914,7 +941,7 @@ def test_current_nine_repository_cut_binds_remote_branch_and_head() -> None:
         cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     )
 
-    assert len(session.calls) == 28
+    assert len(session.calls) == provider_request_count + 1
     assert receipt["request_budget"]["stop_reason"] is None
     assert all(
         repository["repository"]["state"] == "observed"
@@ -1094,9 +1121,10 @@ def test_shared_upstream_validator_matches_git_ref_format(upstream: str) -> None
 
 def test_graphql_rate_limit_marks_remote_cut_with_exact_reason_code() -> None:
     outcome = OUTCOME_FIXTURES["rate_limited"]
+    provider_request_count = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT * 3
     session = _Session(
         [
-            *[_Response() for _ in range(27)],
+            *[_Response() for _ in range(provider_request_count)],
             _Response(
                 200,
                 {
