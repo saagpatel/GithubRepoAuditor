@@ -164,6 +164,15 @@ def validate_checkout_authority_envelope(
             raise ValueError(f"Malformed checkout bare state for {path}.")
         if checkout.get("state") == "observed" and not isinstance(bare, bool):
             raise ValueError(f"Observed checkout must declare bare state for {path}.")
+        if state == "selected":
+            if checkout.get("state") != "observed":
+                raise ValueError(
+                    "Selected checkout authority requires complete observations."
+                )
+            if bare is False and (dirty is not False or dirty_count != 0):
+                raise ValueError(
+                    "Selected checkout authority cannot contain local work."
+                )
 
     representative_checkout = next(
         (

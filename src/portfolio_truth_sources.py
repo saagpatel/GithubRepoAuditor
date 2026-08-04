@@ -237,7 +237,7 @@ def _dedupe_checkouts_by_origin(
             canonical.append(project)
 
     for origin_key, group in by_origin.items():
-        identity_project = _checkout_representative(group, origin_key)
+        identity_project = _checkout_identity_project(group, origin_key)
         authority_group = _checkout_topology_group(
             group,
             workspace_root=workspace_root,
@@ -418,6 +418,22 @@ def _checkout_representative(
     )
 
 
+def _checkout_identity_project(
+    group: list[dict[str, Any]], origin_key: str
+) -> dict[str, Any]:
+    """Choose stable catalog identity independently of mutation-path health."""
+    repo_base = origin_key.rsplit("/", 1)[-1]
+    return min(
+        group,
+        key=lambda project: (
+            str(project.get("name", "")).lower() != repo_base,
+            len(Path(str(project.get("path", ""))).parts),
+            len(str(project.get("path", ""))),
+            str(project.get("path", "")).lower(),
+        ),
+    )
+
+
 def _canonical_checkout_project(
     *,
     identity_project: dict[str, Any],
@@ -488,6 +504,10 @@ def _checkout_collision_record(
         state = "unknown"
         reason_code = "checkout_observation_failed"
         reason = "one or more same-origin checkouts could not be observed completely"
+    elif _checkout_observation(representative).get("bare") is True:
+        state = "unknown"
+        reason_code = "bare_representative_unusable"
+        reason = "the only authoritative checkout is a bare repository"
     elif len(declared_checkout_paths) > 1:
         state = "unknown"
         reason_code = "conflicting_declared_checkout_paths"

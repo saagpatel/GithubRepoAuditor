@@ -26,6 +26,7 @@ from src.portfolio_context_recovery import (
 from src.portfolio_checkout_authority import (
     checkout_authority_blocker,
     checkout_authority_path,
+    validate_checkout_authority_envelope,
 )
 from src.portfolio_truth_publish import (
     PortfolioTruthPublishError,
@@ -873,6 +874,86 @@ def test_failed_singleton_observation_with_declaration_is_valid_unknown(
     validate_truth_snapshot(result.snapshot)
 
 
+def test_declared_bare_singleton_publishes_unknown_and_blocks_consumers(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    seed = portfolio_workspace / "_backups" / "bare-seed"
+    seed.mkdir(parents=True)
+    _write(seed / "README.md", "# BareRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = portfolio_workspace / "BareRepo"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "set-url",
+            "origin",
+            "git@github.com:owner/BareRepo.git",
+        ],
+        cwd=coordinator,
+        check=True,
+    )
+    _write(
+        coordinator / "AGENTS.md",
+        "# BareRepo\n\n## Canonical Paths\n\n"
+        f"- Source: `{coordinator}`\n",
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/BareRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["selected_path"] is None
+    assert authority["selection"]["reason_code"] == "bare_representative_unusable"
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:bare_representative_unusable"
+    validate_truth_snapshot(result.snapshot)
+
+    plan = build_context_recovery_plan(
+        result.snapshot,
+        workspace_root=portfolio_workspace,
+    )
+    target = next(item for item in plan.projects if item.project_key == "BareRepo")
+    assert target.status == "skipped"
+    assert target.reason == "checkout-authority-unknown:bare_representative_unusable"
+
+
 def test_worktree_enumeration_failure_is_explicit_unknown_summary(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
@@ -1206,7 +1287,7 @@ def test_prunable_linked_worktree_is_unknown_not_publication_failure(
     validate_truth_snapshot(result.snapshot)
 
 
-def test_bare_coordinator_worktree_flows_through_truth_validation(
+def test_discovered_bare_coordinator_sibling_preserves_identity_and_mutation_path(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
     legacy_registry: Path,
@@ -1281,8 +1362,7 @@ repos:
         cwd=coordinator,
         check=True,
     )
-    linked = portfolio_workspace / "_codex-worktrees" / "repo-main"
-    linked.parent.mkdir()
+    linked = portfolio_workspace / "Repo-main"
     subprocess.run(
         ["git", "worktree", "add", "-q", str(linked), "main"],
         cwd=coordinator,
@@ -1315,10 +1395,8 @@ repos:
     assert project.advisory.notion_current_state == "Coordinator identity retained"
     assert authority["selection"]["state"] == "selected"
     assert authority["canonical_project_path"] == "Repo"
-    assert authority["selection"]["selected_path"] == (
-        "_codex-worktrees/repo-main"
-    )
-    assert checkout_authority_path(project) == "_codex-worktrees/repo-main"
+    assert authority["selection"]["selected_path"] == "Repo-main"
+    assert checkout_authority_path(project) == "Repo-main"
     assert project.repository_state["local"]["path"] == str(linked)
     assert checkout_authority_blocker(
         project,
@@ -1331,7 +1409,7 @@ repos:
         workspace_root=portfolio_workspace,
     )
     target = next(item for item in plan.projects if item.project_key == "Repo")
-    assert target.relative_path == "_codex-worktrees/repo-main"
+    assert target.relative_path == "Repo-main"
     assert target.target_path.startswith(str(linked))
 
 
@@ -4332,6 +4410,29 @@ def test_checkout_authority_path_falls_back_for_malformed_envelope_variants() ->
     del malformed_record["checkouts"][0]["head"]
     variants.append(malformed_record)
 
+    unknown_discarded = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    unknown_discarded["checkouts"][1].update(
+        {
+            "state": "unknown",
+            "head": None,
+            "branch": None,
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": None,
+        }
+    )
+    variants.append(unknown_discarded)
+
+    dirty_discarded = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    dirty_discarded["checkouts"][1].update(
+        {"dirty": True, "dirty_path_count": 1}
+    )
+    variants.append(dirty_discarded)
+
     for authority in variants:
         project = {
             "identity": {"path": "Repo", "repo_full_name": "owner/Repo"},
@@ -4339,6 +4440,12 @@ def test_checkout_authority_path_falls_back_for_malformed_envelope_variants() ->
                 "checkout_authority": deepcopy(authority),
             },
         }
+        with pytest.raises(ValueError):
+            validate_checkout_authority_envelope(
+                authority,
+                identity_path="Repo",
+                repo_full_name="owner/Repo",
+            )
         assert checkout_authority_path(project) == "Repo"
         assert checkout_authority_blocker(project) == "checkout-authority-malformed"
 

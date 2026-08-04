@@ -270,7 +270,8 @@ def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
         checkout_collisions=collisions,
     )
 
-    assert result[0]["path"] == "Archive/Repo"
+    assert result[0]["path"] == "Repo"
+    assert result[0]["project_path"] == Path("/workspace/Archive/Repo")
     collision = collisions[0]
     assert collision["selection"]["state"] == "selected"
     assert collision["selection"]["selected_path"] == "Archive/Repo"
@@ -298,7 +299,7 @@ def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
     ]
 
 
-def test_observed_checkout_is_preferred_over_failed_basename_match() -> None:
+def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> None:
     collisions: list[dict] = []
     head = "1" * 40
     discovered = [
@@ -317,11 +318,86 @@ def test_observed_checkout_is_preferred_over_failed_basename_match() -> None:
         checkout_collisions=collisions,
     )
 
-    assert result[0]["path"] == "Archive/Repo"
+    assert result[0]["path"] == "Repo"
+    assert result[0]["project_path"] == Path("/workspace/Archive/Repo")
     collision = collisions[0]
     assert collision["selection"]["state"] == "unknown"
     assert collision["selection"]["reason_code"] == "checkout_observation_failed"
     assert collision["selection"]["representative_path"] == "Archive/Repo"
+
+
+def test_discovered_linked_worktree_preserves_coordinator_catalog_identity() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    coordinator = _p(
+        "Repo",
+        "owner/Repo",
+        head=head,
+        common_dir="/git/Repo.git",
+        bare=True,
+        dirty=None,
+        dirty_path_count=None,
+    )
+    coordinator.update(
+        {
+            "group_entry": {"owner": "coordinator-owner"},
+            "source": "coordinator-source",
+        }
+    )
+    linked = _p(
+        "Repo-main",
+        "owner/Repo",
+        head=head,
+        common_dir="/git/Repo.git",
+    )
+    linked.update(
+        {
+            "group_entry": {"owner": "linked-owner"},
+            "source": "linked-source",
+        }
+    )
+
+    result = _dedupe_checkouts_by_origin(
+        [coordinator, linked],
+        checkout_collisions=collisions,
+    )
+
+    assert result[0]["name"] == "Repo"
+    assert result[0]["path"] == "Repo"
+    assert result[0]["group_entry"] == {"owner": "coordinator-owner"}
+    assert result[0]["source"] == "coordinator-source"
+    assert result[0]["project_path"] == Path("/workspace/Repo-main")
+    assert collisions[0]["selection"]["selected_path"] == "Repo-main"
+
+
+def test_declared_bare_singleton_is_unknown() -> None:
+    declaration = {
+        "absolute_path": "/workspace/Repo",
+        "workspace_relative_path": "Repo",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head="1" * 40,
+            common_dir="/git/Repo.git",
+            bare=True,
+            dirty=None,
+            dirty_path_count=None,
+            declared_paths=[declaration],
+        )
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "bare_representative_unusable"
 
 
 def test_declared_linked_worktree_conflicts_with_representative() -> None:

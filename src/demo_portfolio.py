@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+from src.portfolio_truth_sources import checkout_collision_summary
 from src.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
 
 # The demo workspace is deliberately not a real filesystem path.
@@ -841,6 +842,7 @@ def build_snapshot(generated_at: datetime, *, pressure: int = 0) -> dict[str, An
             "github_archived_count": 0,
             "duplicate_display_names": [],
             "unresolved_duplicate_display_names": [],
+            "checkout_collisions": checkout_collision_summary([]),
         },
         "precedence_matrix": {
             "identity": ["demo fixture"],

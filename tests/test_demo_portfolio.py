@@ -26,6 +26,7 @@ from src.demo_portfolio import (
     resolved_coverage_state,
 )
 from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+from src.portfolio_truth_sources import checkout_collision_summary
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
@@ -45,6 +46,12 @@ def _snapshot() -> dict:
 
 def test_schema_version_tracks_the_producer_constant() -> None:
     assert _snapshot()["schema_version"] == SCHEMA_VERSION
+
+
+def test_current_schema_includes_valid_empty_checkout_authority_summary() -> None:
+    assert _snapshot()["source_summary"]["checkout_collisions"] == (
+        checkout_collision_summary([])
+    )
 
 
 def test_generated_at_lands_inside_the_consumer_fresh_window() -> None:

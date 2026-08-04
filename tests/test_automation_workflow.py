@@ -315,6 +315,25 @@ def test_context_pr_plan_rejects_malformed_authority_variants() -> None:
     del malformed_record["checkouts"][0]["head"]
     variants.append(malformed_record)
 
+    unknown_discarded = _checkout_authority()
+    unknown_discarded["checkouts"][1].update(
+        {
+            "state": "unknown",
+            "head": None,
+            "branch": None,
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": None,
+        }
+    )
+    variants.append(unknown_discarded)
+
+    dirty_discarded = _checkout_authority()
+    dirty_discarded["checkouts"][1].update(
+        {"dirty": True, "dirty_path_count": 1}
+    )
+    variants.append(dirty_discarded)
+
     for authority in variants:
         project = _project(
             repository_state={"checkout_authority": deepcopy(authority)}
