@@ -492,7 +492,62 @@
         "dependabot_low": null,
         "dependabot_medium": null,
         "open_high_critical": 0,
-        "providers": {},
+        "providers": {
+          "code_scanning": {
+            "completed": false,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": null,
+            "etag": null,
+            "http_classification": "success",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-07-30T23:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "state": "stale",
+            "zero_findings": null
+          },
+          "dependabot": {
+            "completed": false,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": null,
+            "etag": null,
+            "http_classification": "success",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-07-30T23:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "state": "stale",
+            "zero_findings": null
+          },
+          "secret_scanning": {
+            "completed": false,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": null,
+            "etag": null,
+            "http_classification": "success",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-07-30T23:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "state": "stale",
+            "zero_findings": null
+          }
+        },
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
         "secret_scanning_open": null,

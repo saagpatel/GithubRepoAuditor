@@ -2862,7 +2862,62 @@
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
         "source_produced_at": "2026-07-26T21:09:43.833784+00:00",
-        "providers": {},
+        "providers": {
+          "dependabot": {
+            "state": "stale",
+            "completed": false,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "http_status": 200,
+            "http_classification": "success",
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "etag": null,
+            "last_modified": null,
+            "observed_at": "2026-07-26T21:09:43.833784+00:00",
+            "pagination_complete": true,
+            "counts": null,
+            "zero_findings": null
+          },
+          "code_scanning": {
+            "state": "stale",
+            "completed": false,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "http_status": 200,
+            "http_classification": "success",
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "etag": null,
+            "last_modified": null,
+            "observed_at": "2026-07-26T21:09:43.833784+00:00",
+            "pagination_complete": true,
+            "counts": null,
+            "zero_findings": null
+          },
+          "secret_scanning": {
+            "state": "stale",
+            "completed": false,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "http_status": 200,
+            "http_classification": "success",
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "etag": null,
+            "last_modified": null,
+            "observed_at": "2026-07-26T21:09:43.833784+00:00",
+            "pagination_complete": true,
+            "counts": null,
+            "zero_findings": null
+          }
+        },
         "dependabot_critical": null,
         "dependabot_high": null,
         "dependabot_medium": null,
@@ -2966,7 +3021,62 @@
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
         "source_produced_at": "2026-07-26T21:09:43.833784+00:00",
-        "providers": {},
+        "providers": {
+          "dependabot": {
+            "state": "stale",
+            "completed": false,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "http_status": 200,
+            "http_classification": "success",
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "etag": null,
+            "last_modified": null,
+            "observed_at": "2026-07-26T21:09:43.833784+00:00",
+            "pagination_complete": true,
+            "counts": null,
+            "zero_findings": null
+          },
+          "code_scanning": {
+            "state": "stale",
+            "completed": false,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "http_status": 200,
+            "http_classification": "success",
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "etag": null,
+            "last_modified": null,
+            "observed_at": "2026-07-26T21:09:43.833784+00:00",
+            "pagination_complete": true,
+            "counts": null,
+            "zero_findings": null
+          },
+          "secret_scanning": {
+            "state": "stale",
+            "completed": false,
+            "reason": "receipt_stale",
+            "reason_code": "stale_observation",
+            "http_status": 200,
+            "http_classification": "success",
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "etag": null,
+            "last_modified": null,
+            "observed_at": "2026-07-26T21:09:43.833784+00:00",
+            "pagination_complete": true,
+            "counts": null,
+            "zero_findings": null
+          }
+        },
         "dependabot_critical": null,
         "dependabot_high": null,
         "dependabot_medium": null,
