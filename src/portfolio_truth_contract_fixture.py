@@ -54,9 +54,14 @@ def build_contract_fixture() -> dict[str, Any]:
         GENERATED_AT,
         project_specs=_contract_project_specs(),
     )
+    # This deterministic compatibility artifact is not emitted by an attested
+    # producer checkout. Canonical truth uses an empty object for absent
+    # evidence; partial synthetic evidence would be invalid and misleading.
+    fixture["producer"] = {}
     fixture["contract_fixture"] = {
         "contract_version": CONTRACT_VERSION,
         "deterministic": True,
+        "producer_evidence": "absent",
     }
     fixture["projects"][0]["additive_contract_canary"] = {
         "consumer_behavior": "ignore-compatible-addition"
@@ -106,6 +111,7 @@ def build_contract_manifest() -> dict[str, Any]:
             "evaluation_time": EVALUATED_AT.isoformat(),
             "project_count": len(_PROJECT_CODENAMES),
             "coverage_states": ["complete", "partial", "stale", "unknown"],
+            "producer_evidence": "absent",
             "additive_canary_paths": [
                 "contract_fixture",
                 "projects[0].additive_contract_canary",

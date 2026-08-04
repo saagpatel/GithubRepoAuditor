@@ -1,7 +1,8 @@
 {
   "contract_fixture": {
     "contract_version": "ghra-pcc-portfolio-truth.v1",
-    "deterministic": true
+    "deterministic": true,
+    "producer_evidence": "absent"
   },
   "coverage": [
     {
@@ -58,13 +59,7 @@
       "demo fixture receipt"
     ]
   },
-  "producer": {
-    "checkout_role": "demo-fixture",
-    "dirty_path_count": 0,
-    "repository": "demo-org/portfolio-auditor",
-    "verified_at": "2026-08-01T00:00:00+00:00",
-    "worktree_clean": true
-  },
+  "producer": {},
   "projects": [
     {
       "additive_contract_canary": {

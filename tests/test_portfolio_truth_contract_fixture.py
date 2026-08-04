@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 
+import pytest
+
 from src.demo_portfolio import resolved_coverage_state
 from src.portfolio_truth_contract_fixture import (
     CONTRACT_VERSION,
@@ -20,6 +22,7 @@ from src.portfolio_truth_contract_fixture import (
     manifest_bytes,
 )
 from src.portfolio_truth_types import SCHEMA_VERSION
+from src.portfolio_truth_validate import validate_truth_snapshot_payload
 
 
 def test_committed_contract_artifacts_match_the_deterministic_generator() -> None:
@@ -71,7 +74,32 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
     }
     assert states == ["complete", "partial", "stale", "unknown"]
     assert fixture["contract_fixture"]["contract_version"] == CONTRACT_VERSION
+    assert fixture["contract_fixture"]["producer_evidence"] == "absent"
     assert "additive_contract_canary" in fixture["projects"][0]
+
+
+def test_generated_and_committed_fixtures_pass_canonical_payload_validation() -> None:
+    generated = build_contract_fixture()
+    committed = json.loads(Path(FIXTURE_RELATIVE_PATH).read_text())
+
+    assert generated["producer"] == {}
+    assert committed["producer"] == {}
+    validate_truth_snapshot_payload(generated)
+    validate_truth_snapshot_payload(committed)
+
+
+def test_canonical_payload_validation_rejects_partial_producer_evidence() -> None:
+    fixture = build_contract_fixture()
+    fixture["producer"] = {
+        "repository": "demo-org/portfolio-auditor",
+        "checkout_role": "demo-fixture",
+        "worktree_clean": True,
+        "dirty_path_count": 0,
+        "verified_at": GENERATED_AT.isoformat(),
+    }
+
+    with pytest.raises(ValueError, match="Producer evidence is missing fields"):
+        validate_truth_snapshot_payload(fixture)
 
 
 def test_fixture_contains_only_public_safe_synthetic_identity() -> None:
