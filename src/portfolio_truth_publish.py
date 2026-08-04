@@ -222,7 +222,14 @@ def publish_portfolio_truth(
         else nullcontext()
     )
     try:
-        with publication_guard:
+        with publication_guard as live_security:
+            if (
+                live_security is not None
+                and live_security.entries_by_full_name != security_alerts_by_name
+            ):
+                raise PortfolioTruthPublishError(
+                    "Security receipt normalized evidence changed after it was loaded."
+                )
             if producer_evidence is not None and producer_repo_root is not None:
                 verify_evidence_still_current(producer_repo_root, producer_evidence)
             for path, staged in temp_files.items():
