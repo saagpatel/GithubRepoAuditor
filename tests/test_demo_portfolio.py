@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from src.automation_proposals import VALID_ACTION_TYPES, VALID_STATUSES
 from src.demo_portfolio import (
     DEMO_PROJECTS,
     FRESH_OFFSET_HOURS,
     HISTORY_POINTS,
+    STALE_RECEIPT_AGE_HOURS,
     build_projects,
     build_proposals,
     build_security_burndown,
@@ -25,26 +27,112 @@ from src.demo_portfolio import (
     history_snapshots,
     resolved_coverage_state,
 )
-from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    PROVIDER_NAMES,
+    _provider_result,
+)
+from src.portfolio_pathing import build_operating_path_entry
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
+    TRUTH_LATEST_FILENAME,
     VALID_ACTIVITY_STATUS,
     VALID_ATTENTION_STATES,
+    VALID_CATEGORY_TAGS,
     VALID_CONTEXT_QUALITY,
 )
+from src.portfolio_truth_reconcile import _build_security_fields
+from src.portfolio_truth_validate import validate_truth_snapshot_payload
 
 # Portfolio Command Center reads anything older than this as no longer fresh.
 CONSUMER_FRESH_WINDOW_HOURS = 48
 
 NOW = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+DEMO_OUTPUT_DIR = Path("output/demo")
 
 
 def _snapshot() -> dict:
     return build_snapshot(fixture_generated_at(NOW))
 
 
+def _expected_inputs(snapshot: dict) -> dict:
+    return {
+        "catalog": {
+            "source_id": "portfolio-catalog",
+            "sha256": None,
+            "observed_at": snapshot["generated_at"],
+        },
+        "workspace": {
+            "source_id": "projects-root",
+            "observed_at": snapshot["generated_at"],
+        },
+        "notion": {
+            "mode": "unavailable",
+            "observed_at": None,
+            "carried_from_generated_at": None,
+        },
+        "github_security": {
+            "source_id": "github-security-coverage-receipt",
+            "schema_version": "GitHubSecurityCoverageReceiptV1",
+            "produced_at": snapshot["generated_at"],
+            "state": "fresh",
+            "age_hours": 0.0,
+            "producer_commit": "a" * 40,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "cohort_repository_count": sum(
+                project["security"]["cohort_member"]
+                for project in snapshot["projects"]
+            ),
+            "path": "/demo-workspace/github-security-coverage.json",
+            "receipt_id": "sha256:" + "b" * 64,
+            "content_sha256": "b" * 64,
+        },
+    }
+
+
 def test_schema_version_tracks_the_producer_constant() -> None:
     assert _snapshot()["schema_version"] == SCHEMA_VERSION
+
+
+def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
+    snapshot = _snapshot()
+
+    assert snapshot["inputs"] == _expected_inputs(snapshot)
+    assert snapshot["exclusions"] == {
+        "policy_version": "workspace_discovery.v2",
+        "counts": {},
+    }
+    assert snapshot["producer"] == {}
+    validate_truth_snapshot_payload(
+        snapshot,
+        allow_synthetic_security_matrix=True,
+    )
+
+
+def test_committed_demo_truth_artifacts_match_the_canonical_envelope() -> None:
+    paths = [DEMO_OUTPUT_DIR / TRUTH_LATEST_FILENAME]
+    paths.extend(
+        DEMO_OUTPUT_DIR / f"portfolio-truth-history-{index:02d}.json"
+        for index in range(1, HISTORY_POINTS + 1)
+    )
+
+    for path in paths:
+        snapshot = json.loads(path.read_text())
+        assert snapshot["inputs"] == _expected_inputs(snapshot)
+        assert snapshot["exclusions"] == {
+            "policy_version": "workspace_discovery.v2",
+            "counts": {},
+        }
+        assert snapshot["producer"] == {}
+        validate_truth_snapshot_payload(
+            snapshot,
+            allow_synthetic_security_matrix=True,
+        )
+
+        raw = path.read_text().lower()
+        for forbidden in ("/users/", "saagpatel", "saagar", "@gmail.com", "gmail"):
+            assert forbidden not in raw
 
 
 def test_generated_at_lands_inside_the_consumer_fresh_window() -> None:
@@ -69,12 +157,79 @@ def test_every_project_uses_known_enum_values() -> None:
         assert derived["attention_state"] in VALID_ATTENTION_STATES
         assert derived["activity_status"] in VALID_ACTIVITY_STATUS
         assert derived["context_quality"] in VALID_CONTEXT_QUALITY
+        assert project["declared"]["category"] in VALID_CATEGORY_TAGS
+        if derived["attention_state"] == "active-infra":
+            assert project["declared"]["category"] == "infrastructure"
+        if derived["attention_state"] == "active-product":
+            assert project["declared"]["category"] == "commercial"
         assert project["risk"]["risk_tier"] in {
             "elevated",
             "moderate",
             "baseline",
             "deferred",
         }
+
+
+def test_every_demo_path_matches_the_production_path_helper() -> None:
+    for project in _snapshot()["projects"]:
+        declared = project["declared"]
+        derived = project["derived"]
+        expected = build_operating_path_entry(
+            {**declared, "has_explicit_entry": True},
+            context_quality=derived["context_quality"],
+            archived=derived["archived"],
+        )
+
+        assert expected["operating_path_source"] == "explicit-operating-path"
+        assert declared["operating_path"] == expected["operating_path"]
+        assert derived["path_override"] == expected["path_override"]
+        assert derived["path_confidence"] == expected["path_confidence"]
+        assert derived["path_rationale"] == expected["path_rationale"]
+
+
+def test_demo_path_matrix_covers_low_and_high_confidence_semantics() -> None:
+    projects = {
+        project["identity"]["display_name"]: project
+        for project in _snapshot()["projects"]
+    }
+    dovetail = projects["Dovetail Forge"]
+    quartz = projects["Quartz Signal"]
+
+    assert dovetail["derived"]["context_quality"] == "boilerplate"
+    assert dovetail["derived"]["path_confidence"] == "low"
+    assert dovetail["derived"]["path_override"] == "investigate"
+    assert dovetail["risk"]["path_risk"] is True
+    assert quartz["derived"]["context_quality"] == "full"
+    assert quartz["derived"]["path_confidence"] == "high"
+    assert quartz["derived"]["path_override"] == ""
+    assert quartz["risk"]["path_risk"] is False
+
+
+def test_every_demo_row_carries_meaningful_production_shaped_provenance() -> None:
+    for project in _snapshot()["projects"]:
+        provenance = project["provenance"]
+        assert REQUIRED_PROJECT_PROVENANCE_KEYS <= provenance.keys()
+        assert all(
+            provenance[key]["source"].strip()
+            for key in REQUIRED_PROJECT_PROVENANCE_KEYS
+        )
+        assert (
+            provenance["derived.activity_status"]["detail"]
+            == project["derived"]["activity_status"]
+        )
+        assert provenance["derived.archived"]["detail"] == str(
+            project["derived"]["archived"]
+        ).lower()
+        assert (
+            provenance["derived.context_quality"]["detail"]
+            == project["derived"]["context_quality"]
+        )
+        assert provenance["derived.context_files"]["detail"] == str(
+            len(project["derived"]["context_files"])
+        )
+        assert provenance["derived.stack"]["detail"] == ", ".join(
+            project["derived"]["stack"]
+        )
 
 
 def test_coverage_states_span_the_whole_receipt_model() -> None:
@@ -100,6 +255,35 @@ def test_declared_complete_rows_survive_the_consumer_receipt_gate() -> None:
             assert provider["pagination_complete"] is True
             assert isinstance(provider["counts"], dict)
         assert resolved_coverage_state(security) == "complete"
+
+
+def test_stale_rows_are_older_than_the_receipt_freshness_window() -> None:
+    snapshot = _snapshot()
+    generated_at = datetime.fromisoformat(snapshot["generated_at"])
+
+    for project in snapshot["projects"]:
+        security = project["security"]
+        if security["coverage_state"] != "stale":
+            continue
+        source_produced_at = datetime.fromisoformat(security["source_produced_at"])
+        age_hours = (generated_at - source_produced_at).total_seconds() / 3600
+
+        assert age_hours == STALE_RECEIPT_AGE_HOURS
+        assert age_hours > 24
+        assert set(security["providers"]) == set(PROVIDER_NAMES)
+        for name in PROVIDER_NAMES:
+            assert security["providers"][name] == _provider_result(
+                name,
+                state="stale",
+                observed_at=security["source_produced_at"],
+                http_status=200,
+                reason="receipt_stale",
+                pagination_complete=True,
+                conditional_request=True,
+                conditional_result="modified",
+                http_classification="success",
+            )
+        assert _build_security_fields(security).to_dict() == security
 
 
 def test_unknown_rows_carry_no_receipt_evidence() -> None:
@@ -133,6 +317,31 @@ def test_rollups_agree_with_the_project_records() -> None:
         )
 
 
+def test_risk_text_and_tiers_use_canonical_dependabot_alert_counts() -> None:
+    snapshot = _snapshot()
+    repos_with_open_high_critical = 0
+
+    for project in snapshot["projects"]:
+        security = project["security"]
+        risk = project["risk"]
+        canonical_count = (security["dependabot_critical"] or 0) + (
+            security["dependabot_high"] or 0
+        )
+        factor = "active-high-severity-alerts"
+
+        assert security["open_high_critical"] == canonical_count
+        assert risk["security_risk"] is (canonical_count > 0)
+        assert (factor in risk["risk_factors"]) is (canonical_count > 0)
+        if canonical_count > 0:
+            repos_with_open_high_critical += 1
+        if (security["dependabot_critical"] or 0) > 0:
+            assert risk["risk_tier"] == "elevated"
+
+    assert snapshot["rollups"]["security"][
+        "repos_with_open_high_critical"
+    ] == repos_with_open_high_critical
+
+
 def test_attention_state_counts_match_the_project_records() -> None:
     snapshot = _snapshot()
     counts = snapshot["source_summary"]["attention_state_counts"]
@@ -153,6 +362,11 @@ def test_history_gives_the_trends_view_a_real_curve() -> None:
     assert timestamps == sorted(timestamps)
     assert len(set(timestamps)) == len(timestamps)
     assert all(s["schema_version"] == SCHEMA_VERSION for _, s in snapshots)
+    for _, snapshot in snapshots:
+        validate_truth_snapshot_payload(
+            snapshot,
+            allow_synthetic_security_matrix=True,
+        )
 
     # Backlog pressure decays toward the present, so the curve actually moves.
     open_high = [s["rollups"]["security"]["total_open_high"] for _, s in snapshots]

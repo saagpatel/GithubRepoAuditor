@@ -4,6 +4,7 @@ import json
 import tempfile
 from contextlib import nullcontext
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from src.github_security_coverage import (
@@ -102,7 +103,15 @@ def publish_portfolio_truth(
     producer_evidence: ProducerEvidence | None = None,
     producer_repo_root: Path | None = None,
     require_producer_evidence: bool = False,
+    now: datetime | None = None,
 ) -> PortfolioTruthPublishResult:
+    if (
+        security_coverage_metadata is not None
+        or security_receipt_binding is not None
+    ) and now is None:
+        raise PortfolioTruthPublishError(
+            "Receipt-backed security publication requires an explicit evaluation clock."
+        )
     if require_producer_evidence and producer_evidence is None:
         raise PortfolioTruthPublishError(
             "Canonical publication requires validated producer evidence."
@@ -148,8 +157,16 @@ def publish_portfolio_truth(
         repo_status_by_name=repo_status_by_name,
         producer=producer_evidence.to_dict() if producer_evidence else {},
         prior_notion_generated_at=prior_notion_generated_at,
+        now=now,
     )
-    validate_truth_snapshot(build_result.snapshot)
+    validate_truth_snapshot(
+        build_result.snapshot,
+        security_max_age_hours=(
+            security_receipt_binding.max_age_hours
+            if security_receipt_binding is not None
+            else 24
+        ),
+    )
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
@@ -197,15 +214,24 @@ def publish_portfolio_truth(
     originals = {path: (path.read_text() if path.exists() else None) for path in targets}
     published: list[Path] = []
 
+    # This live guard is intentionally separate from the snapshot's shared
+    # evaluation clock: it catches receipt replacement or expiry before writes.
     publication_guard = (
         verified_security_coverage_receipt_binding(security_receipt_binding)
         if security_receipt_binding is not None
         else nullcontext()
     )
     try:
-        with publication_guard:
-            if producer_evidence is not None and producer_repo_root is not None:
-                verify_evidence_still_current(producer_repo_root, producer_evidence)
+        if producer_evidence is not None and producer_repo_root is not None:
+            verify_evidence_still_current(producer_repo_root, producer_evidence)
+        with publication_guard as live_security:
+            if (
+                live_security is not None
+                and live_security.entries_by_full_name != security_alerts_by_name
+            ):
+                raise PortfolioTruthPublishError(
+                    "Security receipt normalized evidence changed after it was loaded."
+                )
             for path, staged in temp_files.items():
                 if path in {registry_output, portfolio_report_output} and not changed[path]:
                     staged.unlink(missing_ok=True)

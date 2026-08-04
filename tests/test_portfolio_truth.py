@@ -12,6 +12,10 @@ import pytest
 
 from src.cli import main
 from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    SecurityCoverageReceiptBinding,
+    _provider_result,
+    _remote_repository_result,
     collect_security_coverage,
     load_security_coverage_receipt,
     write_security_coverage_receipt,
@@ -25,11 +29,13 @@ from src.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
 )
+from src.producer_preflight import ProducerEvidence, producer_evidence_receipt_id
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
@@ -471,6 +477,9 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     beta = projects["Beta"]
     gamma = projects["Calibrate"]
 
+    for project in projects.values():
+        assert REQUIRED_PROJECT_PROVENANCE_KEYS <= project.provenance.keys()
+
     assert alpha.identity.project_key == "Alpha"
     assert alpha.declared.owner == "d"
     assert alpha.declared.category == "commercial"
@@ -821,13 +830,13 @@ repos:
 def test_attention_state_classifier_separates_activity_from_operator_attention() -> (
     None
 ):
-    from src.portfolio_truth_reconcile import _attention_state_for
+    from src.portfolio_truth_decisions import derive_attention_state
     from src.portfolio_truth_types import VALID_LIFECYCLE_STATES
 
     assert "manual-only" in VALID_LIFECYCLE_STATES
 
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -839,7 +848,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "active-product"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -851,7 +860,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "active-infra"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -863,7 +872,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="active",
@@ -875,7 +884,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="recent",
             archived=False,
             lifecycle_state="active",
@@ -887,7 +896,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -899,7 +908,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="dormant",
@@ -911,7 +920,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "parked"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="dormant",
@@ -923,7 +932,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -935,7 +944,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="manual-only",
@@ -947,7 +956,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -959,7 +968,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -971,7 +980,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "experiment"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=True,
             lifecycle_state="archived",
@@ -983,7 +992,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "archived"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="active",
@@ -995,7 +1004,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="active",
@@ -1022,7 +1031,7 @@ def test_attention_state_uses_resolved_catalog_operating_path(
     expected_attention: str,
 ) -> None:
     from src.portfolio_pathing import build_operating_path_entry
-    from src.portfolio_truth_reconcile import _attention_state_for
+    from src.portfolio_truth_decisions import derive_attention_state
 
     catalog_entry = build_operating_path_entry(
         {
@@ -1035,7 +1044,7 @@ def test_attention_state_uses_resolved_catalog_operating_path(
 
     assert catalog_entry["operating_path"] == operating_path
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -1577,6 +1586,85 @@ def test_security_overlay_absent_leaves_repos_unscanned(
         assert project.risk.security_risk is False
 
 
+@pytest.mark.parametrize(
+    ("produced_offset", "loaded_age", "state", "expected_age"),
+    (
+        (timedelta(minutes=-3), -0.05, "fresh", 0.0),
+        (timedelta(seconds=4), 0.0, "fresh", 0.001),
+        (timedelta(), 0.0, "fresh", 0.0),
+        (timedelta(seconds=-36), -0.01, "fresh", 0.0),
+        (timedelta(hours=24, microseconds=-1), 24.0, "fresh", 24.0),
+        (timedelta(hours=24), 24.0, "fresh", 24.0),
+        (timedelta(hours=24, microseconds=1), 24.0, "stale", 24.0),
+    ),
+)
+def test_security_input_freshness_is_canonicalized_at_snapshot_clock(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    produced_offset: timedelta,
+    loaded_age: float,
+    state: str,
+    expected_age: float,
+) -> None:
+    evaluation_at = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    produced_at = evaluation_at - produced_offset
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": produced_at.isoformat(),
+        "state": state,
+        "age_hours": loaded_age,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    built = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=evaluation_at,
+        security_coverage_metadata=metadata,
+    )
+
+    assert built.snapshot.inputs["github_security"]["age_hours"] == expected_age
+    validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
+
+
+def test_security_input_rejects_clock_skew_beyond_tolerance(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    evaluation_at = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    produced_at = evaluation_at + timedelta(minutes=3, microseconds=1)
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": produced_at.isoformat(),
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+    built = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=evaluation_at,
+        security_coverage_metadata=metadata,
+    )
+
+    with pytest.raises(ValueError, match="future-dated"):
+        validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
+
+
 def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None:
     # GHAS is keyed by repo name ("signal-noise"); the local dir is "Signal & Noise".
     from src.portfolio_truth_reconcile import _select_security_entry
@@ -1940,6 +2028,7 @@ def test_registry_render_surfaces_security_and_round_trips(
     legacy_registry: Path,
     tmp_path: Path,
 ) -> None:
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
     security = {
         "Alpha": {
             "dependabot": {
@@ -1947,6 +2036,7 @@ def test_registry_render_surfaces_security_and_round_trips(
                 "high": 1,
                 "medium": 0,
                 "low": 0,
+                "receipt_id": 7,
                 "available": True,
             },
             "code_scanning": {"available": True},
@@ -1958,6 +2048,7 @@ def test_registry_render_surfaces_security_and_round_trips(
         catalog_path=portfolio_catalog,
         legacy_registry_path=legacy_registry,
         include_notion=False,
+        now=now,
         security_alerts_by_name=security,
     )
     markdown = render_registry_markdown(result.snapshot)
@@ -1976,6 +2067,41 @@ def test_registry_render_surfaces_security_and_round_trips(
     registry_path.write_text(markdown)
     parsed = parse_registry(registry_path)
     assert len(parsed) == len(result.snapshot.projects)
+    validate_truth_snapshot(result.snapshot)
+
+    published = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=tmp_path / "legacy-security-output",
+        registry_output=portfolio_workspace / "legacy-security-registry.md",
+        portfolio_report_output=portfolio_workspace / "legacy-security-report.md",
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    assert published.latest_path.exists()
+
+
+def test_receipt_backed_security_publish_requires_explicit_evaluation_clock(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="Receipt-backed security publication requires an explicit evaluation clock",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=tmp_path / "security-output",
+            registry_output=portfolio_workspace / "security-registry.md",
+            portfolio_report_output=portfolio_workspace / "security-report.md",
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_coverage_metadata={},
+        )
 
 
 def test_registry_render_omits_security_flag_when_unscanned(
@@ -2249,6 +2375,132 @@ def test_publish_is_noop_for_unchanged_compatibility_outputs(
     assert second.report_changed is False
     assert registry_output.stat().st_mtime_ns == registry_mtime
     assert report_output.stat().st_mtime_ns == report_mtime
+
+
+def test_publish_uses_bound_security_max_age_for_remote_evidence(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
+        lambda _binding: nullcontext(),
+    )
+    now = datetime.now(timezone.utc)
+    observed_at = now - timedelta(hours=30)
+    alpha = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init", "-b", "main"], cwd=alpha, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "tests@example.invalid"],
+        cwd=alpha,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Tests"], cwd=alpha, check=True
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=alpha, check=True)
+    subprocess.run(["git", "commit", "-m", "fixture"], cwd=alpha, check=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=alpha,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=alpha,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    security = {
+        "d/Alpha": {
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at.isoformat(),
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "providers": {
+                name: _provider_result(
+                    name,
+                    state="not_requested",
+                    reason="fixture_not_requested",
+                )
+                for name in ("dependabot", "code_scanning", "secret_scanning")
+            },
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=observed_at.isoformat(),
+                default_branch=branch,
+                head_sha=head,
+                archived=False,
+            ),
+        }
+    }
+    binding = SecurityCoverageReceiptBinding(
+        source_path=str(tmp_path / "security.json"),
+        receipt_id="sha256:" + "a" * 64,
+        content_sha256="b" * 64,
+        receipt_state="fresh",
+        max_age_hours=48,
+        expected_cohort_count=1,
+        expected_producer_commit=None,
+    )
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": observed_at.isoformat(),
+        "state": "fresh",
+        "age_hours": 30.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "receipt_id": binding.receipt_id,
+        "content_sha256": binding.content_sha256,
+        "path": binding.source_path,
+    }
+
+    built = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+    )
+    validate_truth_snapshot(built.snapshot, security_max_age_hours=48)
+    with pytest.raises(ValueError, match="configured freshness window"):
+        validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
+
+    published = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=tmp_path / "max-age-output",
+        registry_output=portfolio_workspace / "max-age-registry.md",
+        portfolio_report_output=portfolio_workspace / "max-age-report.md",
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+        security_receipt_binding=binding,
+        now=now,
+    )
+    payload = json.loads(published.latest_path.read_text())
+    alpha_payload = next(
+        project for project in payload["projects"] if project["identity"]["path"] == "Alpha"
+    )
+    assert alpha_payload["repository_state"]["remote_default_branch"]["state"] == "observed"
 
 
 def test_generated_registry_notes_do_not_accumulate_purpose_prefix(
@@ -2570,6 +2822,7 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
             security_alerts_by_name=loaded.entries_by_full_name,
             security_coverage_metadata=metadata,
             security_receipt_binding=binding,
+            now=now,
         )
 
     assert replaced is True
@@ -2577,6 +2830,202 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
     assert report_output.read_text() == "sentinel-report\n"
     assert not (output_dir / "portfolio-truth-latest.json").exists()
     assert not list(output_dir.glob("portfolio-truth-*.json"))
+
+
+def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import contextmanager
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    nested_observed_at = now - timedelta(hours=24) + timedelta(milliseconds=500)
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    receipt_path = output_dir / "github-security-coverage-latest.json"
+    receipt_truth = {
+        "projects": [
+            {
+                "identity": {"repo_full_name": "d/Alpha"},
+                "derived": {"attention_state": "active-product"},
+            }
+        ]
+    }
+    receipt = collect_security_coverage(
+        receipt_truth,
+        token=None,
+        expected_cohort_count=1,
+        now=now,
+        producer_commit="a" * 40,
+    )
+    alpha_receipt = receipt["repositories"]["d/Alpha"]
+    alpha_receipt["providers"]["dependabot"] = _provider_result(
+        "dependabot",
+        state="observed",
+        observed_at=nested_observed_at.isoformat(),
+        http_status=200,
+        pagination_complete=True,
+        counts={"critical": 0, "high": 0, "medium": 0, "low": 0},
+    )
+    alpha_receipt["repository"] = _remote_repository_result(
+        state="observed",
+        observed_at=nested_observed_at.isoformat(),
+        default_branch="main",
+        head_sha="b" * 40,
+        archived=False,
+    )
+    write_security_coverage_receipt(
+        receipt,
+        receipt_path,
+        expected_cohort_count=1,
+    )
+    loaded = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now,
+    )
+    at_boundary = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now + timedelta(milliseconds=500),
+    )
+    reloaded = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now + timedelta(seconds=1),
+    )
+    assert loaded.receipt_id == at_boundary.receipt_id == reloaded.receipt_id
+    assert loaded.content_sha256 == at_boundary.content_sha256 == reloaded.content_sha256
+    assert loaded.receipt_state == at_boundary.receipt_state == "fresh"
+    assert reloaded.receipt_state == "fresh"
+    assert loaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
+        "state"
+    ] == "observed"
+    assert reloaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
+        "state"
+    ] == "stale"
+    assert at_boundary.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
+        "state"
+    ] == "observed"
+    assert loaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
+        "observed"
+    )
+    assert reloaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
+        "stale"
+    )
+    assert at_boundary.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
+        "observed"
+    )
+
+    binding = loaded.binding()
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": loaded.schema_version,
+        "produced_at": loaded.produced_at,
+        "state": loaded.receipt_state,
+        "age_hours": loaded.age_hours,
+        "producer_commit": loaded.producer_commit,
+        "cohort_policy": loaded.cohort_policy,
+        "cohort_repository_count": len(loaded.cohort_repositories),
+        "path": loaded.source_path,
+        "receipt_id": loaded.receipt_id,
+        "content_sha256": loaded.content_sha256,
+    }
+    producer_repo_root = tmp_path / "producer-repo"
+    verified_at = now.isoformat()
+    producer_evidence = ProducerEvidence(
+        repository="saagpatel/GithubRepoAuditor",
+        expected_repository="saagpatel/GithubRepoAuditor",
+        commit="a" * 40,
+        ref="refs/heads/main",
+        checkout_role="canonical-producer",
+        checkout_path=str(producer_repo_root),
+        worktree_clean=True,
+        dirty_path_count=0,
+        verified_at=now,
+        receipt_id=producer_evidence_receipt_id(
+            repository="saagpatel/GithubRepoAuditor",
+            expected_repository="saagpatel/GithubRepoAuditor",
+            commit="a" * 40,
+            ref="refs/heads/main",
+            checkout_role="canonical-producer",
+            checkout_path=str(producer_repo_root),
+            verified_at=verified_at,
+        ),
+    )
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    registry_output.write_text("sentinel-registry\n")
+    report_output.write_text("sentinel-report\n")
+
+    clock = {"now": now}
+    events: list[str] = []
+    verification_count = 0
+
+    def advance_during_final_producer_verification(
+        _repo_root: Path,
+        _evidence: ProducerEvidence,
+    ) -> None:
+        nonlocal verification_count
+        verification_count += 1
+        events.append(f"verify-{verification_count}")
+        if verification_count == 2:
+            clock["now"] = now + timedelta(seconds=1)
+
+    @contextmanager
+    def reloaded_guard(_binding: SecurityCoverageReceiptBinding):
+        events.append("guard-enter")
+        try:
+            yield load_security_coverage_receipt(
+                receipt_path,
+                expected_cohort_count=1,
+                expected_producer_commit="a" * 40,
+                now=clock["now"],
+            )
+        finally:
+            events.append("guard-exit")
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.verify_evidence_still_current",
+        advance_during_final_producer_verification,
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
+        reloaded_guard,
+    )
+
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="normalized evidence changed after it was loaded",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_alerts_by_name=loaded.entries_by_full_name,
+            security_coverage_metadata=metadata,
+            security_receipt_binding=binding,
+            producer_evidence=producer_evidence,
+            producer_repo_root=producer_repo_root,
+            now=now,
+        )
+
+    assert events == ["verify-1", "verify-2", "guard-enter", "guard-exit"]
+    assert registry_output.read_text() == "sentinel-registry\n"
+    assert report_output.read_text() == "sentinel-report\n"
+    assert not (output_dir / "portfolio-truth-latest.json").exists()
+    assert not list(output_dir.glob("portfolio-truth-*.json"))
+    assert not list(output_dir.glob("*.tmp"))
 
 
 def test_publish_requires_producer_evidence_before_touching_outputs(
@@ -2922,9 +3371,11 @@ def test_portfolio_truth_app_threads_security_cohort_count(
 
     def fake_security_loader(**kwargs):
         captured.update(kwargs)
+        captured["security_now"] = kwargs["now"]
         return None
 
-    def fake_publish(**_kwargs):
+    def fake_publish(**kwargs):
+        captured["publish_now"] = kwargs["now"]
         return SimpleNamespace(
             latest_path=tmp_path / "latest.json",
             snapshot_path=tmp_path / "history.json",
@@ -2970,6 +3421,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     assert captured["max_age_hours"] == 12
     assert captured["expected_producer_commit"] is None
     assert captured["repo_status_cache"] is None
+    assert captured["security_now"] is captured["publish_now"]
 
 
 def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
@@ -3104,24 +3556,39 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     from types import SimpleNamespace
 
     from src.app.portfolio_truth import run_portfolio_truth_mode
-    from src.producer_preflight import PREFLIGHT_SCHEMA_VERSION
+    from src.producer_preflight import (
+        PREFLIGHT_PASS_CHECKS,
+        PREFLIGHT_SCHEMA_VERSION,
+        producer_evidence_receipt_id,
+    )
 
     receipt = tmp_path / "producer.json"
+    checkout_path = str(tmp_path / "producer-repo")
+    verified_at = "2026-07-10T12:00:00Z"
     receipt.write_text(
         json.dumps(
             {
                 "schema_version": PREFLIGHT_SCHEMA_VERSION,
                 "state": "pass",
                 "repository": "saagpatel/GithubRepoAuditor",
+                "expected_repository": "saagpatel/GithubRepoAuditor",
                 "commit": "a" * 40,
                 "ref": "refs/remotes/origin/main",
                 "checkout_role": "canonical-automation",
-                "checkout_path": str(tmp_path / "producer-repo"),
+                "checkout_path": checkout_path,
                 "worktree_clean": True,
                 "dirty_path_count": 0,
-                "verified_at": "2026-07-10T12:00:00Z",
-                "receipt_id": "sha256:" + "a" * 64,
-                "checks": {},
+                "verified_at": verified_at,
+                "receipt_id": producer_evidence_receipt_id(
+                    repository="saagpatel/GithubRepoAuditor",
+                    expected_repository="saagpatel/GithubRepoAuditor",
+                    commit="a" * 40,
+                    ref="refs/remotes/origin/main",
+                    checkout_role="canonical-automation",
+                    checkout_path=checkout_path,
+                    verified_at=verified_at,
+                ),
+                "checks": PREFLIGHT_PASS_CHECKS,
             }
         )
     )
@@ -3167,6 +3634,7 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     assert evidence.commit == "a" * 40
     assert captured["producer_repo_root"] == tmp_path / "producer-repo"
     assert captured["require_producer_evidence"] is True
+    assert captured["now"] is None
 
 
 def test_cli_portfolio_truth_allow_empty_notion_carries_forward(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,7 @@ from src.producer_preflight import load_producer_evidence
 
 
 def run_portfolio_truth_mode(args: Any) -> None:
+    evaluation_at: datetime | None = None
     output_dir = Path(args.output_dir)
     workspace_root = Path(args.workspace_root)
     registry_output = (
@@ -63,6 +65,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
     security_coverage_metadata: dict[str, object] | None = None
     security_receipt_binding: SecurityCoverageReceiptBinding | None = None
     if getattr(args, "portfolio_truth_include_security", False):
+        evaluation_at = datetime.now(timezone.utc)
         receipt_path_value = getattr(args, "portfolio_truth_security_receipt", None)
         loaded_security = load_security_coverage_by_full_name(
             output_dir=output_dir,
@@ -78,6 +81,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
             expected_producer_commit=(
                 producer_evidence.commit if producer_evidence is not None else None
             ),
+            now=evaluation_at,
         )
         if loaded_security is not None:
             try:
@@ -143,6 +147,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
             producer_evidence=producer_evidence,
             producer_repo_root=producer_repo_root,
             require_producer_evidence=require_producer_evidence,
+            now=evaluation_at,
         )
     except (PortfolioTruthPublishError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
