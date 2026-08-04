@@ -580,7 +580,7 @@ def _security_block(
         "code_scanning_critical": cs_crit,
         "code_scanning_high": cs_high,
         "secret_scanning_open": secrets,
-        "open_high_critical": dep_crit + dep_high + cs_crit + cs_high,
+        "open_high_critical": dep_crit + dep_high,
     }
 
 

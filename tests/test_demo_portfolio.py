@@ -202,6 +202,30 @@ def test_rollups_agree_with_the_project_records() -> None:
         )
 
 
+def test_risk_text_and_tiers_use_canonical_dependabot_alert_counts() -> None:
+    snapshot = _snapshot()
+    repos_with_open_high_critical = 0
+
+    for project in snapshot["projects"]:
+        security = project["security"]
+        risk = project["risk"]
+        canonical_count = (security["dependabot_critical"] or 0) + (
+            security["dependabot_high"] or 0
+        )
+        factor = f"{canonical_count} open high/critical security alerts"
+
+        assert security["open_high_critical"] == canonical_count
+        assert risk["security_risk"] is (canonical_count > 0)
+        assert (factor in risk["risk_factors"]) is (canonical_count > 0)
+        if canonical_count > 0:
+            repos_with_open_high_critical += 1
+            assert risk["risk_tier"] == "elevated"
+
+    assert snapshot["rollups"]["security"][
+        "repos_with_open_high_critical"
+    ] == repos_with_open_high_critical
+
+
 def test_attention_state_counts_match_the_project_records() -> None:
     snapshot = _snapshot()
     counts = snapshot["source_summary"]["attention_state_counts"]
