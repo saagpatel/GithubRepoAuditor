@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
@@ -91,6 +92,34 @@ def test_fixture_stale_receipt_is_stale_at_the_manifest_evaluation_time() -> Non
     age_hours = (EVALUATED_AT - source_produced_at).total_seconds() / 3600
 
     assert age_hours > 24
+
+
+def test_fixture_receipt_rows_preserve_producer_repository_state() -> None:
+    fixture = build_contract_fixture()
+    receipt_rows = [
+        project
+        for project in fixture["projects"]
+        if project["security"]["receipt_schema_version"]
+    ]
+
+    for project in receipt_rows:
+        repository_state = project["repository_state"]
+        remote = repository_state["remote_default_branch"]
+        assert repository_state["state"] == "observed"
+        assert repository_state["local"]["path"].startswith("/demo-workspace/")
+        assert remote["source"] == "github-graphql-default-branch-head-v1"
+        if project["security"]["receipt_state"] == "stale":
+            assert remote["state"] == "stale"
+            assert remote["default_branch"] is None
+            assert remote["head_sha"] is None
+        else:
+            assert remote["state"] == "observed"
+            assert remote["default_branch"] == "main"
+            assert len(remote["head_sha"]) == 64
+
+    raw = json.dumps([project["repository_state"] for project in receipt_rows]).lower()
+    assert "/users/" not in raw
+    assert "saagpatel" not in raw
 
 
 def test_generated_and_committed_fixtures_pass_canonical_payload_validation() -> None:
@@ -192,7 +221,7 @@ def test_canonical_payload_validation_rejects_invalid_provider_state() -> None:
         "fabricated"
     )
 
-    with pytest.raises(ValueError, match="Invalid security provider state"):
+    with pytest.raises(ValueError, match="state is invalid"):
         validate_truth_snapshot_payload(fixture)
 
 
@@ -203,7 +232,7 @@ def test_canonical_payload_validation_rejects_observed_provider_count_shape() ->
     ]
     del counts["low"]
 
-    with pytest.raises(ValueError, match="provider counts.*invalid"):
+    with pytest.raises(ValueError, match="counts are invalid"):
         validate_truth_snapshot_payload(fixture)
 
 
@@ -213,7 +242,7 @@ def test_canonical_payload_validation_rejects_provider_classification_drift() ->
         "http_classification"
     ] = "ok"
 
-    with pytest.raises(ValueError, match="provider classification"):
+    with pytest.raises(ValueError, match="http_classification"):
         validate_truth_snapshot_payload(fixture)
 
 
@@ -233,20 +262,62 @@ def test_canonical_payload_validation_rejects_invalid_active_infra_category() ->
         validate_truth_snapshot_payload(fixture)
 
 
+def test_canonical_payload_validation_rejects_providers_without_receipt() -> None:
+    fixture = build_contract_fixture()
+    unknown = next(
+        project["security"]
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "unknown"
+    )
+    stale = next(
+        project["security"]
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "stale"
+    )
+    unknown["providers"] = deepcopy(stale["providers"])
+
+    with pytest.raises(ValueError, match="require receipt evidence"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_missing_remote_branch_state() -> None:
+    fixture = build_contract_fixture()
+    del fixture["projects"][0]["repository_state"]["remote_default_branch"]
+
+    with pytest.raises(ValueError, match="requires remote_default_branch"):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(("field", "value"), (("default_branch", None), ("head_sha", "short")))
+def test_canonical_payload_validation_rejects_invalid_remote_branch_shape(
+    field: str,
+    value: object,
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["repository_state"]["remote_default_branch"][field] = value
+
+    with pytest.raises(ValueError, match="Invalid remote default branch"):
+        validate_truth_snapshot_payload(fixture)
+
+
 @pytest.mark.parametrize(
-    ("section", "field"),
-    ((None, "repository_state"), ("security", "cohort_member")),
+    ("section", "field", "message"),
+    (
+        (None, "repository_state", "Invalid repository state"),
+        ("security", "cohort_member", "canonical reconstruction"),
+    ),
 )
 def test_canonical_payload_validation_rejects_missing_project_fields(
     section: str | None,
     field: str,
+    message: str,
 ) -> None:
     fixture = build_contract_fixture()
     project = fixture["projects"][0]
     target = project if section is None else project[section]
     del target[field]
 
-    with pytest.raises(ValueError, match="canonical reconstruction"):
+    with pytest.raises(ValueError, match=message):
         validate_truth_snapshot_payload(fixture)
 
 

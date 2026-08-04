@@ -61,6 +61,17 @@ PROVIDER_STATES = frozenset(
         "stale",
     }
 )
+PROVIDER_CONDITIONAL_RESULTS = frozenset(
+    {
+        "not_used",
+        "modified",
+        "not_modified",
+        "failed",
+        "malformed",
+        "incomplete",
+        "invalid_prior",
+    }
+)
 REMOTE_REPOSITORY_STATES = frozenset(
     {
         "observed",
@@ -412,7 +423,7 @@ def _provider_result(
         and pagination_complete
         and isinstance(counts, dict)
     )
-    return {
+    result = {
         "state": state,
         "reason_code": _provider_reason_code(state),
         "observed_at": observed_at,
@@ -441,6 +452,235 @@ def _provider_result(
         ),
         "counts": counts if state == "observed" else None,
     }
+    validate_normalized_security_provider(provider, result)
+    return result
+
+
+def validate_normalized_security_provider(
+    provider: str,
+    value: Any,
+    *,
+    produced_at: datetime | None = None,
+    current: datetime | None = None,
+) -> dict[str, Any]:
+    """Validate one provider envelope after receipt normalization."""
+    if provider not in PROVIDER_NAMES:
+        raise SecurityCoverageError(f"invalid security provider: {provider}")
+    if not isinstance(value, dict):
+        raise SecurityCoverageError(f"{provider} normalized result must be an object")
+    required = {
+        "state",
+        "reason_code",
+        "observed_at",
+        "http_status",
+        "http_classification",
+        "reason",
+        "etag",
+        "last_modified",
+        "conditional",
+        "pagination_complete",
+        "completed",
+        "zero_findings",
+        "counts",
+    }
+    missing = sorted(required - value.keys())
+    if missing:
+        raise SecurityCoverageError(
+            f"{provider} normalized result is missing fields: {missing}"
+        )
+
+    state = _text(value.get("state"))
+    if state not in PROVIDER_STATES:
+        raise SecurityCoverageError(f"{provider}.state is invalid: {state!r}")
+    if value.get("reason_code") != _provider_reason_code(state):
+        raise SecurityCoverageError(f"{provider}.reason_code does not match state")
+
+    conditional = value.get("conditional")
+    if (
+        not isinstance(conditional, dict)
+        or set(conditional) != {"requested", "result"}
+        or not isinstance(conditional.get("requested"), bool)
+        or conditional.get("result") not in PROVIDER_CONDITIONAL_RESULTS
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.conditional metadata is invalid"
+        )
+
+    observed_at_value = value.get("observed_at")
+    observed_at = None
+    if observed_at_value is not None:
+        observed_at = _parse_datetime(
+            observed_at_value,
+            field_name=f"{provider}.observed_at",
+        )
+        if produced_at is not None and observed_at > produced_at:
+            raise SecurityCoverageError(
+                f"{provider}.observed_at is later than receipt produced_at"
+            )
+        if current is not None and (
+            current - observed_at
+        ).total_seconds() / 3600 < -0.05:
+            raise SecurityCoverageError(f"{provider}.observed_at is future-dated")
+    elif state != "not_requested":
+        raise SecurityCoverageError(f"{provider}.observed_at is required for {state}")
+
+    http_status = value.get("http_status")
+    if http_status is not None and (
+        not isinstance(http_status, int) or isinstance(http_status, bool)
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.http_status must be an integer or null"
+        )
+    reason = value.get("reason")
+    if reason is not None and not isinstance(reason, str):
+        raise SecurityCoverageError(f"{provider}.reason must be a string or null")
+    if state not in {"observed", "stale"} and not _text(reason):
+        raise SecurityCoverageError(f"{provider}.reason is required for {state}")
+    for field_name in ("etag", "last_modified"):
+        field_value = value.get(field_name)
+        if field_value is not None and not isinstance(field_value, str):
+            raise SecurityCoverageError(
+                f"{provider}.{field_name} must be a string or null"
+            )
+    if not isinstance(value.get("pagination_complete"), bool):
+        raise SecurityCoverageError(
+            f"{provider}.pagination_complete must be boolean"
+        )
+    if not isinstance(value.get("completed"), bool):
+        raise SecurityCoverageError(f"{provider}.completed must be boolean")
+
+    if state in {"observed", "stale"}:
+        if http_status not in {200, 304}:
+            raise SecurityCoverageError(
+                f"{provider}.{state} requires HTTP 200 or 304"
+            )
+        expected_classification = (
+            "success" if http_status == 200 else "not_modified"
+        )
+        expected_result = "not_modified" if http_status == 304 else (
+            "modified" if conditional["requested"] else "not_used"
+        )
+        if value.get("http_classification") != expected_classification:
+            raise SecurityCoverageError(
+                f"{provider}.http_classification does not match {state} response"
+            )
+        if conditional["result"] != expected_result or (
+            http_status == 304 and conditional["requested"] is not True
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.conditional metadata does not match {state} response"
+            )
+        if value.get("pagination_complete") is not True:
+            raise SecurityCoverageError(
+                f"{provider}.{state} requires complete pagination"
+            )
+    elif value.get("pagination_complete") is not False:
+        raise SecurityCoverageError(
+            f"{provider}.{state} cannot claim complete pagination"
+        )
+
+    if state == "not_requested":
+        if http_status is not None or value.get("http_classification") is not None:
+            raise SecurityCoverageError(
+                f"{provider}.not_requested cannot claim an HTTP response"
+            )
+        if conditional["result"] not in {"not_used", "incomplete"}:
+            raise SecurityCoverageError(
+                f"{provider}.not_requested conditional result is invalid"
+            )
+        if conditional["result"] == "not_used" and conditional["requested"]:
+            raise SecurityCoverageError(
+                f"{provider}.not_requested cannot claim an unused request"
+            )
+    elif state == "credential_unavailable" and http_status not in {None, 401}:
+        raise SecurityCoverageError(
+            f"{provider}.credential_unavailable requires HTTP 401 or no response"
+        )
+    elif state == "forbidden" and http_status != 403:
+        raise SecurityCoverageError(f"{provider}.forbidden requires HTTP 403")
+    elif state == "feature_unavailable":
+        if reason == ELIGIBILITY_REASON:
+            if (
+                http_status != 200
+                or value.get("http_classification") != "eligibility"
+                or conditional != {"requested": False, "result": "not_used"}
+            ):
+                raise SecurityCoverageError(
+                    f"{provider}.feature_unavailable eligibility result is invalid"
+                )
+        elif http_status not in {403, 404}:
+            raise SecurityCoverageError(
+                f"{provider}.feature_unavailable requires HTTP 403 or 404"
+            )
+    elif state == "not_found" and http_status != 404:
+        raise SecurityCoverageError(f"{provider}.not_found requires HTTP 404")
+    elif state == "gone" and http_status != 410:
+        raise SecurityCoverageError(f"{provider}.gone requires HTTP 410")
+    elif state == "rate_limited" and http_status not in {403, 429}:
+        raise SecurityCoverageError(
+            f"{provider}.rate_limited requires HTTP 403 or 429"
+        )
+    elif state == "transient_error" and not (
+        http_status is None or http_status >= 500
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.transient_error requires a network failure or HTTP 5xx"
+        )
+
+    if state not in {"observed", "stale", "not_requested"}:
+        expected_classification = (
+            None
+            if http_status is None
+            else "eligibility"
+            if state == "feature_unavailable" and reason == ELIGIBILITY_REASON
+            else "success"
+            if http_status == 200
+            else "not_modified"
+            if http_status == 304
+            else reason
+        )
+        if value.get("http_classification") != expected_classification:
+            raise SecurityCoverageError(
+                f"{provider}.http_classification does not match its HTTP response"
+            )
+
+    counts = value.get("counts")
+    if state == "observed":
+        if (
+            not isinstance(counts, dict)
+            or set(counts) != set(_COUNT_KEYS[provider])
+            or any(
+                not isinstance(count, int)
+                or isinstance(count, bool)
+                or count < 0
+                for count in counts.values()
+            )
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.counts are invalid for an observed result"
+            )
+        if value.get("completed") is not True:
+            raise SecurityCoverageError(
+                f"{provider}.observed must be completed"
+            )
+        if value.get("zero_findings") is not (sum(counts.values()) == 0):
+            raise SecurityCoverageError(
+                f"{provider}.zero_findings does not match observed counts"
+            )
+    else:
+        if counts is not None:
+            raise SecurityCoverageError(
+                f"{provider}.{state} must clear counts"
+            )
+        if value.get("completed") is not False or value.get("zero_findings") is not None:
+            raise SecurityCoverageError(
+                f"{provider}.{state} cannot claim a completed observation"
+            )
+        if state == "stale" and reason != "receipt_stale":
+            raise SecurityCoverageError(
+                f"{provider}.stale requires receipt_stale reason"
+            )
+    return dict(value)
 
 
 def _response_message(response: requests.Response) -> str:
@@ -1526,15 +1766,7 @@ def _validate_provider(
     conditional = _mapping(data.get("conditional"))
     if not isinstance(conditional.get("requested"), bool) or conditional.get(
         "result"
-    ) not in {
-        "not_used",
-        "modified",
-        "not_modified",
-        "failed",
-        "malformed",
-        "incomplete",
-        "invalid_prior",
-    }:
+    ) not in PROVIDER_CONDITIONAL_RESULTS:
         raise SecurityCoverageError(f"{provider}.conditional metadata is invalid")
     if http_status is not None and (
         not isinstance(http_status, int) or isinstance(http_status, bool)
@@ -1645,7 +1877,7 @@ def _validate_provider(
         state = "stale"
         counts = None
     normalized_completed = state == "observed" and raw_completed
-    return {
+    normalized = {
         "state": state,
         "reason_code": _provider_reason_code(state),
         "observed_at": data.get("observed_at"),
@@ -1660,6 +1892,12 @@ def _validate_provider(
         "zero_findings": raw_zero_findings if normalized_completed else None,
         "counts": counts,
     }
+    return validate_normalized_security_provider(
+        provider,
+        normalized,
+        produced_at=produced_at,
+        current=current,
+    )
 
 
 def _validate_remote_repository(

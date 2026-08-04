@@ -136,7 +136,63 @@
         "top_level_dir": "platform"
       },
       "provenance": {},
-      "repository_state": {},
+      "repository_state": {
+        "local": {
+          "ahead": 0,
+          "behind": 0,
+          "branch": "main",
+          "dirty": false,
+          "dirty_path_count": 0,
+          "head": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
+          "path": "/demo-workspace/platform/dovetail-forge",
+          "upstream": "origin/main",
+          "upstream_observation_source": "local_tracking_ref"
+        },
+        "observed_at": "2026-08-01T00:00:00+00:00",
+        "remote_default_branch": {
+          "archived": false,
+          "default_branch": "main",
+          "head_sha": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
+          "observed_at": "2026-08-01T00:00:00+00:00",
+          "reason": null,
+          "reason_code": "observed",
+          "source": "github-graphql-default-branch-head-v1",
+          "state": "observed"
+        },
+        "state": "observed",
+        "topology": {
+          "configured_path": "/demo-workspace/platform/dovetail-forge",
+          "kind": "working_repository",
+          "linked_worktree_count": 0,
+          "selection": {
+            "branch": "main",
+            "candidate_count": 1,
+            "head": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
+            "path": "/demo-workspace/platform/dovetail-forge",
+            "reason": null,
+            "reason_code": "unique_remote_head_match",
+            "source": "github-graphql-default-branch-head-v1",
+            "state": "selected"
+          },
+          "worktree_count": 1
+        },
+        "worktrees": [
+          {
+            "ahead": 0,
+            "bare": false,
+            "behind": 0,
+            "branch": "main",
+            "detached": false,
+            "dirty": false,
+            "dirty_path_count": 0,
+            "head": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
+            "path": "/demo-workspace/platform/dovetail-forge",
+            "state": "observed",
+            "upstream": "origin/main",
+            "upstream_observation_source": "local_tracking_ref"
+          }
+        ]
+      },
       "risk": {
         "context_risk": false,
         "doctor_gap": false,
@@ -304,7 +360,63 @@
         "top_level_dir": "studio"
       },
       "provenance": {},
-      "repository_state": {},
+      "repository_state": {
+        "local": {
+          "ahead": 0,
+          "behind": 0,
+          "branch": "main",
+          "dirty": false,
+          "dirty_path_count": 0,
+          "head": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
+          "path": "/demo-workspace/studio/kestrel-loom",
+          "upstream": "origin/main",
+          "upstream_observation_source": "local_tracking_ref"
+        },
+        "observed_at": "2026-08-01T00:00:00+00:00",
+        "remote_default_branch": {
+          "archived": false,
+          "default_branch": "main",
+          "head_sha": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
+          "observed_at": "2026-08-01T00:00:00+00:00",
+          "reason": null,
+          "reason_code": "observed",
+          "source": "github-graphql-default-branch-head-v1",
+          "state": "observed"
+        },
+        "state": "observed",
+        "topology": {
+          "configured_path": "/demo-workspace/studio/kestrel-loom",
+          "kind": "working_repository",
+          "linked_worktree_count": 0,
+          "selection": {
+            "branch": "main",
+            "candidate_count": 1,
+            "head": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
+            "path": "/demo-workspace/studio/kestrel-loom",
+            "reason": null,
+            "reason_code": "unique_remote_head_match",
+            "source": "github-graphql-default-branch-head-v1",
+            "state": "selected"
+          },
+          "worktree_count": 1
+        },
+        "worktrees": [
+          {
+            "ahead": 0,
+            "bare": false,
+            "behind": 0,
+            "branch": "main",
+            "detached": false,
+            "dirty": false,
+            "dirty_path_count": 0,
+            "head": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
+            "path": "/demo-workspace/studio/kestrel-loom",
+            "state": "observed",
+            "upstream": "origin/main",
+            "upstream_observation_source": "local_tracking_ref"
+          }
+        ]
+      },
       "risk": {
         "context_risk": false,
         "doctor_gap": false,
@@ -466,7 +578,60 @@
         "top_level_dir": "lab"
       },
       "provenance": {},
-      "repository_state": {},
+      "repository_state": {
+        "local": {
+          "ahead": 0,
+          "behind": 0,
+          "branch": "main",
+          "dirty": false,
+          "dirty_path_count": 0,
+          "head": "f0880b359ae6df38b4ea8eae386c6eca43085e5cfe95ccb0814289e3427cbac2",
+          "path": "/demo-workspace/lab/quartz-signal",
+          "upstream": "origin/main",
+          "upstream_observation_source": "local_tracking_ref"
+        },
+        "observed_at": "2026-08-01T00:00:00+00:00",
+        "remote_default_branch": {
+          "archived": null,
+          "default_branch": null,
+          "head_sha": null,
+          "observed_at": "2026-07-30T23:00:00+00:00",
+          "reason": "receipt_stale",
+          "reason_code": "stale_observation",
+          "source": "github-graphql-default-branch-head-v1",
+          "state": "stale"
+        },
+        "state": "observed",
+        "topology": {
+          "configured_path": "/demo-workspace/lab/quartz-signal",
+          "kind": "working_repository",
+          "linked_worktree_count": 0,
+          "selection": {
+            "candidate_count": 0,
+            "reason": "independent remote-default evidence is not observed (state=stale)",
+            "reason_code": "remote_default_branch_unavailable",
+            "source": "github-graphql-default-branch-head-v1",
+            "state": "unknown"
+          },
+          "worktree_count": 1
+        },
+        "worktrees": [
+          {
+            "ahead": 0,
+            "bare": false,
+            "behind": 0,
+            "branch": "main",
+            "detached": false,
+            "dirty": false,
+            "dirty_path_count": 0,
+            "head": "f0880b359ae6df38b4ea8eae386c6eca43085e5cfe95ccb0814289e3427cbac2",
+            "path": "/demo-workspace/lab/quartz-signal",
+            "state": "observed",
+            "upstream": "origin/main",
+            "upstream_observation_source": "local_tracking_ref"
+          }
+        ]
+      },
       "risk": {
         "context_risk": true,
         "doctor_gap": false,
@@ -625,7 +790,55 @@
         "top_level_dir": "lab"
       },
       "provenance": {},
-      "repository_state": {},
+      "repository_state": {
+        "local": {
+          "ahead": 0,
+          "behind": 0,
+          "branch": "main",
+          "dirty": false,
+          "dirty_path_count": 0,
+          "head": "f88738445f00c41b9915812a478d50676b4a5a3a9902d61950cc26be60d266d4",
+          "path": "/demo-workspace/lab/solstice-cairn",
+          "upstream": "origin/main",
+          "upstream_observation_source": "local_tracking_ref"
+        },
+        "observed_at": "2026-08-01T00:00:00+00:00",
+        "remote_default_branch": {
+          "reason": "no independent live remote read was performed by portfolio generation",
+          "reason_code": "not_requested",
+          "state": "unknown"
+        },
+        "state": "observed",
+        "topology": {
+          "configured_path": "/demo-workspace/lab/solstice-cairn",
+          "kind": "working_repository",
+          "linked_worktree_count": 0,
+          "selection": {
+            "candidate_count": 0,
+            "reason": "independent remote-default evidence is not observed (state=unknown)",
+            "reason_code": "remote_default_branch_unavailable",
+            "source": "remote_default_branch",
+            "state": "unknown"
+          },
+          "worktree_count": 1
+        },
+        "worktrees": [
+          {
+            "ahead": 0,
+            "bare": false,
+            "behind": 0,
+            "branch": "main",
+            "detached": false,
+            "dirty": false,
+            "dirty_path_count": 0,
+            "head": "f88738445f00c41b9915812a478d50676b4a5a3a9902d61950cc26be60d266d4",
+            "path": "/demo-workspace/lab/solstice-cairn",
+            "state": "observed",
+            "upstream": "origin/main",
+            "upstream_observation_source": "local_tracking_ref"
+          }
+        ]
+      },
       "risk": {
         "context_risk": true,
         "doctor_gap": false,
@@ -684,10 +897,10 @@
       "dependabot_observed_count": 2,
       "dependabot_zero_finding_count": 0,
       "partial_repo_count": 1,
-      "remote_default_branch_observed_count": 0,
+      "remote_default_branch_observed_count": 2,
       "remote_default_branch_partial_count": 0,
-      "remote_default_branch_stale_count": 0,
-      "remote_default_branch_unavailable_count": 4,
+      "remote_default_branch_stale_count": 1,
+      "remote_default_branch_unavailable_count": 1,
       "repos_with_open_high_critical": 1,
       "scanned_count": 1,
       "secret_scanning_observed_count": 1,

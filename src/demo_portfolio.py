@@ -13,12 +13,17 @@ a schema bump can never leave the demo fixture silently behind.
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    _remote_repository_result,
+)
+from src.portfolio_repository_state import _observed_result
 from src.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
 
 # The demo workspace is deliberately not a real filesystem path.
@@ -626,6 +631,94 @@ def _security_block(
     }
 
 
+def _repository_state(
+    *,
+    group: str,
+    slug: str,
+    observed_at: str,
+    security: dict[str, Any],
+) -> dict[str, Any]:
+    source_produced_at = security["source_produced_at"]
+    if security["receipt_state"] == "stale":
+        remote = _remote_repository_result(
+            state="stale",
+            observed_at=source_produced_at,
+            reason="receipt_stale",
+        )
+    elif security["receipt_schema_version"]:
+        remote = _remote_repository_result(
+            state="observed",
+            observed_at=source_produced_at,
+            reason=None,
+            default_branch="main",
+            head_sha=hashlib.sha256(f"{DEMO_ORG}/{slug}".encode()).hexdigest(),
+            archived=False,
+        )
+    else:
+        remote = {
+            "state": "unknown",
+            "reason_code": "not_requested",
+            "reason": (
+                "no independent live remote read was performed by portfolio generation"
+            ),
+        }
+    path = f"{DEMO_WORKSPACE_ROOT}/{group}/{slug}"
+    head = remote.get("head_sha") or hashlib.sha256(path.encode()).hexdigest()
+    local = {
+        "path": path,
+        "head": head,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "upstream": "origin/main",
+        "upstream_observation_source": "local_tracking_ref",
+        "ahead": 0,
+        "behind": 0,
+    }
+    worktree = {
+        "state": "observed",
+        **local,
+        "detached": False,
+        "bare": False,
+    }
+    if remote["state"] == "observed":
+        selection = {
+            "source": remote["source"],
+            "state": "selected",
+            "reason_code": "unique_remote_head_match",
+            "reason": None,
+            "candidate_count": 1,
+            "path": path,
+            "head": head,
+            "branch": "main",
+        }
+    else:
+        selection = {
+            "source": remote.get("source", "remote_default_branch"),
+            "state": "unknown",
+            "reason_code": "remote_default_branch_unavailable",
+            "reason": (
+                "independent remote-default evidence is not observed "
+                f"(state={remote['state']})"
+            ),
+            "candidate_count": 0,
+        }
+    topology = {
+        "kind": "working_repository",
+        "configured_path": path,
+        "worktree_count": 1,
+        "linked_worktree_count": 0,
+        "selection": selection,
+    }
+    return _observed_result(
+        observed_at=datetime.fromisoformat(observed_at),
+        remote=remote,
+        worktrees=[worktree],
+        topology=topology,
+        local=local,
+    )
+
+
 def resolved_coverage_state(security: dict[str, Any]) -> str:
     """Mirror of the consumer's receipt gate, used to keep rollups honest.
 
@@ -749,6 +842,12 @@ def build_projects(
         )
         operating_path, lifecycle_state = _ATTENTION_INTENT[spec.attention]
         security = _security_block(spec, _pressure_alerts(spec, index, pressure), stamp)
+        repository_state = _repository_state(
+            group=spec.group,
+            slug=slug,
+            observed_at=stamp,
+            security=security,
+        )
         context_files = ["AGENTS.md"]
         if context_quality in {"full", "standard"}:
             context_files.append("docs/current-state.md")
@@ -824,6 +923,7 @@ def build_projects(
                 },
                 "risk": _risk(spec, security, context_quality),
                 "security": security,
+                "repository_state": repository_state,
                 "advisory": {
                     "notion_portfolio_call": "",
                     "notion_momentum": "",
