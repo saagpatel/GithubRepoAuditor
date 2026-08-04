@@ -245,6 +245,57 @@ def test_observation_reports_linked_worktree_without_file_names(tmp_path: Path) 
     assert "untracked.txt" not in str(state)
 
 
+def test_unborn_linked_worktree_normalizes_zero_head_and_validates(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    orphan = tmp_path / "orphan"
+    _git(repo, "worktree", "add", "--orphan", str(orphan))
+    orphan_block = next(
+        block
+        for block in _git(repo, "worktree", "list", "--porcelain").split("\n\n")
+        if f"worktree {orphan}" in block
+    )
+    raw_head = next(
+        line.removeprefix("HEAD ")
+        for line in orphan_block.splitlines()
+        if line.startswith("HEAD ")
+    )
+    assert len(raw_head) in {40, 64}
+    assert set(raw_head) == {"0"}
+
+    observed_at = datetime(2026, 7, 12, tzinfo=UTC)
+    state = observe_repository_state(repo, observed_at=observed_at)
+    orphan_state = next(
+        item for item in state["worktrees"] if item["path"] == str(orphan)
+    )
+
+    assert state["state"] == "observed"
+    assert orphan_state["state"] == "unknown"
+    assert orphan_state["reason_code"] == "worktree_observation_failed"
+    assert orphan_state["head"] is None
+    assert orphan_state["branch"] == "orphan"
+    assert orphan_state["detached"] is False
+    _validate_repository_state_shape(
+        state,
+        expected_remote=state["remote_default_branch"],
+        project_key="fixture/unborn-worktree",
+        generated_at=observed_at,
+    )
+
+    tampered = deepcopy(state)
+    next(
+        item for item in tampered["worktrees"] if item["path"] == str(orphan)
+    )["head"] = raw_head
+    with pytest.raises(ValueError, match="worktree 1"):
+        _validate_repository_state_shape(
+            tampered,
+            expected_remote=state["remote_default_branch"],
+            project_key="fixture/unborn-worktree",
+            generated_at=observed_at,
+        )
+
+
 def test_dangling_bare_head_uses_clean_matching_linked_worktree(
     tmp_path: Path,
 ) -> None:

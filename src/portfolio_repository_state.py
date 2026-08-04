@@ -475,7 +475,11 @@ def _worktrees(path: Path) -> list[dict[str, Any]]:
         if key == "worktree":
             current["path"] = value
         elif key == "HEAD":
-            current["head"] = value
+            current["head"] = (
+                None
+                if len(value) in {40, 64} and value and set(value) == {"0"}
+                else value
+            )
         elif key == "branch":
             current["branch"] = value.removeprefix("refs/heads/")
         elif key == "detached":

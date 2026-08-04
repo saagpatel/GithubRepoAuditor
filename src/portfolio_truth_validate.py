@@ -1386,7 +1386,7 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
             value.get("reason_code") != "worktree_observation_failed"
             or value.get("reason") != "git could not observe the linked worktree"
             or not _nonempty_text(value.get("path"))
-            or not _valid_git_oid(value.get("head"))
+            or not _optional_git_head(value.get("head"))
             or not _optional_git_branch(value.get("branch"))
             or not isinstance(value.get("detached"), bool)
             or value.get("bare") is not False
