@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_repository_state import observe_repository_state
+from src.portfolio_truth_validate import _validate_repository_state_shape
 
 
 def _git(path: Path, *args: str) -> str:
@@ -108,6 +109,13 @@ def test_dangling_bare_head_uses_clean_matching_linked_worktree(
     assert state["local"]["path"] == str(linked)
     assert state["local"]["head"] == head
     assert state["local"]["dirty"] is False
+
+    _validate_repository_state_shape(
+        state,
+        expected_remote=state["remote_default_branch"],
+        project_key="fixture/bare-coordinator",
+        generated_at=datetime(2026, 7, 12, tzinfo=UTC),
+    )
 
 
 def test_bare_coordinator_selects_unique_clean_remote_default_worktree(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,8 +23,12 @@ from src.portfolio_truth_contract_fixture import (
     fixture_bytes,
     manifest_bytes,
 )
+from src.portfolio_truth_reconcile import _build_security_fields
 from src.portfolio_truth_types import SCHEMA_VERSION
-from src.portfolio_truth_validate import validate_truth_snapshot_payload
+from src.portfolio_truth_validate import (
+    _validate_security_fields,
+    validate_truth_snapshot_payload,
+)
 
 
 def test_committed_contract_artifacts_match_the_deterministic_generator() -> None:
@@ -40,16 +44,16 @@ def test_manifest_binds_schema_generator_and_fixture_digest() -> None:
     assert manifest["contract_version"] == CONTRACT_VERSION
     assert manifest["portfolio_truth_schema_version"] == SCHEMA_VERSION
     assert manifest["producer"]["repository"] == PRODUCER_REPOSITORY
-    assert manifest["producer"]["artifact_sha256"] == hashlib.sha256(
-        fixture_raw
-    ).hexdigest()
+    assert (
+        manifest["producer"]["artifact_sha256"]
+        == hashlib.sha256(fixture_raw).hexdigest()
+    )
 
 
 def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
     fixture = build_contract_fixture()
     states = [
-        resolved_coverage_state(project["security"])
-        for project in fixture["projects"]
+        resolved_coverage_state(project["security"]) for project in fixture["projects"]
     ]
 
     assert fixture["schema_version"] == SCHEMA_VERSION
@@ -119,6 +123,28 @@ def test_fixture_receipt_rows_preserve_producer_repository_state() -> None:
     raw = json.dumps([project["repository_state"] for project in receipt_rows]).lower()
     assert "/users/" not in raw
     assert "saagpatel" not in raw
+
+
+def test_fixture_repository_state_spans_fresh_stale_and_no_receipt_rows() -> None:
+    fixture = build_contract_fixture()
+    by_receipt_state = {
+        project["security"]["receipt_state"]: project["repository_state"]
+        for project in fixture["projects"]
+    }
+
+    assert {"fresh", "stale", "unknown"}.issubset(by_receipt_state)
+    for repository_state in by_receipt_state.values():
+        assert repository_state["state"] == "observed"
+        assert repository_state["local"] == {
+            key: repository_state["worktrees"][0][key]
+            for key in repository_state["local"]
+        }
+        assert repository_state["topology"]["worktree_count"] == len(
+            repository_state["worktrees"]
+        )
+    assert by_receipt_state["fresh"]["remote_default_branch"]["state"] == "observed"
+    assert by_receipt_state["stale"]["remote_default_branch"]["state"] == "stale"
+    assert by_receipt_state["unknown"]["remote_default_branch"]["state"] == "unknown"
 
 
 def test_generated_and_committed_fixtures_pass_canonical_payload_validation() -> None:
@@ -226,9 +252,7 @@ def test_canonical_payload_validation_rejects_invalid_provider_state() -> None:
 
 def test_canonical_payload_validation_rejects_observed_provider_count_shape() -> None:
     fixture = build_contract_fixture()
-    counts = fixture["projects"][0]["security"]["providers"]["dependabot"][
-        "counts"
-    ]
+    counts = fixture["projects"][0]["security"]["providers"]["dependabot"]["counts"]
     del counts["low"]
 
     with pytest.raises(ValueError, match="counts are invalid"):
@@ -275,8 +299,78 @@ def test_canonical_payload_validation_rejects_providers_without_receipt() -> Non
     )
     unknown["providers"] = deepcopy(stale["providers"])
 
-    with pytest.raises(ValueError, match="require receipt evidence"):
+    with pytest.raises(ValueError, match="Legacy security provider"):
         validate_truth_snapshot_payload(fixture)
+
+
+def _legacy_security_fields():
+    return _build_security_fields(
+        {
+            "dependabot": {"critical": 1, "high": 2, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        (
+            lambda fields: fields.providers["dependabot"].update(reason="fabricated"),
+            "envelope",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"].update(
+                observed_at=GENERATED_AT.isoformat()
+            ),
+            "envelope",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"].update(
+                reason_code="observed"
+            ),
+            "provider",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"].update(
+                pagination_complete=False
+            ),
+            "counts",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"]["counts"].update(high=-1),
+            "counts",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"]["counts"].update(high=True),
+            "counts",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"].update(
+                state="not_requested", pagination_complete=False, counts={}
+            ),
+            "unobserved",
+        ),
+        (
+            lambda fields: object.__setattr__(fields, "dependabot_high", 99),
+            "does not match",
+        ),
+        (
+            lambda fields: object.__setattr__(fields, "coverage_state", "unknown"),
+            "coverage",
+        ),
+    ),
+)
+def test_legacy_security_validation_rejects_tampered_envelopes(
+    mutation: object,
+    message: str,
+) -> None:
+    fields = _legacy_security_fields()
+    mutation(fields)
+
+    with pytest.raises(ValueError, match=message):
+        _validate_security_fields(fields, "fixture/legacy", GENERATED_AT)
 
 
 def test_canonical_payload_validation_rejects_missing_remote_branch_state() -> None:
@@ -287,7 +381,207 @@ def test_canonical_payload_validation_rejects_missing_remote_branch_state() -> N
         validate_truth_snapshot_payload(fixture)
 
 
-@pytest.mark.parametrize(("field", "value"), (("default_branch", None), ("head_sha", "short")))
+def _delete_repository_field(repository_state: dict[str, object], field: str) -> None:
+    del repository_state[field]
+
+
+def _set_nested_repository_value(
+    repository_state: dict[str, object],
+    path: tuple[str | int, ...],
+    value: object,
+) -> None:
+    target: object = repository_state
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+
+
+def _delete_nested_repository_value(
+    repository_state: dict[str, object],
+    path: tuple[str | int, ...],
+) -> None:
+    target: object = repository_state
+    for key in path[:-1]:
+        target = target[key]
+    del target[path[-1]]
+
+
+def _replace_all_repository_paths(repository_state: dict[str, object]) -> None:
+    private_path = "/Users/d/private-repository"
+    repository_state["local"]["path"] = private_path
+    repository_state["worktrees"][0]["path"] = private_path
+    repository_state["topology"]["configured_path"] = private_path
+    repository_state["topology"]["selection"]["path"] = private_path
+
+
+def _replace_all_repository_paths_with_other_demo_path(
+    repository_state: dict[str, object],
+) -> None:
+    other_path = "/demo-workspace/other/project"
+    repository_state["local"]["path"] = other_path
+    repository_state["worktrees"][0]["path"] = other_path
+    repository_state["topology"]["configured_path"] = other_path
+    repository_state["topology"]["selection"]["path"] = other_path
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        (lambda state: _delete_repository_field(state, "local"), "fields"),
+        (lambda state: _delete_repository_field(state, "worktrees"), "fields"),
+        (lambda state: _delete_repository_field(state, "topology"), "fields"),
+        (
+            lambda state: _delete_nested_repository_value(state, ("local", "upstream")),
+            "fields",
+        ),
+        (
+            lambda state: _delete_nested_repository_value(
+                state, ("worktrees", 0, "dirty")
+            ),
+            "fields",
+        ),
+        (
+            lambda state: _delete_nested_repository_value(
+                state, ("topology", "selection")
+            ),
+            "fields",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "path"), "/Users/d/private-local"
+            ),
+            "[Rr]epository",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "path"), "/Users/d/private-worktree"
+            ),
+            "[Rr]epository",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state,
+                ("topology", "selection", "path"),
+                "/Users/d/private-selection",
+            ),
+            "[Rr]epository",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "configured_path"), "/Users/d/private-topology"
+            ),
+            "[Rr]epository",
+        ),
+        (_replace_all_repository_paths, "public-safe"),
+        (_replace_all_repository_paths_with_other_demo_path, "match identity"),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "head"), "short"
+            ),
+            "head",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "head"), "short"
+            ),
+            "head",
+        ),
+        (
+            lambda state: _set_nested_repository_value(state, ("local", "dirty"), True),
+            "dirty state",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "dirty_path_count"), 1
+            ),
+            "dirty state",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream_observation_source"), "unavailable"
+            ),
+            "upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "branch"), None
+            ),
+            "detached upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "kind"), "fabricated"
+            ),
+            "topology kind",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "worktree_count"), 99
+            ),
+            "worktree count",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "worktree_count"), True
+            ),
+            "worktree count",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "linked_worktree_count"), 99
+            ),
+            "linked worktree count",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "selection", "candidate_count"), 99
+            ),
+            "selection",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("topology", "selection", "candidate_count"), True
+            ),
+            "selection",
+        ),
+        (
+            lambda state: state.update(
+                observed_at=(GENERATED_AT + timedelta(minutes=1)).isoformat()
+            ),
+            "future-dated",
+        ),
+    ),
+)
+def test_canonical_payload_validation_rejects_repository_state_attacks(
+    mutation: object,
+    message: str,
+) -> None:
+    fixture = build_contract_fixture()
+    repository_state = fixture["projects"][0]["repository_state"]
+    mutation(repository_state)
+
+    with pytest.raises(ValueError, match=message):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_remote_evidence_without_receipt() -> None:
+    fixture = build_contract_fixture()
+    unknown = next(
+        project
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "unknown"
+    )
+    unknown["repository_state"]["remote_default_branch"] = deepcopy(
+        fixture["projects"][0]["repository_state"]["remote_default_branch"]
+    )
+
+    with pytest.raises(ValueError, match="production normalization"):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), (("default_branch", None), ("head_sha", "short"))
+)
 def test_canonical_payload_validation_rejects_invalid_remote_branch_shape(
     field: str,
     value: object,
@@ -302,7 +596,7 @@ def test_canonical_payload_validation_rejects_invalid_remote_branch_shape(
 @pytest.mark.parametrize(
     ("section", "field", "message"),
     (
-        (None, "repository_state", "Invalid repository state"),
+        (None, "repository_state", "requires remote_default_branch"),
         ("security", "cohort_member", "canonical reconstruction"),
     ),
 )

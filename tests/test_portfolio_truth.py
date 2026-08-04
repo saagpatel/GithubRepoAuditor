@@ -1976,6 +1976,19 @@ def test_registry_render_surfaces_security_and_round_trips(
     registry_path.write_text(markdown)
     parsed = parse_registry(registry_path)
     assert len(parsed) == len(result.snapshot.projects)
+    validate_truth_snapshot(result.snapshot)
+
+    published = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=tmp_path / "legacy-security-output",
+        registry_output=portfolio_workspace / "legacy-security-registry.md",
+        portfolio_report_output=portfolio_workspace / "legacy-security-report.md",
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    assert published.latest_path.exists()
 
 
 def test_registry_render_omits_security_flag_when_unscanned(

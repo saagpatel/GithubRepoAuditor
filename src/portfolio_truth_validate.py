@@ -21,6 +21,12 @@ from src.portfolio_pathing import (
     VALID_PATH_CONFIDENCE,
     VALID_PATH_OVERRIDES,
 )
+from src.portfolio_repository_state import (
+    _local_from_worktree,
+    _select_remote_default_worktree,
+    _selected_worktree,
+    _tracks_nonmatching_branch,
+)
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
@@ -151,9 +157,7 @@ def _validate_security_fields(
     """Validate receipt-backed provider envelopes after receipt normalization."""
     providers = security.providers
     if not isinstance(providers, Mapping):
-        raise ValueError(
-            f"Security providers for {project_key} must be an object."
-        )
+        raise ValueError(f"Security providers for {project_key} must be an object.")
 
     has_receipt_evidence = bool(
         security.receipt_schema_version
@@ -162,9 +166,7 @@ def _validate_security_fields(
     )
     if not has_receipt_evidence:
         if providers:
-            raise ValueError(
-                f"Security providers for {project_key} require receipt evidence."
-            )
+            _validate_legacy_security_fields(security, project_key)
         return
     if security.receipt_schema_version != GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION:
         raise ValueError(
@@ -251,6 +253,103 @@ def _validate_security_fields(
         )
 
 
+def _validate_legacy_security_fields(
+    security: SecurityFields,
+    project_key: str,
+) -> None:
+    if (
+        security.receipt_schema_version
+        or security.source_produced_at
+        or security.receipt_state != "unknown"
+        or set(security.providers) != set(PROVIDER_NAMES)
+    ):
+        raise ValueError(f"Legacy security evidence for {project_key} is invalid.")
+    provider_keys = {
+        "state",
+        "observed_at",
+        "http_status",
+        "reason",
+        "etag",
+        "last_modified",
+        "pagination_complete",
+        "counts",
+    }
+    count_fields = {
+        "dependabot": {
+            "critical": "dependabot_critical",
+            "high": "dependabot_high",
+            "medium": "dependabot_medium",
+            "low": "dependabot_low",
+        },
+        "code_scanning": {
+            "critical": "code_scanning_critical",
+            "high": "code_scanning_high",
+        },
+        "secret_scanning": {"open": "secret_scanning_open"},
+    }
+    states: dict[str, str] = {}
+    for name in PROVIDER_NAMES:
+        provider = security.providers[name]
+        if not isinstance(provider, Mapping) or set(provider) != provider_keys:
+            raise ValueError(
+                f"Legacy security provider for {project_key}/{name} is invalid."
+            )
+        state = provider.get("state")
+        if state not in {"observed", "not_requested"}:
+            raise ValueError(
+                f"Legacy security provider state for {project_key}/{name} is invalid."
+            )
+        states[name] = state
+        if (
+            provider.get("observed_at") is not None
+            or provider.get("http_status") is not None
+            or provider.get("reason") != "legacy_ghas_entry"
+            or provider.get("etag") is not None
+            or provider.get("last_modified") is not None
+        ):
+            raise ValueError(
+                f"Legacy security provider envelope for {project_key}/{name} is invalid."
+            )
+        counts = provider.get("counts")
+        if state == "observed":
+            if (
+                provider.get("pagination_complete") is not True
+                or not isinstance(counts, Mapping)
+                or any(
+                    not isinstance(value, int) or isinstance(value, bool) or value < 0
+                    for value in counts.values()
+                )
+            ):
+                raise ValueError(
+                    f"Legacy security provider counts for {project_key}/{name} are invalid."
+                )
+        elif provider.get("pagination_complete") is not False or counts is not None:
+            raise ValueError(
+                f"Legacy unobserved provider for {project_key}/{name} is invalid."
+            )
+        for count_name, field_name in count_fields[name].items():
+            expected = counts.get(count_name, 0) if state == "observed" else None
+            if getattr(security, field_name) != expected:
+                raise ValueError(
+                    f"Legacy security count for {project_key}/{field_name} "
+                    "does not match its provider."
+                )
+
+    observed_count = sum(state == "observed" for state in states.values())
+    expected_coverage = (
+        "complete"
+        if observed_count == 3
+        else "partial"
+        if observed_count
+        else "unknown"
+    )
+    if (
+        security.coverage_state != expected_coverage
+        or security.alerts_available is not (expected_coverage == "complete")
+    ):
+        raise ValueError(f"Legacy security coverage for {project_key} is inconsistent.")
+
+
 def _validate_repository_state(
     repository_state: dict[str, Any],
     security: SecurityFields,
@@ -258,59 +357,584 @@ def _validate_repository_state(
     generated_at: datetime,
 ) -> None:
     if not isinstance(repository_state, Mapping):
-        raise ValueError(
-            f"Repository state for {project_key} must be an object."
-        )
+        raise ValueError(f"Repository state for {project_key} must be an object.")
     has_receipt_evidence = bool(security.receipt_schema_version)
-    if not has_receipt_evidence:
-        return
-    if repository_state.get("state") not in {
-        "observed",
-        "unknown",
-        "not_a_repository",
-    }:
-        raise ValueError(f"Invalid repository state for {project_key}.")
-    _parse_datetime(
-        repository_state.get("observed_at"),
-        f"projects[{project_key}].repository_state.observed_at",
-    )
     remote = repository_state.get("remote_default_branch")
     if not isinstance(remote, dict):
         raise ValueError(
             f"Repository state for {project_key} requires remote_default_branch."
         )
-    produced_at = _parse_datetime(
-        security.source_produced_at,
-        f"projects[{project_key}].security.source_produced_at",
-    )
-    try:
-        normalized = _validate_remote_repository(
-            remote,
-            receipt_is_stale=security.receipt_state == "stale",
-            produced_at=produced_at,
-            current=generated_at,
-            max_age_hours=24,
+    if has_receipt_evidence:
+        produced_at = _parse_datetime(
+            security.source_produced_at,
+            f"projects[{project_key}].security.source_produced_at",
         )
-    except SecurityCoverageError as exc:
-        raise ValueError(
-            f"Invalid remote default branch for {project_key}: {exc}"
-        ) from exc
-    if remote != normalized:
+        try:
+            expected_remote = _validate_remote_repository(
+                remote,
+                receipt_is_stale=security.receipt_state == "stale",
+                produced_at=produced_at,
+                current=generated_at,
+                max_age_hours=24,
+            )
+        except SecurityCoverageError as exc:
+            raise ValueError(
+                f"Invalid remote default branch for {project_key}: {exc}"
+            ) from exc
+    else:
+        expected_remote = {
+            "state": "unknown",
+            "reason_code": "not_requested",
+            "reason": (
+                "no independent live remote read was performed by portfolio generation"
+            ),
+        }
+    if remote != expected_remote:
         raise ValueError(
             f"Remote default branch for {project_key} differs from production "
             "normalization."
         )
+    _validate_repository_state_shape(
+        repository_state,
+        expected_remote=expected_remote,
+        project_key=project_key,
+        generated_at=generated_at,
+    )
+
+
+def _validate_repository_state_shape(
+    repository_state: Mapping[str, Any],
+    *,
+    expected_remote: dict[str, Any],
+    project_key: str,
+    generated_at: datetime,
+) -> None:
+    state = repository_state.get("state")
+    if state not in {"observed", "unknown", "not_a_repository"}:
+        raise ValueError(f"Invalid repository state for {project_key}.")
+    observed_at = _parse_datetime(
+        repository_state.get("observed_at"),
+        f"projects[{project_key}].repository_state.observed_at",
+    )
+    if observed_at > generated_at:
+        raise ValueError(f"Repository state for {project_key} is future-dated.")
+    if state == "not_a_repository":
+        _require_repository_keys(
+            repository_state,
+            {"state", "observed_at", "remote_default_branch"},
+            project_key,
+            "repository state",
+        )
+        return
+    if state == "unknown" and "topology" not in repository_state:
+        _require_repository_keys(
+            repository_state,
+            {
+                "state",
+                "observed_at",
+                "reason_code",
+                "reason",
+                "remote_default_branch",
+            },
+            project_key,
+            "repository state",
+        )
+        if repository_state.get(
+            "reason_code"
+        ) != "repository_observation_failed" or not _nonempty_text(
+            repository_state.get("reason")
+        ):
+            raise ValueError(
+                f"Repository observation failure for {project_key} is invalid."
+            )
+        return
+
+    required = {
+        "state",
+        "observed_at",
+        "local",
+        "remote_default_branch",
+        "topology",
+        "worktrees",
+    }
+    if state == "unknown":
+        required.remove("local")
+        required.update({"reason_code", "reason"})
+        if "local" in repository_state:
+            required.add("local")
+    _require_repository_keys(
+        repository_state,
+        required,
+        project_key,
+        "repository state",
+    )
+    worktrees = repository_state.get("worktrees")
+    if not isinstance(worktrees, list) or not worktrees:
+        raise ValueError(f"Repository worktrees for {project_key} are invalid.")
+    for index, worktree in enumerate(worktrees):
+        _validate_worktree(worktree, project_key=project_key, index=index)
+    paths = [worktree["path"] for worktree in worktrees]
+    if len({Path(path).resolve() for path in paths}) != len(paths):
+        raise ValueError(f"Repository worktree paths for {project_key} are duplicated.")
+
+    topology = repository_state.get("topology")
+    if not isinstance(topology, Mapping):
+        raise ValueError(f"Repository topology for {project_key} is invalid.")
+    kind = topology.get("kind")
+    topology_keys = {
+        "kind",
+        "configured_path",
+        "worktree_count",
+        "linked_worktree_count",
+        "selection",
+    }
+    if kind == "bare_coordinator":
+        topology_keys.add("coordinator")
+    elif kind != "working_repository":
+        raise ValueError(f"Repository topology kind for {project_key} is invalid.")
+    _require_repository_keys(topology, topology_keys, project_key, "topology")
+    configured_path = topology.get("configured_path")
+    if not any(_same_repository_path(configured_path, path) for path in paths):
+        raise ValueError(
+            f"Repository configured path for {project_key} is not a worktree."
+        )
+    worktree_count = topology.get("worktree_count")
+    if (
+        not isinstance(worktree_count, int)
+        or isinstance(worktree_count, bool)
+        or worktree_count != len(worktrees)
+    ):
+        raise ValueError(f"Repository worktree count for {project_key} is invalid.")
+    coordinator_count = sum(item.get("state") == "coordinator" for item in worktrees)
+    expected_linked_count = len(worktrees) - coordinator_count
+    if kind == "working_repository":
+        expected_linked_count -= 1
+        if coordinator_count:
+            raise ValueError(
+                f"Working repository topology for {project_key} has a coordinator."
+            )
+    elif coordinator_count != 1:
+        raise ValueError(
+            f"Bare repository topology for {project_key} requires one coordinator."
+        )
+    linked_worktree_count = topology.get("linked_worktree_count")
+    if (
+        not isinstance(linked_worktree_count, int)
+        or isinstance(linked_worktree_count, bool)
+        or linked_worktree_count != expected_linked_count
+    ):
+        raise ValueError(
+            f"Repository linked worktree count for {project_key} is invalid."
+        )
+    if kind == "bare_coordinator":
+        _validate_coordinator(
+            topology.get("coordinator"),
+            worktrees,
+            configured_path=str(configured_path),
+            project_key=project_key,
+        )
+
+    selection = topology.get("selection")
+    _validate_selection(selection, project_key=project_key)
+    expected_selection = _select_remote_default_worktree(worktrees, expected_remote)
+    if selection != expected_selection:
+        raise ValueError(f"Repository selection for {project_key} is inconsistent.")
+
+    local = repository_state.get("local")
+    if local is not None:
+        _validate_local(local, project_key=project_key, label="local")
+    if selection.get("state") == "selected":
+        if state != "observed" or local != _local_from_worktree(
+            _selected_worktree(worktrees, selection)
+        ):
+            raise ValueError(
+                f"Selected repository worktree for {project_key} does not match local."
+            )
+        return
+
+    if kind == "bare_coordinator":
+        if (
+            state != "unknown"
+            or local is not None
+            or repository_state.get("reason_code") != selection.get("reason_code")
+            or repository_state.get("reason") != selection.get("reason")
+        ):
+            raise ValueError(
+                f"Bare repository uncertainty for {project_key} is inconsistent."
+            )
+        return
+
+    configured = next(
+        item
+        for item in worktrees
+        if _same_repository_path(item["path"], configured_path)
+    )
+    if configured.get("state") != "observed":
+        raise ValueError(
+            f"Configured repository worktree for {project_key} is not observed."
+        )
+    expected_local = _local_from_worktree(configured)
+    if local != expected_local:
+        raise ValueError(
+            f"Configured repository worktree for {project_key} does not match local."
+        )
+    if expected_remote.get("state") == "observed":
+        expected_state = "unknown"
+        expected_reason_code = selection.get("reason_code")
+        expected_reason = selection.get("reason")
+    elif _tracks_nonmatching_branch(expected_local):
+        expected_state = "unknown"
+        expected_reason_code = "nonstandard_upstream_requires_remote_default_evidence"
+        expected_reason = (
+            "the configured worktree tracks a differently named branch, and "
+            "independent remote-default evidence is unavailable"
+        )
+    else:
+        expected_state = "observed"
+        expected_reason_code = expected_reason = None
+    if state != expected_state or (
+        state == "unknown"
+        and (
+            repository_state.get("reason_code") != expected_reason_code
+            or repository_state.get("reason") != expected_reason
+        )
+    ):
+        raise ValueError(f"Repository state for {project_key} is inconsistent.")
+
+
+def _validate_local(
+    value: Any,
+    *,
+    project_key: str,
+    label: str,
+    require_exact_keys: bool = True,
+) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Repository {label} for {project_key} is invalid.")
+    local_keys = {
+        "path",
+        "head",
+        "branch",
+        "dirty",
+        "dirty_path_count",
+        "upstream",
+        "upstream_observation_source",
+        "ahead",
+        "behind",
+    }
+    if require_exact_keys:
+        _require_repository_keys(value, local_keys, project_key, label)
+    elif not local_keys.issubset(value):
+        raise ValueError(f"Repository {label} fields for {project_key} are invalid.")
+    if not _nonempty_text(value.get("path")):
+        raise ValueError(f"Repository {label} path for {project_key} is invalid.")
+    if not isinstance(value.get("head"), str) or not re.fullmatch(
+        r"[0-9a-f]{40,64}", value["head"]
+    ):
+        raise ValueError(f"Repository {label} head for {project_key} is invalid.")
+    branch = value.get("branch")
+    if branch is not None and not _nonempty_text(branch):
+        raise ValueError(f"Repository {label} branch for {project_key} is invalid.")
+    dirty = value.get("dirty")
+    count = value.get("dirty_path_count")
+    if (
+        not isinstance(dirty, bool)
+        or not isinstance(count, int)
+        or isinstance(count, bool)
+        or count < 0
+        or dirty is not (count > 0)
+    ):
+        raise ValueError(
+            f"Repository {label} dirty state for {project_key} is invalid."
+        )
+    upstream = value.get("upstream")
+    expected_source = "local_tracking_ref" if upstream else "unavailable"
+    if (
+        upstream is not None and (not _nonempty_text(upstream) or "/" not in upstream)
+    ) or value.get("upstream_observation_source") != expected_source:
+        raise ValueError(f"Repository {label} upstream for {project_key} is invalid.")
+    if branch is None and upstream is not None:
+        raise ValueError(
+            f"Repository {label} detached upstream for {project_key} is invalid."
+        )
+    for field_name in ("ahead", "behind"):
+        count_value = value.get(field_name)
+        if upstream is None:
+            valid = count_value is None
+        else:
+            valid = (
+                isinstance(count_value, int)
+                and not isinstance(count_value, bool)
+                and count_value >= 0
+            )
+        if not valid:
+            raise ValueError(
+                f"Repository {label} {field_name} for {project_key} is invalid."
+            )
+
+
+def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Repository worktree {index} for {project_key} is invalid.")
+    state = value.get("state")
+    label = f"worktree {index}"
+    if state == "observed":
+        _require_repository_keys(
+            value,
+            {
+                "state",
+                "path",
+                "head",
+                "branch",
+                "dirty",
+                "dirty_path_count",
+                "upstream",
+                "upstream_observation_source",
+                "ahead",
+                "behind",
+                "detached",
+                "bare",
+            },
+            project_key,
+            label,
+        )
+        _validate_local(
+            value,
+            project_key=project_key,
+            label=label,
+            require_exact_keys=False,
+        )
+        if value.get("bare") is not False or not isinstance(
+            value.get("detached"), bool
+        ):
+            raise ValueError(f"Repository {label} flags for {project_key} are invalid.")
+        if (value["branch"] is None) is not value["detached"]:
+            raise ValueError(
+                f"Repository {label} branch state for {project_key} is invalid."
+            )
+        return
+    if state == "coordinator":
+        _require_repository_keys(
+            value,
+            {
+                "state",
+                "path",
+                "head",
+                "branch",
+                "detached",
+                "bare",
+                "dirty",
+                "dirty_path_count",
+            },
+            project_key,
+            label,
+        )
+        if (
+            not _nonempty_text(value.get("path"))
+            or value.get("detached") is not False
+            or value.get("bare") is not True
+            or value.get("dirty") is not None
+            or value.get("dirty_path_count") is not None
+            or not _optional_git_head(value.get("head"))
+            or not _optional_nonempty_text(value.get("branch"))
+        ):
+            raise ValueError(f"Repository {label} for {project_key} is invalid.")
+        return
+    if state == "unknown":
+        _require_repository_keys(
+            value,
+            {
+                "state",
+                "reason_code",
+                "reason",
+                "path",
+                "head",
+                "branch",
+                "detached",
+                "bare",
+                "dirty",
+                "dirty_path_count",
+            },
+            project_key,
+            label,
+        )
+        if (
+            value.get("reason_code") != "worktree_observation_failed"
+            or not _nonempty_text(value.get("reason"))
+            or not _nonempty_text(value.get("path"))
+            or not isinstance(value.get("head"), str)
+            or not re.fullmatch(r"[0-9a-f]{40,64}", value["head"])
+            or not _optional_nonempty_text(value.get("branch"))
+            or not isinstance(value.get("detached"), bool)
+            or value.get("bare") is not False
+            or value.get("dirty") is not None
+            or value.get("dirty_path_count") is not None
+        ):
+            raise ValueError(f"Repository {label} for {project_key} is invalid.")
+        if (value["branch"] is None) is not value["detached"]:
+            raise ValueError(
+                f"Repository {label} branch state for {project_key} is invalid."
+            )
+        return
+    raise ValueError(f"Repository {label} state for {project_key} is invalid.")
+
+
+def _validate_coordinator(
+    value: Any,
+    worktrees: list[dict[str, Any]],
+    *,
+    configured_path: str,
+    project_key: str,
+) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Repository coordinator for {project_key} is invalid.")
+    _require_repository_keys(
+        value,
+        {"path", "head", "head_state", "branch"},
+        project_key,
+        "coordinator",
+    )
+    matching = [
+        item
+        for item in worktrees
+        if item.get("state") == "coordinator"
+        and _same_repository_path(item.get("path"), configured_path)
+    ]
+    if len(matching) != 1:
+        raise ValueError(f"Repository coordinator for {project_key} is inconsistent.")
+    head = value.get("head")
+    expected_head_state = "observed" if head else "dangling"
+    if (
+        value.get("path") != configured_path
+        or value.get("head_state") != expected_head_state
+        or not _optional_git_head(head)
+        or not _optional_nonempty_text(value.get("branch"))
+    ):
+        raise ValueError(f"Repository coordinator for {project_key} is inconsistent.")
+
+
+def _validate_selection(value: Any, *, project_key: str) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Repository selection for {project_key} is invalid.")
+    state = value.get("state")
+    keys = {"source", "state", "reason_code", "reason", "candidate_count"}
+    if state == "selected":
+        keys.update({"path", "head", "branch"})
+    elif state != "unknown":
+        raise ValueError(f"Repository selection for {project_key} is invalid.")
+    _require_repository_keys(value, keys, project_key, "selection")
+    candidate_count = value.get("candidate_count")
+    if (
+        not _nonempty_text(value.get("source"))
+        or not _nonempty_text(value.get("reason_code"))
+        or not isinstance(candidate_count, int)
+        or isinstance(candidate_count, bool)
+        or candidate_count < 0
+    ):
+        raise ValueError(f"Repository selection for {project_key} is invalid.")
+    if state == "selected":
+        if (
+            value.get("reason") is not None
+            or not _nonempty_text(value.get("path"))
+            or not isinstance(value.get("head"), str)
+            or not re.fullmatch(r"[0-9a-f]{40,64}", value["head"])
+            or not _optional_nonempty_text(value.get("branch"))
+        ):
+            raise ValueError(f"Repository selection for {project_key} is invalid.")
+    elif not _nonempty_text(value.get("reason")):
+        raise ValueError(f"Repository selection for {project_key} is invalid.")
+
+
+def _require_repository_keys(
+    value: Mapping[str, Any],
+    expected: set[str],
+    project_key: str,
+    label: str,
+) -> None:
+    if set(value) != expected:
+        raise ValueError(f"Repository {label} fields for {project_key} are invalid.")
+
+
+def _nonempty_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _optional_nonempty_text(value: Any) -> bool:
+    return value is None or _nonempty_text(value)
+
+
+def _optional_git_head(value: Any) -> bool:
+    return value is None or (
+        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40,64}", value) is not None
+    )
+
+
+def _same_repository_path(left: Any, right: Any) -> bool:
+    return (
+        isinstance(left, str)
+        and isinstance(right, str)
+        and Path(left).resolve() == Path(right).resolve()
+    )
 
 
 def validate_truth_snapshot_payload(payload: Mapping[str, Any]) -> None:
     """Fully validate serialized truth, including canonical byte-shape fidelity."""
     canonical = canonicalize_truth_snapshot_payload(payload)
+    for project in canonical["projects"]:
+        _validate_portable_repository_paths(
+            project["repository_state"],
+            project_key=project["identity"]["project_key"],
+            project_path=project["identity"]["path"],
+        )
     supplied = _without_documented_contract_canaries(payload)
     mismatch = _first_payload_mismatch(supplied, canonical)
     if mismatch is not None:
         raise ValueError(
             "Serialized PortfolioTruth snapshot differs from canonical "
             f"reconstruction at {mismatch}."
+        )
+
+
+def _validate_portable_repository_paths(
+    repository_state: Mapping[str, Any],
+    *,
+    project_key: str,
+    project_path: str,
+) -> None:
+    paths: list[Any] = []
+    local = repository_state.get("local")
+    if isinstance(local, Mapping):
+        paths.append(local.get("path"))
+    topology = repository_state.get("topology")
+    if isinstance(topology, Mapping):
+        paths.append(topology.get("configured_path"))
+        selection = topology.get("selection")
+        if isinstance(selection, Mapping) and selection.get("state") == "selected":
+            paths.append(selection.get("path"))
+        coordinator = topology.get("coordinator")
+        if isinstance(coordinator, Mapping):
+            paths.append(coordinator.get("path"))
+    worktrees = repository_state.get("worktrees")
+    if isinstance(worktrees, list):
+        paths.extend(
+            worktree.get("path")
+            for worktree in worktrees
+            if isinstance(worktree, Mapping)
+        )
+    if any(
+        not isinstance(path, str)
+        or not path.startswith("/demo-workspace/")
+        or ".." in Path(path).parts
+        for path in paths
+    ):
+        raise ValueError(
+            f"Portable repository paths for {project_key} are not public-safe."
+        )
+    if isinstance(topology, Mapping) and topology.get("configured_path") != str(
+        Path("/demo-workspace") / project_path
+    ):
+        raise ValueError(
+            f"Portable configured path for {project_key} does not match identity."
         )
 
 
@@ -385,9 +1009,13 @@ def _snapshot_from_payload(payload: Mapping[str, Any]) -> PortfolioTruthSnapshot
             exclusions=dict(payload["exclusions"]),
         )
     except KeyError as exc:
-        raise ValueError(f"Portfolio truth payload is missing field: {exc.args[0]}") from exc
+        raise ValueError(
+            f"Portfolio truth payload is missing field: {exc.args[0]}"
+        ) from exc
     except TypeError as exc:
-        raise ValueError(f"Portfolio truth payload has an invalid field type: {exc}") from exc
+        raise ValueError(
+            f"Portfolio truth payload has an invalid field type: {exc}"
+        ) from exc
 
 
 def _project_from_payload(payload: object) -> PortfolioTruthProject:
@@ -401,8 +1029,12 @@ def _project_from_payload(payload: object) -> PortfolioTruthProject:
                 last_activity, "projects[].derived.last_meaningful_activity_at"
             )
         return PortfolioTruthProject(
-            identity=IdentityFields(**_model_kwargs(IdentityFields, payload["identity"])),
-            declared=DeclaredFields(**_model_kwargs(DeclaredFields, payload["declared"])),
+            identity=IdentityFields(
+                **_model_kwargs(IdentityFields, payload["identity"])
+            ),
+            declared=DeclaredFields(
+                **_model_kwargs(DeclaredFields, payload["declared"])
+            ),
             derived=DerivedFields(**_model_kwargs(DerivedFields, derived)),
             risk=RiskFields(**_model_kwargs(RiskFields, payload.get("risk", {}))),
             security=SecurityFields(
@@ -498,8 +1130,12 @@ def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:
     if mode == "live" and notion.get("carried_from_generated_at") is not None:
         raise ValueError("Live Notion input cannot declare a carried-forward origin.")
     if mode == "verified-snapshot" and not notion.get("observed_at"):
-        raise ValueError("Verified Notion snapshot input requires an observation timestamp.")
-    github_security = inputs.get("github_security") if isinstance(inputs, dict) else None
+        raise ValueError(
+            "Verified Notion snapshot input requires an observation timestamp."
+        )
+    github_security = (
+        inputs.get("github_security") if isinstance(inputs, dict) else None
+    )
     if isinstance(github_security, dict):
         receipt_id = github_security.get("receipt_id")
         content_sha256 = github_security.get("content_sha256")
