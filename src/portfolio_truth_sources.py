@@ -295,12 +295,20 @@ def _checkout_topology_group(
             ):
                 continue
             known_paths.add(resolved_path)
-            linked_project = _inspect_project_dir(
-                resolved_path,
-                resolved_root,
-                catalog_data=catalog_data,
-                now=now,
-            )
+            try:
+                linked_project = _inspect_project_dir(
+                    resolved_path,
+                    resolved_root,
+                    catalog_data=catalog_data,
+                    now=now,
+                )
+            except OSError:
+                linked_project = {
+                    "name": resolved_path.name,
+                    "path": resolved_path.relative_to(resolved_root).as_posix(),
+                    "project_path": resolved_path,
+                    "_checkout_observation": _checkout_observation({}),
+                }
             linked_project["repo_full_name"] = source_project.get("repo_full_name", "")
             expanded.append(linked_project)
     return expanded
@@ -535,6 +543,9 @@ def _declared_checkout_evidence(
     for source_project in group:
         observation = _checkout_observation(source_project)
         for declaration in observation.get("declared_paths") or []:
+            if declaration.get("scope") == "outside_workspace":
+                unresolved.add(str(declaration["workspace_relative_path"]))
+                continue
             target = Path(str(declaration["absolute_path"]))
             candidates = [
                 project
@@ -1084,6 +1095,14 @@ def _declared_canonical_paths(
             for match in _ABSOLUTE_CODE_PATH.finditer(line):
                 candidate = Path(match.group("path")).resolve()
                 if not _path_is_within(candidate, resolved_workspace):
+                    declarations.append(
+                        {
+                            "source_file": source_file,
+                            "absolute_path": "",
+                            "workspace_relative_path": "external-checkout",
+                            "scope": "outside_workspace",
+                        }
+                    )
                     continue
                 declarations.append(
                     {

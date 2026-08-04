@@ -736,6 +736,157 @@ def test_unresolved_declared_checkout_flows_through_truth_validation(
     validate_truth_snapshot(result.snapshot)
 
 
+def test_external_declared_checkout_is_opaque_unknown(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "ExternalRepo"
+    repo.mkdir()
+    external_root = portfolio_workspace.parent / "outside"
+    external_root.mkdir()
+    escape = portfolio_workspace / "escape"
+    escape.symlink_to(external_root, target_is_directory=True)
+    external_target = escape / "ExternalRepo" / "src"
+    _write(
+        repo / "AGENTS.md",
+        "# ExternalRepo\n\n## Canonical Paths\n\n"
+        f"- Source: `{external_target}`\n",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/ExternalRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "AGENTS.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/ExternalRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["selection"]["state"] == "unknown"
+    assert (
+        authority["selection"]["reason_code"]
+        == "declared_checkout_path_unresolved"
+    )
+    assert authority["unresolved_declared_paths"] == ["external-checkout"]
+    assert str(external_target) not in json.dumps(authority)
+    assert str(external_target.resolve()) not in json.dumps(authority)
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:declared_checkout_path_unresolved"
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_prunable_linked_worktree_is_unknown_not_publication_failure(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "PrunableRepo"
+    repo.mkdir()
+    _write(repo / "README.md", "# PrunableRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/PrunableRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    linked = portfolio_workspace / "_codex-worktrees" / "prunable-repo"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature", str(linked), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+    preserved = portfolio_workspace / "_backups" / "prunable-repo"
+    preserved.parent.mkdir()
+    linked.rename(preserved)
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/PrunableRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["reason_code"] == "checkout_observation_failed"
+    missing = next(
+        item
+        for item in authority["discarded_checkouts"]
+        if item["path"] == "_codex-worktrees/prunable-repo"
+    )
+    assert missing["state"] == "unknown"
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:checkout_observation_failed"
+    validate_truth_snapshot(result.snapshot)
+
+
 def test_bare_coordinator_worktree_flows_through_truth_validation(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
