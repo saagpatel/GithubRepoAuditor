@@ -252,6 +252,9 @@ def test_prepare_pilot_blocks_unknown_checkout_authority(tmp_path):
     repo = workspace / "ConflictedRepo"
     repo.mkdir(parents=True)
     (repo / "AGENTS.md").write_text("# ConflictedRepo\n")
+    safe_repo = workspace / "SafeRepo"
+    safe_repo.mkdir()
+    (safe_repo / "AGENTS.md").write_text("# SafeRepo\n")
     snapshot = {
         "workspace_root": str(workspace),
         "generated_at": "2026-08-03T12:00:00+00:00",
@@ -279,13 +282,26 @@ def test_prepare_pilot_blocks_unknown_checkout_authority(tmp_path):
                         }
                     }
                 },
-            }
+            },
+            {
+                "identity": {
+                    "project_key": "SafeRepo",
+                    "path": "SafeRepo",
+                    "display_name": "SafeRepo",
+                },
+                "derived": {
+                    "archived": False,
+                    "context_quality": "full",
+                    "context_files": ["AGENTS.md"],
+                    "run_instructions_present": False,
+                },
+            },
         ],
     }
     snap_path = tmp_path / "snap.json"
     snap_path.write_text(json.dumps(snapshot))
 
-    result = prepare_pilot(str(snap_path), per_tier={"full": 1})
+    result = prepare_pilot(str(snap_path), per_tier={"full": 2})
 
     assert result["state"] == "blocked"
     assert result["records"] == []

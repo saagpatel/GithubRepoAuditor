@@ -172,7 +172,7 @@ def prepare_pilot(
         "state": "blocked" if authority_blocked else "ready",
         "generated_at": generated_at,
         "workspace_root": workspace_root,
-        "records": records,
+        "records": [] if authority_blocked else records,
         "errors": errors,
     }
 
