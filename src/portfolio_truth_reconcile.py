@@ -197,11 +197,94 @@ def _validate_security_receipt_cohort_identity(
     *,
     projects: list[PortfolioTruthProject],
     security_alerts_by_name: dict[str, dict],
+    candidate_projects: list[PortfolioTruthProject] | None = None,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
 ) -> None:
-    """Require receipt membership to match freshly derived default attention."""
+    """Bind receipt membership to attention derived before the new receipt."""
+    if candidate_projects is None:
+        candidate_projects = projects
+    prior_security_alerts_by_name = prior_security_alerts_by_name or {}
     receipt_repositories = tuple(sorted(security_alerts_by_name, key=str.lower))
     try:
-        derived_repositories = derive_default_attention_cohort(
+        candidate_repositories = derive_default_attention_cohort(
+            {
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": project.identity.project_key,
+                            "repo_full_name": project.identity.repo_full_name,
+                        },
+                        "derived": {
+                            "attention_state": project.derived.attention_state,
+                        },
+                    }
+                    for project in candidate_projects
+                ]
+            },
+            expected_count=len(receipt_repositories),
+        )
+    except SecurityCoverageError as exc:
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt cohort cannot match freshly "
+            f"derived default attention: {exc}."
+        ) from exc
+
+    receipt_only = sorted(
+        set(receipt_repositories) - set(candidate_repositories),
+        key=str.lower,
+    )
+    derived_only = sorted(
+        set(candidate_repositories) - set(receipt_repositories),
+        key=str.lower,
+    )
+    if receipt_only or derived_only:
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt cohort differs from freshly "
+            "derived pre-security default attention: "
+            f"receipt_only={receipt_only}; derived_only={derived_only}."
+        )
+
+    final_repositories = _derive_project_security_cohort(projects)
+    final_only = sorted(
+        set(final_repositories) - set(receipt_repositories),
+        key=str.lower,
+    )
+    if final_only:
+        raise ValueError(
+            "PortfolioTruth post-receipt attention contains repositories outside "
+            f"the collected security cohort: {final_only}."
+        )
+
+    departed = sorted(
+        set(receipt_repositories) - set(final_repositories),
+        key=str.lower,
+    )
+    unresolved_departures = [
+        repository
+        for repository in departed
+        if not _is_verified_security_cohort_departure(
+            prior_security_alerts_by_name.get(repository),
+            security_alerts_by_name.get(repository),
+        )
+    ]
+    if unresolved_departures:
+        raise ValueError(
+            "PortfolioTruth receipt members left default attention without fresh "
+            "observed Dependabot resolution or repository archive evidence: "
+            f"{unresolved_departures}."
+        )
+
+
+def _derive_project_security_cohort(
+    projects: list[PortfolioTruthProject],
+) -> tuple[str, ...]:
+    expected_count = sum(
+        project.derived.attention_state in DEFAULT_ATTENTION_STATES
+        and not project.identity.project_key.startswith("supp:")
+        for project in projects
+    )
+    try:
+        return derive_default_attention_cohort(
             {
                 "projects": [
                     {
@@ -216,29 +299,47 @@ def _validate_security_receipt_cohort_identity(
                     for project in projects
                 ]
             },
-            expected_count=len(receipt_repositories),
+            expected_count=expected_count,
         )
     except SecurityCoverageError as exc:
         raise ValueError(
-            "PortfolioTruth GitHub security receipt cohort cannot match freshly "
-            f"derived default attention: {exc}."
+            f"PortfolioTruth post-receipt security cohort is invalid: {exc}."
         ) from exc
 
-    if receipt_repositories == derived_repositories:
-        return
 
-    receipt_only = sorted(
-        set(receipt_repositories) - set(derived_repositories),
-        key=str.lower,
+def _is_verified_security_cohort_departure(
+    prior_entry: dict[str, Any] | None,
+    current_entry: dict[str, Any] | None,
+) -> bool:
+    prior = dict(prior_entry or {})
+    current = dict(current_entry or {})
+    prior_dependabot = dict((prior.get("providers") or {}).get("dependabot") or {})
+    current_dependabot = dict((current.get("providers") or {}).get("dependabot") or {})
+    current_repository = dict(current.get("repository") or {})
+    prior_counts = dict(prior_dependabot.get("counts") or {})
+    current_counts = dict(current_dependabot.get("counts") or {})
+    observed_resolution = (
+        prior_dependabot.get("state") == "observed"
+        and sum(
+            value
+            for value in (
+                prior_counts.get("high"),
+                prior_counts.get("critical"),
+            )
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        > 0
+        and current.get("receipt_state") == "fresh"
+        and current_dependabot.get("state") == "observed"
+        and current_counts.get("high") == 0
+        and current_counts.get("critical") == 0
     )
-    derived_only = sorted(
-        set(derived_repositories) - set(receipt_repositories),
-        key=str.lower,
+    observed_archive = (
+        current.get("receipt_state") == "fresh"
+        and current_repository.get("state") == "observed"
+        and current_repository.get("archived") is True
     )
-    raise ValueError(
-        "PortfolioTruth GitHub security receipt cohort differs from freshly derived "
-        f"default attention: receipt_only={receipt_only}; derived_only={derived_only}."
-    )
+    return observed_resolution or observed_archive
 
 
 def build_portfolio_truth_snapshot(
@@ -252,6 +353,7 @@ def build_portfolio_truth_snapshot(
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, Any] | None = None,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
     producer: dict[str, Any] | None = None,
     prior_notion_generated_at: str | None = None,
@@ -293,23 +395,38 @@ def build_portfolio_truth_snapshot(
             now=now,
         ),
     )
-    projects = [
-        _build_truth_project(
-            raw_project,
-            catalog_data=catalog_data,
-            legacy_rows=legacy_rows,
-            notion_context=notion_context,
-            now=now,
-            release_count_by_name=release_count_by_name,
-            security_alerts_by_name=security_alerts_by_name,
-            repo_status_by_name=repo_status_by_name,
-        )
-        for raw_project in workspace_projects
-    ]
+
+    def materialize_projects(
+        security_lookup: dict[str, dict] | None,
+    ) -> list[PortfolioTruthProject]:
+        return [
+            _build_truth_project(
+                raw_project,
+                catalog_data=catalog_data,
+                legacy_rows=legacy_rows,
+                notion_context=notion_context,
+                now=now,
+                release_count_by_name=release_count_by_name,
+                security_alerts_by_name=security_lookup,
+                repo_status_by_name=repo_status_by_name,
+            )
+            for raw_project in workspace_projects
+        ]
+
+    prior_security_alerts = prior_security_alerts_by_name or {}
+    candidate_projects = (
+        materialize_projects(prior_security_alerts)
+        if security_coverage_metadata is not None
+        and security_alerts_by_name is not None
+        else None
+    )
+    projects = materialize_projects(security_alerts_by_name)
     if security_coverage_metadata is not None and security_alerts_by_name is not None:
         _validate_security_receipt_cohort_identity(
             projects=projects,
+            candidate_projects=candidate_projects,
             security_alerts_by_name=security_alerts_by_name,
+            prior_security_alerts_by_name=prior_security_alerts,
         )
     projects.sort(
         key=lambda item: (

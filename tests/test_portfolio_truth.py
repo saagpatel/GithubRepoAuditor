@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1758,7 +1759,7 @@ repos:
     with pytest.raises(
         ValueError,
         match=(
-            "receipt cohort differs from freshly derived default attention: "
+            "receipt cohort differs from freshly derived pre-security default attention: "
             "receipt_only=\\['d/Old'\\]; derived_only=\\['d/New'\\]"
         ),
     ):
@@ -1769,6 +1770,7 @@ repos:
             now=now,
             security_alerts_by_name=security,
             security_coverage_metadata=metadata,
+            prior_security_alerts_by_name=security,
         )
 
 
@@ -2033,7 +2035,7 @@ def test_security_cohort_identity_rejects_missing_repository_name() -> None:
         )
 
 
-def test_security_cohort_identity_accepts_receipt_risk_driven_attention(
+def test_security_cohort_identity_rejects_receipt_self_promotion_without_prior(
     tmp_path: Path,
 ) -> None:
     workspace = tmp_path / "workspace"
@@ -2091,19 +2093,464 @@ repos:
         "path": "/evidence/github-security-coverage-latest.json",
     }
 
+    with pytest.raises(ValueError, match="expected 1, observed 0"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name=security,
+            security_coverage_metadata=metadata,
+        )
+
+
+def test_security_cohort_identity_accepts_observed_resolution_from_prior_risk(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "Manual"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# Manual\n\nRisk resolution fixture.\n")
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Manual.git"],
+        cwd=project,
+        capture_output=True,
+        check=True,
+    )
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Manual:
+    owner: d
+    lifecycle_state: manual-only
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+"""
+    )
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+
+    def receipt_entry(*, high: int, state: str = "observed") -> dict:
+        counts = (
+            {"critical": 0, "high": high, "medium": 0, "low": 0}
+            if state == "observed"
+            else None
+        )
+        return {
+            "repo_full_name": "d/Manual",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": now.isoformat(),
+            "providers": {
+                "dependabot": {
+                    "state": state,
+                    "observed_at": now.isoformat(),
+                    "pagination_complete": state == "observed",
+                    "counts": counts,
+                }
+            },
+        }
+
+    prior_security = {"d/Manual": receipt_entry(high=1)}
+    current_security = {"d/Manual": receipt_entry(high=0)}
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": now.isoformat(),
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
     result = build_portfolio_truth_snapshot(
         workspace_root=workspace,
         catalog_path=catalog_path,
         include_notion=False,
         now=now,
-        security_alerts_by_name=security,
+        security_alerts_by_name=current_security,
         security_coverage_metadata=metadata,
+        prior_security_alerts_by_name=prior_security,
     )
     manual = result.snapshot.projects[0]
 
-    assert manual.declared.lifecycle_state == "manual-only"
-    assert manual.security.dependabot_high == 1
-    assert manual.derived.attention_state == "decision-needed"
+    assert manual.security.cohort_member is True
+    assert manual.security.dependabot_high == 0
+    assert manual.derived.attention_state == "manual-only"
+    assert (
+        derive_default_attention_cohort(result.snapshot.to_dict(), expected_count=0)
+        == ()
+    )
+
+    unavailable_security = {"d/Manual": receipt_entry(high=0, state="not_requested")}
+    with pytest.raises(ValueError, match="without fresh observed Dependabot"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name=unavailable_security,
+            security_coverage_metadata=metadata,
+            prior_security_alerts_by_name=prior_security,
+        )
+
+
+def test_security_cohort_uses_prior_archive_state_and_allows_observed_exit(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "Active"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# Active\n\nArchive transition fixture.\n")
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Active.git"],
+        cwd=project,
+        capture_output=True,
+        check=True,
+    )
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Active:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+"""
+    )
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+
+    def receipt_entry(*, archived: bool) -> dict:
+        return {
+            "repo_full_name": "d/Active",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": now.isoformat(),
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=now.isoformat(),
+                default_branch="main",
+                head_sha="b" * 40,
+                archived=archived,
+            ),
+            "providers": {
+                "dependabot": _provider_result(
+                    "dependabot",
+                    state="observed",
+                    observed_at=now.isoformat(),
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"critical": 0, "high": 0, "medium": 0, "low": 0},
+                )
+            },
+        }
+
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": now.isoformat(),
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    with pytest.raises(ValueError, match="expected 1, observed 0"):
+        build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=now,
+            security_alerts_by_name={"d/Active": receipt_entry(archived=False)},
+            security_coverage_metadata=metadata,
+            repo_status_by_name={
+                "Active": {"source": "audit_report", "archived": True}
+            },
+        )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
+        security_coverage_metadata=metadata,
+        prior_security_alerts_by_name={
+            "d/Active": receipt_entry(archived=False)
+        },
+    )
+
+    active = result.snapshot.projects[0]
+    assert active.security.cohort_member is True
+    assert active.derived.attention_state == "archived"
+    assert (
+        derive_default_attention_cohort(result.snapshot.to_dict(), expected_count=0)
+        == ()
+    )
+
+
+def test_receipt_publication_uses_bound_prior_risk_for_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "Manual"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# Manual\n\nTwo-cycle risk fixture.\n")
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Manual.git"],
+        cwd=project,
+        capture_output=True,
+        check=True,
+    )
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+
+    def write_catalog(lifecycle_state: str) -> None:
+        catalog_path.write_text(
+            f"""
+repos:
+  Manual:
+    owner: d
+    lifecycle_state: {lifecycle_state}
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+"""
+        )
+
+    def security_entry(*, high: int, observed_at: datetime) -> dict:
+        zero_counts = {
+            "code_scanning": {
+                "critical": 0,
+                "high": 0,
+                "warning": 0,
+                "note": 0,
+            },
+            "secret_scanning": {"open": 0},
+        }
+        return {
+            "repo_full_name": "d/Manual",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at.isoformat(),
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=observed_at.isoformat(),
+                default_branch="main",
+                head_sha="b" * 40,
+                archived=False,
+            ),
+            "providers": {
+                "dependabot": _provider_result(
+                    "dependabot",
+                    state="observed",
+                    observed_at=observed_at.isoformat(),
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={
+                        "critical": 0,
+                        "high": high,
+                        "medium": 0,
+                        "low": 0,
+                    },
+                ),
+                **{
+                    provider: _provider_result(
+                        provider,
+                        state="observed",
+                        observed_at=observed_at.isoformat(),
+                        http_status=200,
+                        pagination_complete=True,
+                        counts=counts,
+                    )
+                    for provider, counts in zero_counts.items()
+                },
+            },
+        }
+
+    def metadata(*, observed_at: datetime, marker: str, count: int = 1) -> dict:
+        return {
+            "source_id": "github-security-coverage-receipt",
+            "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "produced_at": observed_at.isoformat(),
+            "state": "fresh",
+            "age_hours": 0.0,
+            "producer_commit": "a" * 40,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "cohort_repository_count": count,
+            "path": "/evidence/github-security-coverage-latest.json",
+            "receipt_id": "sha256:" + marker * 64,
+            "content_sha256": marker * 64,
+        }
+
+    output_dir = tmp_path / "output"
+    registry_output = workspace / "project-registry.md"
+    report_output = workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    first_at = datetime(2026, 8, 4, 11, tzinfo=timezone.utc)
+    write_catalog("active")
+    publish_portfolio_truth(
+        workspace_root=workspace,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=report_output,
+        catalog_path=catalog_path,
+        include_notion=False,
+        now=first_at,
+        security_alerts_by_name={
+            "d/Manual": security_entry(high=1, observed_at=first_at)
+        },
+        security_coverage_metadata=metadata(observed_at=first_at, marker="a"),
+    )
+
+    second_at = first_at + timedelta(hours=1)
+    write_catalog("manual-only")
+    from contextlib import contextmanager
+    from src import portfolio_truth_publish as publish_module
+
+    original_lock = publish_module._portfolio_truth_publication_lock
+    original_verify = publish_module._verify_prior_security_evidence_current
+    first_recheck = threading.Event()
+    second_lock_attempt = threading.Event()
+    second_recheck = threading.Event()
+    release_first = threading.Event()
+    counter_lock = threading.Lock()
+    lock_attempts = 0
+    verification_count = 0
+
+    @contextmanager
+    def observed_publication_lock(latest_path: Path):
+        nonlocal lock_attempts
+        with counter_lock:
+            lock_attempts += 1
+            attempt = lock_attempts
+        if attempt == 2:
+            second_lock_attempt.set()
+        with original_lock(latest_path):
+            yield
+
+    def gate_first_after_prior_recheck(evidence) -> None:
+        nonlocal verification_count
+        original_verify(evidence)
+        with counter_lock:
+            verification_count += 1
+            verification = verification_count
+        if verification == 1:
+            first_recheck.set()
+            if not release_first.wait(timeout=5):
+                raise AssertionError("timed out waiting to release first publisher")
+        else:
+            second_recheck.set()
+
+    monkeypatch.setattr(
+        publish_module,
+        "_portfolio_truth_publication_lock",
+        observed_publication_lock,
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "_verify_prior_security_evidence_current",
+        gate_first_after_prior_recheck,
+    )
+
+    results: dict[str, object] = {}
+    errors: dict[str, Exception] = {}
+
+    def publish_resolution(label: str, observed_at: datetime, marker: str) -> None:
+        try:
+            results[label] = publish_portfolio_truth(
+                workspace_root=workspace,
+                output_dir=output_dir,
+                registry_output=registry_output,
+                portfolio_report_output=report_output,
+                catalog_path=catalog_path,
+                include_notion=False,
+                now=observed_at,
+                security_alerts_by_name={
+                    "d/Manual": security_entry(high=0, observed_at=observed_at)
+                },
+                security_coverage_metadata=metadata(
+                    observed_at=observed_at,
+                    marker=marker,
+                ),
+            )
+        except Exception as exc:
+            errors[label] = exc
+
+    first_publisher = threading.Thread(
+        target=publish_resolution,
+        args=("first", second_at, "b"),
+        daemon=True,
+    )
+    competing_publisher = threading.Thread(
+        target=publish_resolution,
+        args=("competing", second_at + timedelta(minutes=1), "c"),
+        daemon=True,
+    )
+    first_publisher.start()
+    assert first_recheck.wait(timeout=5)
+    competing_publisher.start()
+    try:
+        assert second_lock_attempt.wait(timeout=5)
+        assert second_recheck.wait(timeout=0.2) is False
+    finally:
+        release_first.set()
+    first_publisher.join(timeout=5)
+    competing_publisher.join(timeout=5)
+
+    assert first_publisher.is_alive() is False
+    assert competing_publisher.is_alive() is False
+    assert "first" not in errors
+    assert isinstance(errors.get("competing"), ValueError)
+    assert "expected 1, observed 0" in str(errors["competing"])
+    assert second_recheck.is_set() is False
+
+    resolved = results["first"]
+    assert hasattr(resolved, "latest_path")
+    payload = json.loads(resolved.latest_path.read_text())
+    manual = payload["projects"][0]
+
+    assert manual["security"]["cohort_member"] is True
+    assert manual["security"]["dependabot_high"] == 0
+    assert manual["derived"]["attention_state"] == "manual-only"
+    assert derive_default_attention_cohort(payload, expected_count=0) == ()
+
+    payload["inputs"]["github_security"].pop("receipt_id")
+    resolved.latest_path.write_text(json.dumps(payload))
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="requires both receipt_id and content_sha256",
+    ):
+        publish_portfolio_truth(
+            workspace_root=workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=catalog_path,
+            include_notion=False,
+            now=second_at + timedelta(hours=1),
+            security_alerts_by_name={},
+            security_coverage_metadata=metadata(
+                observed_at=second_at + timedelta(hours=1),
+                marker="d",
+                count=0,
+            ),
+        )
 
 
 def test_security_overlay_absent_leaves_repos_unscanned(
@@ -3041,6 +3488,41 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
     )
     assert alpha_payload["repository_state"]["remote_default_branch"]["state"] == "observed"
 
+    second_at = now + timedelta(hours=1)
+    second_security = json.loads(json.dumps(security))
+    second_security["d/Alpha"]["source_produced_at"] = second_at.isoformat()
+    second_binding = SecurityCoverageReceiptBinding(
+        source_path=str(tmp_path / "security-next.json"),
+        receipt_id="sha256:" + "c" * 64,
+        content_sha256="d" * 64,
+        receipt_state="fresh",
+        max_age_hours=48,
+        expected_cohort_count=1,
+        expected_producer_commit=None,
+    )
+    second_metadata = {
+        **metadata,
+        "produced_at": second_at.isoformat(),
+        "age_hours": 0.0,
+        "path": second_binding.source_path,
+        "receipt_id": second_binding.receipt_id,
+        "content_sha256": second_binding.content_sha256,
+    }
+    republished = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=tmp_path / "max-age-output",
+        registry_output=portfolio_workspace / "max-age-registry.md",
+        portfolio_report_output=portfolio_workspace / "max-age-report.md",
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=second_security,
+        security_coverage_metadata=second_metadata,
+        security_receipt_binding=second_binding,
+        now=second_at,
+    )
+    assert republished.latest_path.is_file()
+
 
 def test_generated_registry_notes_do_not_accumulate_purpose_prefix(
     portfolio_workspace: Path,
@@ -3379,6 +3861,115 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
     assert not list(output_dir.glob("portfolio-truth-*.json"))
 
 
+def test_publish_refuses_prior_truth_pointer_replacement_after_load(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
+    output_dir = tmp_path / "output"
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    first = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=report_output,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now - timedelta(minutes=1),
+    )
+    registry_before = registry_output.read_text()
+    report_before = report_output.read_text()
+    concurrent_truth = "concurrent PortfolioTruth replacement\n"
+
+    security = {
+        "d/Alpha": {
+            "repo_full_name": "d/Alpha",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": now.isoformat(),
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "providers": {
+                name: _provider_result(
+                    name,
+                    state="not_requested",
+                    reason="fixture_not_requested",
+                )
+                for name in ("dependabot", "code_scanning", "secret_scanning")
+            },
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=now.isoformat(),
+                default_branch="main",
+                head_sha="b" * 40,
+                archived=False,
+            ),
+        }
+    }
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": now.isoformat(),
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    from src import portfolio_truth_publish as publish_module
+
+    original_stage = publish_module._stage_text
+    replaced = False
+
+    def stage_then_replace_prior(target: Path, content: str) -> Path:
+        nonlocal replaced
+        staged = original_stage(target, content)
+        if not replaced:
+            replaced = True
+            first.latest_path.write_text(concurrent_truth)
+        return staged
+
+    monkeypatch.setattr(publish_module, "_stage_text", stage_then_replace_prior)
+
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="changed after it authorized security cohort derivation",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_alerts_by_name=security,
+            security_coverage_metadata=metadata,
+            now=now,
+        )
+
+    assert replaced is True
+    assert first.latest_path.read_text() == concurrent_truth
+    assert registry_output.read_text() == registry_before
+    assert report_output.read_text() == report_before
+    assert not list(output_dir.glob("*.tmp"))
+
+
 def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
@@ -3613,6 +4204,45 @@ def test_publish_requires_producer_evidence_before_touching_outputs(
     assert registry_output.read_text() == "sentinel-registry\n"
     assert report_output.read_text() == "sentinel-report\n"
     assert not output_dir.exists()
+
+    mismatched_output = tmp_path / "mismatched-output"
+    mismatched_registry = portfolio_workspace / "mismatched-registry.md"
+    mismatched_report = portfolio_workspace / "mismatched-report.md"
+    binding = SecurityCoverageReceiptBinding(
+        source_path=str(tmp_path / "security.json"),
+        receipt_id="sha256:" + "a" * 64,
+        content_sha256="b" * 64,
+        receipt_state="fresh",
+        max_age_hours=24,
+        expected_cohort_count=0,
+        expected_producer_commit=None,
+    )
+    security_metadata = {
+        "receipt_id": "sha256:" + "c" * 64,
+        "content_sha256": binding.content_sha256,
+        "path": binding.source_path,
+    }
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="receipt_id metadata does not match",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=mismatched_output,
+            registry_output=mismatched_registry,
+            portfolio_report_output=mismatched_report,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_alerts_by_name={},
+            security_coverage_metadata=security_metadata,
+            security_receipt_binding=binding,
+            now=datetime(2026, 8, 4, 12, tzinfo=timezone.utc),
+        )
+
+    assert not mismatched_output.exists()
+    assert not mismatched_registry.exists()
+    assert not mismatched_report.exists()
 
 
 def test_publish_refuses_to_drop_existing_notion_context(
