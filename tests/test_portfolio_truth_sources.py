@@ -363,6 +363,36 @@ def test_declared_linked_worktree_conflicts_with_representative() -> None:
     )
 
 
+def test_declared_undiscovered_checkout_is_unknown() -> None:
+    declaration = {
+        "absolute_path": "/workspace/_codex-worktrees/repo-retired/src",
+        "workspace_relative_path": "_codex-worktrees/repo-retired/src",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head="1" * 40,
+            common_dir="/git/Repo/.git",
+            declared_paths=[declaration],
+        )
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "declared_checkout_path_unresolved"
+    assert collision["unresolved_declared_paths"] == [
+        "_codex-worktrees/repo-retired/src"
+    ]
+
+
 def test_declared_path_to_other_full_clone_overrides_head_reason() -> None:
     nested_declaration = {
         "absolute_path": "/workspace/Money/AIGCCore/src",

@@ -238,7 +238,11 @@ def _dedupe_checkouts_by_origin(
             group,
             workspace_root=workspace_root,
         )
-        if len(authority_group) > 1:
+        has_checkout_declarations = any(
+            _checkout_observation(project).get("declared_paths")
+            for project in authority_group
+        )
+        if len(authority_group) > 1 or has_checkout_declarations:
             collision = _checkout_collision_record(
                 origin=str(representative.get("repo_full_name") or origin_key),
                 origin_key=origin_key,
