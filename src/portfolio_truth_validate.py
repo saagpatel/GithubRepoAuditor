@@ -1223,6 +1223,7 @@ def _validate_local(
         "dirty",
         "dirty_path_count",
         "upstream",
+        "upstream_branch",
         "upstream_observation_source",
         "ahead",
         "behind",
@@ -1251,12 +1252,25 @@ def _validate_local(
             f"Repository {label} dirty state for {project_key} is invalid."
         )
     upstream = value.get("upstream")
+    upstream_branch = value.get("upstream_branch")
     expected_source = "local_tracking_ref" if upstream else "unavailable"
     if (upstream is not None and not _valid_git_upstream(upstream)) or value.get(
         "upstream_observation_source"
     ) != expected_source:
         raise ValueError(f"Repository {label} upstream for {project_key} is invalid.")
-    if branch is None and upstream is not None:
+    if upstream is None:
+        if upstream_branch is not None:
+            raise ValueError(
+                f"Repository {label} upstream branch for {project_key} is invalid."
+            )
+    elif not _valid_git_branch(upstream_branch) or not (
+        upstream == upstream_branch
+        or _remote_upstream_matches_branch(upstream, upstream_branch)
+    ):
+        raise ValueError(
+            f"Repository {label} upstream branch for {project_key} is invalid."
+        )
+    if branch is None and (upstream is not None or upstream_branch is not None):
         raise ValueError(
             f"Repository {label} detached upstream for {project_key} is invalid."
         )
@@ -1292,6 +1306,7 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
                 "dirty",
                 "dirty_path_count",
                 "upstream",
+                "upstream_branch",
                 "upstream_observation_source",
                 "ahead",
                 "behind",
@@ -1379,6 +1394,14 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
             )
         return
     raise ValueError(f"Repository {label} state for {project_key} is invalid.")
+
+
+def _remote_upstream_matches_branch(upstream: str, upstream_branch: str) -> bool:
+    suffix = f"/{upstream_branch}"
+    if not upstream.endswith(suffix):
+        return False
+    remote_prefix = upstream[: -len(suffix)]
+    return _valid_git_branch(remote_prefix)
 
 
 def _validate_coordinator(

@@ -1319,6 +1319,12 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _delete_nested_repository_value(
+                state, ("local", "upstream_branch")
+            ),
+            "fields",
+        ),
+        (
+            lambda state: _delete_nested_repository_value(
                 state, ("worktrees", 0, "dirty")
             ),
             "fields",
@@ -1402,6 +1408,18 @@ def _replace_all_repository_paths_with_other_demo_path(
                 state, ("local", "upstream_observation_source"), "unavailable"
             ),
             "upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream_branch"), "feature/foo"
+            ),
+            "upstream branch",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "upstream_branch"), None
+            ),
+            "upstream branch",
         ),
         (
             lambda state: _set_nested_repository_value(

@@ -129,6 +129,7 @@ def _observe_working_tree(path: Path) -> dict[str, Any]:
     branch = _git(path, "branch", "--show-current") or None
     dirty = _git(path, "status", "--porcelain", "--untracked-files=all")
     upstream = _git_optional(path, "rev-parse", "--abbrev-ref", "@{upstream}")
+    upstream_branch = _upstream_branch(path, branch=branch, upstream=upstream)
     ahead = behind = None
     if upstream:
         counts = _git(
@@ -147,12 +148,30 @@ def _observe_working_tree(path: Path) -> dict[str, Any]:
         "dirty": bool(dirty),
         "dirty_path_count": len(dirty.splitlines()) if dirty else 0,
         "upstream": upstream,
+        "upstream_branch": upstream_branch,
         "upstream_observation_source": (
             "local_tracking_ref" if upstream else "unavailable"
         ),
         "ahead": ahead,
         "behind": behind,
     }
+
+
+def _upstream_branch(
+    path: Path,
+    *,
+    branch: str | None,
+    upstream: str | None,
+) -> str | None:
+    if upstream is None:
+        return None
+    if branch is None:
+        raise ValueError("detached worktree unexpectedly has an upstream")
+    merge_ref = _git_optional(path, "config", "--get", f"branch.{branch}.merge")
+    prefix = "refs/heads/"
+    if not merge_ref or not merge_ref.startswith(prefix) or merge_ref == prefix:
+        raise ValueError("tracked branch has no exact refs/heads merge target")
+    return merge_ref.removeprefix(prefix)
 
 
 def _observe_bare_coordinator(path: Path) -> dict[str, Any]:
@@ -324,6 +343,7 @@ def _local_from_worktree(worktree: dict[str, Any]) -> dict[str, Any]:
         "dirty",
         "dirty_path_count",
         "upstream",
+        "upstream_branch",
         "upstream_observation_source",
         "ahead",
         "behind",
@@ -333,10 +353,9 @@ def _local_from_worktree(worktree: dict[str, Any]) -> dict[str, Any]:
 
 def _tracks_nonmatching_branch(local: dict[str, Any]) -> bool:
     branch = str(local.get("branch") or "")
-    upstream = str(local.get("upstream") or "")
-    if not branch or not upstream:
+    upstream_branch = str(local.get("upstream_branch") or "")
+    if not branch or not upstream_branch:
         return False
-    upstream_branch = upstream.split("/", 1)[-1]
     return upstream_branch != branch
 
 
