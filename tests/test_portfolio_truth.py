@@ -12,6 +12,10 @@ import pytest
 
 from src.cli import main
 from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    SecurityCoverageReceiptBinding,
+    _provider_result,
+    _remote_repository_result,
     collect_security_coverage,
     load_security_coverage_receipt,
     write_security_coverage_receipt,
@@ -1947,6 +1951,7 @@ def test_registry_render_surfaces_security_and_round_trips(
                 "high": 1,
                 "medium": 0,
                 "low": 0,
+                "receipt_id": 7,
                 "available": True,
             },
             "code_scanning": {"available": True},
@@ -2262,6 +2267,122 @@ def test_publish_is_noop_for_unchanged_compatibility_outputs(
     assert second.report_changed is False
     assert registry_output.stat().st_mtime_ns == registry_mtime
     assert report_output.stat().st_mtime_ns == report_mtime
+
+
+def test_publish_uses_bound_security_max_age_for_remote_evidence(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
+        lambda _binding: nullcontext(),
+    )
+    now = datetime.now(timezone.utc)
+    observed_at = now - timedelta(hours=30)
+    alpha = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init", "-b", "main"], cwd=alpha, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "tests@example.invalid"],
+        cwd=alpha,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Tests"], cwd=alpha, check=True
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=alpha, check=True)
+    subprocess.run(["git", "commit", "-m", "fixture"], cwd=alpha, check=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=alpha,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=alpha,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    security = {
+        "d/Alpha": {
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at.isoformat(),
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "providers": {
+                name: _provider_result(
+                    name,
+                    state="not_requested",
+                    reason="fixture_not_requested",
+                )
+                for name in ("dependabot", "code_scanning", "secret_scanning")
+            },
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=observed_at.isoformat(),
+                default_branch=branch,
+                head_sha=head,
+                archived=False,
+            ),
+        }
+    }
+    binding = SecurityCoverageReceiptBinding(
+        source_path=str(tmp_path / "security.json"),
+        receipt_id="sha256:" + "a" * 64,
+        content_sha256="b" * 64,
+        receipt_state="fresh",
+        max_age_hours=48,
+        expected_cohort_count=1,
+        expected_producer_commit=None,
+    )
+    metadata = {
+        "receipt_id": binding.receipt_id,
+        "content_sha256": binding.content_sha256,
+        "path": binding.source_path,
+    }
+
+    built = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    validate_truth_snapshot(built.snapshot, security_max_age_hours=48)
+    with pytest.raises(ValueError, match="production normalization"):
+        validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
+
+    published = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=tmp_path / "max-age-output",
+        registry_output=portfolio_workspace / "max-age-registry.md",
+        portfolio_report_output=portfolio_workspace / "max-age-report.md",
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+        security_receipt_binding=binding,
+    )
+    payload = json.loads(published.latest_path.read_text())
+    alpha_payload = next(
+        project for project in payload["projects"] if project["identity"]["path"] == "Alpha"
+    )
+    assert alpha_payload["repository_state"]["remote_default_branch"]["state"] == "observed"
 
 
 def test_generated_registry_notes_do_not_accumulate_purpose_prefix(

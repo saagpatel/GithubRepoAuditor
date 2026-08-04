@@ -50,7 +50,13 @@ from src.portfolio_truth_types import (
 from src.registry_parser import _normalize, parse_registry
 
 
-def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
+def validate_truth_snapshot(
+    snapshot: PortfolioTruthSnapshot,
+    *,
+    security_max_age_hours: int = 24,
+) -> None:
+    if security_max_age_hours <= 0:
+        raise ValueError("Security max age hours must be positive.")
     if snapshot.schema_version != SCHEMA_VERSION:
         raise ValueError(f"Unexpected schema version: {snapshot.schema_version}")
     if snapshot.derivation_policy_version != DERIVATION_POLICY_VERSION:
@@ -146,6 +152,7 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             project.security,
             key,
             snapshot.generated_at,
+            security_max_age_hours,
         )
 
 
@@ -167,6 +174,8 @@ def _validate_security_fields(
     if not has_receipt_evidence:
         if providers:
             _validate_legacy_security_fields(security, project_key)
+        else:
+            _validate_unattested_security_fields(security, project_key)
         return
     if security.receipt_schema_version != GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION:
         raise ValueError(
@@ -177,6 +186,10 @@ def _validate_security_fields(
         raise ValueError(
             f"Invalid security receipt state for {project_key}: "
             f"{security.receipt_state}"
+        )
+    if security.cohort_member is not True or not security.cohort_policy:
+        raise ValueError(
+            f"Receipt-backed security evidence for {project_key} must be a cohort member."
         )
     produced_at = _parse_datetime(
         security.source_produced_at,
@@ -350,11 +363,46 @@ def _validate_legacy_security_fields(
         raise ValueError(f"Legacy security coverage for {project_key} is inconsistent.")
 
 
+def _validate_unattested_security_fields(
+    security: SecurityFields,
+    project_key: str,
+) -> None:
+    count_values = (
+        security.dependabot_critical,
+        security.dependabot_high,
+        security.dependabot_medium,
+        security.dependabot_low,
+        security.code_scanning_critical,
+        security.code_scanning_high,
+        security.secret_scanning_open,
+    )
+    if (
+        security.alerts_available is not False
+        or security.coverage_state != "unknown"
+        or security.receipt_schema_version
+        or security.receipt_state != "unknown"
+        or security.source_produced_at
+        or any(value is not None for value in count_values)
+    ):
+        raise ValueError(
+            f"Unattested security evidence for {project_key} is inconsistent."
+        )
+    valid_cohort = (
+        security.cohort_member is True
+        and security.cohort_policy == "portfolio-default-attention-v1"
+    ) or (security.cohort_member is False and not security.cohort_policy)
+    if not valid_cohort:
+        raise ValueError(
+            f"Unattested security cohort metadata for {project_key} is inconsistent."
+        )
+
+
 def _validate_repository_state(
     repository_state: dict[str, Any],
     security: SecurityFields,
     project_key: str,
     generated_at: datetime,
+    security_max_age_hours: int,
 ) -> None:
     if not isinstance(repository_state, Mapping):
         raise ValueError(f"Repository state for {project_key} must be an object.")
@@ -375,7 +423,7 @@ def _validate_repository_state(
                 receipt_is_stale=security.receipt_state == "stale",
                 produced_at=produced_at,
                 current=generated_at,
-                max_age_hours=24,
+                max_age_hours=security_max_age_hours,
             )
         except SecurityCoverageError as exc:
             raise ValueError(
@@ -416,8 +464,10 @@ def _validate_repository_state_shape(
         repository_state.get("observed_at"),
         f"projects[{project_key}].repository_state.observed_at",
     )
-    if observed_at > generated_at:
-        raise ValueError(f"Repository state for {project_key} is future-dated.")
+    if observed_at != generated_at:
+        raise ValueError(
+            f"Repository state for {project_key} must match snapshot generated_at."
+        )
     if state == "not_a_repository":
         _require_repository_keys(
             repository_state,
@@ -461,6 +511,10 @@ def _validate_repository_state_shape(
         required.remove("local")
         required.update({"reason_code", "reason"})
         if "local" in repository_state:
+            if repository_state.get("local") is None:
+                raise ValueError(
+                    f"Unknown repository state for {project_key} must omit null local."
+                )
             required.add("local")
     _require_repository_keys(
         repository_state,
@@ -628,12 +682,10 @@ def _validate_local(
         raise ValueError(f"Repository {label} fields for {project_key} are invalid.")
     if not _nonempty_text(value.get("path")):
         raise ValueError(f"Repository {label} path for {project_key} is invalid.")
-    if not isinstance(value.get("head"), str) or not re.fullmatch(
-        r"[0-9a-f]{40,64}", value["head"]
-    ):
+    if not _valid_git_oid(value.get("head")):
         raise ValueError(f"Repository {label} head for {project_key} is invalid.")
     branch = value.get("branch")
-    if branch is not None and not _nonempty_text(branch):
+    if branch is not None and not _valid_git_branch(branch):
         raise ValueError(f"Repository {label} branch for {project_key} is invalid.")
     dirty = value.get("dirty")
     count = value.get("dirty_path_count")
@@ -649,9 +701,9 @@ def _validate_local(
         )
     upstream = value.get("upstream")
     expected_source = "local_tracking_ref" if upstream else "unavailable"
-    if (
-        upstream is not None and (not _nonempty_text(upstream) or "/" not in upstream)
-    ) or value.get("upstream_observation_source") != expected_source:
+    if (upstream is not None and not _valid_git_upstream(upstream)) or value.get(
+        "upstream_observation_source"
+    ) != expected_source:
         raise ValueError(f"Repository {label} upstream for {project_key} is invalid.")
     if branch is None and upstream is not None:
         raise ValueError(
@@ -736,7 +788,7 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
             or value.get("dirty") is not None
             or value.get("dirty_path_count") is not None
             or not _optional_git_head(value.get("head"))
-            or not _optional_nonempty_text(value.get("branch"))
+            or not _optional_git_branch(value.get("branch"))
         ):
             raise ValueError(f"Repository {label} for {project_key} is invalid.")
         return
@@ -760,11 +812,10 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
         )
         if (
             value.get("reason_code") != "worktree_observation_failed"
-            or not _nonempty_text(value.get("reason"))
+            or value.get("reason") != "git could not observe the linked worktree"
             or not _nonempty_text(value.get("path"))
-            or not isinstance(value.get("head"), str)
-            or not re.fullmatch(r"[0-9a-f]{40,64}", value["head"])
-            or not _optional_nonempty_text(value.get("branch"))
+            or not _valid_git_oid(value.get("head"))
+            or not _optional_git_branch(value.get("branch"))
             or not isinstance(value.get("detached"), bool)
             or value.get("bare") is not False
             or value.get("dirty") is not None
@@ -808,7 +859,7 @@ def _validate_coordinator(
         value.get("path") != configured_path
         or value.get("head_state") != expected_head_state
         or not _optional_git_head(head)
-        or not _optional_nonempty_text(value.get("branch"))
+        or not _optional_git_branch(value.get("branch"))
     ):
         raise ValueError(f"Repository coordinator for {project_key} is inconsistent.")
 
@@ -836,9 +887,8 @@ def _validate_selection(value: Any, *, project_key: str) -> None:
         if (
             value.get("reason") is not None
             or not _nonempty_text(value.get("path"))
-            or not isinstance(value.get("head"), str)
-            or not re.fullmatch(r"[0-9a-f]{40,64}", value["head"])
-            or not _optional_nonempty_text(value.get("branch"))
+            or not _valid_git_oid(value.get("head"))
+            or not _optional_git_branch(value.get("branch"))
         ):
             raise ValueError(f"Repository selection for {project_key} is invalid.")
     elif not _nonempty_text(value.get("reason")):
@@ -859,13 +909,40 @@ def _nonempty_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _optional_nonempty_text(value: Any) -> bool:
-    return value is None or _nonempty_text(value)
-
-
 def _optional_git_head(value: Any) -> bool:
-    return value is None or (
-        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40,64}", value) is not None
+    return value is None or _valid_git_oid(value)
+
+
+def _valid_git_oid(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) in {40, 64}
+        and re.fullmatch(r"[0-9a-f]+", value) is not None
+    )
+
+
+def _valid_git_branch(value: Any) -> bool:
+    return (
+        _nonempty_text(value)
+        and re.search(r"[\x00-\x20\x7f~^:?*\[\\]", value) is None
+        and not value.startswith(("-", ".", "/"))
+        and not value.endswith((".", "/"))
+        and not any(token in value for token in ("..", "@{", "//", "/."))
+    )
+
+
+def _optional_git_branch(value: Any) -> bool:
+    return value is None or _valid_git_branch(value)
+
+
+def _valid_git_upstream(value: Any) -> bool:
+    if not _nonempty_text(value) or "/" not in value:
+        return False
+    remote, branch = value.split("/", 1)
+    return (
+        _nonempty_text(remote)
+        and re.search(r"\s", remote) is None
+        and _valid_git_branch(branch)
     )
 
 
@@ -930,12 +1007,26 @@ def _validate_portable_repository_paths(
         raise ValueError(
             f"Portable repository paths for {project_key} are not public-safe."
         )
+    if _contains_private_user_path(repository_state):
+        raise ValueError(
+            f"Portable repository state for {project_key} contains a private user path."
+        )
     if isinstance(topology, Mapping) and topology.get("configured_path") != str(
         Path("/demo-workspace") / project_path
     ):
         raise ValueError(
             f"Portable configured path for {project_key} does not match identity."
         )
+
+
+def _contains_private_user_path(value: Any) -> bool:
+    if isinstance(value, str):
+        return "/users/" in value.casefold()
+    if isinstance(value, Mapping):
+        return any(_contains_private_user_path(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_private_user_path(item) for item in value)
+    return False
 
 
 def canonicalize_truth_snapshot_payload(
