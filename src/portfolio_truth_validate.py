@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from src.portfolio_pathing import (
     VALID_MATURITY_PROGRAMS,
@@ -25,14 +27,7 @@ from src.registry_parser import _normalize, parse_registry
 
 
 def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
-    if snapshot.schema_version != SCHEMA_VERSION:
-        raise ValueError(f"Unexpected schema version: {snapshot.schema_version}")
-    if snapshot.derivation_policy_version != DERIVATION_POLICY_VERSION:
-        raise ValueError(
-            "Unexpected derivation policy version: "
-            f"{snapshot.derivation_policy_version}"
-        )
-    _validate_contract_envelope(snapshot)
+    validate_truth_snapshot_payload(snapshot.to_dict())
     seen_keys: set[str] = set()
     for project in snapshot.projects:
         key = project.identity.project_key
@@ -98,8 +93,24 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             raise ValueError(f"Invalid doctor standard for {key}: {doctor_std}")
 
 
-def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
-    producer = snapshot.producer
+def validate_truth_snapshot_payload(payload: Mapping[str, Any]) -> None:
+    """Validate the serialized contract shared by publication and fixtures."""
+    schema_version = payload.get("schema_version")
+    if schema_version != SCHEMA_VERSION:
+        raise ValueError(f"Unexpected schema version: {schema_version}")
+    derivation_policy_version = payload.get("derivation_policy_version")
+    if derivation_policy_version != DERIVATION_POLICY_VERSION:
+        raise ValueError(
+            "Unexpected derivation policy version: "
+            f"{derivation_policy_version}"
+        )
+    _validate_contract_envelope(payload)
+
+
+def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:
+    producer = payload.get("producer")
+    if not isinstance(producer, dict):
+        raise ValueError("Portfolio truth producer evidence must be an object.")
     if producer:
         required = {
             "repository",
@@ -130,11 +141,11 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
             raise ValueError(
                 "Canonical producer evidence must declare zero dirty paths."
             )
-    if not snapshot.coverage:
+    coverage = payload.get("coverage")
+    if not isinstance(coverage, list) or not coverage:
         raise ValueError("Portfolio truth coverage envelope is required.")
-    notion = (
-        snapshot.inputs.get("notion") if isinstance(snapshot.inputs, dict) else None
-    )
+    inputs = payload.get("inputs")
+    notion = inputs.get("notion") if isinstance(inputs, dict) else None
     if not isinstance(notion, dict):
         raise ValueError("Portfolio truth inputs.notion is required.")
     mode = notion.get("mode")
@@ -146,11 +157,7 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
         raise ValueError("Live Notion input cannot declare a carried-forward origin.")
     if mode == "verified-snapshot" and not notion.get("observed_at"):
         raise ValueError("Verified Notion snapshot input requires an observation timestamp.")
-    github_security = (
-        snapshot.inputs.get("github_security")
-        if isinstance(snapshot.inputs, dict)
-        else None
-    )
+    github_security = inputs.get("github_security") if isinstance(inputs, dict) else None
     if isinstance(github_security, dict):
         receipt_id = github_security.get("receipt_id")
         content_sha256 = github_security.get("content_sha256")

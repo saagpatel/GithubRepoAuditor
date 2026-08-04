@@ -17,12 +17,13 @@
     ],
     "evaluation_time": "2026-08-01T06:00:00+00:00",
     "generated_at": "2026-08-01T00:00:00+00:00",
+    "producer_evidence": "absent",
     "project_count": 4
   },
   "portfolio_truth_schema_version": "0.11.0",
   "producer": {
     "artifact_path": "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json",
-    "artifact_sha256": "ac79fcad2d6501ee55d59bf08ec510da482b68b6130afca18bfeef56c2d60322",
+    "artifact_sha256": "4706d1097464f98eadebbe6def0690fcc7b624d948749d54f7ec47351b999978",
     "generator": "src.portfolio_truth_contract_fixture:build_contract_fixture",
     "manifest_path": "fixtures/contracts/portfolio-command-center-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"

@@ -14,9 +14,11 @@ if str(REPO_ROOT) not in sys.path:
 from src.portfolio_truth_contract_fixture import (  # noqa: E402
     FIXTURE_RELATIVE_PATH,
     MANIFEST_RELATIVE_PATH,
+    build_contract_fixture,
     fixture_bytes,
     manifest_bytes,
 )
+from src.portfolio_truth_validate import validate_truth_snapshot_payload  # noqa: E402
 
 
 def _expected_artifacts() -> tuple[tuple[Path, bytes], ...]:
@@ -27,6 +29,14 @@ def _expected_artifacts() -> tuple[tuple[Path, bytes], ...]:
 
 
 def _check() -> int:
+    try:
+        validate_truth_snapshot_payload(build_contract_fixture())
+    except ValueError as exc:
+        print(
+            f"Portable PortfolioTruth consumer contract is invalid: {exc}",
+            file=sys.stderr,
+        )
+        return 1
     drifted: list[Path] = []
     for path, expected in _expected_artifacts():
         if not path.is_file() or path.read_bytes() != expected:

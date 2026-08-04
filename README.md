@@ -230,7 +230,10 @@ To record the Portfolio Command Center wedge from the same fixture, follow
 The smaller PCC compatibility fixture is fixed-clock and deterministic. GHRA
 owns its manifest, schema identity, generator, and digest; PCC pins the exact
 producer commit separately so the artifact never needs a self-referential Git
-hash. Regenerate or verify it with:
+hash. Because the synthetic fixture is not emitted by an attested producer
+checkout, its canonical `producer` evidence is intentionally empty; partial or
+invented producer evidence fails the same validation gate used for publication.
+Regenerate or verify it with:
 
 ```bash
 python scripts/generate_portfolio_truth_contract_fixture.py
