@@ -338,9 +338,16 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
             raise ValueError(
                 "Declared checkout paths do not match declared path evidence."
             )
-        if checkout_count == 1 and not (declared_evidence or unresolved_paths):
+        topology_failure = (
+            state == "unknown"
+            and selection.get("reason_code") == "worktree_enumeration_failed"
+        )
+        if checkout_count == 1 and not (
+            declared_evidence or unresolved_paths or topology_failure
+        ):
             raise ValueError(
-                "Single-checkout authority groups require declared path evidence."
+                "Single-checkout authority groups require declaration or "
+                "topology-failure evidence."
             )
 
         project = project_by_origin.get(origin_key)

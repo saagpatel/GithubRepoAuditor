@@ -248,7 +248,15 @@ def _dedupe_checkouts_by_origin(
             _checkout_observation(project).get("declared_paths")
             for project in authority_group
         )
-        if len(authority_group) > 1 or has_checkout_declarations:
+        has_topology_failure = any(
+            project.get("_worktree_enumeration_failed") is True
+            for project in authority_group
+        )
+        if (
+            len(authority_group) > 1
+            or has_checkout_declarations
+            or has_topology_failure
+        ):
             collision = _checkout_collision_record(
                 origin=str(representative.get("repo_full_name") or origin_key),
                 origin_key=origin_key,
@@ -288,7 +296,13 @@ def _checkout_topology_group(
         project_path = Path(str(source_project["project_path"]))
         try:
             worktree_paths = _git_worktree_paths(project_path)
-        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        except (
+            OSError,
+            ValueError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+        ):
+            source_project["_worktree_enumeration_failed"] = True
             continue
         for worktree_path in worktree_paths:
             resolved_path = worktree_path.resolve()
@@ -432,19 +446,26 @@ def _checkout_collision_record(
     has_external_worktree = any(
         project.get("_external_worktree") is True for project in group
     )
+    has_topology_failure = any(
+        project.get("_worktree_enumeration_failed") is True for project in group
+    )
     conflicting_heads = len(clone_heads) > 1 or "" in clone_heads
 
     state = "selected"
     reason_code = "single_clone_topology"
     reason = "all discovered checkouts share one Git common directory"
-    if len(clone_groups) > 1 and not observations_complete:
+    if has_topology_failure:
         state = "unknown"
-        reason_code = "checkout_observation_failed"
-        reason = "one or more same-origin checkouts could not be observed completely"
+        reason_code = "worktree_enumeration_failed"
+        reason = "linked-worktree topology could not be enumerated"
     elif has_external_worktree:
         state = "unknown"
         reason_code = "external_linked_worktree_unobserved"
         reason = "one or more linked worktrees are outside the observed workspace"
+    elif not observations_complete:
+        state = "unknown"
+        reason_code = "checkout_observation_failed"
+        reason = "one or more same-origin checkouts could not be observed completely"
     elif len(declared_checkout_paths) > 1:
         state = "unknown"
         reason_code = "conflicting_declared_checkout_paths"

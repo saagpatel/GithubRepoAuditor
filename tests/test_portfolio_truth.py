@@ -35,6 +35,7 @@ from src.portfolio_truth_render import (
 from src.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
+    _git_read,
     _git_remote_full_name,
     load_safe_notion_project_context,
 )
@@ -734,6 +735,172 @@ def test_unresolved_declared_checkout_flows_through_truth_validation(
         "_codex-worktrees/repo-retired/src"
     ]
     validate_truth_snapshot(result.snapshot)
+
+
+def test_failed_singleton_observation_with_declaration_is_valid_unknown(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    monkeypatch,
+) -> None:
+    repo = portfolio_workspace / "ObservationRepo"
+    repo.mkdir()
+    declared_target = repo / "src"
+    _write(
+        repo / "AGENTS.md",
+        "# ObservationRepo\n\n## Canonical Paths\n\n"
+        f"- Source: `{declared_target}`\n",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/ObservationRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "AGENTS.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    def _timeout_status(project_path: Path, *args: str) -> str:
+        if args and args[0] == "status":
+            raise subprocess.TimeoutExpired(["git", "status"], timeout=5)
+        return _git_read(project_path, *args)
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources._git_read",
+        _timeout_status,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/ObservationRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["reason_code"] == "checkout_observation_failed"
+    assert authority["selection"]["selected_path"] is None
+    assert authority["declared_checkout_paths"] == ["ObservationRepo"]
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:checkout_observation_failed"
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_worktree_enumeration_failure_is_explicit_unknown_summary(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    monkeypatch,
+) -> None:
+    repo = portfolio_workspace / "TopologyRepo"
+    repo.mkdir()
+    _write(repo / "README.md", "# TopologyRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/TopologyRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    def _timeout_worktree_enumeration(_project_path: Path) -> list[Path]:
+        raise subprocess.TimeoutExpired(["git", "worktree", "list"], timeout=5)
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources._git_worktree_paths",
+        _timeout_worktree_enumeration,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/TopologyRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["reason_code"] == "worktree_enumeration_failed"
+    summary = result.snapshot.source_summary["checkout_collisions"]
+    assert summary["state"] == "unknown"
+    assert summary["group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:worktree_enumeration_failed"
+    assert any(
+        "same-origin checkout groups" in warning
+        for warning in result.snapshot.warnings
+    )
+    assert all(
+        "same-origin full-clone groups" not in warning
+        for warning in result.snapshot.warnings
+    )
+    validate_truth_snapshot(result.snapshot)
+
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "`worktree_enumeration_failed`" in markdown
+    assert "No same-origin checkout collisions were observed." not in markdown
+    validate_portfolio_report_markdown(markdown)
 
 
 def test_external_declared_checkout_is_opaque_unknown(

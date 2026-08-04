@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import src.portfolio_repository_state as repository_state
-from src.portfolio_repository_state import observe_repository_state
 
 
 def _git(path: Path, *args: str) -> str:
@@ -59,7 +58,7 @@ def test_observation_reports_dirty_no_upstream_and_unknown_remote(
     repo = _repo(tmp_path)
     (repo / "dirty.txt").write_text("dirty\n")
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         repo, observed_at=datetime(2026, 7, 12, tzinfo=UTC)
     )
 
@@ -76,7 +75,9 @@ def test_observation_reports_linked_worktree_without_file_names(tmp_path: Path) 
     _git(repo, "worktree", "add", "-b", "feature", str(linked), "HEAD")
     (linked / "untracked.txt").write_text("preserve\n")
 
-    state = observe_repository_state(repo, observed_at=datetime.now(UTC))
+    state = repository_state.observe_repository_state(
+        repo, observed_at=datetime.now(UTC)
+    )
 
     assert len(state["worktrees"]) == 2
     linked_state = next(
@@ -110,7 +111,7 @@ def test_external_worktree_is_opaque_and_not_observed(
         _record_observation,
     )
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         repo,
         observed_at=datetime.now(UTC),
         workspace_root=workspace,
@@ -136,7 +137,7 @@ def test_dangling_bare_head_uses_clean_matching_linked_worktree(
     _git(bare, "worktree", "add", str(linked), "main")
     _git(bare, "symbolic-ref", "HEAD", "refs/heads/missing-default")
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),
@@ -159,7 +160,7 @@ def test_bare_coordinator_selects_unique_clean_remote_default_worktree(
     linked = tmp_path / "linked"
     _git(bare, "worktree", "add", str(linked), "main")
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),
@@ -182,7 +183,7 @@ def test_multiple_remote_head_candidates_use_default_branch_tiebreak(
     detached = tmp_path / "detached"
     _git(repo, "worktree", "add", "--detach", str(detached), head)
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         repo,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),
@@ -216,7 +217,7 @@ def test_recovery_tracking_does_not_impersonate_remote_default(
     )
     _git(repo, "branch", "--set-upstream-to=origin/recovery/repo-main", "main")
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         repo,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(remote_head),
@@ -236,7 +237,7 @@ def test_bare_coordinator_missing_remote_evidence_is_precise_unknown(
     linked = tmp_path / "linked"
     _git(bare, "worktree", "add", str(linked), "main")
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
     )
@@ -255,7 +256,7 @@ def test_ambiguous_remote_default_worktrees_fail_closed(tmp_path: Path) -> None:
     _git(bare, "worktree", "add", "--detach", str(first), head)
     _git(bare, "worktree", "add", "--detach", str(second), head)
 
-    state = observe_repository_state(
+    state = repository_state.observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),

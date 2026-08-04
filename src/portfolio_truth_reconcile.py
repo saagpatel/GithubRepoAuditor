@@ -346,7 +346,7 @@ def build_portfolio_truth_snapshot(
     ]
     if ambiguous_checkout_origins:
         warnings.append(
-            "Checkout authority is UNKNOWN for same-origin full-clone groups: "
+            "Checkout authority is UNKNOWN for same-origin checkout groups: "
             + ", ".join(ambiguous_checkout_origins)
         )
 
