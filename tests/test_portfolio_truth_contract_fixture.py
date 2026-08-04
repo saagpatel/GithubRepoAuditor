@@ -102,6 +102,14 @@ def test_canonical_payload_validation_rejects_partial_producer_evidence() -> Non
         validate_truth_snapshot_payload(fixture)
 
 
+def test_canonical_payload_validation_rejects_invalid_project_row() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["derived"]["primary_context_file"] = "README.md"
+
+    with pytest.raises(ValueError, match="Invalid primary context file"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def test_fixture_contains_only_public_safe_synthetic_identity() -> None:
     raw = fixture_bytes().decode().lower()
     _forbidden_extra = [

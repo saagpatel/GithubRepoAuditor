@@ -42,7 +42,7 @@ _ACTIVITY_AGE_DAYS = {"active": 2, "recent": 21, "stale": 190}
 
 # attention_state -> (operating_path, lifecycle_state)
 _ATTENTION_INTENT = {
-    "active-product": ("operate", "active"),
+    "active-product": ("maintain", "active"),
     "active-infra": ("maintain", "active"),
     "decision-needed": ("finish", "active"),
     "experiment": ("experiment", "active"),
@@ -707,11 +707,16 @@ def build_projects(
         )
         operating_path, lifecycle_state = _ATTENTION_INTENT[spec.attention]
         security = _security_block(spec, _pressure_alerts(spec, index, pressure), stamp)
-        context_files = ["README.md"]
+        context_files = ["AGENTS.md"]
         if context_quality in {"full", "standard"}:
             context_files.append("docs/current-state.md")
         if context_quality == "full":
             context_files.append("docs/architecture.md")
+        has_minimum_context = context_quality in {
+            "minimum-viable",
+            "standard",
+            "full",
+        }
 
         projects.append(
             {
@@ -754,16 +759,15 @@ def build_projects(
                     "activity_status": spec.activity,
                     "archived": spec.attention == "archived",
                     "stack": list(spec.stack),
-                    "stack_present": True,
+                    "stack_present": has_minimum_context,
                     "context_files": context_files,
                     "context_file_count": len(context_files),
-                    "primary_context_file": "README.md",
+                    "primary_context_file": "AGENTS.md",
                     "project_summary_present": context_quality != "none",
-                    "current_state_present": context_quality in {"full", "standard"},
-                    "run_instructions_present": context_quality != "boilerplate",
-                    "known_risks_present": context_quality == "full",
-                    "next_recommended_move_present": context_quality
-                    in {"full", "standard"},
+                    "current_state_present": has_minimum_context,
+                    "run_instructions_present": has_minimum_context,
+                    "known_risks_present": has_minimum_context,
+                    "next_recommended_move_present": has_minimum_context,
                     "last_meaningful_activity_at": _iso(
                         generated_at - timedelta(days=_ACTIVITY_AGE_DAYS[spec.activity])
                     ),
