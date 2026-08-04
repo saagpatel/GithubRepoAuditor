@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import fields
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from types import UnionType
+from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from src.github_security_coverage import (
     DEFAULT_COHORT_POLICY,
@@ -32,6 +33,13 @@ from src.portfolio_repository_state import (
     _tracks_nonmatching_branch,
 )
 from src.portfolio_truth_coverage import build_coverage_envelope
+from src.portfolio_truth_decisions import build_project_decision
+from src.portfolio_truth_metadata import (
+    build_exclusions,
+    build_source_summary,
+    build_warnings,
+)
+from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
@@ -52,6 +60,7 @@ from src.portfolio_truth_types import (
     RiskFields,
     SecurityFields,
 )
+from src.producer_preflight import ProducerEvidence
 from src.registry_parser import _normalize, parse_registry
 
 
@@ -59,9 +68,11 @@ def validate_truth_snapshot(
     snapshot: PortfolioTruthSnapshot,
     *,
     security_max_age_hours: int = 24,
+    allow_synthetic_security_matrix: bool = False,
 ) -> None:
     if security_max_age_hours <= 0:
         raise ValueError("Security max age hours must be positive.")
+    _validate_runtime_dataclass(snapshot, "snapshot")
     if snapshot.schema_version != SCHEMA_VERSION:
         raise ValueError(f"Unexpected schema version: {snapshot.schema_version}")
     if snapshot.derivation_policy_version != DERIVATION_POLICY_VERSION:
@@ -70,6 +81,17 @@ def validate_truth_snapshot(
             f"{snapshot.derivation_policy_version}"
         )
     _validate_contract_envelope(snapshot.to_dict())
+    expected_order = sorted(
+        snapshot.projects,
+        key=lambda project: (
+            project.identity.section_marker.lower(),
+            project.identity.display_name.lower(),
+        ),
+    )
+    if [project.identity.project_key for project in snapshot.projects] != [
+        project.identity.project_key for project in expected_order
+    ]:
+        raise ValueError("PortfolioTruth projects differ from producer ordering.")
     seen_keys: set[str] = set()
     for project in snapshot.projects:
         key = project.identity.project_key
@@ -80,6 +102,36 @@ def validate_truth_snapshot(
             raise ValueError(
                 f"Project path must stay workspace-relative: {project.identity.path}"
             )
+        if project.identity.project_key != project.identity.path:
+            raise ValueError(
+                f"Project key for {key} must exactly match its identity path."
+            )
+        required_identity = (
+            project.identity.project_key,
+            project.identity.display_name,
+            project.identity.path,
+            project.identity.top_level_dir,
+            project.identity.group_key,
+            project.identity.group_label,
+            project.identity.section_marker,
+            project.identity.section_label,
+        )
+        if any(not value.strip() for value in required_identity):
+            raise ValueError(f"Project identity for {key!r} has empty required fields.")
+        if not isinstance(project.warnings, list) or any(
+            not isinstance(value, str) for value in project.warnings
+        ):
+            raise ValueError(f"Project warnings for {key} must be strings.")
+        if not isinstance(project.provenance, dict) or any(
+            not isinstance(field_name, str)
+            or not field_name
+            or not isinstance(source, Mapping)
+            or set(source) != {"source", "detail"}
+            or not isinstance(source.get("source"), str)
+            or not isinstance(source.get("detail"), str)
+            for field_name, source in project.provenance.items()
+        ):
+            raise ValueError(f"Project provenance for {key} is invalid.")
         if project.derived.context_quality not in VALID_CONTEXT_QUALITY:
             raise ValueError(
                 f"Invalid context quality for {key}: {project.derived.context_quality}"
@@ -173,18 +225,37 @@ def validate_truth_snapshot(
             snapshot.generated_at,
             security_max_age_hours,
         )
+        expected_risk, expected_attention = build_project_decision(
+            display_name=project.identity.display_name,
+            operating_path=project.declared.operating_path,
+            path_override=project.derived.path_override,
+            context_quality=project.derived.context_quality,
+            activity_status=project.derived.activity_status,
+            archived=project.derived.archived,
+            lifecycle_state=project.declared.lifecycle_state,
+            category=project.declared.category,
+            criticality=project.declared.criticality,
+            doctor_standard=project.declared.doctor_standard,
+            known_risks_present=project.derived.known_risks_present,
+            run_instructions_present=project.derived.run_instructions_present,
+            security_coverage_state=project.security.coverage_state,
+            security_high_alerts=project.security.dependabot_high or 0,
+            security_critical_alerts=project.security.dependabot_critical or 0,
+        )
+        if project.risk.to_dict() != expected_risk:
+            raise ValueError(
+                f"Project risk for {key} differs from production derivation."
+            )
+        if project.derived.attention_state != expected_attention:
+            raise ValueError(
+                f"Project attention for {key} differs from production derivation."
+            )
 
-    notion_context_rows = snapshot.source_summary.get("notion_context_rows")
-    notion_context_carried_forward = snapshot.source_summary.get(
-        "notion_context_carried_forward"
+    notion_context_rows, notion_context_carried_forward = _validate_snapshot_metadata(
+        snapshot,
+        security_max_age_hours=security_max_age_hours,
+        allow_synthetic_security_matrix=allow_synthetic_security_matrix,
     )
-    if (
-        not isinstance(notion_context_rows, int)
-        or isinstance(notion_context_rows, bool)
-        or notion_context_rows < 0
-        or not isinstance(notion_context_carried_forward, bool)
-    ):
-        raise ValueError("PortfolioTruth notion coverage source summary is invalid.")
     expected_coverage = build_coverage_envelope(
         projects=snapshot.projects,
         notion_context_carried_forward=notion_context_carried_forward,
@@ -192,6 +263,404 @@ def validate_truth_snapshot(
     )
     if snapshot.coverage != expected_coverage:
         raise ValueError("PortfolioTruth coverage differs from the producer envelope.")
+
+
+def _validate_runtime_dataclass(value: object, path: str) -> None:
+    """Recursively enforce postponed dataclass annotations at runtime."""
+    hints = get_type_hints(type(value))
+    for field in fields(value):
+        _validate_runtime_value(
+            getattr(value, field.name),
+            hints[field.name],
+            f"{path}.{field.name}",
+        )
+    if isinstance(value, DerivedFields):
+        if value.context_file_count != len(value.context_files):
+            raise ValueError(
+                f"Portfolio truth {path}.context_file_count differs from context_files."
+            )
+        if value.readme_char_count < 0 or (
+            value.release_count is not None and value.release_count < 0
+        ):
+            raise ValueError(
+                f"Portfolio truth {path} observation counts must be non-negative."
+            )
+    if isinstance(value, SecurityFields):
+        count_fields = (
+            value.dependabot_critical,
+            value.dependabot_high,
+            value.dependabot_medium,
+            value.dependabot_low,
+            value.code_scanning_critical,
+            value.code_scanning_high,
+            value.secret_scanning_open,
+        )
+        if any(count is not None and count < 0 for count in count_fields):
+            raise ValueError(
+                f"Portfolio truth {path} observation counts must be non-negative."
+            )
+
+
+def _validate_runtime_value(value: object, annotation: object, path: str) -> None:
+    if annotation is Any:
+        return
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin in {Union, UnionType}:
+        if not any(_runtime_value_matches(value, option) for option in args):
+            raise ValueError(f"Portfolio truth {path} has an invalid runtime type.")
+        if value is not None:
+            option = next(
+                option for option in args if _runtime_value_matches(value, option)
+            )
+            _validate_runtime_value(value, option, path)
+        return
+    if origin is list:
+        if type(value) is not list:
+            raise ValueError(f"Portfolio truth {path} must be an array.")
+        for index, item in enumerate(value):
+            _validate_runtime_value(item, args[0], f"{path}[{index}]")
+        return
+    if origin is dict:
+        if type(value) is not dict:
+            raise ValueError(f"Portfolio truth {path} must be an object.")
+        for key, item in value.items():
+            _validate_runtime_value(key, args[0], f"{path}.<key>")
+            _validate_runtime_value(item, args[1], f"{path}[{key!r}]")
+        return
+    if isinstance(annotation, type) and is_dataclass(annotation):
+        if type(value) is not annotation:
+            raise ValueError(f"Portfolio truth {path} has an invalid runtime type.")
+        _validate_runtime_dataclass(value, path)
+        return
+    if not _runtime_value_matches(value, annotation):
+        raise ValueError(f"Portfolio truth {path} has an invalid runtime type.")
+
+
+def _runtime_value_matches(value: object, annotation: object) -> bool:
+    if annotation is Any:
+        return True
+    origin = get_origin(annotation)
+    if origin in {Union, UnionType}:
+        return any(_runtime_value_matches(value, option) for option in get_args(annotation))
+    if origin is list:
+        return type(value) is list
+    if origin is dict:
+        return type(value) is dict
+    if annotation is bool:
+        return type(value) is bool
+    if annotation is int:
+        return type(value) is int
+    if annotation is str:
+        return type(value) is str
+    if annotation is datetime:
+        return isinstance(value, datetime)
+    if annotation is type(None):
+        return value is None
+    return isinstance(annotation, type) and isinstance(value, annotation)
+
+
+def _validate_snapshot_metadata(
+    snapshot: PortfolioTruthSnapshot,
+    *,
+    security_max_age_hours: int,
+    allow_synthetic_security_matrix: bool,
+) -> tuple[int, bool]:
+    if snapshot.precedence_matrix != PRECEDENCE_MATRIX:
+        raise ValueError(
+            "PortfolioTruth precedence matrix differs from the producer contract."
+        )
+    summary = snapshot.source_summary
+    catalog_errors = summary.get("catalog_errors")
+    catalog_warnings = summary.get("catalog_warnings")
+    legacy_registry_rows = summary.get("legacy_registry_rows")
+    notion_context_rows = summary.get("notion_context_rows")
+    notion_context_carried_forward = summary.get("notion_context_carried_forward")
+    if (
+        not isinstance(catalog_errors, list)
+        or any(not isinstance(value, str) for value in catalog_errors)
+        or not isinstance(catalog_warnings, list)
+        or any(not isinstance(value, str) for value in catalog_warnings)
+        or not isinstance(legacy_registry_rows, int)
+        or isinstance(legacy_registry_rows, bool)
+        or legacy_registry_rows < 0
+        or not isinstance(notion_context_rows, int)
+        or isinstance(notion_context_rows, bool)
+        or notion_context_rows < 0
+        or not isinstance(notion_context_carried_forward, bool)
+    ):
+        raise ValueError("PortfolioTruth source summary has invalid bounded inputs.")
+    expected_summary = build_source_summary(
+        workspace_root=snapshot.workspace_root,
+        projects=snapshot.projects,
+        catalog_errors=catalog_errors,
+        catalog_warnings=catalog_warnings,
+        legacy_registry_rows=legacy_registry_rows,
+        notion_context_rows=notion_context_rows,
+        notion_context_carried_forward=notion_context_carried_forward,
+    )
+    if summary != expected_summary:
+        raise ValueError("PortfolioTruth source summary differs from producer facts.")
+    expected_warnings = build_warnings(
+        catalog_errors=catalog_errors,
+        catalog_warnings=catalog_warnings,
+        unresolved_duplicates=summary["unresolved_duplicate_display_names"],
+    )
+    if snapshot.warnings != expected_warnings:
+        raise ValueError("PortfolioTruth warnings differ from producer facts.")
+    _validate_snapshot_inputs(
+        snapshot,
+        notion_context_rows=notion_context_rows,
+        notion_context_carried_forward=notion_context_carried_forward,
+        security_max_age_hours=security_max_age_hours,
+        allow_synthetic_security_matrix=allow_synthetic_security_matrix,
+    )
+    _validate_snapshot_exclusions(snapshot.exclusions)
+    return notion_context_rows, notion_context_carried_forward
+
+
+def _validate_snapshot_inputs(
+    snapshot: PortfolioTruthSnapshot,
+    *,
+    notion_context_rows: int,
+    notion_context_carried_forward: bool,
+    security_max_age_hours: int,
+    allow_synthetic_security_matrix: bool,
+) -> None:
+    inputs = snapshot.inputs
+    allowed_input_keys = {"catalog", "workspace", "notion", "github_security"}
+    if not isinstance(inputs, dict) or not {
+        "catalog",
+        "workspace",
+        "notion",
+    }.issubset(inputs) or not set(inputs).issubset(allowed_input_keys):
+        raise ValueError("PortfolioTruth input envelope fields are invalid.")
+    generated_at = snapshot.generated_at.isoformat()
+    catalog = inputs.get("catalog")
+    workspace = inputs.get("workspace")
+    notion = inputs.get("notion")
+    if (
+        not isinstance(catalog, dict)
+        or set(catalog) != {"source_id", "sha256", "observed_at"}
+        or catalog.get("source_id") != "portfolio-catalog"
+        or catalog.get("observed_at") != generated_at
+        or (
+            catalog.get("sha256") is not None
+            and (
+                not isinstance(catalog.get("sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", catalog["sha256"]) is None
+            )
+        )
+    ):
+        raise ValueError("PortfolioTruth catalog input is invalid.")
+    if (
+        not isinstance(workspace, dict)
+        or workspace
+        != {"source_id": "projects-root", "observed_at": generated_at}
+    ):
+        raise ValueError("PortfolioTruth workspace input is invalid.")
+    if not isinstance(notion, dict) or set(notion) != {
+        "mode",
+        "observed_at",
+        "carried_from_generated_at",
+    }:
+        raise ValueError("PortfolioTruth Notion input fields are invalid.")
+    mode = notion.get("mode")
+    observed_at = notion.get("observed_at")
+    carried_from = notion.get("carried_from_generated_at")
+    if notion_context_rows == 0:
+        expected_notion = {
+            "mode": "unavailable",
+            "observed_at": None,
+            "carried_from_generated_at": None,
+        }
+        if notion_context_carried_forward or notion != expected_notion:
+            raise ValueError("PortfolioTruth empty Notion input is inconsistent.")
+    elif notion_context_carried_forward:
+        known_origin = (
+            mode == "carried-forward"
+            and isinstance(observed_at, str)
+            and carried_from == observed_at
+        )
+        unknown_origin = (
+            mode == "unavailable"
+            and observed_at is None
+            and carried_from is None
+        )
+        if not known_origin and not unknown_origin:
+            raise ValueError("PortfolioTruth carried Notion input is inconsistent.")
+        if known_origin and (
+            _parse_datetime(observed_at, "inputs.notion.observed_at")
+            > snapshot.generated_at
+        ):
+            raise ValueError("PortfolioTruth Notion input is future-dated.")
+    else:
+        if (
+            mode not in {"live", "verified-snapshot"}
+            or not isinstance(observed_at, str)
+            or carried_from is not None
+        ):
+            raise ValueError("PortfolioTruth observed Notion input is inconsistent.")
+        if _parse_datetime(observed_at, "inputs.notion.observed_at") > snapshot.generated_at:
+            raise ValueError("PortfolioTruth Notion input is future-dated.")
+    github_security = inputs.get("github_security")
+    has_receipt_rows = any(
+        project.security.receipt_state in {"fresh", "stale"}
+        for project in snapshot.projects
+    )
+    if has_receipt_rows and github_security is None:
+        raise ValueError(
+            "PortfolioTruth GitHub security input is required for receipt-backed rows."
+        )
+    if github_security is not None:
+        _validate_github_security_input(
+            github_security,
+            snapshot=snapshot,
+            security_max_age_hours=security_max_age_hours,
+            allow_synthetic_security_matrix=allow_synthetic_security_matrix,
+        )
+
+
+def _validate_github_security_input(
+    value: Any,
+    *,
+    snapshot: PortfolioTruthSnapshot,
+    security_max_age_hours: int,
+    allow_synthetic_security_matrix: bool,
+) -> None:
+    allowed = {
+        "source_id",
+        "schema_version",
+        "produced_at",
+        "state",
+        "age_hours",
+        "producer_commit",
+        "cohort_policy",
+        "cohort_repository_count",
+        "path",
+        "receipt_id",
+        "content_sha256",
+    }
+    required = allowed - {"receipt_id", "content_sha256"}
+    if (
+        not isinstance(value, dict)
+        or not required.issubset(value)
+        or not set(value).issubset(allowed)
+    ):
+        raise ValueError("PortfolioTruth GitHub security input fields are invalid.")
+    text_fields = {
+        "source_id",
+        "schema_version",
+        "producer_commit",
+        "cohort_policy",
+        "path",
+    }
+    if any(field in value and not _nonempty_text(value[field]) for field in text_fields):
+        raise ValueError("PortfolioTruth GitHub security input text is invalid.")
+    if value.get("source_id", "github-security-coverage-receipt") != (
+        "github-security-coverage-receipt"
+    ) or value.get("schema_version", GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION) != (
+        GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+    ):
+        raise ValueError("PortfolioTruth GitHub security source identity is invalid.")
+    producer_commit = value.get("producer_commit")
+    if producer_commit is not None and (
+        not isinstance(producer_commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", producer_commit) is None
+        or set(producer_commit) == {"0"}
+    ):
+        raise ValueError("PortfolioTruth GitHub security producer commit is invalid.")
+    snapshot_producer_commit = snapshot.producer.get("commit")
+    if snapshot_producer_commit and producer_commit != snapshot_producer_commit:
+        raise ValueError(
+            "PortfolioTruth GitHub security producer commit differs from producer evidence."
+        )
+    if value.get("cohort_policy", DEFAULT_COHORT_POLICY) != DEFAULT_COHORT_POLICY:
+        raise ValueError("PortfolioTruth GitHub security cohort policy is invalid.")
+    produced_at = _parse_datetime(
+        value["produced_at"], "inputs.github_security.produced_at"
+    )
+    if produced_at > snapshot.generated_at:
+        raise ValueError("PortfolioTruth GitHub security input is future-dated.")
+    age = round((snapshot.generated_at - produced_at).total_seconds() / 3600, 3)
+    expected_state = "stale" if age > security_max_age_hours else "fresh"
+    if value["state"] != expected_state:
+        raise ValueError("PortfolioTruth GitHub security input state is invalid.")
+    age_hours = value.get("age_hours")
+    if (
+        not isinstance(age_hours, (int, float))
+        or isinstance(age_hours, bool)
+        or age_hours < 0
+        or age_hours != age
+    ):
+        raise ValueError("PortfolioTruth GitHub security input age is invalid.")
+    cohort_count = value.get("cohort_repository_count")
+    expected_cohort_count = sum(
+        project.security.cohort_member
+        for project in snapshot.projects
+        if not project.identity.project_key.startswith("supp:")
+    )
+    if (
+        not isinstance(cohort_count, int)
+        or isinstance(cohort_count, bool)
+        or cohort_count < 0
+        or cohort_count != expected_cohort_count
+    ):
+        raise ValueError("PortfolioTruth GitHub security cohort count is invalid.")
+    receipt_id = value.get("receipt_id")
+    content_sha256 = value.get("content_sha256")
+    if (receipt_id is None) != (content_sha256 is None) or (
+        receipt_id is not None
+        and (
+            not isinstance(receipt_id, str)
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", receipt_id) is None
+            or not isinstance(content_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", content_sha256) is None
+        )
+    ):
+        raise ValueError("PortfolioTruth GitHub security input identity is invalid.")
+    receipt_sources = {
+        project.security.source_produced_at
+        for project in snapshot.projects
+        if project.security.receipt_state in {"fresh", "stale"}
+    }
+    receipt_states = {
+        project.security.receipt_state
+        for project in snapshot.projects
+        if project.security.receipt_state in {"fresh", "stale"}
+    }
+    if receipt_sources and (
+        value["produced_at"] not in receipt_sources
+        if allow_synthetic_security_matrix
+        else receipt_sources != {value["produced_at"]}
+    ):
+        raise ValueError("PortfolioTruth GitHub security source time is inconsistent.")
+    if receipt_states and (
+        value["state"] not in receipt_states
+        if allow_synthetic_security_matrix
+        else receipt_states != {value["state"]}
+    ):
+        raise ValueError("PortfolioTruth GitHub security receipt state is inconsistent.")
+
+
+def _validate_snapshot_exclusions(exclusions: Any) -> None:
+    if not isinstance(exclusions, dict) or set(exclusions) != {
+        "policy_version",
+        "counts",
+    }:
+        raise ValueError("PortfolioTruth exclusions envelope fields are invalid.")
+    counts = exclusions.get("counts")
+    if not isinstance(counts, dict) or any(
+        not isinstance(key, str)
+        or not key
+        or not isinstance(value, int)
+        or isinstance(value, bool)
+        or value < 0
+        for key, value in counts.items()
+    ):
+        raise ValueError("PortfolioTruth exclusion counts are invalid.")
+    if exclusions != build_exclusions(counts):
+        raise ValueError("PortfolioTruth exclusions differ from producer policy.")
 
 
 def _validate_security_fields(
@@ -991,16 +1460,37 @@ def validate_truth_snapshot_payload(
     payload: Mapping[str, Any],
     *,
     security_max_age_hours: int = 24,
+    allow_synthetic_security_matrix: bool = False,
 ) -> None:
     """Fully validate serialized truth, including canonical byte-shape fidelity."""
+    if payload.get("workspace_root") != "/demo-workspace":
+        raise ValueError(
+            "Portable PortfolioTruth workspace_root must be exactly /demo-workspace."
+        )
     if _contains_private_identity(payload):
         raise ValueError(
             "Portable Repository/upstream paths are not public-safe: payload contains "
             "a private user path or email identity."
         )
+    contract_fixture = payload.get("contract_fixture")
+    is_documented_contract_matrix = (
+        isinstance(contract_fixture, Mapping)
+        and contract_fixture
+        == {
+            "contract_version": "ghra-pcc-portfolio-truth.v1",
+            "deterministic": True,
+            "producer_evidence": "absent",
+            "security_evidence_semantics": (
+                "synthetic-cross-receipt-state-matrix"
+            ),
+        }
+    )
     canonical = canonicalize_truth_snapshot_payload(
         payload,
         security_max_age_hours=security_max_age_hours,
+        allow_synthetic_security_matrix=(
+            allow_synthetic_security_matrix or is_documented_contract_matrix
+        ),
     )
     for project in canonical["projects"]:
         _validate_portable_repository_paths(
@@ -1063,10 +1553,12 @@ def _validate_portable_repository_paths(
 def _contains_private_identity(value: Any) -> bool:
     if isinstance(value, str):
         return (
-            re.search(r"(?:^|[/\\])(?:users|home)[/\\]", value, re.IGNORECASE)
+            re.search(
+                r"(?:^|[/\\])(?:users|home|root)[/\\]", value, re.IGNORECASE
+            )
             is not None
             or re.search(
-                r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
+                r"[A-Z0-9._%+-]+@[A-Z0-9.-]+",
                 value,
                 re.IGNORECASE,
             )
@@ -1087,12 +1579,14 @@ def canonicalize_truth_snapshot_payload(
     payload: Mapping[str, Any],
     *,
     security_max_age_hours: int = 24,
+    allow_synthetic_security_matrix: bool = False,
 ) -> dict[str, Any]:
     """Return the canonical serializer output for one raw truth snapshot."""
     snapshot = _snapshot_from_payload(payload)
     validate_truth_snapshot(
         snapshot,
         security_max_age_hours=security_max_age_hours,
+        allow_synthetic_security_matrix=allow_synthetic_security_matrix,
     )
     return snapshot.to_dict()
 
@@ -1247,24 +1741,54 @@ def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:
             "verified_at",
             "receipt_id",
         }
-        missing = sorted(required - producer.keys())
-        if missing:
-            raise ValueError(f"Producer evidence is missing fields: {missing}")
+        if set(producer) != required:
+            missing = sorted(required - producer.keys())
+            if missing:
+                raise ValueError(f"Producer evidence is missing fields: {missing}")
+            raise ValueError("Producer evidence contains unexpected fields.")
         commit = producer.get("commit")
         if (
             not isinstance(commit, str)
             or len(commit) != 40
             or any(char not in "0123456789abcdef" for char in commit)
+            or set(commit) == {"0"}
         ):
             raise ValueError("Producer commit must be a lowercase 40-character SHA.")
+        for field_name in ("repository", "ref", "checkout_role"):
+            if not _nonempty_text(producer.get(field_name)):
+                raise ValueError(f"Producer {field_name} must be a nonempty string.")
+        checkout_path = producer.get("checkout_path")
+        if not isinstance(checkout_path, str) or not Path(checkout_path).is_absolute():
+            raise ValueError("Producer checkout_path must be an absolute path.")
         if producer.get("worktree_clean") is not True:
             raise ValueError(
                 "Canonical producer evidence must declare a clean worktree."
             )
-        if producer.get("dirty_path_count") != 0:
+        if (
+            not isinstance(producer.get("dirty_path_count"), int)
+            or isinstance(producer.get("dirty_path_count"), bool)
+            or producer.get("dirty_path_count") != 0
+        ):
             raise ValueError(
                 "Canonical producer evidence must declare zero dirty paths."
             )
+        receipt_id = producer.get("receipt_id")
+        if not isinstance(receipt_id, str) or re.fullmatch(
+            r"sha256:[0-9a-f]{64}", receipt_id
+        ) is None:
+            raise ValueError("Producer receipt_id must be a SHA-256 identity.")
+        verified_at = _parse_datetime(
+            producer.get("verified_at"), "producer.verified_at"
+        )
+        generated_at = _parse_datetime(payload.get("generated_at"), "generated_at")
+        if verified_at > generated_at:
+            raise ValueError("Producer evidence is future-dated.")
+        try:
+            normalized_producer = ProducerEvidence.from_dict(producer).to_dict()
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Producer evidence is invalid: {exc}") from exc
+        if normalized_producer != producer:
+            raise ValueError("Producer evidence differs from its canonical shape.")
     coverage = payload.get("coverage")
     if not isinstance(coverage, list) or not coverage:
         raise ValueError("Portfolio truth coverage envelope is required.")

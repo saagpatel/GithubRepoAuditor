@@ -2349,6 +2349,14 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
         expected_producer_commit=None,
     )
     metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": observed_at.isoformat(),
+        "state": "fresh",
+        "age_hours": 30.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
         "receipt_id": binding.receipt_id,
         "content_sha256": binding.content_sha256,
         "path": binding.source_path,
@@ -2361,6 +2369,7 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
         include_notion=False,
         now=now,
         security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
     )
     validate_truth_snapshot(built.snapshot, security_max_age_hours=48)
     with pytest.raises(ValueError, match="configured freshness window"):

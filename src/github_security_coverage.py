@@ -531,6 +531,11 @@ def validate_normalized_security_provider(
         raise SecurityCoverageError(
             f"{provider} normalized result is missing fields: {missing}"
         )
+    unexpected = sorted(value.keys() - required)
+    if unexpected:
+        raise SecurityCoverageError(
+            f"{provider} normalized result has unexpected fields: {unexpected}"
+        )
 
     state = _text(value.get("state"))
     if state not in PROVIDER_STATES:
@@ -644,6 +649,12 @@ def validate_normalized_security_provider(
             raise SecurityCoverageError(
                 f"{provider}.{state} requires complete pagination"
             )
+        if state == "observed":
+            expected_reason = None if http_status == 200 else "not_modified"
+            if reason != expected_reason:
+                raise SecurityCoverageError(
+                    f"{provider}.reason does not match observed response"
+                )
     elif value.get("pagination_complete") is not False:
         raise SecurityCoverageError(
             f"{provider}.{state} cannot claim complete pagination"
@@ -2036,6 +2047,10 @@ def _validate_remote_repository(
         if not isinstance(archived, bool):
             raise SecurityCoverageError(
                 "repository.archived must be boolean when observed"
+            )
+        if data.get("reason") is not None:
+            raise SecurityCoverageError(
+                "repository.reason must be null when observed"
             )
     elif state == "partial":
         if observed_at is None or not isinstance(archived, bool):

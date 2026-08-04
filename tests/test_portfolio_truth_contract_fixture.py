@@ -13,6 +13,8 @@ import pytest
 
 from src.demo_portfolio import resolved_coverage_state
 from src.portfolio_truth_coverage import build_coverage_envelope
+from src.portfolio_truth_metadata import build_source_summary, build_warnings
+from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
 from src.portfolio_truth_contract_fixture import (
     CONTRACT_VERSION,
     EVALUATED_AT,
@@ -28,9 +30,12 @@ from src.portfolio_truth_contract_fixture import (
 from src.portfolio_truth_reconcile import _build_security_fields
 from src.portfolio_truth_types import SCHEMA_VERSION
 from src.portfolio_truth_validate import (
+    _snapshot_from_payload,
     _validate_security_fields,
+    validate_truth_snapshot,
     validate_truth_snapshot_payload,
 )
+from src.producer_preflight import ProducerEvidence
 
 
 def test_committed_contract_artifacts_match_the_deterministic_generator() -> None:
@@ -75,12 +80,25 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
             "observed_at": None,
             "carried_from_generated_at": None,
         },
+        "github_security": {
+            "source_id": "github-security-coverage-receipt",
+            "schema_version": "GitHubSecurityCoverageReceiptV1",
+            "produced_at": GENERATED_AT.isoformat(),
+            "state": "fresh",
+            "age_hours": 0.0,
+            "producer_commit": "a" * 40,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "cohort_repository_count": 3,
+            "path": "/demo-workspace/github-security-coverage.json",
+            "receipt_id": "sha256:" + "b" * 64,
+            "content_sha256": "b" * 64,
+        },
     }
     assert fixture["exclusions"] == {
         "policy_version": "workspace_discovery.v2",
         "counts": {},
     }
-    assert states == ["complete", "partial", "stale", "unknown"]
+    assert sorted(states) == ["complete", "partial", "stale", "unknown"]
     assert fixture["contract_fixture"]["contract_version"] == CONTRACT_VERSION
     assert fixture["contract_fixture"]["producer_evidence"] == "absent"
     assert "additive_contract_canary" in fixture["projects"][0]
@@ -159,6 +177,22 @@ def test_generated_and_committed_fixtures_pass_canonical_payload_validation() ->
     validate_truth_snapshot_payload(committed)
 
 
+def test_observed_provider_requires_response_bound_reason() -> None:
+    fixture = build_contract_fixture()
+    provider = _complete_project(fixture)["security"]["providers"]["dependabot"]
+    provider.update(
+        http_status=304,
+        http_classification="not_modified",
+        reason="not_modified",
+        conditional={"requested": True, "result": "not_modified"},
+    )
+    validate_truth_snapshot_payload(fixture)
+
+    provider["reason"] = "fabricated"
+    with pytest.raises(ValueError, match="reason does not match observed response"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def test_contract_fixture_uses_the_shared_producer_coverage_envelope() -> None:
     fixture = build_contract_fixture()
 
@@ -173,6 +207,462 @@ def test_contract_fixture_uses_the_shared_producer_coverage_envelope() -> None:
         "github_security",
         "notion",
     ]
+
+
+def test_contract_fixture_uses_the_shared_producer_precedence_matrix() -> None:
+    fixture = build_contract_fixture()
+
+    assert fixture["precedence_matrix"] == PRECEDENCE_MATRIX
+
+
+@pytest.mark.parametrize(
+    "duplicate_path",
+    ("platform/dovetail-forge-copy", "supp:dovetail-forge-copy"),
+)
+def test_shared_source_summary_exposes_workspace_and_supplementary_duplicates(
+    duplicate_path: str,
+) -> None:
+    fixture = build_contract_fixture()
+    original = _complete_project(fixture)
+    duplicate = deepcopy(original)
+    duplicate["identity"]["project_key"] = duplicate_path
+    duplicate["identity"]["path"] = duplicate_path
+
+    summary = build_source_summary(
+        workspace_root=fixture["workspace_root"],
+        projects=[original, duplicate],
+        catalog_errors=[],
+        catalog_warnings=[],
+        legacy_registry_rows=0,
+        notion_context_rows=0,
+        notion_context_carried_forward=False,
+    )
+    warnings = build_warnings(
+        catalog_errors=[],
+        catalog_warnings=[],
+        unresolved_duplicates=summary["unresolved_duplicate_display_names"],
+    )
+
+    assert summary["duplicate_display_names"] == ["Dovetail Forge"]
+    assert summary["unresolved_duplicate_display_names"] == ["Dovetail Forge"]
+    assert warnings == [
+        "Duplicate project display names require path-qualified registry labels: "
+        "Dovetail Forge"
+    ]
+
+
+def _complete_project(fixture: dict[str, object]) -> dict[str, object]:
+    return next(
+        project
+        for project in fixture["projects"]
+        if project["security"]["coverage_state"] == "complete"
+    )
+
+
+def test_generic_snapshot_validation_rejects_synthetic_mixed_receipt_batch() -> None:
+    fixture = build_contract_fixture()
+
+    with pytest.raises(ValueError, match="source time is inconsistent"):
+        validate_truth_snapshot(_snapshot_from_payload(fixture))
+
+
+def test_contract_rejects_tampered_synthetic_matrix_marker() -> None:
+    fixture = build_contract_fixture()
+    fixture["contract_fixture"]["deterministic"] = False
+
+    with pytest.raises(ValueError, match="source time is inconsistent"):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        (
+            lambda payload: payload["precedence_matrix"].pop("declared.owner"),
+            "precedence matrix",
+        ),
+        (
+            lambda payload: payload["precedence_matrix"]["declared.owner"].append(
+                "demo-fixture"
+            ),
+            "precedence matrix",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(project_count=99),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"].pop(
+                "activity_status_counts"
+            ),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"][
+                "context_quality_counts"
+            ].update(full=99),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"][
+                "attention_state_counts"
+            ].update(parked=99),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(archived_count=99),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(
+                github_archived_count=99
+            ),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(
+                duplicate_display_names=["fabricated"]
+            ),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(
+                catalog_errors=["fabricated catalog error"]
+            ),
+            "warnings",
+        ),
+        (
+            lambda payload: payload.update(workspace_root="/demo-other"),
+            "workspace_root",
+        ),
+        (
+            lambda payload: payload["inputs"]["catalog"].update(
+                source_id="fabricated"
+            ),
+            "catalog input",
+        ),
+        (
+            lambda payload: payload["inputs"].pop("catalog"),
+            "input envelope",
+        ),
+        (
+            lambda payload: payload["inputs"]["catalog"].update(
+                observed_at=(GENERATED_AT - timedelta(minutes=1)).isoformat()
+            ),
+            "catalog input",
+        ),
+        (
+            lambda payload: payload["inputs"]["workspace"].update(
+                source_id="fabricated"
+            ),
+            "workspace input",
+        ),
+        (
+            lambda payload: payload["inputs"].pop("workspace"),
+            "input envelope",
+        ),
+        (
+            lambda payload: payload["inputs"]["workspace"].update(
+                observed_at=(GENERATED_AT - timedelta(minutes=1)).isoformat()
+            ),
+            "workspace input",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(
+                notion_context_rows=1
+            ),
+            "Notion input",
+        ),
+        (
+            lambda payload: payload["source_summary"].update(
+                notion_context_carried_forward=True
+            ),
+            "Notion input",
+        ),
+        (
+            lambda payload: payload["inputs"]["notion"].update(
+                mode="live", observed_at=GENERATED_AT.isoformat()
+            ),
+            "Notion input",
+        ),
+        (
+            lambda payload: payload["exclusions"].update(policy_version="fabricated"),
+            "exclusions",
+        ),
+        (
+            lambda payload: payload["exclusions"]["counts"].update(hidden=-1),
+            "exclusion counts",
+        ),
+        (
+            lambda payload: payload["warnings"].append("fabricated warning"),
+            "warnings",
+        ),
+    ),
+)
+def test_contract_validation_rejects_top_level_envelope_drift(
+    mutation: object,
+    message: str,
+) -> None:
+    fixture = build_contract_fixture()
+    mutation(fixture)
+
+    with pytest.raises(ValueError, match=message):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_validation_rejects_cross_envelope_notion_drift() -> None:
+    fixture = build_contract_fixture()
+    observed_at = (GENERATED_AT - timedelta(hours=1)).isoformat()
+    fixture["source_summary"].update(
+        notion_context_rows=1,
+        notion_context_carried_forward=True,
+    )
+    fixture["inputs"]["notion"] = {
+        "mode": "carried-forward",
+        "observed_at": observed_at,
+        "carried_from_generated_at": observed_at,
+    }
+
+    with pytest.raises(ValueError, match="coverage differs"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_portable_contract_rejects_coherent_non_demo_workspace_root() -> None:
+    fixture = build_contract_fixture()
+    fixture["workspace_root"] = "/demo-other"
+    fixture["source_summary"]["workspace_root"] = "/demo-other"
+
+    with pytest.raises(ValueError, match="exactly /demo-workspace"):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    "github_security",
+    (
+        {},
+        {
+            "path": "/evidence/security.json",
+            "receipt_id": "sha256:" + "a" * 64,
+            "content_sha256": "b" * 64,
+        },
+    ),
+)
+def test_contract_rejects_partial_github_security_input(
+    github_security: dict[str, object],
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["inputs"]["github_security"] = github_security
+
+    with pytest.raises(ValueError, match="GitHub security input fields"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_requires_github_security_input_for_receipt_rows() -> None:
+    fixture = build_contract_fixture()
+    fixture["inputs"].pop("github_security")
+
+    with pytest.raises(ValueError, match="required for receipt-backed rows"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def _valid_producer_evidence() -> dict[str, object]:
+    return ProducerEvidence(
+        repository="saagpatel/GithubRepoAuditor",
+        commit="a" * 40,
+        ref="refs/heads/main",
+        checkout_role="canonical-producer",
+        checkout_path="/demo-workspace/producer",
+        worktree_clean=True,
+        dirty_path_count=0,
+        verified_at=GENERATED_AT,
+        receipt_id="sha256:" + "b" * 64,
+    ).to_dict()
+
+
+def test_contract_accepts_canonical_producer_evidence_shape() -> None:
+    fixture = build_contract_fixture()
+    fixture["producer"] = _valid_producer_evidence()
+
+    validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_rejects_future_producer_evidence() -> None:
+    fixture = build_contract_fixture()
+    fixture["producer"] = _valid_producer_evidence()
+    fixture["producer"]["verified_at"] = (GENERATED_AT + timedelta(seconds=1)).isoformat()
+
+    with pytest.raises(ValueError, match="future-dated"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_binds_github_security_commit_to_producer_evidence() -> None:
+    fixture = build_contract_fixture()
+    fixture["producer"] = _valid_producer_evidence()
+    fixture["inputs"]["github_security"] = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": "GitHubSecurityCoverageReceiptV1",
+        "produced_at": GENERATED_AT.isoformat(),
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "b" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 2,
+        "path": "/demo-workspace/github-security.json",
+    }
+
+    with pytest.raises(ValueError, match="differs from producer evidence"):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        (lambda value: value.update(repository=7), "repository"),
+        (lambda value: value.update(ref=None), "ref"),
+        (lambda value: value.update(checkout_role={}), "checkout_role"),
+        (lambda value: value.update(checkout_path=7), "checkout_path"),
+        (lambda value: value.update(verified_at="not-a-time"), "verified_at"),
+        (lambda value: value.update(receipt_id=[]), "receipt_id"),
+        (lambda value: value.update(commit="0" * 40), "commit"),
+        (lambda value: value.update(extra="fabricated"), "unexpected fields"),
+    ),
+)
+def test_contract_rejects_malformed_producer_evidence(
+    mutation: object,
+    message: str,
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["producer"] = _valid_producer_evidence()
+    mutation(fixture["producer"])
+
+    with pytest.raises(ValueError, match=message):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_rejects_forged_supplementary_project_key() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["identity"]["project_key"] = "supp:forged"
+
+    with pytest.raises(ValueError, match="exactly match"):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("warnings", [7], "warnings"),
+        (
+            "provenance",
+            {"derived.activity_status": {"source": 7, "detail": "active"}},
+            "provenance",
+        ),
+        (
+            "provenance",
+            {
+                "derived.activity_status": {
+                    "source": "derived",
+                    "detail": "active",
+                    "extra": "fabricated",
+                }
+            },
+            "provenance",
+        ),
+    ),
+)
+def test_contract_rejects_malformed_project_metadata(
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0][field] = value
+
+    with pytest.raises(ValueError, match=message):
+        validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value", "message"),
+    (
+        ("identity", "display_name", 7, "display_name"),
+        ("declared", "owner", {}, "owner"),
+        ("declared", "automation_eligible", "yes", "automation_eligible"),
+        ("derived", "context_files", 7, "context_files"),
+        ("derived", "context_file_count", -99, "context_file_count"),
+        ("derived", "has_ci", "yes", "has_ci"),
+        ("advisory", "notion_momentum", 7, "notion_momentum"),
+        ("risk", "risk_factors", {}, "risk_factors"),
+        ("risk", "security_risk", "false", "security_risk"),
+    ),
+)
+def test_contract_rejects_malformed_nested_dataclass_types(
+    section: str,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0][section][field] = value
+
+    with pytest.raises(ValueError, match=message):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_rejects_erased_security_risk_and_decision() -> None:
+    fixture = build_contract_fixture()
+    kestrel = next(
+        project
+        for project in fixture["projects"]
+        if project["identity"]["display_name"] == "Kestrel Loom"
+    )
+    assert kestrel["security"]["dependabot_high"] == 3
+    kestrel["risk"] = {
+        "risk_tier": "baseline",
+        "risk_factors": [],
+        "risk_summary": (
+            "No non-security risk factors detected; GitHub security coverage is "
+            "partial."
+        ),
+        "doctor_gap": False,
+        "context_risk": False,
+        "path_risk": False,
+        "security_risk": False,
+    }
+    kestrel["derived"]["attention_state"] = "active-infra"
+    kestrel["declared"]["category"] = "infrastructure"
+
+    with pytest.raises(ValueError, match="risk.*production derivation"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def _append_hidden_duplicate(fixture: dict[str, object]) -> None:
+    projects = fixture["projects"]
+    duplicate = deepcopy(projects[0])
+    duplicate["identity"]["project_key"] = "supp:duplicate-hidden"
+    duplicate["identity"]["path"] = "supp:duplicate-hidden"
+    projects.append(duplicate)
+
+
+def test_contract_rejects_appended_hidden_duplicate_by_ordering() -> None:
+    fixture = build_contract_fixture()
+    _append_hidden_duplicate(fixture)
+
+    with pytest.raises(ValueError, match="producer ordering"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_rejects_sorted_hidden_duplicate_by_source_summary() -> None:
+    fixture = build_contract_fixture()
+    _append_hidden_duplicate(fixture)
+    fixture["projects"].sort(
+        key=lambda project: (
+            project["identity"]["section_marker"].lower(),
+            project["identity"]["display_name"].lower(),
+        )
+    )
+
+    with pytest.raises(ValueError, match="source summary"):
+        validate_truth_snapshot_payload(fixture)
 
 
 @pytest.mark.parametrize(
@@ -321,7 +811,9 @@ def test_canonical_payload_validation_rejects_invalid_provider_state() -> None:
 
 def test_canonical_payload_validation_rejects_observed_provider_count_shape() -> None:
     fixture = build_contract_fixture()
-    counts = fixture["projects"][0]["security"]["providers"]["dependabot"]["counts"]
+    counts = _complete_project(fixture)["security"]["providers"]["dependabot"][
+        "counts"
+    ]
     del counts["low"]
 
     with pytest.raises(ValueError, match="counts are invalid"):
@@ -348,7 +840,7 @@ def test_canonical_payload_validation_rejects_invalid_declared_category() -> Non
 
 def test_canonical_payload_validation_rejects_invalid_active_infra_category() -> None:
     fixture = build_contract_fixture()
-    fixture["projects"][0]["declared"]["category"] = "learning"
+    _complete_project(fixture)["declared"]["category"] = "learning"
 
     with pytest.raises(ValueError, match="requires the infrastructure category"):
         validate_truth_snapshot_payload(fixture)
@@ -447,7 +939,7 @@ def test_legacy_security_rejects_noncanonical_cohort_types(
 
 def test_serialized_security_freshness_honors_explicit_validation_context() -> None:
     fixture = build_contract_fixture()
-    project = fixture["projects"][0]
+    project = _complete_project(fixture)
     observed_at = GENERATED_AT - timedelta(hours=30)
     project["security"]["source_produced_at"] = observed_at.isoformat()
     for provider in project["security"]["providers"].values():
@@ -494,6 +986,12 @@ def _legacy_security_fields():
         (
             lambda fields: fields.providers["dependabot"].update(reason="fabricated"),
             "envelope",
+        ),
+        (
+            lambda fields: fields.providers["dependabot"].update(
+                undocumented_canary=True
+            ),
+            "provider",
         ),
         (
             lambda fields: fields.providers["dependabot"].update(
@@ -804,7 +1302,7 @@ def test_canonical_payload_validation_rejects_repository_state_attacks(
     message: str,
 ) -> None:
     fixture = build_contract_fixture()
-    repository_state = fixture["projects"][0]["repository_state"]
+    repository_state = _complete_project(fixture)["repository_state"]
     mutation(repository_state)
 
     with pytest.raises(ValueError, match=message):
@@ -819,10 +1317,20 @@ def test_canonical_payload_validation_rejects_remote_evidence_without_receipt() 
         if project["security"]["receipt_state"] == "unknown"
     )
     unknown["repository_state"]["remote_default_branch"] = deepcopy(
-        fixture["projects"][0]["repository_state"]["remote_default_branch"]
+        _complete_project(fixture)["repository_state"]["remote_default_branch"]
     )
 
     with pytest.raises(ValueError, match="production normalization"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_observed_remote_repository_requires_null_reason() -> None:
+    fixture = build_contract_fixture()
+    _complete_project(fixture)["repository_state"]["remote_default_branch"][
+        "reason"
+    ] = "fabricated"
+
+    with pytest.raises(ValueError, match="reason must be null when observed"):
         validate_truth_snapshot_payload(fixture)
 
 
@@ -850,6 +1358,8 @@ def test_portable_repository_state_rejects_private_observation_failure_reason() 
             r"C:\Users\d\private-reason",
         ),
         (("declared", "notes"), "owner@example.com"),
+        (("declared", "notes"), "owner@localhost"),
+        (("declared", "notes"), "/root/private-note"),
         (("warnings",), ["/Users/d/private-warning"]),
     ),
 )
@@ -901,7 +1411,9 @@ def test_canonical_payload_validation_rejects_invalid_remote_branch_shape(
     value: object,
 ) -> None:
     fixture = build_contract_fixture()
-    fixture["projects"][0]["repository_state"]["remote_default_branch"][field] = value
+    _complete_project(fixture)["repository_state"]["remote_default_branch"][
+        field
+    ] = value
 
     with pytest.raises(ValueError, match="Invalid remote default branch"):
         validate_truth_snapshot_payload(fixture)

@@ -62,6 +62,7 @@ def build_contract_fixture() -> dict[str, Any]:
         "contract_version": CONTRACT_VERSION,
         "deterministic": True,
         "producer_evidence": "absent",
+        "security_evidence_semantics": "synthetic-cross-receipt-state-matrix",
     }
     fixture["projects"][0]["additive_contract_canary"] = {
         "consumer_behavior": "ignore-compatible-addition"
@@ -112,6 +113,9 @@ def build_contract_manifest() -> dict[str, Any]:
             "project_count": len(_PROJECT_CODENAMES),
             "coverage_states": ["complete", "partial", "stale", "unknown"],
             "producer_evidence": "absent",
+            "security_evidence_semantics": (
+                "synthetic-cross-receipt-state-matrix"
+            ),
             "additive_canary_paths": [
                 "contract_fixture",
                 "projects[0].additive_contract_canary",
