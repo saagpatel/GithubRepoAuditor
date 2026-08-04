@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ import pytest
 from src.demo_portfolio import resolved_coverage_state
 from src.portfolio_truth_contract_fixture import (
     CONTRACT_VERSION,
+    EVALUATED_AT,
     FIXTURE_RELATIVE_PATH,
     GENERATED_AT,
     MANIFEST_RELATIVE_PATH,
@@ -76,6 +78,19 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
     assert fixture["contract_fixture"]["contract_version"] == CONTRACT_VERSION
     assert fixture["contract_fixture"]["producer_evidence"] == "absent"
     assert "additive_contract_canary" in fixture["projects"][0]
+
+
+def test_fixture_stale_receipt_is_stale_at_the_manifest_evaluation_time() -> None:
+    fixture = build_contract_fixture()
+    stale_security = next(
+        project["security"]
+        for project in fixture["projects"]
+        if resolved_coverage_state(project["security"]) == "stale"
+    )
+    source_produced_at = datetime.fromisoformat(stale_security["source_produced_at"])
+    age_hours = (EVALUATED_AT - source_produced_at).total_seconds() / 3600
+
+    assert age_hours > 24
 
 
 def test_generated_and_committed_fixtures_pass_canonical_payload_validation() -> None:

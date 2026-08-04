@@ -30,6 +30,7 @@ COHORT_POLICY = "portfolio-default-attention-v1"
 # the consumer's 48h "fresh" band, and far enough from zero to look like a real
 # overnight run rather than a synthetic instant.
 FRESH_OFFSET_HOURS = 6
+STALE_RECEIPT_AGE_HOURS = 25
 
 # Number of timestamped snapshots emitted for the trends view, newest first.
 HISTORY_POINTS = 9
@@ -503,6 +504,10 @@ def _security_block(
         }
 
     if spec.coverage == "stale":
+        source_produced_at = _iso(
+            datetime.fromisoformat(observed_at)
+            - timedelta(hours=STALE_RECEIPT_AGE_HOURS)
+        )
         return {
             "alerts_available": False,
             "coverage_state": "stale",
@@ -510,7 +515,7 @@ def _security_block(
             "cohort_policy": COHORT_POLICY,
             "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
             "receipt_state": "stale",
-            "source_produced_at": observed_at,
+            "source_produced_at": source_produced_at,
             "providers": {},
             "dependabot_critical": None,
             "dependabot_high": None,

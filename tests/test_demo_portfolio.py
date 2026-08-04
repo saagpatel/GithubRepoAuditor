@@ -18,6 +18,7 @@ from src.demo_portfolio import (
     DEMO_PROJECTS,
     FRESH_OFFSET_HOURS,
     HISTORY_POINTS,
+    STALE_RECEIPT_AGE_HOURS,
     build_projects,
     build_proposals,
     build_security_burndown,
@@ -181,6 +182,21 @@ def test_declared_complete_rows_survive_the_consumer_receipt_gate() -> None:
             assert provider["pagination_complete"] is True
             assert isinstance(provider["counts"], dict)
         assert resolved_coverage_state(security) == "complete"
+
+
+def test_stale_rows_are_older_than_the_receipt_freshness_window() -> None:
+    snapshot = _snapshot()
+    generated_at = datetime.fromisoformat(snapshot["generated_at"])
+
+    for project in snapshot["projects"]:
+        security = project["security"]
+        if security["coverage_state"] != "stale":
+            continue
+        source_produced_at = datetime.fromisoformat(security["source_produced_at"])
+        age_hours = (generated_at - source_produced_at).total_seconds() / 3600
+
+        assert age_hours == STALE_RECEIPT_AGE_HOURS
+        assert age_hours > 24
 
 
 def test_unknown_rows_carry_no_receipt_evidence() -> None:
