@@ -28,7 +28,11 @@ from src.demo_portfolio import (
     history_snapshots,
     resolved_coverage_state,
 )
-from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    PROVIDER_NAMES,
+    _provider_result,
+)
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
     TRUTH_LATEST_FILENAME,
@@ -36,6 +40,7 @@ from src.portfolio_truth_types import (
     VALID_ATTENTION_STATES,
     VALID_CONTEXT_QUALITY,
 )
+from src.portfolio_truth_reconcile import _build_security_fields
 from src.portfolio_truth_validate import validate_truth_snapshot_payload
 
 # Portfolio Command Center reads anything older than this as no longer fresh.
@@ -197,6 +202,20 @@ def test_stale_rows_are_older_than_the_receipt_freshness_window() -> None:
 
         assert age_hours == STALE_RECEIPT_AGE_HOURS
         assert age_hours > 24
+        assert set(security["providers"]) == set(PROVIDER_NAMES)
+        for name in PROVIDER_NAMES:
+            assert security["providers"][name] == _provider_result(
+                name,
+                state="stale",
+                observed_at=security["source_produced_at"],
+                http_status=200,
+                reason="receipt_stale",
+                pagination_complete=True,
+                conditional_request=True,
+                conditional_result="modified",
+                http_classification="success",
+            )
+        assert _build_security_fields(security).to_dict() == security
 
 
 def test_unknown_rows_carry_no_receipt_evidence() -> None:

@@ -477,6 +477,24 @@ def _unavailable_provider(observed_at: str) -> dict[str, Any]:
     }
 
 
+def _stale_provider(observed_at: str) -> dict[str, Any]:
+    return {
+        "state": "stale",
+        "completed": False,
+        "reason": "receipt_stale",
+        "reason_code": "stale_observation",
+        "http_status": 200,
+        "http_classification": "success",
+        "conditional": {"requested": True, "result": "modified"},
+        "etag": None,
+        "last_modified": None,
+        "observed_at": observed_at,
+        "pagination_complete": True,
+        "counts": None,
+        "zero_findings": None,
+    }
+
+
 def _security_block(
     spec: DemoProject, alerts: tuple[int, ...], observed_at: str
 ) -> dict[str, Any]:
@@ -516,7 +534,10 @@ def _security_block(
             "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
             "receipt_state": "stale",
             "source_produced_at": source_produced_at,
-            "providers": {},
+            "providers": {
+                name: _stale_provider(source_produced_at)
+                for name in ("dependabot", "code_scanning", "secret_scanning")
+            },
             "dependabot_critical": None,
             "dependabot_high": None,
             "dependabot_medium": None,
