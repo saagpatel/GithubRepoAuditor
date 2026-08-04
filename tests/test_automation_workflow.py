@@ -13,6 +13,7 @@ injected ``FakeRunner``.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -100,6 +101,63 @@ def _project(
     )
 
 
+def _checkout_authority(
+    *,
+    canonical_path: str = "MyRepo",
+    representative_path: str = "MyRepo",
+    origin: str = "owner/MyRepo",
+    state: str = "selected",
+    reason_code: str = "single_clone_topology",
+) -> dict:
+    other_path = (
+        f"{canonical_path}-linked"
+        if representative_path == canonical_path
+        else canonical_path
+    )
+    representative = {
+        "path": representative_path,
+        "state": "observed",
+        "relation": "representative",
+        "head": "1" * 40,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    other = {
+        "path": other_path if state == "selected" else f"Archive/{canonical_path}",
+        "state": "observed",
+        "relation": (
+            "linked_worktree" if state == "selected" else "independent_full_clone"
+        ),
+        "head": ("1" if state == "selected" else "2") * 40,
+        "branch": "feature",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    return {
+        "schema_version": "CheckoutCollisionV1",
+        "origin": origin,
+        "canonical_project_path": canonical_path,
+        "checkout_count": 2,
+        "full_clone_count": 1 if state == "selected" else 2,
+        "declared_checkout_paths": [],
+        "declared_path_evidence": [],
+        "unresolved_declared_paths": [],
+        "selection": {
+            "state": state,
+            "reason_code": reason_code,
+            "reason": "fixture authority",
+            "representative_path": representative_path,
+            "selected_path": representative_path if state == "selected" else None,
+            "rationale": "fixture selection",
+        },
+        "checkouts": [representative, other],
+        "discarded_checkouts": [other],
+    }
+
+
 def _snapshot(*projects: PortfolioTruthProject) -> PortfolioTruthSnapshot:
     from datetime import datetime, timezone
 
@@ -185,15 +243,10 @@ def test_context_pr_plan_explicit_branch_overrides_repo_default() -> None:
 def test_context_pr_plan_blocks_unknown_checkout_authority() -> None:
     project = _project(
         repository_state={
-            "checkout_authority": {
-                "schema_version": "CheckoutCollisionV1",
-                "selection": {
-                    "state": "unknown",
-                    "reason_code": "conflicting_full_clone_heads",
-                    "representative_path": "MyRepo",
-                    "selected_path": None,
-                }
-            }
+            "checkout_authority": _checkout_authority(
+                state="unknown",
+                reason_code="conflicting_full_clone_heads",
+            )
         }
     )
 
@@ -204,24 +257,20 @@ def test_context_pr_plan_blocks_unknown_checkout_authority() -> None:
         build_context_pr_plan(project, workspace_root=Path("/ws"))
 
 
-def test_context_pr_plan_blocks_selected_path_mismatch() -> None:
+def test_context_pr_plan_treats_selected_path_mismatch_as_malformed() -> None:
     project = _project(
         repository_state={
-            "checkout_authority": {
-                "schema_version": "CheckoutCollisionV1",
-                "selection": {
-                    "state": "selected",
-                    "reason_code": "equivalent_full_clones",
-                    "representative_path": "Archive/MyRepo",
-                    "selected_path": "Archive/MyRepo",
-                }
-            }
+            "checkout_authority": _checkout_authority(
+                canonical_path="Archive/MyRepo",
+                representative_path="Archive/MyRepo",
+                reason_code="equivalent_full_clones",
+            )
         }
     )
 
     with pytest.raises(
         AutomationExecutionError,
-        match="checkout-authority-path-mismatch",
+        match="checkout-authority-malformed",
     ):
         build_context_pr_plan(project, workspace_root=Path("/ws"))
 
@@ -232,24 +281,11 @@ def test_context_pr_plan_uses_selected_checkout_without_replacing_identity() -> 
         path="Repo",
         repo_full_name="owner/Repo",
         repository_state={
-            "checkout_authority": {
-                "schema_version": "CheckoutCollisionV1",
-                "canonical_project_path": "Repo",
-                "selection": {
-                    "state": "selected",
-                    "reason_code": "single_clone_topology",
-                    "representative_path": "_codex-worktrees/repo-main",
-                    "selected_path": "_codex-worktrees/repo-main",
-                },
-                "checkouts": [
-                    {
-                        "path": "_codex-worktrees/repo-main",
-                        "state": "observed",
-                        "relation": "representative",
-                        "bare": False,
-                    }
-                ],
-            }
+            "checkout_authority": _checkout_authority(
+                canonical_path="Repo",
+                representative_path="_codex-worktrees/repo-main",
+                origin="owner/Repo",
+            )
         },
     )
 
@@ -258,6 +294,36 @@ def test_context_pr_plan_uses_selected_checkout_without_replacing_identity() -> 
     assert project.identity.display_name == "Repo"
     assert project.identity.path == "Repo"
     assert plan.repo_path == Path("/ws/_codex-worktrees/repo-main")
+
+
+def test_context_pr_plan_rejects_malformed_authority_variants() -> None:
+    variants = []
+
+    missing_field = _checkout_authority()
+    missing_field.pop("origin")
+    variants.append(missing_field)
+
+    invalid_type = _checkout_authority()
+    invalid_type["selection"] = "selected"
+    variants.append(invalid_type)
+
+    invalid_count = _checkout_authority()
+    invalid_count["checkout_count"] = 3
+    variants.append(invalid_count)
+
+    malformed_record = _checkout_authority()
+    del malformed_record["checkouts"][0]["head"]
+    variants.append(malformed_record)
+
+    for authority in variants:
+        project = _project(
+            repository_state={"checkout_authority": deepcopy(authority)}
+        )
+        with pytest.raises(
+            AutomationExecutionError,
+            match="checkout-authority-malformed",
+        ):
+            build_context_pr_plan(project, workspace_root=Path("/ws"))
 
 
 def test_context_pr_plan_apply_change_writes_managed_block(tmp_path: Path) -> None:
@@ -423,15 +489,10 @@ def test_execute_catalog_seed_blocks_unknown_checkout_authority(tmp_path: Path) 
     catalog_path = tmp_path / "catalog.yaml"
     project = _project(
         repository_state={
-            "checkout_authority": {
-                "schema_version": "CheckoutCollisionV1",
-                "selection": {
-                    "state": "unknown",
-                    "reason_code": "conflicting_full_clone_heads",
-                    "representative_path": "MyRepo",
-                    "selected_path": None,
-                },
-            }
+            "checkout_authority": _checkout_authority(
+                state="unknown",
+                reason_code="conflicting_full_clone_heads",
+            )
         }
     )
 

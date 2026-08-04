@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -58,9 +59,62 @@ def _write(path: Path, content: str) -> None:
 def _set_mtime(path: Path, timestamp: float) -> None:
     path.touch()
     path.chmod(0o644)
-    import os
-
     os.utime(path, (timestamp, timestamp))
+
+
+def _checkout_authority_fixture(
+    *,
+    canonical_path: str,
+    origin: str,
+    state: str = "selected",
+    reason_code: str = "single_clone_topology",
+) -> dict:
+    representative = {
+        "path": canonical_path,
+        "state": "observed",
+        "relation": "representative",
+        "head": "1" * 40,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    other = {
+        "path": (
+            f"{canonical_path}-linked"
+            if state == "selected"
+            else f"Archive/{canonical_path}"
+        ),
+        "state": "observed",
+        "relation": (
+            "linked_worktree" if state == "selected" else "independent_full_clone"
+        ),
+        "head": ("1" if state == "selected" else "2") * 40,
+        "branch": "feature",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    return {
+        "schema_version": "CheckoutCollisionV1",
+        "origin": origin,
+        "canonical_project_path": canonical_path,
+        "checkout_count": 2,
+        "full_clone_count": 1 if state == "selected" else 2,
+        "declared_checkout_paths": [],
+        "declared_path_evidence": [],
+        "unresolved_declared_paths": [],
+        "selection": {
+            "state": state,
+            "reason_code": reason_code,
+            "reason": "fixture authority",
+            "representative_path": canonical_path,
+            "selected_path": canonical_path if state == "selected" else None,
+            "rationale": "fixture selection",
+        },
+        "checkouts": [representative, other],
+        "discarded_checkouts": [other],
+    }
 
 
 def _security_test_project(
@@ -4170,15 +4224,12 @@ def test_context_recovery_plan_skips_unknown_checkout_authority(
             project,
             repository_state={
                 **project.repository_state,
-                "checkout_authority": {
-                    "schema_version": "CheckoutCollisionV1",
-                    "selection": {
-                        "state": "unknown",
-                        "reason_code": "conflicting_full_clone_heads",
-                        "representative_path": project.identity.path,
-                        "selected_path": None,
-                    }
-                },
+                "checkout_authority": _checkout_authority_fixture(
+                    canonical_path=project.identity.path,
+                    origin=project.identity.repo_full_name or "fixture/FreshCollision",
+                    state="unknown",
+                    reason_code="conflicting_full_clone_heads",
+                ),
             },
         )
         if project.identity.project_key == "FreshCollision"
@@ -4248,10 +4299,48 @@ def test_context_recovery_malformed_authority_never_redirects_target_path(
     )
 
     assert target.status == "skipped"
-    assert target.reason == "checkout-authority-path-mismatch"
+    assert target.reason == "checkout-authority-malformed"
     assert target.relative_path == "FreshMalformed"
     assert target.target_path.startswith(str(target_repo))
     assert "malicious-target" not in target.target_path
+
+
+def test_checkout_authority_path_falls_back_for_malformed_envelope_variants() -> None:
+    variants = []
+
+    missing_field = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    missing_field.pop("origin")
+    variants.append(missing_field)
+
+    invalid_type = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    invalid_type["selection"] = "selected"
+    variants.append(invalid_type)
+
+    invalid_count = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    invalid_count["checkout_count"] = 3
+    variants.append(invalid_count)
+
+    malformed_record = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    del malformed_record["checkouts"][0]["head"]
+    variants.append(malformed_record)
+
+    for authority in variants:
+        project = {
+            "identity": {"path": "Repo", "repo_full_name": "owner/Repo"},
+            "repository_state": {
+                "checkout_authority": deepcopy(authority),
+            },
+        }
+        assert checkout_authority_path(project) == "Repo"
+        assert checkout_authority_blocker(project) == "checkout-authority-malformed"
 
 
 def test_context_recovery_apply_writes_primary_context_and_catalog_seed(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from src.portfolio_checkout_authority import validate_checkout_authority_envelope
 from src.portfolio_pathing import (
     VALID_MATURITY_PROGRAMS,
     VALID_OPERATING_PATHS,
@@ -11,7 +12,6 @@ from src.portfolio_pathing import (
 )
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
-    CHECKOUT_COLLISION_SCHEMA_VERSION,
     CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
     DERIVATION_POLICY_VERSION,
     SCHEMA_VERSION,
@@ -147,220 +147,24 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
     for group in groups:
         if not isinstance(group, dict):
             raise ValueError("Checkout collision group must be an object.")
-        required_group = {
-            "schema_version",
-            "origin",
-            "checkout_count",
-            "full_clone_count",
-            "declared_checkout_paths",
-            "declared_path_evidence",
-            "unresolved_declared_paths",
-            "selection",
-            "checkouts",
-            "discarded_checkouts",
-        }
-        group_missing = sorted(required_group - group.keys())
-        if group_missing:
-            raise ValueError(
-                f"Checkout collision group is missing fields: {group_missing}"
-            )
-        if group.get("schema_version") != CHECKOUT_COLLISION_SCHEMA_VERSION:
-            raise ValueError("Unexpected checkout collision schema version.")
         origin = group.get("origin")
         if not isinstance(origin, str) or not origin.strip():
             raise ValueError("Checkout collision origin must be non-empty.")
         origin_key = origin.lower()
-        if origin_key in seen_origins:
-            raise ValueError(f"Duplicate checkout collision origin: {origin}")
-        seen_origins.add(origin_key)
-
-        checkout_count = _require_nonnegative_count(group, "checkout_count")
-        full_clone_count = _require_nonnegative_count(group, "full_clone_count")
-        if checkout_count < 1:
-            raise ValueError("Checkout authority groups require at least one checkout.")
-        if not 1 <= full_clone_count <= checkout_count:
-            raise ValueError("Checkout collision full_clone_count is out of range.")
-        full_clone_groups += int(full_clone_count > 1)
-
-        selection = group.get("selection")
-        if not isinstance(selection, dict):
-            raise ValueError("Checkout collision selection must be an object.")
-        for key in (
-            "state",
-            "reason_code",
-            "reason",
-            "representative_path",
-            "selected_path",
-            "rationale",
-        ):
-            if key not in selection:
-                raise ValueError(f"Checkout collision selection is missing {key}.")
-        state = selection.get("state")
-        if state not in {"selected", "unknown"}:
-            raise ValueError(f"Invalid checkout authority state: {state}")
-        representative_path = _require_relative_path(
-            selection.get("representative_path"),
-            "checkout representative_path",
-        )
-        canonical_project_path = _require_relative_path(
-            group.get("canonical_project_path", representative_path),
-            "checkout canonical_project_path",
-        )
-        selected_path = selection.get("selected_path")
-        if state == "unknown":
-            ambiguous += 1
-            if selected_path is not None:
-                raise ValueError("UNKNOWN checkout authority cannot select a path.")
-        elif selected_path != representative_path:
-            raise ValueError(
-                "Selected checkout path must equal the representative path."
-            )
-        for key in ("reason_code", "reason", "rationale"):
-            if not isinstance(selection.get(key), str) or not selection[key].strip():
-                raise ValueError(
-                    f"Checkout collision selection {key} must be non-empty."
-                )
-
-        checkouts = group.get("checkouts")
-        discarded = group.get("discarded_checkouts")
-        if not isinstance(checkouts, list) or len(checkouts) != checkout_count:
-            raise ValueError(
-                "Checkout collision checkouts do not match checkout_count."
-            )
-        if not isinstance(discarded, list):
-            raise ValueError("Discarded checkouts must be a list.")
-        checkout_paths: set[str] = set()
-        representative_count = 0
-        for checkout in checkouts:
-            if not isinstance(checkout, dict):
-                raise ValueError("Checkout collision checkout must be an object.")
-            required_checkout = {
-                "path",
-                "state",
-                "relation",
-                "head",
-                "branch",
-                "dirty",
-                "dirty_path_count",
-                "bare",
-            }
-            missing_checkout = sorted(required_checkout - checkout.keys())
-            if missing_checkout:
-                raise ValueError(
-                    f"Checkout collision checkout is missing fields: {missing_checkout}"
-                )
-            path = _require_relative_path(checkout.get("path"), "checkout path")
-            if path in checkout_paths:
-                raise ValueError(f"Duplicate checkout collision path: {path}")
-            checkout_paths.add(path)
-            if checkout.get("state") not in {"observed", "unknown"}:
-                raise ValueError("Invalid checkout observation state.")
-            relation = checkout.get("relation")
-            if relation not in {
-                "representative",
-                "linked_worktree",
-                "independent_full_clone",
-            }:
-                raise ValueError("Invalid checkout relation.")
-            representative_count += int(relation == "representative")
-            head = checkout.get("head")
-            if head is not None and not re.fullmatch(
-                r"[0-9a-f]{40}|[0-9a-f]{64}", str(head)
-            ):
-                raise ValueError(f"Malformed checkout head for {path}.")
-            branch = checkout.get("branch")
-            if branch is not None and not isinstance(branch, str):
-                raise ValueError(f"Malformed checkout branch for {path}.")
-            dirty = checkout.get("dirty")
-            if dirty is not None and not isinstance(dirty, bool):
-                raise ValueError(f"Malformed checkout dirty state for {path}.")
-            dirty_count = checkout.get("dirty_path_count")
-            if dirty_count is not None and (
-                isinstance(dirty_count, bool)
-                or not isinstance(dirty_count, int)
-                or dirty_count < 0
-            ):
-                raise ValueError(f"Malformed checkout dirty_path_count for {path}.")
-            bare = checkout.get("bare")
-            if bare is not None and not isinstance(bare, bool):
-                raise ValueError(f"Malformed checkout bare state for {path}.")
-            if checkout.get("state") == "observed" and not isinstance(bare, bool):
-                raise ValueError(f"Observed checkout must declare bare state for {path}.")
-        representative_checkout = next(
-            (
-                checkout
-                for checkout in checkouts
-                if checkout["path"] == representative_path
-            ),
-            None,
-        )
-        if (
-            representative_count != 1
-            or representative_checkout is None
-            or representative_checkout["relation"] != "representative"
-            or (state == "selected" and representative_checkout["bare"] is not False)
-        ):
-            raise ValueError("Checkout collision requires one observed representative.")
-        expected_discarded = [
-            checkout
-            for checkout in checkouts
-            if checkout["path"] != representative_path
-        ]
-        if discarded != expected_discarded:
-            raise ValueError(
-                "Discarded checkout evidence does not match the checkout set."
-            )
-        discarded_count += len(discarded)
-
-        declared_paths = group.get("declared_checkout_paths")
-        unresolved_paths = group.get("unresolved_declared_paths")
-        declared_evidence = group.get("declared_path_evidence")
-        if not isinstance(declared_paths, list) or not isinstance(
-            unresolved_paths, list
-        ):
-            raise ValueError("Declared checkout paths must be lists.")
-        for path in declared_paths + unresolved_paths:
-            _require_relative_path(path, "declared checkout path")
-        if not isinstance(declared_evidence, list):
-            raise ValueError("Declared path evidence must be a list.")
-        for item in declared_evidence:
-            if not isinstance(item, dict):
-                raise ValueError("Declared path evidence must be an object.")
-            _require_relative_path(item.get("source_path"), "declared source path")
-            target = _require_relative_path(
-                item.get("target_checkout_path"), "declared target checkout path"
-            )
-            if target not in checkout_paths:
-                raise ValueError(
-                    "Declared checkout target is not in the collision group."
-                )
-        expected_declared_paths = sorted(
-            {item["target_checkout_path"] for item in declared_evidence},
-            key=str.lower,
-        )
-        if declared_paths != expected_declared_paths:
-            raise ValueError(
-                "Declared checkout paths do not match declared path evidence."
-            )
-        topology_failure = (
-            state == "unknown"
-            and selection.get("reason_code") == "worktree_enumeration_failed"
-        )
-        if checkout_count == 1 and not (
-            declared_evidence or unresolved_paths or topology_failure
-        ):
-            raise ValueError(
-                "Single-checkout authority groups require declaration or "
-                "topology-failure evidence."
-            )
-
         project = project_by_origin.get(origin_key)
         if project is None:
             raise ValueError(f"Checkout collision has no canonical project: {origin}")
-        if project.identity.path != canonical_project_path:
-            raise ValueError(
-                "Canonical project path differs from collision identity."
-            )
+        validated = validate_checkout_authority_envelope(
+            group,
+            identity_path=project.identity.path,
+            repo_full_name=project.identity.repo_full_name,
+        )
+        if origin_key in seen_origins:
+            raise ValueError(f"Duplicate checkout collision origin: {origin}")
+        seen_origins.add(origin_key)
+        full_clone_groups += int(validated.full_clone_count > 1)
+        ambiguous += int(validated.state == "unknown")
+        discarded_count += validated.discarded_count
         if project.repository_state.get("checkout_authority") != group:
             raise ValueError(
                 "Project checkout authority differs from collision summary."
@@ -391,15 +195,6 @@ def _require_nonnegative_count(value: dict, key: str) -> int:
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError(f"{key} must be a non-negative integer.")
     return count
-
-
-def _require_relative_path(value: object, label: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{label} must be a non-empty string.")
-    path = Path(value)
-    if path.is_absolute() or ".." in path.parts:
-        raise ValueError(f"{label} must stay workspace-relative.")
-    return value
 
 
 def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:

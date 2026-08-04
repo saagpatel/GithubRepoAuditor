@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 import os
 import subprocess
@@ -63,6 +64,64 @@ def _project(key, quality, *, archived=False, path=None):
             "context_files": ["CLAUDE.md"],
             "run_instructions_present": False,
         },
+    }
+
+
+def _checkout_authority(
+    *,
+    canonical_path: str,
+    representative_path: str | None = None,
+    state: str = "selected",
+    reason_code: str = "single_clone_topology",
+) -> dict:
+    representative_path = representative_path or canonical_path
+    representative = {
+        "path": representative_path,
+        "state": "observed",
+        "relation": "representative",
+        "head": "1" * 40,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    other = {
+        "path": (
+            canonical_path
+            if representative_path != canonical_path
+            else f"{canonical_path}-linked"
+        )
+        if state == "selected"
+        else f"Archive/{canonical_path}",
+        "state": "observed",
+        "relation": (
+            "linked_worktree" if state == "selected" else "independent_full_clone"
+        ),
+        "head": ("1" if state == "selected" else "2") * 40,
+        "branch": "feature",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    return {
+        "schema_version": "CheckoutCollisionV1",
+        "origin": f"owner/{canonical_path.rsplit('/', 1)[-1]}",
+        "canonical_project_path": canonical_path,
+        "checkout_count": 2,
+        "full_clone_count": 1 if state == "selected" else 2,
+        "declared_checkout_paths": [],
+        "declared_path_evidence": [],
+        "unresolved_declared_paths": [],
+        "selection": {
+            "state": state,
+            "reason_code": reason_code,
+            "reason": "fixture authority",
+            "representative_path": representative_path,
+            "selected_path": representative_path if state == "selected" else None,
+            "rationale": "fixture selection",
+        },
+        "checkouts": [representative, other],
+        "discarded_checkouts": [other],
     }
 
 
@@ -140,23 +199,10 @@ def test_build_record_uses_selected_checkout_without_replacing_identity():
             "run_instructions_present": True,
         },
         "repository_state": {
-            "checkout_authority": {
-                "schema_version": "CheckoutCollisionV1",
-                "canonical_project_path": "Repo",
-                "selection": {
-                    "state": "selected",
-                    "representative_path": "_codex-worktrees/repo-main",
-                    "selected_path": "_codex-worktrees/repo-main",
-                },
-                "checkouts": [
-                    {
-                        "path": "_codex-worktrees/repo-main",
-                        "state": "observed",
-                        "relation": "representative",
-                        "bare": False,
-                    }
-                ],
-            }
+            "checkout_authority": _checkout_authority(
+                canonical_path="Repo",
+                representative_path="_codex-worktrees/repo-main",
+            )
         },
     }
 
@@ -311,15 +357,13 @@ def test_prepare_pilot_blocks_unknown_checkout_authority(tmp_path):
                     "run_instructions_present": False,
                 },
                 "repository_state": {
-                    "checkout_authority": {
-                        "schema_version": "CheckoutCollisionV1",
-                        "selection": {
-                            "state": "unknown",
-                            "reason_code": "declared_path_conflicts_with_representative",
-                            "representative_path": "ConflictedRepo",
-                            "selected_path": None,
-                        }
-                    }
+                    "checkout_authority": _checkout_authority(
+                        canonical_path="ConflictedRepo",
+                        state="unknown",
+                        reason_code=(
+                            "declared_path_conflicts_with_representative"
+                        ),
+                    )
                 },
             },
             {
@@ -361,57 +405,58 @@ def test_prepare_pilot_malformed_authority_never_redirects_error_path(tmp_path):
     repo = workspace / "CanonicalRepo"
     repo.mkdir(parents=True)
     (repo / "AGENTS.md").write_text("# CanonicalRepo\n")
+    base_project = {
+        "identity": {
+            "project_key": "CanonicalRepo",
+            "path": "CanonicalRepo",
+            "display_name": "CanonicalRepo",
+        },
+        "derived": {
+            "archived": False,
+            "context_quality": "full",
+            "context_files": ["AGENTS.md"],
+            "run_instructions_present": False,
+        },
+    }
+    variants = []
+
+    missing_field = _checkout_authority(canonical_path="CanonicalRepo")
+    missing_field.pop("origin")
+    variants.append(missing_field)
+
+    invalid_type = _checkout_authority(canonical_path="CanonicalRepo")
+    invalid_type["selection"] = "selected"
+    variants.append(invalid_type)
+
+    invalid_count = _checkout_authority(canonical_path="CanonicalRepo")
+    invalid_count["checkout_count"] = 3
+    variants.append(invalid_count)
+
+    malformed_record = _checkout_authority(canonical_path="CanonicalRepo")
+    del malformed_record["checkouts"][0]["head"]
+    variants.append(malformed_record)
+
     snapshot = {
         "workspace_root": str(workspace),
         "generated_at": "2026-08-03T12:00:00+00:00",
-        "projects": [
-            {
-                "identity": {
-                    "project_key": "CanonicalRepo",
-                    "path": "CanonicalRepo",
-                    "display_name": "CanonicalRepo",
-                },
-                "derived": {
-                    "archived": False,
-                    "context_quality": "full",
-                    "context_files": ["AGENTS.md"],
-                    "run_instructions_present": False,
-                },
-                "repository_state": {
-                    "checkout_authority": {
-                        "schema_version": "CheckoutCollisionV1",
-                        "selection": {
-                            "state": "selected",
-                            "reason_code": "single_clone_topology",
-                            "representative_path": "redirected/Repo",
-                            "selected_path": "redirected/Repo",
-                        },
-                        "checkouts": [
-                            {
-                                "path": "redirected/Repo",
-                                "state": "observed",
-                                "relation": "representative",
-                                "bare": False,
-                            }
-                        ],
-                    }
-                },
-            }
-        ],
+        "projects": [],
     }
     snap_path = tmp_path / "snap.json"
-    snap_path.write_text(json.dumps(snapshot))
+    for authority in variants:
+        project = deepcopy(base_project)
+        project["repository_state"] = {"checkout_authority": authority}
+        snapshot["projects"] = [project]
+        snap_path.write_text(json.dumps(snapshot))
 
-    result = prepare_pilot(str(snap_path), per_tier={"full": 1})
+        result = prepare_pilot(str(snap_path), per_tier={"full": 1})
 
-    assert result["state"] == "blocked"
-    assert result["records"] == []
-    assert result["errors"] == [
-        {
-            "project_key": "CanonicalRepo",
-            "abs_path": str(repo),
-            "error": "checkout_authority_blocked",
-            "reason": "checkout-authority-path-mismatch",
-        }
-    ]
-    assert "redirected" not in result["errors"][0]["abs_path"]
+        assert result["state"] == "blocked"
+        assert result["records"] == []
+        assert result["errors"] == [
+            {
+                "project_key": "CanonicalRepo",
+                "abs_path": str(repo),
+                "error": "checkout_authority_blocked",
+                "reason": "checkout-authority-malformed",
+            }
+        ]
