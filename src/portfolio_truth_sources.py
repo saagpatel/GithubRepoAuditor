@@ -365,7 +365,7 @@ def _checkout_collision_record(
             )
         elif any(
             _checkout_observation(project).get("dirty") is True
-            for project in clone_representatives
+            for project in group
         ):
             state = "unknown"
             reason_code = "full_clone_local_work_present"

@@ -198,6 +198,48 @@ def test_conflicting_independent_full_clone_heads_are_unknown() -> None:
     assert summary["discarded_checkout_count"] == 1
 
 
+def test_dirty_linked_worktree_in_independent_clone_is_unknown() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo/.git",
+        ),
+        _p(
+            "Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head=head,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+        _p(
+            "Repo-fix",
+            "owner/Repo",
+            path="Archive/Repo-fix",
+            head="2" * 40,
+            branch="fix",
+            common_dir="/git/Archive/Repo/.git",
+            dirty=True,
+            dirty_path_count=1,
+        ),
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    collision = collisions[0]
+    assert collision["full_clone_count"] == 2
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "full_clone_local_work_present"
+    assert any(
+        checkout["path"] == "Archive/Repo-fix" and checkout["dirty"] is True
+        for checkout in collision["discarded_checkouts"]
+    )
+
+
 def test_declared_path_to_other_full_clone_overrides_head_reason() -> None:
     nested_declaration = {
         "absolute_path": "/workspace/Money/AIGCCore/src",
