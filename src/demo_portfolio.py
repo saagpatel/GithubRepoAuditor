@@ -813,24 +813,13 @@ def build_snapshot(
     coverage_states = Counter(
         resolved_coverage_state(project["security"]) for project in projects
     )
-    risk_tiers = Counter(project["risk"]["risk_tier"] for project in projects)
     attention = Counter(project["derived"]["attention_state"] for project in projects)
     activity = Counter(project["derived"]["activity_status"] for project in projects)
     context_quality = Counter(
         project["derived"]["context_quality"] for project in projects
     )
 
-    observed = [
-        project
-        for project in projects
-        if resolved_coverage_state(project["security"]) in {"complete", "partial"}
-    ]
-    total_open_high = sum(p["security"]["dependabot_high"] or 0 for p in observed)
-    total_open_critical = sum(
-        p["security"]["dependabot_critical"] or 0 for p in observed
-    )
-
-    return {
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "derivation_policy_version": DERIVATION_POLICY_VERSION,
         "generated_at": _iso(generated_at),
@@ -900,35 +889,10 @@ def build_snapshot(
         },
         "warnings": [],
         "projects": projects,
-        "rollups": {
-            "risk_tier_counts": {
-                tier: risk_tiers.get(tier, 0)
-                for tier in ("elevated", "moderate", "baseline", "deferred")
-            },
-            "security": {
-                "coverage_state": "partial",
-                "complete_repo_count": coverage_states.get("complete", 0),
-                "partial_repo_count": coverage_states.get("partial", 0),
-                "stale_count": coverage_states.get("stale", 0),
-                "unknown_count": coverage_states.get("unknown", 0),
-                "scanned_count": coverage_states.get("complete", 0),
-                "repos_with_open_high_critical": sum(
-                    1
-                    for p in observed
-                    if (p["security"]["open_high_critical"] or 0) > 0
-                ),
-                "total_open_high": total_open_high,
-                "total_open_critical": total_open_critical,
-            },
-            "decision": {
-                "decision_needed_count": attention.get("decision-needed", 0),
-                "default_attention_count": sum(
-                    attention.get(state, 0)
-                    for state in ("active-product", "active-infra", "decision-needed")
-                ),
-            },
-        },
     }
+    from src.portfolio_truth_validate import canonicalize_truth_snapshot_payload
+
+    return canonicalize_truth_snapshot_payload(payload)
 
 
 def history_snapshots(generated_at: datetime) -> list[tuple[str, dict[str, Any]]]:
