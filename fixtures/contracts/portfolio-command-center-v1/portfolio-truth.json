@@ -496,7 +496,7 @@
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
         "secret_scanning_open": null,
-        "source_produced_at": "2026-08-01T00:00:00+00:00"
+        "source_produced_at": "2026-07-30T23:00:00+00:00"
       },
       "warnings": []
     },
