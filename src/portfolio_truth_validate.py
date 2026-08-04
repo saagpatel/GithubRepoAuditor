@@ -202,6 +202,10 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
             selection.get("representative_path"),
             "checkout representative_path",
         )
+        canonical_project_path = _require_relative_path(
+            group.get("canonical_project_path", representative_path),
+            "checkout canonical_project_path",
+        )
         selected_path = selection.get("selected_path")
         if state == "unknown":
             ambiguous += 1
@@ -353,9 +357,9 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
         project = project_by_origin.get(origin_key)
         if project is None:
             raise ValueError(f"Checkout collision has no canonical project: {origin}")
-        if project.identity.path != representative_path:
+        if project.identity.path != canonical_project_path:
             raise ValueError(
-                "Canonical project path differs from collision representative."
+                "Canonical project path differs from collision identity."
             )
         if project.repository_state.get("checkout_authority") != group:
             raise ValueError(

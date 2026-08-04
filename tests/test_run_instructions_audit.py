@@ -128,6 +128,45 @@ def test_build_record_prefers_claude_md():
     assert build_record(project, "/w")["primary_file_name"] == "CLAUDE.md"
 
 
+def test_build_record_uses_selected_checkout_without_replacing_identity():
+    project = {
+        "identity": {
+            "project_key": "Repo",
+            "path": "Repo",
+            "display_name": "Repo",
+        },
+        "derived": {
+            "context_files": ["AGENTS.md"],
+            "run_instructions_present": True,
+        },
+        "repository_state": {
+            "checkout_authority": {
+                "schema_version": "CheckoutCollisionV1",
+                "canonical_project_path": "Repo",
+                "selection": {
+                    "state": "selected",
+                    "representative_path": "_codex-worktrees/repo-main",
+                    "selected_path": "_codex-worktrees/repo-main",
+                },
+                "checkouts": [
+                    {
+                        "path": "_codex-worktrees/repo-main",
+                        "state": "observed",
+                        "relation": "representative",
+                        "bare": False,
+                    }
+                ],
+            }
+        },
+    }
+
+    record = build_record(project, "/workspace")
+
+    assert record["project_key"] == "Repo"
+    assert record["display_name"] == "Repo"
+    assert record["abs_path"] == "/workspace/_codex-worktrees/repo-main"
+
+
 def test_is_after_compares_tz_aware_iso():
     assert is_after("2026-05-25T19:25:00-07:00", "2026-05-17T05:01:39+00:00")
     assert not is_after("2026-05-10T00:00:00+00:00", "2026-05-17T05:01:39+00:00")

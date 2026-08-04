@@ -16,7 +16,10 @@ from src.portfolio_context_contract import (
     temporary_project_reason,
     upsert_managed_context_block,
 )
-from src.portfolio_checkout_authority import checkout_authority_blocker
+from src.portfolio_checkout_authority import (
+    checkout_authority_blocker,
+    checkout_authority_path,
+)
 from src.portfolio_truth_types import (
     PortfolioTruthProject,
     PortfolioTruthSnapshot,
@@ -87,7 +90,8 @@ def build_context_recovery_plan(
     target_projects.sort(key=_recovery_priority)
 
     for index, project in enumerate(target_projects, start=1):
-        project_path = workspace_root / project.identity.path
+        execution_path = checkout_authority_path(project)
+        project_path = workspace_root / execution_path
         reason = temporary_project_reason(
             project.identity.project_key, project.identity.display_name
         )
@@ -121,7 +125,7 @@ def build_context_recovery_plan(
                 priority_rank=index,
                 project_key=project.identity.project_key,
                 display_name=project.identity.display_name,
-                relative_path=project.identity.path,
+                relative_path=execution_path,
                 activity_status=display_activity_status(
                     project.derived.activity_status, archived=project.derived.archived
                 ),
@@ -202,7 +206,7 @@ def apply_context_recovery_plan(
 
     for target in eligible_targets:
         project = project_index[target.project_key]
-        project_path = workspace_root / project.identity.path
+        project_path = workspace_root / checkout_authority_path(project)
         try:
             authority_reason = checkout_authority_blocker(
                 project,

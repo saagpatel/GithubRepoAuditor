@@ -237,6 +237,7 @@ def _dedupe_checkouts_by_origin(
             canonical.append(project)
 
     for origin_key, group in by_origin.items():
+        identity_project = _checkout_representative(group, origin_key)
         authority_group = _checkout_topology_group(
             group,
             workspace_root=workspace_root,
@@ -244,6 +245,10 @@ def _dedupe_checkouts_by_origin(
             now=now,
         )
         representative = _checkout_representative(authority_group, origin_key)
+        canonical_project = _canonical_checkout_project(
+            identity_project=identity_project,
+            representative=representative,
+        )
         has_checkout_declarations = any(
             _checkout_observation(project).get("declared_paths")
             for project in authority_group
@@ -262,11 +267,12 @@ def _dedupe_checkouts_by_origin(
                 origin_key=origin_key,
                 group=authority_group,
                 representative=representative,
+                canonical_project_path=str(canonical_project.get("path") or ""),
             )
-            representative["checkout_authority"] = collision
+            canonical_project["checkout_authority"] = collision
             if checkout_collisions is not None:
                 checkout_collisions.append(collision)
-        canonical.append(representative)
+        canonical.append(canonical_project)
 
     canonical.sort(key=lambda p: str(p.get("name", "")).lower())
     return canonical
@@ -412,12 +418,28 @@ def _checkout_representative(
     )
 
 
+def _canonical_checkout_project(
+    *,
+    identity_project: dict[str, Any],
+    representative: dict[str, Any],
+) -> dict[str, Any]:
+    """Keep discovered identity while observing the selected healthy checkout."""
+    if identity_project is representative:
+        return representative
+    canonical = dict(representative)
+    for key in ("name", "path", "top_level_dir"):
+        if key in identity_project:
+            canonical[key] = identity_project[key]
+    return canonical
+
+
 def _checkout_collision_record(
     *,
     origin: str,
     origin_key: str,
     group: list[dict[str, Any]],
     representative: dict[str, Any],
+    canonical_project_path: str,
 ) -> dict[str, Any]:
     clone_groups: dict[str, list[dict[str, Any]]] = {}
     for project in group:
@@ -522,6 +544,7 @@ def _checkout_collision_record(
     return {
         "schema_version": CHECKOUT_COLLISION_SCHEMA_VERSION,
         "origin": origin,
+        "canonical_project_path": canonical_project_path,
         "checkout_count": len(group),
         "full_clone_count": len(clone_groups),
         "declared_checkout_paths": declared_checkout_paths,

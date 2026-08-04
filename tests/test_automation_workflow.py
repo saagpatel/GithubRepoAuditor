@@ -226,6 +226,40 @@ def test_context_pr_plan_blocks_selected_path_mismatch() -> None:
         build_context_pr_plan(project, workspace_root=Path("/ws"))
 
 
+def test_context_pr_plan_uses_selected_checkout_without_replacing_identity() -> None:
+    project = _project(
+        display_name="Repo",
+        path="Repo",
+        repo_full_name="owner/Repo",
+        repository_state={
+            "checkout_authority": {
+                "schema_version": "CheckoutCollisionV1",
+                "canonical_project_path": "Repo",
+                "selection": {
+                    "state": "selected",
+                    "reason_code": "single_clone_topology",
+                    "representative_path": "_codex-worktrees/repo-main",
+                    "selected_path": "_codex-worktrees/repo-main",
+                },
+                "checkouts": [
+                    {
+                        "path": "_codex-worktrees/repo-main",
+                        "state": "observed",
+                        "relation": "representative",
+                        "bare": False,
+                    }
+                ],
+            }
+        },
+    )
+
+    plan = build_context_pr_plan(project, workspace_root=Path("/ws"))
+
+    assert project.identity.display_name == "Repo"
+    assert project.identity.path == "Repo"
+    assert plan.repo_path == Path("/ws/_codex-worktrees/repo-main")
+
+
 def test_context_pr_plan_apply_change_writes_managed_block(tmp_path: Path) -> None:
     project = _project(path="MyRepo")
     repo_path = tmp_path / "MyRepo"

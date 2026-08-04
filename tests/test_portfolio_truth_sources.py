@@ -747,9 +747,12 @@ def test_bare_coordinator_uses_worktree_inside_excluded_container(
         project for project in projects if project["repo_full_name"] == "owner/Repo"
     ]
     assert len(repo_projects) == 1
-    assert repo_projects[0]["path"] == "_codex-worktrees/repo-main"
+    assert repo_projects[0]["name"] == "Repo"
+    assert repo_projects[0]["path"] == "Repo"
+    assert repo_projects[0]["project_path"] == linked
     collision = collisions[0]
     assert collision["selection"]["state"] == "selected"
+    assert collision["canonical_project_path"] == "Repo"
     assert collision["selection"]["representative_path"] == (
         "_codex-worktrees/repo-main"
     )

@@ -14,7 +14,10 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from src.portfolio_checkout_authority import checkout_authority_blocker
+from src.portfolio_checkout_authority import (
+    checkout_authority_blocker,
+    checkout_authority_path,
+)
 from src.portfolio_context_contract import (
     analyze_project_context,
     choose_primary_context_file,
@@ -87,7 +90,7 @@ def select_pilot(
 
 
 def build_record(project: dict, workspace_root: str) -> dict:
-    path = project["identity"]["path"]
+    path = checkout_authority_path(project)
     derived = project["derived"]
     context_files = derived["context_files"]
     return {

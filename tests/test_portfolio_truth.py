@@ -22,7 +22,10 @@ from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
 )
-from src.portfolio_checkout_authority import checkout_authority_blocker
+from src.portfolio_checkout_authority import (
+    checkout_authority_blocker,
+    checkout_authority_path,
+)
 from src.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
@@ -1153,7 +1156,47 @@ def test_bare_coordinator_worktree_flows_through_truth_validation(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
     legacy_registry: Path,
+    monkeypatch,
 ) -> None:
+    portfolio_catalog.write_text(
+        """
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+  category: default-category
+  tool_provenance: unknown
+
+repos:
+  Repo:
+    owner: coordinator-owner
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: codex
+"""
+    )
+    legacy_registry.write_text(
+        """
+# Project Registry
+
+## Standalone Projects (Root Level)
+
+| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |
+|---------|--------|------|-----------------|-------|---------------|----------|-------|
+| Repo | parked | codex | standard | Python | README.md | legacy-category | Coordinator legacy |
+"""
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_reconcile.load_safe_notion_project_context",
+        lambda: {
+            "repo": {
+                "portfolio_call": "Maintain",
+                "momentum": "Stable",
+                "current_state": "Coordinator identity retained",
+            }
+        },
+    )
     seed = portfolio_workspace / "_backups" / "seed"
     seed.mkdir(parents=True)
     _write(seed / "README.md", "# Repo\n")
@@ -1196,7 +1239,7 @@ def test_bare_coordinator_worktree_flows_through_truth_validation(
         workspace_root=portfolio_workspace,
         catalog_path=portfolio_catalog,
         legacy_registry_path=legacy_registry,
-        include_notion=False,
+        include_notion=True,
         now=datetime(2026, 8, 3, tzinfo=timezone.utc),
     )
 
@@ -1206,14 +1249,36 @@ def test_bare_coordinator_worktree_flows_through_truth_validation(
         if item.identity.repo_full_name == "owner/Repo"
     )
     authority = project.repository_state["checkout_authority"]
-    assert project.identity.path == "_codex-worktrees/repo-main"
+    assert project.identity.display_name == "Repo"
+    assert project.identity.path == "Repo"
+    assert project.identity.project_key == "Repo"
+    assert project.declared.owner == "coordinator-owner"
+    assert project.declared.lifecycle_state == "active"
+    assert project.declared.review_cadence == "weekly"
+    assert project.declared.category == "legacy-category"
+    assert project.advisory.legacy_status == "parked"
+    assert project.advisory.notion_portfolio_call == "Maintain"
+    assert project.advisory.notion_current_state == "Coordinator identity retained"
     assert authority["selection"]["state"] == "selected"
-    assert authority["selection"]["selected_path"] == project.identity.path
+    assert authority["canonical_project_path"] == "Repo"
+    assert authority["selection"]["selected_path"] == (
+        "_codex-worktrees/repo-main"
+    )
+    assert checkout_authority_path(project) == "_codex-worktrees/repo-main"
+    assert project.repository_state["local"]["path"] == str(linked)
     assert checkout_authority_blocker(
         project,
         workspace_root=portfolio_workspace,
     ) is None
     validate_truth_snapshot(result.snapshot)
+
+    plan = build_context_recovery_plan(
+        result.snapshot,
+        workspace_root=portfolio_workspace,
+    )
+    target = next(item for item in plan.projects if item.project_key == "Repo")
+    assert target.relative_path == "_codex-worktrees/repo-main"
+    assert target.target_path.startswith(str(linked))
 
 
 def test_live_catalog_produces_exact_tier_zero_attention_semantics(

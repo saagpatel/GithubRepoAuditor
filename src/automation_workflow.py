@@ -48,7 +48,10 @@ from src.portfolio_context_recovery import (
     _suggested_catalog_seed,
     write_managed_context_block,
 )
-from src.portfolio_checkout_authority import checkout_authority_blocker
+from src.portfolio_checkout_authority import (
+    checkout_authority_blocker,
+    checkout_authority_path,
+)
 from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnapshot
 
 CONTRACT_VERSION = "automation_workflow_v1"
@@ -94,7 +97,7 @@ def build_context_pr_plan(
     )
     if authority_reason:
         raise AutomationExecutionError(authority_reason)
-    repo_path = workspace_root / project.identity.path
+    repo_path = workspace_root / checkout_authority_path(project)
     resolved_branch = default_branch or project.identity.default_branch or DEFAULT_DEFAULT_BRANCH
     display = project.identity.display_name
     commit_message = f"docs(context): refresh managed context block for {display}"
