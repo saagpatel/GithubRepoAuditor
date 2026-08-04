@@ -60,6 +60,7 @@ def checkout_authority_blocker(
     if (
         selected_checkout.get("state") != "observed"
         or selected_checkout.get("relation") != "representative"
+        or selected_checkout.get("bare") is not False
     ):
         return "checkout-authority-malformed"
 

@@ -31,6 +31,7 @@ def _p(
     common_dir: str | None = None,
     dirty: bool | None = False,
     dirty_path_count: int | None = 0,
+    bare: bool = False,
     declared_paths: list[dict[str, str]] | None = None,
 ) -> dict:
     relative_path = path or name
@@ -48,6 +49,7 @@ def _p(
             "dirty": dirty,
             "dirty_path_count": dirty_path_count,
             "git_common_dir": common_dir,
+            "bare": bare,
             "declared_paths": declared_paths or [],
         }
     return project
@@ -155,6 +157,7 @@ def test_linked_worktrees_keep_discarded_checkout_evidence() -> None:
             "branch": "fix",
             "dirty": False,
             "dirty_path_count": 0,
+            "bare": False,
         }
     ]
 
@@ -238,6 +241,61 @@ def test_dirty_linked_worktree_in_independent_clone_is_unknown() -> None:
         checkout["path"] == "Archive/Repo-fix" and checkout["dirty"] is True
         for checkout in collision["discarded_checkouts"]
     )
+
+
+def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo.git",
+            bare=True,
+            dirty=None,
+            dirty_path_count=None,
+        ),
+        _p(
+            "Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head=head,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+    ]
+
+    result = _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=collisions,
+    )
+
+    assert result[0]["path"] == "Archive/Repo"
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "selected"
+    assert collision["selection"]["selected_path"] == "Archive/Repo"
+    assert collision["checkouts"] == [
+        {
+            "path": "Archive/Repo",
+            "state": "observed",
+            "relation": "representative",
+            "head": head,
+            "branch": "main",
+            "dirty": False,
+            "dirty_path_count": 0,
+            "bare": False,
+        },
+        {
+            "path": "Repo",
+            "state": "observed",
+            "relation": "independent_full_clone",
+            "head": head,
+            "branch": "main",
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": True,
+        },
+    ]
 
 
 def test_declared_path_to_other_full_clone_overrides_head_reason() -> None:
@@ -398,6 +456,7 @@ def test_discovery_recognizes_conventional_bare_coordinator(tmp_path) -> None:
     assert project["_checkout_observation"]["state"] == "observed"
     assert project["_checkout_observation"]["head"] is None
     assert project["_checkout_observation"]["git_common_dir"] == str(coordinator)
+    assert project["_checkout_observation"]["bare"] is True
 
 
 def test_discovery_observes_conflicting_full_clones_without_count_inflation(

@@ -240,6 +240,7 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
                 "branch",
                 "dirty",
                 "dirty_path_count",
+                "bare",
             }
             missing_checkout = sorted(required_checkout - checkout.keys())
             if missing_checkout:
@@ -278,6 +279,11 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
                 or dirty_count < 0
             ):
                 raise ValueError(f"Malformed checkout dirty_path_count for {path}.")
+            bare = checkout.get("bare")
+            if bare is not None and not isinstance(bare, bool):
+                raise ValueError(f"Malformed checkout bare state for {path}.")
+            if checkout.get("state") == "observed" and not isinstance(bare, bool):
+                raise ValueError(f"Observed checkout must declare bare state for {path}.")
         representative_checkout = next(
             (
                 checkout
@@ -290,6 +296,7 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
             representative_count != 1
             or representative_checkout is None
             or representative_checkout["relation"] != "representative"
+            or (state == "selected" and representative_checkout["bare"] is not False)
         ):
             raise ValueError("Checkout collision requires one observed representative.")
         expected_discarded = [

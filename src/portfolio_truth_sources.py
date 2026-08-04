@@ -278,6 +278,7 @@ def _checkout_representative(
     return min(
         group,
         key=lambda project: (
+            _checkout_observation(project).get("bare") is True,
             str(project.get("name", "")).lower() != repo_base,
             len(Path(str(project.get("path", ""))).parts),
             len(str(project.get("path", ""))),
@@ -432,6 +433,7 @@ def _checkout_observation(project: dict[str, Any]) -> dict[str, Any]:
         "dirty": None,
         "dirty_path_count": None,
         "git_common_dir": None,
+        "bare": None,
         "declared_paths": [],
     }
 
@@ -459,6 +461,7 @@ def _published_checkout(
         "branch": observation.get("branch"),
         "dirty": observation.get("dirty"),
         "dirty_path_count": observation.get("dirty_path_count"),
+        "bare": observation.get("bare"),
     }
 
 
@@ -944,6 +947,7 @@ def _observe_checkout(project_path: Path, *, workspace_root: Path) -> dict[str, 
             "dirty": None,
             "dirty_path_count": None,
             "git_common_dir": None,
+            "bare": None,
             "declared_paths": _declared_canonical_paths(
                 project_path, workspace_root=workspace_root
             ),
@@ -955,6 +959,7 @@ def _observe_checkout(project_path: Path, *, workspace_root: Path) -> dict[str, 
         "dirty": dirty,
         "dirty_path_count": dirty_path_count,
         "git_common_dir": common_dir or None,
+        "bare": bare,
         "declared_paths": _declared_canonical_paths(
             project_path, workspace_root=workspace_root
         ),

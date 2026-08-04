@@ -309,7 +309,7 @@ def _render_checkout_authority_section(summary: dict[str, Any]) -> list[str]:
         f"- Authority state UNKNOWN: `{ambiguous_count}`",
         f"- Discarded checkout records retained: `{discarded_count}`",
         "- Selection policy: preserve one compatibility representative per origin; "
-        "independent full-clone conflicts remain UNKNOWN.",
+        + "independent full-clone conflicts remain UNKNOWN.",
     ]
     groups = summary.get("groups", [])
     if not groups:

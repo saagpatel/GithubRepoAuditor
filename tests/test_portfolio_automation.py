@@ -183,6 +183,7 @@ def test_observed_selected_checkout_authority_remains_eligible() -> None:
                         "path": "Repo",
                         "state": "observed",
                         "relation": "representative",
+                        "bare": False,
                     }
                 ],
             }
