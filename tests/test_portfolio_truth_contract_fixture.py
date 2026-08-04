@@ -303,10 +303,49 @@ def test_canonical_payload_validation_rejects_providers_without_receipt() -> Non
         validate_truth_snapshot_payload(fixture)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("coverage_state", "complete"),
+        ("alerts_available", True),
+        ("receipt_state", "fabricated"),
+        ("dependabot_high", 1),
+        ("cohort_policy", "portfolio-default-attention-v1"),
+    ),
+)
+def test_unattested_security_validation_rejects_fabricated_metadata(
+    field: str,
+    value: object,
+) -> None:
+    fixture = build_contract_fixture()
+    security = next(
+        project["security"]
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "unknown"
+    )
+    security[field] = value
+
+    with pytest.raises(ValueError, match="Unattested security"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_receipt_security_validation_rejects_false_cohort_membership() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["security"]["cohort_member"] = False
+
+    with pytest.raises(ValueError, match="cohort member"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def _legacy_security_fields():
     return _build_security_fields(
         {
-            "dependabot": {"critical": 1, "high": 2, "available": True},
+            "dependabot": {
+                "critical": 1,
+                "high": 2,
+                "receipt_id": 7,
+                "available": True,
+            },
             "code_scanning": {"available": True},
             "secret_scanning": {"open": 0, "available": True},
         }
@@ -482,7 +521,19 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
+                state, ("local", "head"), "a" * 41
+            ),
+            "head",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
                 state, ("worktrees", 0, "head"), "short"
+            ),
+            "head",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "head"), "a" * 41
             ),
             "head",
         ),
@@ -507,6 +558,24 @@ def _replace_all_repository_paths_with_other_demo_path(
                 state, ("worktrees", 0, "branch"), None
             ),
             "detached upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "branch"), "   "
+            ),
+            "branch",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream"), "origin/"
+            ),
+            "upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream"), "/Users/d/private"
+            ),
+            "upstream",
         ),
         (
             lambda state: _set_nested_repository_value(
@@ -540,6 +609,12 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
+                state, ("topology", "selection", "head"), "a" * 41
+            ),
+            "selection",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
                 state, ("topology", "selection", "candidate_count"), True
             ),
             "selection",
@@ -548,7 +623,13 @@ def _replace_all_repository_paths_with_other_demo_path(
             lambda state: state.update(
                 observed_at=(GENERATED_AT + timedelta(minutes=1)).isoformat()
             ),
-            "future-dated",
+            "match snapshot generated_at",
+        ),
+        (
+            lambda state: state.update(
+                observed_at=(GENERATED_AT - timedelta(days=1)).isoformat()
+            ),
+            "match snapshot generated_at",
         ),
     ),
 )
@@ -579,6 +660,21 @@ def test_canonical_payload_validation_rejects_remote_evidence_without_receipt() 
         validate_truth_snapshot_payload(fixture)
 
 
+def test_portable_repository_state_rejects_private_observation_failure_reason() -> None:
+    fixture = build_contract_fixture()
+    repository_state = fixture["projects"][0]["repository_state"]
+    fixture["projects"][0]["repository_state"] = {
+        "state": "unknown",
+        "observed_at": GENERATED_AT.isoformat(),
+        "reason_code": "repository_observation_failed",
+        "reason": "/Users/d/private-repository",
+        "remote_default_branch": repository_state["remote_default_branch"],
+    }
+
+    with pytest.raises(ValueError, match="private user path"):
+        validate_truth_snapshot_payload(fixture)
+
+
 @pytest.mark.parametrize(
     ("field", "value"), (("default_branch", None), ("head_sha", "short"))
 )
@@ -597,7 +693,7 @@ def test_canonical_payload_validation_rejects_invalid_remote_branch_shape(
     ("section", "field", "message"),
     (
         (None, "repository_state", "requires remote_default_branch"),
-        ("security", "cohort_member", "canonical reconstruction"),
+        ("security", "cohort_member", "cohort member"),
     ),
 )
 def test_canonical_payload_validation_rejects_missing_project_fields(

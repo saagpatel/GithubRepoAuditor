@@ -149,7 +149,14 @@ def publish_portfolio_truth(
         producer=producer_evidence.to_dict() if producer_evidence else {},
         prior_notion_generated_at=prior_notion_generated_at,
     )
-    validate_truth_snapshot(build_result.snapshot)
+    validate_truth_snapshot(
+        build_result.snapshot,
+        security_max_age_hours=(
+            security_receipt_binding.max_age_hours
+            if security_receipt_binding is not None
+            else 24
+        ),
+    )
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"

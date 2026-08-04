@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import subprocess
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from src.portfolio_repository_state import observe_repository_state
+import pytest
+
+from src.portfolio_repository_state import (
+    _local_from_worktree,
+    _observed_result,
+    _select_remote_default_worktree,
+    observe_repository_state,
+)
 from src.portfolio_truth_validate import _validate_repository_state_shape
 
 
@@ -212,6 +220,87 @@ def test_bare_coordinator_missing_remote_evidence_is_precise_unknown(
     assert state["topology"]["kind"] == "bare_coordinator"
     assert state["topology"]["selection"]["candidate_count"] == 0
     assert "local" not in state
+
+    _validate_repository_state_shape(
+        state,
+        expected_remote=state["remote_default_branch"],
+        project_key="fixture/bare-unknown",
+        generated_at=datetime(2026, 7, 12, tzinfo=UTC),
+    )
+    tampered = deepcopy(state)
+    tampered["local"] = None
+    with pytest.raises(ValueError, match="omit null local"):
+        _validate_repository_state_shape(
+            tampered,
+            expected_remote=state["remote_default_branch"],
+            project_key="fixture/bare-unknown",
+            generated_at=datetime(2026, 7, 12, tzinfo=UTC),
+        )
+
+
+def test_remote_selection_can_choose_linked_when_configured_worktree_is_unknown() -> (
+    None
+):
+    observed_at = datetime(2026, 7, 12, tzinfo=UTC)
+    remote = _remote_default("b" * 40)
+    unknown = {
+        "state": "unknown",
+        "reason_code": "worktree_observation_failed",
+        "reason": "git could not observe the linked worktree",
+        "path": "/demo-workspace/fixture/configured",
+        "head": "a" * 40,
+        "branch": "feature",
+        "detached": False,
+        "bare": False,
+        "dirty": None,
+        "dirty_path_count": None,
+    }
+    linked = {
+        "state": "observed",
+        "path": "/demo-workspace/fixture/linked",
+        "head": "b" * 40,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "upstream": "origin/main",
+        "upstream_observation_source": "local_tracking_ref",
+        "ahead": 0,
+        "behind": 0,
+        "detached": False,
+        "bare": False,
+    }
+    worktrees = [unknown, linked]
+    selection = _select_remote_default_worktree(worktrees, remote)
+    state = _observed_result(
+        observed_at=observed_at,
+        remote=remote,
+        worktrees=worktrees,
+        topology={
+            "kind": "working_repository",
+            "configured_path": unknown["path"],
+            "worktree_count": 2,
+            "linked_worktree_count": 1,
+            "selection": selection,
+        },
+        local=_local_from_worktree(linked),
+    )
+
+    _validate_repository_state_shape(
+        state,
+        expected_remote=remote,
+        project_key="fixture/configured",
+        generated_at=observed_at,
+    )
+
+    wrong_reason = deepcopy(state)
+    wrong_reason["worktrees"][0]["reason"] = "different failure"
+    with pytest.raises(ValueError, match="worktree 0"):
+        _validate_repository_state_shape(
+            wrong_reason,
+            expected_remote=remote,
+            project_key="fixture/configured",
+            generated_at=observed_at,
+        )
 
 
 def test_ambiguous_remote_default_worktrees_fail_closed(tmp_path: Path) -> None:
