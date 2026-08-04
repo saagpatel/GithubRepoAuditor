@@ -55,14 +55,8 @@ def _snapshot() -> dict:
     return build_snapshot(fixture_generated_at(NOW))
 
 
-def test_schema_version_tracks_the_producer_constant() -> None:
-    assert _snapshot()["schema_version"] == SCHEMA_VERSION
-
-
-def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
-    snapshot = _snapshot()
-
-    assert snapshot["inputs"] == {
+def _expected_inputs(snapshot: dict) -> dict:
+    return {
         "catalog": {
             "source_id": "portfolio-catalog",
             "sha256": None,
@@ -77,13 +71,42 @@ def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
             "observed_at": None,
             "carried_from_generated_at": None,
         },
+        "github_security": {
+            "source_id": "github-security-coverage-receipt",
+            "schema_version": "GitHubSecurityCoverageReceiptV1",
+            "produced_at": snapshot["generated_at"],
+            "state": "fresh",
+            "age_hours": 0.0,
+            "producer_commit": "a" * 40,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "cohort_repository_count": sum(
+                project["security"]["cohort_member"]
+                for project in snapshot["projects"]
+            ),
+            "path": "/demo-workspace/github-security-coverage.json",
+            "receipt_id": "sha256:" + "b" * 64,
+            "content_sha256": "b" * 64,
+        },
     }
+
+
+def test_schema_version_tracks_the_producer_constant() -> None:
+    assert _snapshot()["schema_version"] == SCHEMA_VERSION
+
+
+def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
+    snapshot = _snapshot()
+
+    assert snapshot["inputs"] == _expected_inputs(snapshot)
     assert snapshot["exclusions"] == {
         "policy_version": "workspace_discovery.v2",
         "counts": {},
     }
     assert snapshot["producer"] == {}
-    validate_truth_snapshot_payload(snapshot)
+    validate_truth_snapshot_payload(
+        snapshot,
+        allow_synthetic_security_matrix=True,
+    )
 
 
 def test_committed_demo_truth_artifacts_match_the_canonical_envelope() -> None:
@@ -95,29 +118,16 @@ def test_committed_demo_truth_artifacts_match_the_canonical_envelope() -> None:
 
     for path in paths:
         snapshot = json.loads(path.read_text())
-        generated_at = snapshot["generated_at"]
-        assert snapshot["inputs"] == {
-            "catalog": {
-                "source_id": "portfolio-catalog",
-                "sha256": None,
-                "observed_at": generated_at,
-            },
-            "workspace": {
-                "source_id": "projects-root",
-                "observed_at": generated_at,
-            },
-            "notion": {
-                "mode": "unavailable",
-                "observed_at": None,
-                "carried_from_generated_at": None,
-            },
-        }
+        assert snapshot["inputs"] == _expected_inputs(snapshot)
         assert snapshot["exclusions"] == {
             "policy_version": "workspace_discovery.v2",
             "counts": {},
         }
         assert snapshot["producer"] == {}
-        validate_truth_snapshot_payload(snapshot)
+        validate_truth_snapshot_payload(
+            snapshot,
+            allow_synthetic_security_matrix=True,
+        )
 
         raw = path.read_text().lower()
         _forbidden_extra = [
@@ -265,13 +275,14 @@ def test_risk_text_and_tiers_use_canonical_dependabot_alert_counts() -> None:
         canonical_count = (security["dependabot_critical"] or 0) + (
             security["dependabot_high"] or 0
         )
-        factor = f"{canonical_count} open high/critical security alerts"
+        factor = "active-high-severity-alerts"
 
         assert security["open_high_critical"] == canonical_count
         assert risk["security_risk"] is (canonical_count > 0)
         assert (factor in risk["risk_factors"]) is (canonical_count > 0)
         if canonical_count > 0:
             repos_with_open_high_critical += 1
+        if (security["dependabot_critical"] or 0) > 0:
             assert risk["risk_tier"] == "elevated"
 
     assert snapshot["rollups"]["security"][
@@ -300,7 +311,10 @@ def test_history_gives_the_trends_view_a_real_curve() -> None:
     assert len(set(timestamps)) == len(timestamps)
     assert all(s["schema_version"] == SCHEMA_VERSION for _, s in snapshots)
     for _, snapshot in snapshots:
-        validate_truth_snapshot_payload(snapshot)
+        validate_truth_snapshot_payload(
+            snapshot,
+            allow_synthetic_security_matrix=True,
+        )
 
     # Backlog pressure decays toward the present, so the curve actually moves.
     open_high = [s["rollups"]["security"]["total_open_high"] for _, s in snapshots]

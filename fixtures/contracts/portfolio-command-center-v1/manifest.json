@@ -18,12 +18,13 @@
     "evaluation_time": "2026-08-01T06:00:00+00:00",
     "generated_at": "2026-08-01T00:00:00+00:00",
     "producer_evidence": "absent",
-    "project_count": 4
+    "project_count": 4,
+    "security_evidence_semantics": "synthetic-cross-receipt-state-matrix"
   },
   "portfolio_truth_schema_version": "0.11.0",
   "producer": {
     "artifact_path": "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json",
-    "artifact_sha256": "adc5952fc069c19577735fb3b6260385d1b0020e96a0056163be534abb1259e0",
+    "artifact_sha256": "f01cd2b3c00ca22155273b42640bac968252bc8e8fd9ffb90a499fc9de6457fc",
     "generator": "src.portfolio_truth_contract_fixture:build_contract_fixture",
     "manifest_path": "fixtures/contracts/portfolio-command-center-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"
