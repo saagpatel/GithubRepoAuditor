@@ -383,6 +383,41 @@ def test_execute_catalog_seed_applies_and_persists_executed(tmp_path: Path) -> N
     assert persisted.execution_ref == str(catalog_path)
 
 
+def test_execute_catalog_seed_blocks_unknown_checkout_authority(tmp_path: Path) -> None:
+    proposals_path = tmp_path / "pending-proposals.json"
+    _write(proposals_path, _proposal(action_type=ACTION_CATALOG_SEED))
+    catalog_path = tmp_path / "catalog.yaml"
+    project = _project(
+        repository_state={
+            "checkout_authority": {
+                "schema_version": "CheckoutCollisionV1",
+                "selection": {
+                    "state": "unknown",
+                    "reason_code": "conflicting_full_clone_heads",
+                    "representative_path": "MyRepo",
+                    "selected_path": None,
+                },
+            }
+        }
+    )
+
+    results = execute_approved_proposals(
+        proposals_path=proposals_path,
+        snapshot=_snapshot(project),
+        workspace_root=tmp_path,
+        catalog_path=catalog_path,
+        executed_at=NOW,
+        dry_run=False,
+    )
+
+    assert results[0].outcome == "failed"
+    assert results[0].detail == (
+        "checkout-authority-unknown:conflicting_full_clone_heads"
+    )
+    assert not catalog_path.exists()
+    assert load_proposals(proposals_path)[0].status == STATUS_APPROVED
+
+
 # --- execute_approved_proposals: resolution + slug policy ------------------
 
 

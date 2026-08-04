@@ -230,6 +230,14 @@ def _dispatch_proposal(
     if project is None:
         return ExecutionResult(proposal.proposal_id, "skipped", "project-not-found")
 
+    if proposal.action_type in {ACTION_CONTEXT_PR, ACTION_CATALOG_SEED}:
+        authority_reason = checkout_authority_blocker(
+            project,
+            workspace_root=workspace_root,
+        )
+        if authority_reason:
+            raise AutomationExecutionError(authority_reason)
+
     if proposal.action_type == ACTION_CONTEXT_PR:
         # A context-PR needs a real GitHub slug for the head/base refs; we never
         # fabricate one from the local display name (decided 2026-06-06).
