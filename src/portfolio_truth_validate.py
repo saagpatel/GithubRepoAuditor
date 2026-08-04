@@ -31,6 +31,7 @@ from src.portfolio_repository_state import (
     _selected_worktree,
     _tracks_nonmatching_branch,
 )
+from src.portfolio_truth_coverage import build_coverage_envelope
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
@@ -172,6 +173,25 @@ def validate_truth_snapshot(
             snapshot.generated_at,
             security_max_age_hours,
         )
+
+    notion_context_rows = snapshot.source_summary.get("notion_context_rows")
+    notion_context_carried_forward = snapshot.source_summary.get(
+        "notion_context_carried_forward"
+    )
+    if (
+        not isinstance(notion_context_rows, int)
+        or isinstance(notion_context_rows, bool)
+        or notion_context_rows < 0
+        or not isinstance(notion_context_carried_forward, bool)
+    ):
+        raise ValueError("PortfolioTruth notion coverage source summary is invalid.")
+    expected_coverage = build_coverage_envelope(
+        projects=snapshot.projects,
+        notion_context_carried_forward=notion_context_carried_forward,
+        notion_context_rows=notion_context_rows,
+    )
+    if snapshot.coverage != expected_coverage:
+        raise ValueError("PortfolioTruth coverage differs from the producer envelope.")
 
 
 def _validate_security_fields(

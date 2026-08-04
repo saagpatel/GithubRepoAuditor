@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from src.demo_portfolio import resolved_coverage_state
+from src.portfolio_truth_coverage import build_coverage_envelope
 from src.portfolio_truth_contract_fixture import (
     CONTRACT_VERSION,
     EVALUATED_AT,
@@ -157,6 +158,73 @@ def test_generated_and_committed_fixtures_pass_canonical_payload_validation() ->
     assert committed["producer"] == {}
     validate_truth_snapshot_payload(generated)
     validate_truth_snapshot_payload(committed)
+
+
+def test_contract_fixture_uses_the_shared_producer_coverage_envelope() -> None:
+    fixture = build_contract_fixture()
+
+    assert fixture["coverage"] == build_coverage_envelope(
+        projects=fixture["projects"],
+        notion_context_carried_forward=False,
+        notion_context_rows=0,
+    )
+    assert [row["source"] for row in fixture["coverage"]] == [
+        "workspace",
+        "git",
+        "github_security",
+        "notion",
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda coverage: coverage.pop(1),
+        lambda coverage: coverage.pop(3),
+        lambda coverage: next(
+            row for row in coverage if row["source"] == "github_security"
+        ).pop("provider_observed_counts"),
+        lambda coverage: next(
+            row for row in coverage if row["source"] == "github_security"
+        )["provider_observed_counts"].update(dependabot=99),
+        lambda coverage: next(
+            row for row in coverage if row["source"] == "github_security"
+        )["remote_default_branch_counts"].update(observed=99),
+        lambda coverage: next(
+            row for row in coverage if row["source"] == "github_security"
+        ).update(cohort_complete_count=99),
+    ),
+)
+def test_contract_validation_rejects_reduced_or_tampered_coverage(
+    mutation: object,
+) -> None:
+    fixture = build_contract_fixture()
+    mutation(fixture["coverage"])
+
+    with pytest.raises(ValueError, match="producer envelope"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_shared_coverage_envelope_preserves_supplementary_behavior() -> None:
+    fixture = build_contract_fixture()
+    supplementary = deepcopy(fixture["projects"][0])
+    supplementary["identity"]["project_key"] = "supp:operator-surface"
+    projects = [*fixture["projects"], supplementary]
+
+    coverage = build_coverage_envelope(
+        projects=projects,
+        notion_context_carried_forward=False,
+        notion_context_rows=0,
+    )
+    by_source = {row["source"]: row for row in coverage}
+
+    assert by_source["workspace"]["project_count"] == 4
+    assert by_source["github_security"]["project_count"] == 4
+    assert by_source["supplementary_registry"] == {
+        "source": "supplementary_registry",
+        "state": "observed",
+        "project_count": 1,
+    }
 
 
 def test_canonical_payload_validation_rejects_partial_producer_evidence() -> None:
@@ -817,6 +885,11 @@ def test_git_identity_can_observe_not_a_repository_race() -> None:
         "observed_at": GENERATED_AT.isoformat(),
         "remote_default_branch": remote,
     }
+    fixture["coverage"] = build_coverage_envelope(
+        projects=fixture["projects"],
+        notion_context_carried_forward=False,
+        notion_context_rows=0,
+    )
 
     validate_truth_snapshot_payload(fixture)
 

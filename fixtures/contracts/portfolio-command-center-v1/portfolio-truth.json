@@ -11,13 +11,53 @@
       "state": "observed"
     },
     {
+      "observed_count": 4,
+      "project_count": 4,
+      "source": "git",
+      "state": "observed"
+    },
+    {
+      "cohort_complete_count": 1,
+      "cohort_partial_count": 1,
+      "cohort_repository_count": 3,
+      "cohort_stale_count": 1,
+      "cohort_unknown_count": 0,
       "complete_repo_count": 1,
       "partial_repo_count": 1,
       "project_count": 4,
+      "provider_observed_counts": {
+        "code_scanning": 1,
+        "dependabot": 2,
+        "secret_scanning": 1
+      },
+      "provider_zero_finding_counts": {
+        "code_scanning": 1,
+        "dependabot": 0,
+        "secret_scanning": 1
+      },
+      "remote_default_branch_counts": {
+        "credential_unavailable": 0,
+        "forbidden": 0,
+        "malformed": 0,
+        "not_found": 0,
+        "not_requested": 0,
+        "observed": 2,
+        "partial": 0,
+        "rate_limited": 0,
+        "stale": 1,
+        "transient_error": 0,
+        "unknown": 1
+      },
+      "scanned_count": 1,
       "source": "github_security",
       "stale_count": 1,
       "state": "partial",
       "unknown_count": 1
+    },
+    {
+      "observed_count": 0,
+      "source": "notion",
+      "state": "unknown"
     }
   ],
   "derivation_policy_version": "portfolio_attention.v3",
@@ -937,7 +977,7 @@
     "duplicate_display_names": [],
     "github_archived_count": 0,
     "legacy_registry_rows": 4,
-    "notion_context_carried_forward": 0,
+    "notion_context_carried_forward": false,
     "notion_context_rows": 0,
     "project_count": 4,
     "unresolved_duplicate_display_names": [],
