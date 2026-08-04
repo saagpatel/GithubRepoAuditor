@@ -24,7 +24,7 @@
   "portfolio_truth_schema_version": "0.11.0",
   "producer": {
     "artifact_path": "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json",
-    "artifact_sha256": "368d827ae89e30ceea8cea651abe83ba15eef26d3d5d0a432a46dab762caa564",
+    "artifact_sha256": "ba3000833f1cd9c89442948ebe51f7e405e7832333a69c6f7347fb2fbfae254a",
     "generator": "src.portfolio_truth_contract_fixture:build_contract_fixture",
     "manifest_path": "fixtures/contracts/portfolio-command-center-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"
