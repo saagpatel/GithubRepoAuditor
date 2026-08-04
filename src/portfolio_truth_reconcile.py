@@ -17,10 +17,7 @@ from src.portfolio_context_contract import has_substantive_readme_support
 from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_repository_state import observe_repository_state
 from src.portfolio_truth_coverage import build_coverage_envelope
-from src.portfolio_truth_decisions import (
-    build_project_decision,
-    derive_attention_state,
-)
+from src.portfolio_truth_decisions import build_project_decision
 from src.portfolio_truth_metadata import (
     build_exclusions,
     build_input_envelope,
@@ -50,9 +47,6 @@ from src.project_registry import DEFAULT_SUPPLEMENTARY
 from src.registry_parser import _normalize
 
 logger = logging.getLogger(__name__)
-
-# Backward-compatible private import used by the focused policy tests.
-_attention_state_for = derive_attention_state
 
 # ── Strict signal constants (mirror src/analyzers/testing.py and cicd.py) ──
 _TEST_DIRS = frozenset(("test", "tests", "__tests__", "spec", "test_suite"))
