@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import fields
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,13 +23,27 @@ from src.portfolio_truth_types import (
     VALID_DOCTOR_STANDARDS,
     VALID_LIFECYCLE_STATES,
     VALID_RISK_TIERS,
+    AdvisoryFields,
+    DeclaredFields,
+    DerivedFields,
+    IdentityFields,
     PortfolioTruthSnapshot,
+    PortfolioTruthProject,
+    RiskFields,
+    SecurityFields,
 )
 from src.registry_parser import _normalize, parse_registry
 
 
 def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
-    validate_truth_snapshot_payload(snapshot.to_dict())
+    if snapshot.schema_version != SCHEMA_VERSION:
+        raise ValueError(f"Unexpected schema version: {snapshot.schema_version}")
+    if snapshot.derivation_policy_version != DERIVATION_POLICY_VERSION:
+        raise ValueError(
+            "Unexpected derivation policy version: "
+            f"{snapshot.derivation_policy_version}"
+        )
+    _validate_contract_envelope(snapshot.to_dict())
     seen_keys: set[str] = set()
     for project in snapshot.projects:
         key = project.identity.project_key
@@ -94,17 +110,93 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
 
 
 def validate_truth_snapshot_payload(payload: Mapping[str, Any]) -> None:
-    """Validate the serialized contract shared by publication and fixtures."""
-    schema_version = payload.get("schema_version")
-    if schema_version != SCHEMA_VERSION:
-        raise ValueError(f"Unexpected schema version: {schema_version}")
-    derivation_policy_version = payload.get("derivation_policy_version")
-    if derivation_policy_version != DERIVATION_POLICY_VERSION:
-        raise ValueError(
-            "Unexpected derivation policy version: "
-            f"{derivation_policy_version}"
+    """Construct and fully validate the serialized canonical truth contract."""
+    validate_truth_snapshot(_snapshot_from_payload(payload))
+
+
+def _snapshot_from_payload(payload: Mapping[str, Any]) -> PortfolioTruthSnapshot:
+    try:
+        raw_projects = payload["projects"]
+        if not isinstance(raw_projects, list):
+            raise ValueError("Portfolio truth projects must be an array.")
+        projects = [_project_from_payload(project) for project in raw_projects]
+        return PortfolioTruthSnapshot(
+            schema_version=str(payload["schema_version"]),
+            generated_at=_parse_datetime(payload["generated_at"], "generated_at"),
+            workspace_root=str(payload["workspace_root"]),
+            source_summary=dict(payload["source_summary"]),
+            precedence_matrix=dict(payload["precedence_matrix"]),
+            warnings=list(payload["warnings"]),
+            projects=projects,
+            derivation_policy_version=str(payload["derivation_policy_version"]),
+            producer=dict(payload["producer"]),
+            inputs=dict(payload["inputs"]),
+            coverage=list(payload["coverage"]),
+            exclusions=dict(payload["exclusions"]),
         )
-    _validate_contract_envelope(payload)
+    except KeyError as exc:
+        raise ValueError(f"Portfolio truth payload is missing field: {exc.args[0]}") from exc
+    except TypeError as exc:
+        raise ValueError(f"Portfolio truth payload has an invalid field type: {exc}") from exc
+
+
+def _project_from_payload(payload: object) -> PortfolioTruthProject:
+    if not isinstance(payload, Mapping):
+        raise ValueError("Portfolio truth project must be an object.")
+    try:
+        derived = dict(payload["derived"])
+        last_activity = derived.get("last_meaningful_activity_at")
+        if last_activity is not None:
+            derived["last_meaningful_activity_at"] = _parse_datetime(
+                last_activity, "projects[].derived.last_meaningful_activity_at"
+            )
+        return PortfolioTruthProject(
+            identity=IdentityFields(**_model_kwargs(IdentityFields, payload["identity"])),
+            declared=DeclaredFields(**_model_kwargs(DeclaredFields, payload["declared"])),
+            derived=DerivedFields(**_model_kwargs(DerivedFields, derived)),
+            risk=RiskFields(**_model_kwargs(RiskFields, payload.get("risk", {}))),
+            security=SecurityFields(
+                **_model_kwargs(SecurityFields, payload.get("security", {}))
+            ),
+            advisory=AdvisoryFields(
+                **_model_kwargs(AdvisoryFields, payload.get("advisory", {}))
+            ),
+            repository_state=dict(payload.get("repository_state", {})),
+            provenance=dict(payload.get("provenance", {})),
+            warnings=list(payload.get("warnings", [])),
+        )
+    except KeyError as exc:
+        raise ValueError(
+            f"Portfolio truth project is missing field: {exc.args[0]}"
+        ) from exc
+    except TypeError as exc:
+        raise ValueError(
+            f"Portfolio truth project has an invalid field type: {exc}"
+        ) from exc
+
+
+def _model_kwargs(model: type, payload: object) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"{model.__name__} payload must be an object.")
+    allowed = {field.name for field in fields(model) if field.init}
+    return {key: value for key, value in payload.items() if key in allowed}
+
+
+def _parse_datetime(value: object, field_name: str) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        raise ValueError(f"Portfolio truth {field_name} must be an ISO-8601 timestamp.")
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(
+            f"Portfolio truth {field_name} must be an ISO-8601 timestamp."
+        ) from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"Portfolio truth {field_name} must include a timezone.")
+    return parsed
 
 
 def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:

@@ -1,7 +1,7 @@
 {
   "schema_version": "0.11.0",
   "derivation_policy_version": "portfolio_attention.v3",
-  "generated_at": "2026-07-27T21:44:20.036187+00:00",
+  "generated_at": "2026-07-27T21:50:59.321667+00:00",
   "workspace_root": "/demo-workspace",
   "producer": {},
   "source_summary": {
@@ -79,11 +79,11 @@
     "catalog": {
       "source_id": "portfolio-catalog",
       "sha256": null,
-      "observed_at": "2026-07-27T21:44:20.036187+00:00"
+      "observed_at": "2026-07-27T21:50:59.321667+00:00"
     },
     "workspace": {
       "source_id": "projects-root",
-      "observed_at": "2026-07-27T21:44:20.036187+00:00"
+      "observed_at": "2026-07-27T21:50:59.321667+00:00"
     },
     "notion": {
       "mode": "unavailable",
@@ -108,7 +108,7 @@
         "default_branch": "main"
       },
       "declared": {
-        "operating_path": "operate",
+        "operating_path": "maintain",
         "category": "flagship",
         "tool_provenance": "claude-code",
         "lifecycle_state": "active",
@@ -135,18 +135,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -154,7 +154,7 @@
         "release_count": 3,
         "path_override": "",
         "path_confidence": "high",
-        "path_rationale": "Stable path is operate from explicit operating path."
+        "path_rationale": "Stable path is maintain from explicit operating path."
       },
       "risk": {
         "risk_tier": "elevated",
@@ -174,7 +174,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -189,7 +189,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -212,7 +212,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -235,7 +235,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -277,7 +277,7 @@
         "default_branch": "main"
       },
       "declared": {
-        "operating_path": "operate",
+        "operating_path": "maintain",
         "category": "flagship",
         "tool_provenance": "codex",
         "lifecycle_state": "active",
@@ -304,17 +304,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -322,7 +322,7 @@
         "release_count": 3,
         "path_override": "",
         "path_confidence": "high",
-        "path_rationale": "Stable path is operate from explicit operating path."
+        "path_rationale": "Stable path is maintain from explicit operating path."
       },
       "risk": {
         "risk_tier": "elevated",
@@ -342,7 +342,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -357,7 +357,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -380,7 +380,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -403,7 +403,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -472,16 +472,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -510,7 +510,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -525,7 +525,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 2,
@@ -548,7 +548,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -571,7 +571,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 1
@@ -637,18 +637,18 @@
         "stack": [
           "Go"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -677,7 +677,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -692,7 +692,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -715,7 +715,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -738,7 +738,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -806,18 +806,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -845,7 +845,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -860,7 +860,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -883,7 +883,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -906,7 +906,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -975,17 +975,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1011,7 +1011,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1026,7 +1026,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1049,7 +1049,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1072,7 +1072,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1141,16 +1141,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1179,7 +1179,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1194,7 +1194,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -1217,7 +1217,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1240,7 +1240,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1282,7 +1282,7 @@
         "default_branch": "main"
       },
       "declared": {
-        "operating_path": "operate",
+        "operating_path": "maintain",
         "category": "studio",
         "tool_provenance": "codex",
         "lifecycle_state": "active",
@@ -1307,18 +1307,18 @@
           "TypeScript",
           "React"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1326,7 +1326,7 @@
         "release_count": 0,
         "path_override": "",
         "path_confidence": "medium",
-        "path_rationale": "Stable path is operate from explicit operating path."
+        "path_rationale": "Stable path is maintain from explicit operating path."
       },
       "risk": {
         "risk_tier": "baseline",
@@ -1346,7 +1346,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1361,7 +1361,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1384,7 +1384,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1407,7 +1407,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1475,18 +1475,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1514,7 +1514,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1529,7 +1529,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1552,7 +1552,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1575,7 +1575,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1643,17 +1643,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1681,7 +1681,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1696,7 +1696,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1719,7 +1719,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1742,7 +1742,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1810,16 +1810,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1848,7 +1848,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1863,7 +1863,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1886,7 +1886,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -1904,7 +1904,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -1968,18 +1968,18 @@
         "stack": [
           "Go"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2008,7 +2008,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2023,7 +2023,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -2046,7 +2046,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2064,7 +2064,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2131,18 +2131,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2170,7 +2170,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2185,7 +2185,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2208,7 +2208,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2226,7 +2226,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2292,17 +2292,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2330,7 +2330,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2345,7 +2345,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2368,7 +2368,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2386,7 +2386,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2452,16 +2452,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2490,7 +2490,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2505,7 +2505,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2528,7 +2528,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2546,7 +2546,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2610,18 +2610,18 @@
         "stack": [
           "Rust"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-25T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-25T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -2651,7 +2651,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2666,7 +2666,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2689,7 +2689,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2707,7 +2707,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-07-27T21:44:20.036187+00:00",
+            "observed_at": "2026-07-27T21:50:59.321667+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2773,18 +2773,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2813,7 +2813,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {},
         "dependabot_critical": null,
         "dependabot_high": null,
@@ -2875,17 +2875,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2914,7 +2914,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
-        "source_produced_at": "2026-07-27T21:44:20.036187+00:00",
+        "source_produced_at": "2026-07-27T21:50:59.321667+00:00",
         "providers": {},
         "dependabot_critical": null,
         "dependabot_high": null,
@@ -2976,16 +2976,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3075,18 +3075,18 @@
         "stack": [
           "Zig"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -3178,18 +3178,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3281,17 +3281,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": true,
@@ -3384,16 +3384,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -3483,18 +3483,18 @@
         "stack": [
           "Shell"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -3586,18 +3586,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3689,17 +3689,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": true,
@@ -3793,16 +3793,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -3891,18 +3891,18 @@
         "stack": [
           "R"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3995,18 +3995,18 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
         "context_file_count": 3,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -4097,17 +4097,17 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_file_count": 2,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": true,
@@ -4200,16 +4200,16 @@
         ],
         "stack_present": true,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
-        "current_state_present": false,
+        "current_state_present": true,
         "run_instructions_present": true,
-        "known_risks_present": false,
-        "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "known_risks_present": true,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -4299,18 +4299,18 @@
         "stack": [
           "Nim"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "current_state_present": false,
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-06T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-07-06T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -4400,18 +4400,18 @@
         "stack": [
           "Python"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -4501,18 +4501,18 @@
         "stack": [
           "JavaScript"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -4602,18 +4602,18 @@
         "stack": [
           "Go"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": false,
@@ -4702,18 +4702,18 @@
         "stack": [
           "Ruby"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": false,
@@ -4802,18 +4802,18 @@
         "stack": [
           "C++"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -4903,18 +4903,18 @@
         "stack": [
           "Swift"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": false,
@@ -5003,18 +5003,18 @@
         "stack": [
           "Rust"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": false,
@@ -5103,18 +5103,18 @@
         "stack": [
           "TypeScript"
         ],
-        "stack_present": true,
+        "stack_present": false,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_file_count": 1,
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": false,
         "current_state_present": false,
-        "run_instructions_present": true,
+        "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-18T21:44:20.036187+00:00",
+        "last_meaningful_activity_at": "2026-01-18T21:50:59.321667+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,

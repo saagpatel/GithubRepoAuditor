@@ -97,7 +97,7 @@
         "attention_state": "active-infra",
         "context_file_count": 3,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md",
           "docs/architecture.md"
         ],
@@ -112,7 +112,7 @@
         "path_confidence": "medium",
         "path_override": "",
         "path_rationale": "Stable path is maintain from explicit operating path.",
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 900,
         "release_count": 0,
@@ -263,7 +263,7 @@
         "attention_state": "decision-needed",
         "context_file_count": 2,
         "context_files": [
-          "README.md",
+          "AGENTS.md",
           "docs/current-state.md"
         ],
         "context_quality": "standard",
@@ -271,13 +271,13 @@
         "has_ci": true,
         "has_license": true,
         "has_tests": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "last_meaningful_activity_at": "2026-07-11T00:00:00+00:00",
         "next_recommended_move_present": true,
         "path_confidence": "medium",
         "path_override": "",
         "path_rationale": "Stable path is finish from explicit operating path.",
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 1037,
         "release_count": 0,
@@ -423,20 +423,20 @@
         "attention_state": "parked",
         "context_file_count": 1,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_quality": "minimum-viable",
-        "current_state_present": false,
+        "current_state_present": true,
         "has_ci": true,
         "has_license": true,
         "has_tests": true,
-        "known_risks_present": false,
+        "known_risks_present": true,
         "last_meaningful_activity_at": "2026-01-23T00:00:00+00:00",
-        "next_recommended_move_present": false,
+        "next_recommended_move_present": true,
         "path_confidence": "medium",
         "path_override": "",
         "path_rationale": "Stable path is maintain from explicit operating path.",
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 1174,
         "release_count": 0,
@@ -524,7 +524,7 @@
         "attention_state": "manual-only",
         "context_file_count": 1,
         "context_files": [
-          "README.md"
+          "AGENTS.md"
         ],
         "context_quality": "boilerplate",
         "current_state_present": false,
@@ -537,7 +537,7 @@
         "path_confidence": "medium",
         "path_override": "",
         "path_rationale": "Stable path is maintain from explicit operating path.",
-        "primary_context_file": "README.md",
+        "primary_context_file": "AGENTS.md",
         "project_summary_present": true,
         "readme_char_count": 1311,
         "release_count": 0,
@@ -545,7 +545,7 @@
         "stack": [
           "C"
         ],
-        "stack_present": true
+        "stack_present": false
       },
       "identity": {
         "default_branch": "main",

@@ -222,6 +222,8 @@ def test_history_gives_the_trends_view_a_real_curve() -> None:
     assert timestamps == sorted(timestamps)
     assert len(set(timestamps)) == len(timestamps)
     assert all(s["schema_version"] == SCHEMA_VERSION for _, s in snapshots)
+    for _, snapshot in snapshots:
+        validate_truth_snapshot_payload(snapshot)
 
     # Backlog pressure decays toward the present, so the curve actually moves.
     open_high = [s["rollups"]["security"]["total_open_high"] for _, s in snapshots]
