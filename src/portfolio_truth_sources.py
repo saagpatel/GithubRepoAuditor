@@ -278,6 +278,7 @@ def _checkout_representative(
     return min(
         group,
         key=lambda project: (
+            _checkout_observation(project).get("state") != "observed",
             _checkout_observation(project).get("bare") is True,
             str(project.get("name", "")).lower() != repo_base,
             len(Path(str(project.get("path", ""))).parts),
@@ -303,16 +304,7 @@ def _checkout_collision_record(
     declared_checkout_paths = sorted(
         {item["target_checkout_path"] for item in declarations}, key=str.lower
     )
-    declared_clone_keys = {
-        _checkout_clone_key(
-            next(
-                project
-                for project in group
-                if str(project.get("path")) == declared_path
-            )
-        )
-        for declared_path in declared_checkout_paths
-    }
+    representative_path = str(representative.get("path") or "")
 
     clone_representatives = [
         _checkout_representative(members, origin_key)
@@ -332,33 +324,27 @@ def _checkout_collision_record(
     state = "selected"
     reason_code = "single_clone_topology"
     reason = "all discovered checkouts share one Git common directory"
-    if len(clone_groups) > 1:
-        if not observations_complete:
-            state = "unknown"
-            reason_code = "checkout_observation_failed"
-            reason = (
-                "one or more same-origin checkouts could not be observed completely"
-            )
-        elif len(declared_clone_keys) > 1:
-            state = "unknown"
-            reason_code = "conflicting_declared_checkout_paths"
-            reason = (
-                "canonical path declarations resolve to multiple independent clones"
-            )
-        elif declared_clone_keys and representative_clone not in declared_clone_keys:
-            state = "unknown"
-            reason_code = "declared_path_conflicts_with_representative"
-            reason = (
-                "canonical path declarations resolve to a different full clone than "
-                "the compatibility representative"
-            )
-        elif unresolved_declarations:
-            state = "unknown"
-            reason_code = "declared_checkout_path_unresolved"
-            reason = (
-                "one or more canonical path declarations do not resolve to a checkout"
-            )
-        elif conflicting_heads:
+    if len(clone_groups) > 1 and not observations_complete:
+        state = "unknown"
+        reason_code = "checkout_observation_failed"
+        reason = "one or more same-origin checkouts could not be observed completely"
+    elif len(declared_checkout_paths) > 1:
+        state = "unknown"
+        reason_code = "conflicting_declared_checkout_paths"
+        reason = "canonical path declarations resolve to multiple checkouts"
+    elif declared_checkout_paths and representative_path not in declared_checkout_paths:
+        state = "unknown"
+        reason_code = "declared_path_conflicts_with_representative"
+        reason = (
+            "canonical path declarations resolve to a different checkout than "
+            "the compatibility representative"
+        )
+    elif unresolved_declarations:
+        state = "unknown"
+        reason_code = "declared_checkout_path_unresolved"
+        reason = "one or more canonical path declarations do not resolve to a checkout"
+    elif len(clone_groups) > 1:
+        if conflicting_heads:
             state = "unknown"
             reason_code = "conflicting_full_clone_heads"
             reason = (
@@ -386,7 +372,6 @@ def _checkout_collision_record(
         )
         for project in sorted(group, key=lambda item: str(item.get("path", "")).lower())
     ]
-    representative_path = str(representative.get("path") or "")
     discarded = [
         checkout for checkout in checkouts if checkout["path"] != representative_path
     ]
@@ -405,8 +390,9 @@ def _checkout_collision_record(
             "representative_path": representative_path,
             "selected_path": representative_path if state == "selected" else None,
             "rationale": (
-                "Compatibility representative prefers an origin-basename match, "
-                "then the shallowest, shortest, alphabetic workspace-relative path."
+                "Compatibility representative prefers a fully observed non-bare "
+                "checkout, then an origin-basename match, followed by the shallowest, "
+                "shortest, alphabetic workspace-relative path."
             ),
         },
         "checkouts": checkouts,

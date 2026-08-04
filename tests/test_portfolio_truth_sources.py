@@ -298,6 +298,71 @@ def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
     ]
 
 
+def test_observed_checkout_is_preferred_over_failed_basename_match() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p("Repo", "owner/Repo"),
+        _p(
+            "Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head=head,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+    ]
+
+    result = _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=collisions,
+    )
+
+    assert result[0]["path"] == "Archive/Repo"
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["reason_code"] == "checkout_observation_failed"
+    assert collision["selection"]["representative_path"] == "Archive/Repo"
+
+
+def test_declared_linked_worktree_conflicts_with_representative() -> None:
+    declaration = {
+        "absolute_path": "/workspace/Repo-fix/src",
+        "workspace_relative_path": "Repo-fix/src",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo/.git",
+            declared_paths=[declaration],
+        ),
+        _p(
+            "Repo-fix",
+            "owner/Repo",
+            head=head,
+            branch="fix",
+            common_dir="/git/Repo/.git",
+            declared_paths=[declaration],
+        ),
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    collision = collisions[0]
+    assert collision["full_clone_count"] == 1
+    assert collision["declared_checkout_paths"] == ["Repo-fix"]
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert (
+        collision["selection"]["reason_code"]
+        == "declared_path_conflicts_with_representative"
+    )
+
+
 def test_declared_path_to_other_full_clone_overrides_head_reason() -> None:
     nested_declaration = {
         "absolute_path": "/workspace/Money/AIGCCore/src",
