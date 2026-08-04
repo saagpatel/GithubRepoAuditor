@@ -9,9 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from src.github_security_coverage import (
+    DEFAULT_COHORT_POLICY,
     GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
     PROVIDER_NAMES,
     SecurityCoverageError,
+    _valid_git_branch,
+    _valid_git_oid,
+    _valid_git_upstream,
     _validate_remote_repository,
     validate_normalized_security_provider,
 )
@@ -146,7 +150,21 @@ def validate_truth_snapshot(
         doctor_std = project.declared.doctor_standard
         if doctor_std and doctor_std not in VALID_DOCTOR_STANDARDS:
             raise ValueError(f"Invalid doctor standard for {key}: {doctor_std}")
-        _validate_security_fields(project.security, key, snapshot.generated_at)
+        if not isinstance(project.identity.has_git, bool):
+            raise ValueError(f"Identity has_git for {key} must be boolean.")
+        if (
+            project.identity.has_git is False
+            and project.repository_state.get("state") != "not_a_repository"
+        ):
+            raise ValueError(
+                f"Non-Git identity for {key} must have not_a_repository state."
+            )
+        _validate_security_fields(
+            project.security,
+            key,
+            snapshot.generated_at,
+            security_max_age_hours,
+        )
         _validate_repository_state(
             project.repository_state,
             project.security,
@@ -160,11 +178,18 @@ def _validate_security_fields(
     security: SecurityFields,
     project_key: str,
     generated_at: datetime,
+    security_max_age_hours: int = 24,
 ) -> None:
     """Validate receipt-backed provider envelopes after receipt normalization."""
     providers = security.providers
     if not isinstance(providers, Mapping):
         raise ValueError(f"Security providers for {project_key} must be an object.")
+    if not isinstance(security.cohort_member, bool) or not isinstance(
+        security.cohort_policy, str
+    ):
+        raise ValueError(
+            f"Security cohort metadata for {project_key} has invalid types."
+        )
 
     has_receipt_evidence = bool(
         security.receipt_schema_version
@@ -187,14 +212,29 @@ def _validate_security_fields(
             f"Invalid security receipt state for {project_key}: "
             f"{security.receipt_state}"
         )
-    if security.cohort_member is not True or not security.cohort_policy:
+    if (
+        security.cohort_member is not True
+        or security.cohort_policy != DEFAULT_COHORT_POLICY
+    ):
         raise ValueError(
-            f"Receipt-backed security evidence for {project_key} must be a cohort member."
+            f"Receipt-backed security evidence for {project_key} must be a cohort "
+            "member under the production cohort policy."
         )
     produced_at = _parse_datetime(
         security.source_produced_at,
         f"projects[{project_key}].security.source_produced_at",
     )
+    receipt_age_hours = (generated_at - produced_at).total_seconds() / 3600
+    if receipt_age_hours < -0.05:
+        raise ValueError(f"Security receipt for {project_key} is future-dated.")
+    expected_receipt_state = (
+        "stale" if receipt_age_hours > security_max_age_hours else "fresh"
+    )
+    if security.receipt_state != expected_receipt_state:
+        raise ValueError(
+            f"Security receipt state for {project_key} does not match the "
+            "configured freshness window."
+        )
     if set(providers) != set(PROVIDER_NAMES):
         raise ValueError(
             f"Security providers for {project_key} must contain exactly: "
@@ -223,6 +263,8 @@ def _validate_security_fields(
                 provider,
                 produced_at=produced_at,
                 current=generated_at,
+                max_age_hours=security_max_age_hours,
+                receipt_is_stale=security.receipt_state == "stale",
             )
         except SecurityCoverageError as exc:
             raise ValueError(
@@ -913,37 +955,8 @@ def _optional_git_head(value: Any) -> bool:
     return value is None or _valid_git_oid(value)
 
 
-def _valid_git_oid(value: Any) -> bool:
-    return (
-        isinstance(value, str)
-        and len(value) in {40, 64}
-        and re.fullmatch(r"[0-9a-f]+", value) is not None
-    )
-
-
-def _valid_git_branch(value: Any) -> bool:
-    return (
-        _nonempty_text(value)
-        and re.search(r"[\x00-\x20\x7f~^:?*\[\\]", value) is None
-        and not value.startswith(("-", ".", "/"))
-        and not value.endswith((".", "/"))
-        and not any(token in value for token in ("..", "@{", "//", "/."))
-    )
-
-
 def _optional_git_branch(value: Any) -> bool:
     return value is None or _valid_git_branch(value)
-
-
-def _valid_git_upstream(value: Any) -> bool:
-    if not _nonempty_text(value) or "/" not in value:
-        return False
-    remote, branch = value.split("/", 1)
-    return (
-        _nonempty_text(remote)
-        and re.search(r"\s", remote) is None
-        and _valid_git_branch(branch)
-    )
 
 
 def _same_repository_path(left: Any, right: Any) -> bool:
@@ -954,9 +967,21 @@ def _same_repository_path(left: Any, right: Any) -> bool:
     )
 
 
-def validate_truth_snapshot_payload(payload: Mapping[str, Any]) -> None:
+def validate_truth_snapshot_payload(
+    payload: Mapping[str, Any],
+    *,
+    security_max_age_hours: int = 24,
+) -> None:
     """Fully validate serialized truth, including canonical byte-shape fidelity."""
-    canonical = canonicalize_truth_snapshot_payload(payload)
+    if _contains_private_identity(payload):
+        raise ValueError(
+            "Portable Repository/upstream paths are not public-safe: payload contains "
+            "a private user path or email identity."
+        )
+    canonical = canonicalize_truth_snapshot_payload(
+        payload,
+        security_max_age_hours=security_max_age_hours,
+    )
     for project in canonical["projects"]:
         _validate_portable_repository_paths(
             project["repository_state"],
@@ -1007,10 +1032,6 @@ def _validate_portable_repository_paths(
         raise ValueError(
             f"Portable repository paths for {project_key} are not public-safe."
         )
-    if _contains_private_user_path(repository_state):
-        raise ValueError(
-            f"Portable repository state for {project_key} contains a private user path."
-        )
     if isinstance(topology, Mapping) and topology.get("configured_path") != str(
         Path("/demo-workspace") / project_path
     ):
@@ -1019,22 +1040,40 @@ def _validate_portable_repository_paths(
         )
 
 
-def _contains_private_user_path(value: Any) -> bool:
+def _contains_private_identity(value: Any) -> bool:
     if isinstance(value, str):
-        return "/users/" in value.casefold()
+        return (
+            re.search(r"(?:^|[/\\])(?:users|home)[/\\]", value, re.IGNORECASE)
+            is not None
+            or re.search(
+                r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
+                value,
+                re.IGNORECASE,
+            )
+            is not None
+        )
     if isinstance(value, Mapping):
-        return any(_contains_private_user_path(item) for item in value.values())
+        return any(
+            _contains_private_identity(item)
+            for pair in value.items()
+            for item in pair
+        )
     if isinstance(value, list):
-        return any(_contains_private_user_path(item) for item in value)
+        return any(_contains_private_identity(item) for item in value)
     return False
 
 
 def canonicalize_truth_snapshot_payload(
     payload: Mapping[str, Any],
+    *,
+    security_max_age_hours: int = 24,
 ) -> dict[str, Any]:
     """Return the canonical serializer output for one raw truth snapshot."""
     snapshot = _snapshot_from_payload(payload)
-    validate_truth_snapshot(snapshot)
+    validate_truth_snapshot(
+        snapshot,
+        security_max_age_hours=security_max_age_hours,
+    )
     return snapshot.to_dict()
 
 

@@ -94,6 +94,47 @@ _REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _RECEIPT_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+
+def _valid_git_oid(value: Any) -> bool:
+    """Return whether *value* is a nonzero full lowercase SHA-1 or SHA-256 id."""
+    return (
+        isinstance(value, str)
+        and len(value) in {40, 64}
+        and re.fullmatch(r"[0-9a-f]+", value) is not None
+        and set(value) != {"0"}
+    )
+
+
+def _valid_git_ref_name(value: Any, *, branch: bool = False) -> bool:
+    """Mirror Git ref-format rules for branch and remote-tracking names."""
+    if not isinstance(value, str) or not value or (value == "@" and not branch):
+        return False
+    if branch and (value.startswith("-") or value == "HEAD"):
+        return False
+    if (
+        value.startswith("/")
+        or value.endswith(("/", "."))
+        or "//" in value
+        or ".." in value
+        or "@{" in value
+        or re.search(r"[\x00-\x20\x7f~^:?*\[\\]", value) is not None
+    ):
+        return False
+    return all(
+        component
+        and not component.startswith(".")
+        and not component.endswith(".lock")
+        for component in value.split("/")
+    )
+
+
+def _valid_git_branch(value: Any) -> bool:
+    return _valid_git_ref_name(value, branch=True)
+
+
+def _valid_git_upstream(value: Any) -> bool:
+    return isinstance(value, str) and "/" in value and _valid_git_ref_name(value)
+
 _ENDPOINTS = {
     "dependabot": "dependabot/alerts",
     "code_scanning": "code-scanning/alerts",
@@ -462,6 +503,8 @@ def validate_normalized_security_provider(
     *,
     produced_at: datetime | None = None,
     current: datetime | None = None,
+    max_age_hours: int | None = None,
+    receipt_is_stale: bool = False,
 ) -> dict[str, Any]:
     """Validate one provider envelope after receipt normalization."""
     if provider not in PROVIDER_NAMES:
@@ -523,6 +566,33 @@ def validate_normalized_security_provider(
             raise SecurityCoverageError(f"{provider}.observed_at is future-dated")
     elif state != "not_requested":
         raise SecurityCoverageError(f"{provider}.observed_at is required for {state}")
+
+    if max_age_hours is not None:
+        if max_age_hours <= 0:
+            raise SecurityCoverageError("max_age_hours must be positive")
+        if current is None:
+            raise SecurityCoverageError(
+                "current is required when validating provider freshness"
+            )
+        provider_age_hours = (
+            (current - observed_at).total_seconds() / 3600
+            if observed_at is not None
+            else None
+        )
+        if state == "observed" and (
+            receipt_is_stale
+            or provider_age_hours is None
+            or provider_age_hours > max_age_hours
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.observed is older than the configured freshness window"
+            )
+        if state == "stale" and not receipt_is_stale and (
+            provider_age_hours is None or provider_age_hours <= max_age_hours
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.stale is not justified by receipt or provider age"
+            )
 
     http_status = value.get("http_status")
     if http_status is not None and (
@@ -1897,6 +1967,8 @@ def _validate_provider(
         normalized,
         produced_at=produced_at,
         current=current,
+        max_age_hours=max_age_hours,
+        receipt_is_stale=receipt_is_stale,
     )
 
 
@@ -1953,13 +2025,11 @@ def _validate_remote_repository(
             raise SecurityCoverageError(
                 "repository.observed_at is required when observed"
             )
-        if not isinstance(default_branch, str) or not default_branch.strip():
+        if not _valid_git_branch(default_branch):
             raise SecurityCoverageError(
-                "repository.default_branch is required when observed"
+                "repository.default_branch is invalid when observed"
             )
-        if not isinstance(head_sha, str) or not re.fullmatch(
-            r"[0-9a-f]{40,64}", head_sha
-        ):
+        if not _valid_git_oid(head_sha):
             raise SecurityCoverageError(
                 "repository.head_sha is invalid when observed"
             )

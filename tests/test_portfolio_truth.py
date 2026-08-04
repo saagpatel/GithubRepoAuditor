@@ -2363,7 +2363,7 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
         security_alerts_by_name=security,
     )
     validate_truth_snapshot(built.snapshot, security_max_age_hours=48)
-    with pytest.raises(ValueError, match="production normalization"):
+    with pytest.raises(ValueError, match="configured freshness window"):
         validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
 
     published = publish_portfolio_truth(
