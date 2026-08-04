@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -338,6 +339,73 @@ def test_receipt_security_validation_rejects_false_cohort_membership() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+@pytest.mark.parametrize("cohort_policy", ("other-policy", 123))
+def test_receipt_security_requires_exact_production_cohort_policy(
+    cohort_policy: object,
+) -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["security"]["cohort_policy"] = cohort_policy
+
+    with pytest.raises(ValueError, match="cohort"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_legacy_security_accepts_boolean_member_and_string_policy() -> None:
+    fields = replace(
+        _legacy_security_fields(),
+        cohort_member=True,
+        cohort_policy="legacy-import-v1",
+    )
+
+    _validate_security_fields(fields, "fixture/legacy", GENERATED_AT)
+
+
+@pytest.mark.parametrize(
+    ("cohort_member", "cohort_policy"),
+    (("yes", "legacy-import-v1"), (True, 123)),
+)
+def test_legacy_security_rejects_noncanonical_cohort_types(
+    cohort_member: object,
+    cohort_policy: object,
+) -> None:
+    fields = replace(
+        _legacy_security_fields(),
+        cohort_member=cohort_member,
+        cohort_policy=cohort_policy,
+    )
+
+    with pytest.raises(ValueError, match="invalid types"):
+        _validate_security_fields(fields, "fixture/legacy", GENERATED_AT)
+
+
+def test_serialized_security_freshness_honors_explicit_validation_context() -> None:
+    fixture = build_contract_fixture()
+    project = fixture["projects"][0]
+    observed_at = GENERATED_AT - timedelta(hours=30)
+    project["security"]["source_produced_at"] = observed_at.isoformat()
+    for provider in project["security"]["providers"].values():
+        provider["observed_at"] = observed_at.isoformat()
+    project["repository_state"]["remote_default_branch"]["observed_at"] = (
+        observed_at.isoformat()
+    )
+    stale_project = next(
+        item
+        for item in fixture["projects"]
+        if item["security"]["receipt_state"] == "stale"
+    )
+    stale_at = GENERATED_AT - timedelta(hours=49)
+    stale_project["security"]["source_produced_at"] = stale_at.isoformat()
+    for provider in stale_project["security"]["providers"].values():
+        provider["observed_at"] = stale_at.isoformat()
+    stale_project["repository_state"]["remote_default_branch"]["observed_at"] = (
+        stale_at.isoformat()
+    )
+
+    validate_truth_snapshot_payload(fixture, security_max_age_hours=48)
+    with pytest.raises(ValueError, match="configured freshness window"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def _legacy_security_fields():
     return _build_security_fields(
         {
@@ -528,6 +596,12 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
+                state, ("local", "head"), "0" * 40
+            ),
+            "head",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
                 state, ("worktrees", 0, "head"), "short"
             ),
             "head",
@@ -568,6 +642,12 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
+                state, ("worktrees", 0, "branch"), "main.lock"
+            ),
+            "branch",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
                 state, ("local", "upstream"), "origin/"
             ),
             "upstream",
@@ -575,6 +655,24 @@ def _replace_all_repository_paths_with_other_demo_path(
         (
             lambda state: _set_nested_repository_value(
                 state, ("local", "upstream"), "/Users/example-user/private"
+            ),
+            "upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream"), "bad~remote/main"
+            ),
+            "upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream"), "../main"
+            ),
+            "upstream",
+        ),
+        (
+            lambda state: _set_nested_repository_value(
+                state, ("local", "upstream"), "origin/main.lock"
             ),
             "upstream",
         ),
@@ -674,6 +772,53 @@ def test_portable_repository_state_rejects_private_observation_failure_reason() 
 
     with pytest.raises(ValueError, match="private user path"):
         validate_truth_snapshot_payload(fixture)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "value"),
+    (
+        (("security", "cohort_policy"), "/home/d/private-policy"),
+        (
+            ("repository_state", "remote_default_branch", "reason"),
+            r"C:\Users\d\private-reason",
+        ),
+        (("declared", "notes"), "owner@example.com"),
+        (("warnings",), ["/Users/example-user/private-warning"]),
+    ),
+)
+def test_portable_payload_rejects_private_identity_patterns(
+    field_path: tuple[str, ...],
+    value: object,
+) -> None:
+    fixture = build_contract_fixture()
+    target = fixture["projects"][0]
+    for key in field_path[:-1]:
+        target = target[key]
+    target[field_path[-1]] = value
+
+    with pytest.raises(ValueError, match="private user path or email"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_non_git_identity_cannot_claim_observed_repository_state() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["identity"]["has_git"] = False
+
+    with pytest.raises(ValueError, match="Non-Git identity"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_git_identity_can_observe_not_a_repository_race() -> None:
+    fixture = build_contract_fixture()
+    project = fixture["projects"][0]
+    remote = project["repository_state"]["remote_default_branch"]
+    project["repository_state"] = {
+        "state": "not_a_repository",
+        "observed_at": GENERATED_AT.isoformat(),
+        "remote_default_branch": remote,
+    }
+
+    validate_truth_snapshot_payload(fixture)
 
 
 @pytest.mark.parametrize(

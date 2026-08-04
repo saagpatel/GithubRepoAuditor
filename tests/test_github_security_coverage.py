@@ -17,6 +17,9 @@ from src.github_security_coverage import (
     PROVIDER_STATES,
     SecurityCoverageError,
     _provider_result,
+    _remote_repository_result,
+    _valid_git_branch,
+    _valid_git_upstream,
     collect_security_coverage,
     derive_default_attention_cohort,
     load_security_coverage_receipt,
@@ -169,6 +172,90 @@ def test_normalized_provider_state_machine_rejects_impossible_envelopes(
 
     with pytest.raises(SecurityCoverageError, match=message):
         validate_normalized_security_provider("dependabot", tampered)
+
+
+def test_normalized_provider_freshness_honors_configured_window() -> None:
+    observed_at = NOW - timedelta(hours=30)
+    observed = _provider_result(
+        "dependabot",
+        state="observed",
+        observed_at=observed_at.isoformat(),
+        http_status=200,
+        pagination_complete=True,
+        counts={"critical": 0, "high": 0, "medium": 0, "low": 0},
+    )
+
+    assert validate_normalized_security_provider(
+        "dependabot",
+        observed,
+        produced_at=observed_at,
+        current=NOW,
+        max_age_hours=48,
+    ) == observed
+    with pytest.raises(SecurityCoverageError, match="freshness window"):
+        validate_normalized_security_provider(
+            "dependabot",
+            observed,
+            produced_at=observed_at,
+            current=NOW,
+            max_age_hours=24,
+        )
+
+
+def test_normalized_stale_provider_requires_receipt_or_provider_age() -> None:
+    recent_stale = _provider_result(
+        "dependabot",
+        state="stale",
+        observed_at=NOW.isoformat(),
+        http_status=200,
+        pagination_complete=True,
+        reason="receipt_stale",
+    )
+    old_stale = deepcopy(recent_stale)
+    old_stale["observed_at"] = (NOW - timedelta(hours=30)).isoformat()
+
+    assert validate_normalized_security_provider(
+        "dependabot",
+        recent_stale,
+        produced_at=NOW,
+        current=NOW,
+        max_age_hours=24,
+        receipt_is_stale=True,
+    ) == recent_stale
+    assert validate_normalized_security_provider(
+        "dependabot",
+        old_stale,
+        produced_at=NOW,
+        current=NOW,
+        max_age_hours=24,
+    ) == old_stale
+    with pytest.raises(SecurityCoverageError, match="not justified"):
+        validate_normalized_security_provider(
+            "dependabot",
+            recent_stale,
+            produced_at=NOW,
+            current=NOW,
+            max_age_hours=24,
+        )
+
+
+def test_normalized_unavailable_provider_preserves_old_observation() -> None:
+    unavailable = _provider_result(
+        "dependabot",
+        state="not_found",
+        observed_at=(NOW - timedelta(hours=30)).isoformat(),
+        http_status=404,
+        reason="github_not_found",
+        conditional_result="failed",
+    )
+
+    assert validate_normalized_security_provider(
+        "dependabot",
+        unavailable,
+        produced_at=NOW,
+        current=NOW,
+        max_age_hours=24,
+    ) == unavailable
 
 
 def _truth(count: int = 16) -> dict[str, Any]:
@@ -506,7 +593,6 @@ def test_current_nine_repository_cut_binds_remote_branch_and_head() -> None:
             _remote_graphql_response(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT),
         ]
     )
-
     receipt = _collect(
         session=session,
         cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
@@ -521,6 +607,128 @@ def test_current_nine_repository_cut_binds_remote_branch_and_head() -> None:
         and len(repository["repository"]["head_sha"]) == 40
         for repository in receipt["repositories"].values()
     )
+
+
+@pytest.mark.parametrize(
+    ("branch", "head_sha"),
+    (("main", "a" * 40), ("feature/release-1.2", "b" * 64), ("@", "c" * 40)),
+)
+def test_remote_repository_accepts_canonical_git_tokens(
+    branch: str,
+    head_sha: str,
+) -> None:
+    receipt = _collect()
+    receipt["repositories"]["owner/repo-00"]["repository"] = (
+        _remote_repository_result(
+            state="observed",
+            observed_at=NOW.isoformat(),
+            default_branch=branch,
+            head_sha=head_sha,
+            archived=False,
+        )
+    )
+
+    loaded = validate_security_coverage_receipt(
+        receipt,
+        expected_cohort_count=16,
+        now=NOW,
+    )
+
+    assert (
+        loaded.entries_by_full_name["owner/repo-00"]["repository"]["head_sha"]
+        == head_sha
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("head_sha", "a" * 41, "head_sha"),
+        ("head_sha", "0" * 40, "head_sha"),
+        ("head_sha", "A" * 40, "head_sha"),
+        ("default_branch", "has space", "default_branch"),
+        ("default_branch", "main.lock", "default_branch"),
+        ("default_branch", "feature..topic", "default_branch"),
+        ("default_branch", "HEAD", "default_branch"),
+    ),
+)
+def test_remote_repository_rejects_impossible_git_tokens(
+    field: str,
+    value: str,
+    message: str,
+) -> None:
+    receipt = _collect()
+    repository = _remote_repository_result(
+        state="observed",
+        observed_at=NOW.isoformat(),
+        default_branch="main",
+        head_sha="a" * 40,
+        archived=False,
+    )
+    repository[field] = value
+    receipt["repositories"]["owner/repo-00"]["repository"] = repository
+
+    with pytest.raises(SecurityCoverageError, match=message):
+        validate_security_coverage_receipt(
+            receipt,
+            expected_cohort_count=16,
+            now=NOW,
+        )
+
+
+@pytest.mark.parametrize(
+    "branch",
+    (
+        "main",
+        "feature/topic",
+        "release-1.2",
+        "@",
+        "HEAD",
+        "-topic",
+        ".hidden",
+        "feature/.hidden",
+        "main.lock",
+        "feature..topic",
+        "feature@{topic",
+        "feature//topic",
+        "feature/topic.",
+        "has space",
+        "feature\\topic",
+    ),
+)
+def test_shared_branch_validator_matches_git_check_ref_format(branch: str) -> None:
+    git_accepts = subprocess.run(
+        ["git", "check-ref-format", "--branch", branch],
+        check=False,
+        capture_output=True,
+        text=True,
+    ).returncode == 0
+
+    assert _valid_git_branch(branch) is git_accepts
+
+
+@pytest.mark.parametrize(
+    "upstream",
+    (
+        "origin/main",
+        "upstream/feature/topic",
+        "@/main",
+        "bad~remote/main",
+        "../main",
+        "origin/main.lock",
+        "origin/has space",
+        "origin/feature..topic",
+    ),
+)
+def test_shared_upstream_validator_matches_git_ref_format(upstream: str) -> None:
+    git_accepts = subprocess.run(
+        ["git", "check-ref-format", f"refs/remotes/{upstream}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    ).returncode == 0
+
+    assert _valid_git_upstream(upstream) is git_accepts
 
 
 def test_graphql_rate_limit_marks_remote_cut_with_exact_reason_code() -> None:
