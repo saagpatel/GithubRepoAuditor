@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from src.automation_proposals import VALID_ACTION_TYPES, VALID_STATUSES
 from src.demo_portfolio import (
@@ -28,15 +29,18 @@ from src.demo_portfolio import (
 from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
+    TRUTH_LATEST_FILENAME,
     VALID_ACTIVITY_STATUS,
     VALID_ATTENTION_STATES,
     VALID_CONTEXT_QUALITY,
 )
+from src.portfolio_truth_validate import validate_truth_snapshot_payload
 
 # Portfolio Command Center reads anything older than this as no longer fresh.
 CONSUMER_FRESH_WINDOW_HOURS = 48
 
 NOW = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+DEMO_OUTPUT_DIR = Path("output/demo")
 
 
 def _snapshot() -> dict:
@@ -70,6 +74,46 @@ def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
         "policy_version": "workspace_discovery.v2",
         "counts": {},
     }
+    assert snapshot["producer"] == {}
+    validate_truth_snapshot_payload(snapshot)
+
+
+def test_committed_demo_truth_artifacts_match_the_canonical_envelope() -> None:
+    paths = [DEMO_OUTPUT_DIR / TRUTH_LATEST_FILENAME]
+    paths.extend(
+        DEMO_OUTPUT_DIR / f"portfolio-truth-history-{index:02d}.json"
+        for index in range(1, HISTORY_POINTS + 1)
+    )
+
+    for path in paths:
+        snapshot = json.loads(path.read_text())
+        generated_at = snapshot["generated_at"]
+        assert snapshot["inputs"] == {
+            "catalog": {
+                "source_id": "portfolio-catalog",
+                "sha256": None,
+                "observed_at": generated_at,
+            },
+            "workspace": {
+                "source_id": "projects-root",
+                "observed_at": generated_at,
+            },
+            "notion": {
+                "mode": "unavailable",
+                "observed_at": None,
+                "carried_from_generated_at": None,
+            },
+        }
+        assert snapshot["exclusions"] == {
+            "policy_version": "workspace_discovery.v2",
+            "counts": {},
+        }
+        assert snapshot["producer"] == {}
+        validate_truth_snapshot_payload(snapshot)
+
+        raw = path.read_text().lower()
+        for forbidden in ("/users/", "saagpatel", "saagar", "@gmail.com", "gmail"):
+            assert forbidden not in raw
 
 
 def test_generated_at_lands_inside_the_consumer_fresh_window() -> None:
