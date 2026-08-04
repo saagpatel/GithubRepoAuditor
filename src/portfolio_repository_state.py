@@ -128,18 +128,29 @@ def _observe_working_tree(path: Path) -> dict[str, Any]:
     head = _git(path, "rev-parse", "HEAD")
     branch = _git(path, "branch", "--show-current") or None
     dirty = _git(path, "status", "--porcelain", "--untracked-files=all")
-    upstream = _git_optional(path, "rev-parse", "--abbrev-ref", "@{upstream}")
+    resolved_upstream = _git_optional(
+        path, "rev-parse", "--abbrev-ref", "@{upstream}"
+    )
     upstream_remote, upstream_branch = _upstream_identity(
-        path, branch=branch, upstream=upstream
+        path, branch=branch, upstream=resolved_upstream
+    )
+    upstream = (
+        upstream_branch
+        if upstream_remote == "."
+        else (
+            f"{upstream_remote}/{upstream_branch}"
+            if upstream_remote is not None and upstream_branch is not None
+            else None
+        )
     )
     ahead = behind = None
-    if upstream:
+    if resolved_upstream:
         counts = _git(
             path,
             "rev-list",
             "--left-right",
             "--count",
-            f"{upstream}...HEAD",
+            f"{resolved_upstream}...HEAD",
         )
         behind_text, ahead_text = counts.split()
         behind, ahead = int(behind_text), int(ahead_text)

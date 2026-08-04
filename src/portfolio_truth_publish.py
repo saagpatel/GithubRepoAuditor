@@ -4,6 +4,7 @@ import json
 import tempfile
 from contextlib import nullcontext
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from src.github_security_coverage import (
@@ -102,7 +103,15 @@ def publish_portfolio_truth(
     producer_evidence: ProducerEvidence | None = None,
     producer_repo_root: Path | None = None,
     require_producer_evidence: bool = False,
+    now: datetime | None = None,
 ) -> PortfolioTruthPublishResult:
+    if (
+        security_coverage_metadata is not None
+        or security_receipt_binding is not None
+    ) and now is None:
+        raise PortfolioTruthPublishError(
+            "Receipt-backed security publication requires an explicit evaluation clock."
+        )
     if require_producer_evidence and producer_evidence is None:
         raise PortfolioTruthPublishError(
             "Canonical publication requires validated producer evidence."
@@ -148,6 +157,7 @@ def publish_portfolio_truth(
         repo_status_by_name=repo_status_by_name,
         producer=producer_evidence.to_dict() if producer_evidence else {},
         prior_notion_generated_at=prior_notion_generated_at,
+        now=now,
     )
     validate_truth_snapshot(
         build_result.snapshot,
@@ -204,6 +214,8 @@ def publish_portfolio_truth(
     originals = {path: (path.read_text() if path.exists() else None) for path in targets}
     published: list[Path] = []
 
+    # This live guard is intentionally separate from the snapshot's shared
+    # evaluation clock: it catches receipt replacement or expiry before writes.
     publication_guard = (
         verified_security_coverage_receipt_binding(security_receipt_binding)
         if security_receipt_binding is not None

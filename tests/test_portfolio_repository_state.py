@@ -192,6 +192,42 @@ def test_remote_slash_branch_preserves_display_and_exact_branch(
     )
 
 
+def test_custom_fetch_refspec_serializes_configured_upstream_identity(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "checkout", "-b", "feature/foo")
+    _git(repo, "remote", "add", "origin", str(repo))
+    _git(
+        repo,
+        "config",
+        "remote.origin.fetch",
+        "+refs/heads/*:refs/custom/origin/*",
+    )
+    _git(repo, "fetch", "origin")
+    _git(repo, "config", "branch.feature/foo.remote", "origin")
+    _git(repo, "config", "branch.feature/foo.merge", "refs/heads/feature/foo")
+    assert _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}") == (
+        "custom/origin/feature/foo"
+    )
+
+    observed_at = datetime(2026, 7, 12, tzinfo=UTC)
+    state = observe_repository_state(repo, observed_at=observed_at)
+
+    assert state["state"] == "observed"
+    assert state["local"]["upstream"] == "origin/feature/foo"
+    assert state["local"]["upstream_branch"] == "feature/foo"
+    assert state["local"]["upstream_remote"] == "origin"
+    assert state["local"]["ahead"] == 0
+    assert state["local"]["behind"] == 0
+    _validate_repository_state_shape(
+        state,
+        expected_remote=state["remote_default_branch"],
+        project_key="fixture/custom-fetch-refspec",
+        generated_at=observed_at,
+    )
+
+
 def test_observation_reports_linked_worktree_without_file_names(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     linked = tmp_path / "linked"

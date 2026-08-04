@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -187,7 +187,25 @@ def build_input_envelope(
         },
     }
     if security_coverage_metadata:
-        inputs["github_security"] = dict(security_coverage_metadata)
+        github_security = dict(security_coverage_metadata)
+        produced_at = github_security.get("produced_at")
+        if isinstance(produced_at, str):
+            try:
+                parsed_produced_at = datetime.fromisoformat(
+                    produced_at.replace("Z", "+00:00")
+                )
+            except ValueError:
+                pass
+            else:
+                if parsed_produced_at.tzinfo is not None:
+                    raw_age_hours = (
+                        now.astimezone(timezone.utc)
+                        - parsed_produced_at.astimezone(timezone.utc)
+                    ).total_seconds() / 3600
+                    github_security["age_hours"] = round(
+                        max(raw_age_hours, 0.0), 3
+                    )
+        inputs["github_security"] = github_security
     return inputs
 
 

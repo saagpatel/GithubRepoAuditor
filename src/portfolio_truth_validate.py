@@ -600,17 +600,17 @@ def _validate_github_security_input(
     produced_at = _parse_datetime(
         value["produced_at"], "inputs.github_security.produced_at"
     )
-    if produced_at > snapshot.generated_at:
+    raw_age = (snapshot.generated_at - produced_at).total_seconds() / 3600
+    if raw_age < -0.05:
         raise ValueError("PortfolioTruth GitHub security input is future-dated.")
-    age = round((snapshot.generated_at - produced_at).total_seconds() / 3600, 3)
-    expected_state = "stale" if age > security_max_age_hours else "fresh"
+    age = round(max(raw_age, 0.0), 3)
+    expected_state = "stale" if raw_age > security_max_age_hours else "fresh"
     if value["state"] != expected_state:
         raise ValueError("PortfolioTruth GitHub security input state is invalid.")
     age_hours = value.get("age_hours")
     if (
         not isinstance(age_hours, (int, float))
         or isinstance(age_hours, bool)
-        or age_hours < 0
         or age_hours != age
     ):
         raise ValueError("PortfolioTruth GitHub security input age is invalid.")
