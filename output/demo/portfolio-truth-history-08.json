@@ -26,13 +26,53 @@
       "project_count": 40
     },
     {
+      "source": "git",
+      "state": "observed",
+      "observed_count": 40,
+      "project_count": 40
+    },
+    {
       "source": "github_security",
       "state": "partial",
-      "project_count": 40,
+      "scanned_count": 10,
       "complete_repo_count": 10,
       "partial_repo_count": 6,
       "stale_count": 2,
-      "unknown_count": 22
+      "unknown_count": 22,
+      "cohort_repository_count": 18,
+      "cohort_complete_count": 10,
+      "cohort_partial_count": 6,
+      "cohort_stale_count": 2,
+      "cohort_unknown_count": 0,
+      "provider_observed_counts": {
+        "dependabot": 16,
+        "code_scanning": 10,
+        "secret_scanning": 10
+      },
+      "provider_zero_finding_counts": {
+        "dependabot": 1,
+        "code_scanning": 6,
+        "secret_scanning": 9
+      },
+      "remote_default_branch_counts": {
+        "observed": 16,
+        "partial": 0,
+        "stale": 2,
+        "credential_unavailable": 0,
+        "forbidden": 0,
+        "not_found": 0,
+        "rate_limited": 0,
+        "transient_error": 0,
+        "malformed": 0,
+        "not_requested": 0,
+        "unknown": 22
+      },
+      "project_count": 40
+    },
+    {
+      "source": "notion",
+      "state": "unknown",
+      "observed_count": 0
     }
   ],
   "exclusions": {
@@ -47,7 +87,7 @@
     "catalog_warnings": [],
     "legacy_registry_rows": 40,
     "notion_context_rows": 0,
-    "notion_context_carried_forward": 0,
+    "notion_context_carried_forward": false,
     "context_quality_counts": {
       "full": 8,
       "standard": 8,

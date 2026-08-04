@@ -19,6 +19,7 @@ from src.portfolio_context_contract import has_substantive_readme_support
 from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_risk import build_risk_entry
 from src.portfolio_repository_state import observe_repository_state
+from src.portfolio_truth_coverage import build_coverage_envelope
 from src.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
     discover_workspace_projects,
@@ -356,7 +357,7 @@ def build_portfolio_truth_snapshot(
             notion_observed_at=notion_observed_at,
             security_coverage_metadata=security_coverage_metadata,
         ),
-        coverage=_build_coverage_envelope(
+        coverage=build_coverage_envelope(
             projects=projects,
             notion_context_carried_forward=notion_context_carried_forward,
             notion_context_rows=len(notion_context),
@@ -468,139 +469,6 @@ def _merge_supplementary_discoveries(
         if normalized_name not in used
     )
     return merged
-
-
-def _build_coverage_envelope(
-    *,
-    projects: list[PortfolioTruthProject],
-    notion_context_carried_forward: bool,
-    notion_context_rows: int,
-) -> list[dict[str, Any]]:
-    workspace_projects = [
-        project
-        for project in projects
-        if not project.identity.project_key.startswith("supp:")
-    ]
-    workspace_project_count = len(workspace_projects)
-    supplementary_project_count = len(projects) - workspace_project_count
-    complete = sum(
-        project.security.coverage_state == "complete" for project in workspace_projects
-    )
-    partial = sum(
-        project.security.coverage_state == "partial" for project in workspace_projects
-    )
-    stale = sum(
-        project.security.coverage_state == "stale" for project in workspace_projects
-    )
-    unknown = workspace_project_count - complete - partial - stale
-    cohort_count = sum(project.security.cohort_member for project in workspace_projects)
-    cohort_complete = sum(
-        project.security.cohort_member and project.security.coverage_state == "complete"
-        for project in workspace_projects
-    )
-    cohort_partial = sum(
-        project.security.cohort_member and project.security.coverage_state == "partial"
-        for project in workspace_projects
-    )
-    cohort_stale = sum(
-        project.security.cohort_member and project.security.coverage_state == "stale"
-        for project in workspace_projects
-    )
-    cohort_unknown = cohort_count - cohort_complete - cohort_partial - cohort_stale
-    provider_counts = {
-        provider: sum(
-            project.security.provider_state(provider) == "observed"
-            for project in workspace_projects
-        )
-        for provider in ("dependabot", "code_scanning", "secret_scanning")
-    }
-    provider_zero_finding_counts = {
-        provider: sum(
-            (project.security.providers.get(provider) or {}).get("zero_findings")
-            is True
-            for project in workspace_projects
-        )
-        for provider in ("dependabot", "code_scanning", "secret_scanning")
-    }
-    remote_default_branch_counts = {
-        state: sum(
-            (project.repository_state.get("remote_default_branch") or {}).get("state")
-            == state
-            for project in workspace_projects
-        )
-        for state in (
-            "observed",
-            "partial",
-            "stale",
-            "credential_unavailable",
-            "forbidden",
-            "not_found",
-            "rate_limited",
-            "transient_error",
-            "malformed",
-            "not_requested",
-            "unknown",
-        )
-    }
-    git_observed = sum(
-        project.repository_state.get("state") == "observed"
-        for project in workspace_projects
-    )
-    coverage = [
-        {
-            "source": "workspace",
-            "state": "observed",
-            "project_count": workspace_project_count,
-        },
-        {
-            "source": "git",
-            "state": "observed" if git_observed else "unknown",
-            "observed_count": git_observed,
-            "project_count": workspace_project_count,
-        },
-        {
-            "source": "github_security",
-            "state": (
-                "known"
-                if complete == workspace_project_count
-                else "partial"
-                if complete or partial
-                else "unknown"
-            ),
-            "scanned_count": complete,
-            "complete_repo_count": complete,
-            "partial_repo_count": partial,
-            "stale_count": stale,
-            "unknown_count": unknown,
-            "cohort_repository_count": cohort_count,
-            "cohort_complete_count": cohort_complete,
-            "cohort_partial_count": cohort_partial,
-            "cohort_stale_count": cohort_stale,
-            "cohort_unknown_count": cohort_unknown,
-            "provider_observed_counts": provider_counts,
-            "provider_zero_finding_counts": provider_zero_finding_counts,
-            "remote_default_branch_counts": remote_default_branch_counts,
-            "project_count": workspace_project_count,
-        },
-        {
-            "source": "notion",
-            "state": "carried_forward"
-            if notion_context_carried_forward
-            else "observed"
-            if notion_context_rows
-            else "unknown",
-            "observed_count": notion_context_rows,
-        },
-    ]
-    if supplementary_project_count:
-        coverage.append(
-            {
-                "source": "supplementary_registry",
-                "state": "observed",
-                "project_count": supplementary_project_count,
-            }
-        )
-    return coverage
 
 
 def _build_input_envelope(

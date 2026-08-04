@@ -24,6 +24,7 @@ from src.github_security_coverage import (
     _remote_repository_result,
 )
 from src.portfolio_repository_state import _observed_result
+from src.portfolio_truth_coverage import build_coverage_envelope
 from src.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
 
 # The demo workspace is deliberately not a real filesystem path.
@@ -952,9 +953,6 @@ def build_snapshot(
         project_specs=project_specs,
     )
 
-    coverage_states = Counter(
-        resolved_coverage_state(project["security"]) for project in projects
-    )
     attention = Counter(project["derived"]["attention_state"] for project in projects)
     activity = Counter(project["derived"]["activity_status"] for project in projects)
     context_quality = Counter(
@@ -977,7 +975,7 @@ def build_snapshot(
             "catalog_warnings": [],
             "legacy_registry_rows": len(projects),
             "notion_context_rows": 0,
-            "notion_context_carried_forward": 0,
+            "notion_context_carried_forward": False,
             "context_quality_counts": dict(context_quality),
             "activity_status_counts": dict(activity),
             "attention_state_counts": dict(attention),
@@ -993,22 +991,11 @@ def build_snapshot(
             "risk": ["demo fixture"],
             "security": ["demo fixture receipt"],
         },
-        "coverage": [
-            {
-                "source": "workspace",
-                "state": "observed",
-                "project_count": len(projects),
-            },
-            {
-                "source": "github_security",
-                "state": "partial",
-                "project_count": len(projects),
-                "complete_repo_count": coverage_states.get("complete", 0),
-                "partial_repo_count": coverage_states.get("partial", 0),
-                "stale_count": coverage_states.get("stale", 0),
-                "unknown_count": coverage_states.get("unknown", 0),
-            },
-        ],
+        "coverage": build_coverage_envelope(
+            projects=projects,
+            notion_context_carried_forward=False,
+            notion_context_rows=0,
+        ),
         "exclusions": {
             "policy_version": "workspace_discovery.v2",
             "counts": {},
