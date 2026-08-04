@@ -190,6 +190,30 @@ def test_producer_evidence_rejects_receipt_after_repository_tamper() -> None:
         ProducerEvidence.from_dict(payload)
 
 
+def test_producer_receipt_identity_is_not_delimiter_ambiguous() -> None:
+    common = {
+        "repository": "saagpatel/GithubRepoAuditor",
+        "commit": "a" * 40,
+        "checkout_path": "/demo-workspace/producer",
+        "verified_at": "2026-07-10T12:00:00Z",
+    }
+    left = {
+        **common,
+        "ref": "refs/heads/main\ncanonical",
+        "checkout_role": "producer",
+    }
+    right = {
+        **common,
+        "ref": "refs/heads/main",
+        "checkout_role": "canonical\nproducer",
+    }
+    assert "\n".join(left.values()) == "\n".join(right.values())
+
+    assert producer_evidence_receipt_id(**left) != producer_evidence_receipt_id(
+        **right
+    )
+
+
 def test_load_producer_evidence_rejects_nonpassing_receipt(tmp_path: Path) -> None:
     path = tmp_path / "producer.json"
     path.write_text(

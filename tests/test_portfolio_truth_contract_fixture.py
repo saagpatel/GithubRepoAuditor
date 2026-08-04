@@ -212,6 +212,21 @@ def test_kestrel_rejects_coherently_fabricated_not_found_reason() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+def test_kestrel_rejects_modified_conditional_for_not_found_response() -> None:
+    fixture = build_contract_fixture()
+    kestrel = next(
+        project
+        for project in fixture["projects"]
+        if project["identity"]["display_name"] == "Kestrel Loom"
+    )
+    provider = kestrel["security"]["providers"]["code_scanning"]
+    assert (provider["state"], provider["http_status"]) == ("not_found", 404)
+    provider["conditional"] = {"requested": True, "result": "modified"}
+
+    with pytest.raises(ValueError, match="conditional metadata.*producer domain"):
+        validate_truth_snapshot_payload(fixture)
+
+
 def test_kestrel_rejects_fabricated_partial_remote_reason() -> None:
     fixture = build_contract_fixture()
     kestrel = next(
@@ -622,6 +637,36 @@ def test_contract_rejects_malformed_producer_evidence(
     mutation(fixture["producer"])
 
     with pytest.raises(ValueError, match=message):
+        validate_truth_snapshot_payload(
+            fixture, allow_synthetic_security_matrix=True
+        )
+
+
+@pytest.mark.parametrize(
+    ("ref", "checkout_role"),
+    (
+        ("refs/heads/main\ncanonical", "producer"),
+        ("refs/heads/main", "canonical\nproducer"),
+    ),
+)
+def test_contract_rejects_old_delimiter_collision_producer_identities(
+    ref: str,
+    checkout_role: str,
+) -> None:
+    fixture = build_contract_fixture()
+    producer = _valid_producer_evidence()
+    producer.update(ref=ref, checkout_role=checkout_role)
+    producer["receipt_id"] = producer_evidence_receipt_id(
+        repository=str(producer["repository"]),
+        commit=str(producer["commit"]),
+        ref=ref,
+        checkout_role=checkout_role,
+        checkout_path=str(producer["checkout_path"]),
+        verified_at=str(producer["verified_at"]),
+    )
+    fixture["producer"] = producer
+
+    with pytest.raises(ValueError, match="control-free text"):
         validate_truth_snapshot_payload(
             fixture, allow_synthetic_security_matrix=True
         )
@@ -1419,6 +1464,19 @@ def test_observed_remote_repository_requires_null_reason() -> None:
     ] = "fabricated"
 
     with pytest.raises(ValueError, match="reason must be null when observed"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_stale_remote_repository_requires_observation_time() -> None:
+    fixture = build_contract_fixture()
+    stale = next(
+        project
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "stale"
+    )
+    stale["repository_state"]["remote_default_branch"]["observed_at"] = None
+
+    with pytest.raises(ValueError, match="observed_at.*stale"):
         validate_truth_snapshot_payload(fixture)
 
 

@@ -187,7 +187,7 @@ def _valid_git_branch(value: Any) -> bool:
 
 
 def _valid_git_upstream(value: Any) -> bool:
-    return isinstance(value, str) and "/" in value and _valid_git_ref_name(value)
+    return _valid_git_ref_name(value, branch=True)
 
 _ENDPOINTS = {
     "dependabot": "dependabot/alerts",
@@ -554,6 +554,62 @@ def _validate_provider_reason_domain(
         )
 
 
+def _validate_provider_conditional_domain(
+    provider: str,
+    *,
+    state: str,
+    http_status: int | None,
+    reason: str | None,
+    conditional: dict[str, Any],
+) -> None:
+    requested = conditional["requested"]
+    result = conditional["result"]
+    valid = False
+    if state in {"observed", "stale"}:
+        valid = (
+            http_status == 200
+            and result == ("modified" if requested else "not_used")
+        ) or (http_status == 304 and requested and result == "not_modified")
+    elif state == "not_requested":
+        incomplete_reasons = {
+            "base_request_limit",
+            "quota_reserve_before_pagination_complete",
+            "total_request_limit",
+        }
+        valid = (not requested and result == "not_used") or (
+            reason in incomplete_reasons and result == "incomplete"
+        )
+    elif state == "credential_unavailable":
+        valid = (
+            http_status is None and not requested and result == "not_used"
+        ) or (http_status == 401 and result == "failed")
+    elif state == "feature_unavailable" and reason == ELIGIBILITY_REASON:
+        valid = not requested and result == "not_used"
+    elif state == "malformed":
+        valid = (
+            http_status == 200 and result == "malformed"
+        ) or (
+            http_status == 304 and requested and result == "invalid_prior"
+        ) or (
+            reason is not None
+            and reason.startswith("unexpected_http_")
+            and result == "failed"
+        )
+    elif state in {
+        "forbidden",
+        "feature_unavailable",
+        "not_found",
+        "gone",
+        "rate_limited",
+        "transient_error",
+    }:
+        valid = result == "failed"
+    if not valid:
+        raise SecurityCoverageError(
+            f"{provider}.{state} conditional metadata is outside the producer domain"
+        )
+
+
 def _validate_remote_reason_domain(state: str, reason: Any) -> None:
     domain = _REMOTE_REASON_DOMAINS[state]
     valid = reason in domain
@@ -634,6 +690,10 @@ def _validate_normalized_remote_repository(value: dict[str, Any]) -> None:
             raise SecurityCoverageError(
                 "partial repository observation cannot claim branch or head"
             )
+    elif state == "stale" and observed_at is None:
+        raise SecurityCoverageError(
+            "repository.observed_at is required when stale"
+        )
     elif any(item is not None for item in (default_branch, head_sha, archived)):
         raise SecurityCoverageError(
             "unobserved repository state cannot claim remote values"
@@ -815,6 +875,13 @@ def validate_normalized_security_provider(
         http_status=http_status,
         reason=reason,
         conditional_result=conditional["result"],
+    )
+    _validate_provider_conditional_domain(
+        provider,
+        state=state,
+        http_status=http_status,
+        reason=reason,
+        conditional=conditional,
     )
     for field_name in ("etag", "last_modified"):
         field_value = value.get(field_name)
@@ -2268,6 +2335,10 @@ def _validate_remote_repository(
             raise SecurityCoverageError(
                 "partial repository observation cannot claim branch or head"
             )
+    elif state == "stale" and observed_at is None:
+        raise SecurityCoverageError(
+            "repository.observed_at is required when stale"
+        )
     elif any(value is not None for value in (default_branch, head_sha, archived)):
         raise SecurityCoverageError(
             "unobserved repository state cannot claim remote values"
