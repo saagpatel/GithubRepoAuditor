@@ -201,6 +201,8 @@ def discover_workspace_projects(
         discovered,
         checkout_collisions=checkout_collisions,
         workspace_root=workspace_root,
+        catalog_data=catalog_data,
+        now=now,
     )
 
 
@@ -209,6 +211,8 @@ def _dedupe_checkouts_by_origin(
     *,
     checkout_collisions: list[dict[str, Any]] | None = None,
     workspace_root: Path | None = None,
+    catalog_data: dict[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Collapse multiple on-disk checkouts of the same repo to one canonical project.
 
@@ -233,11 +237,13 @@ def _dedupe_checkouts_by_origin(
             canonical.append(project)
 
     for origin_key, group in by_origin.items():
-        representative = _checkout_representative(group, origin_key)
         authority_group = _checkout_topology_group(
             group,
             workspace_root=workspace_root,
+            catalog_data=catalog_data,
+            now=now,
         )
+        representative = _checkout_representative(authority_group, origin_key)
         has_checkout_declarations = any(
             _checkout_observation(project).get("declared_paths")
             for project in authority_group
@@ -262,10 +268,14 @@ def _checkout_topology_group(
     group: list[dict[str, Any]],
     *,
     workspace_root: Path | None,
+    catalog_data: dict[str, Any] | None,
+    now: datetime | None,
 ) -> list[dict[str, Any]]:
-    """Add in-workspace linked worktrees as authority evidence, not projects."""
+    """Add linked worktrees to authority without duplicating logical projects."""
     if workspace_root is None:
         return list(group)
+    if catalog_data is None or now is None:
+        raise ValueError("topology expansion requires discovery inputs")
 
     resolved_root = workspace_root.resolve()
     expanded = list(group)
@@ -285,20 +295,14 @@ def _checkout_topology_group(
             ):
                 continue
             known_paths.add(resolved_path)
-            relative_path = resolved_path.relative_to(resolved_root).as_posix()
-            expanded.append(
-                {
-                    "name": resolved_path.name,
-                    "repo_full_name": source_project.get("repo_full_name", ""),
-                    "path": relative_path,
-                    "project_path": resolved_path,
-                    "_checkout_observation": _observe_checkout(
-                        resolved_path,
-                        workspace_root=resolved_root,
-                    ),
-                    "_checkout_evidence_only": True,
-                }
+            linked_project = _inspect_project_dir(
+                resolved_path,
+                resolved_root,
+                catalog_data=catalog_data,
+                now=now,
             )
+            linked_project["repo_full_name"] = source_project.get("repo_full_name", "")
+            expanded.append(linked_project)
     return expanded
 
 

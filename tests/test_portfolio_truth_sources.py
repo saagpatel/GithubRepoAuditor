@@ -624,6 +624,71 @@ def test_discovery_observes_dirty_worktree_inside_excluded_container(
     assert linked_evidence["dirty"] is True
 
 
+def test_bare_coordinator_uses_worktree_inside_excluded_container(
+    tmp_path: Path,
+) -> None:
+    seed = tmp_path / "_backups" / "seed"
+    seed.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    (seed / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = tmp_path / "Repo"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:owner/Repo.git"],
+        cwd=coordinator,
+        check=True,
+    )
+    linked = tmp_path / "_codex-worktrees" / "repo-main"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(linked), "main"],
+        cwd=coordinator,
+        check=True,
+    )
+
+    collisions: list[dict] = []
+    projects = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+    )
+
+    repo_projects = [
+        project for project in projects if project["repo_full_name"] == "owner/Repo"
+    ]
+    assert len(repo_projects) == 1
+    assert repo_projects[0]["path"] == "_codex-worktrees/repo-main"
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "selected"
+    assert collision["selection"]["representative_path"] == (
+        "_codex-worktrees/repo-main"
+    )
+    representative = next(
+        item for item in collision["checkouts"] if item["relation"] == "representative"
+    )
+    assert representative["bare"] is False
+
+
 def test_discovery_observes_conflicting_full_clones_without_count_inflation(
     tmp_path,
 ) -> None:

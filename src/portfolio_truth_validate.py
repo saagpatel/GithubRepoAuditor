@@ -176,10 +176,8 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
 
         checkout_count = _require_nonnegative_count(group, "checkout_count")
         full_clone_count = _require_nonnegative_count(group, "full_clone_count")
-        if checkout_count < 2:
-            raise ValueError(
-                "Checkout collision groups require at least two checkouts."
-            )
+        if checkout_count < 1:
+            raise ValueError("Checkout authority groups require at least one checkout.")
         if not 1 <= full_clone_count <= checkout_count:
             raise ValueError("Checkout collision full_clone_count is out of range.")
         full_clone_groups += int(full_clone_count > 1)
@@ -339,6 +337,10 @@ def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
         if declared_paths != expected_declared_paths:
             raise ValueError(
                 "Declared checkout paths do not match declared path evidence."
+            )
+        if checkout_count == 1 and not (declared_evidence or unresolved_paths):
+            raise ValueError(
+                "Single-checkout authority groups require declared path evidence."
             )
 
         project = project_by_origin.get(origin_key)

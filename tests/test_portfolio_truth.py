@@ -22,6 +22,7 @@ from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
 )
+from src.portfolio_checkout_authority import checkout_authority_blocker
 from src.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
@@ -671,6 +672,135 @@ def test_checkout_collision_flows_through_truth_validation_and_report(
     summary["discarded_checkout_count"] += 1
     with pytest.raises(ValueError, match="discarded_checkout_count"):
         validate_truth_snapshot(result.snapshot)
+
+
+def test_unresolved_declared_checkout_flows_through_truth_validation(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "Repo"
+    repo.mkdir()
+    missing_target = portfolio_workspace / "_codex-worktrees" / "repo-retired" / "src"
+    _write(
+        repo / "AGENTS.md",
+        "# Repo\n\n## Canonical Paths\n\n"
+        f"- Source: `{missing_target}`\n",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "AGENTS.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/Repo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert (
+        authority["selection"]["reason_code"]
+        == "declared_checkout_path_unresolved"
+    )
+    assert authority["unresolved_declared_paths"] == [
+        "_codex-worktrees/repo-retired/src"
+    ]
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_bare_coordinator_worktree_flows_through_truth_validation(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    seed = portfolio_workspace / "_backups" / "seed"
+    seed.mkdir(parents=True)
+    _write(seed / "README.md", "# Repo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = portfolio_workspace / "Repo"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:owner/Repo.git"],
+        cwd=coordinator,
+        check=True,
+    )
+    linked = portfolio_workspace / "_codex-worktrees" / "repo-main"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(linked), "main"],
+        cwd=coordinator,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/Repo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert project.identity.path == "_codex-worktrees/repo-main"
+    assert authority["selection"]["state"] == "selected"
+    assert authority["selection"]["selected_path"] == project.identity.path
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) is None
+    validate_truth_snapshot(result.snapshot)
 
 
 def test_live_catalog_produces_exact_tier_zero_attention_semantics(
