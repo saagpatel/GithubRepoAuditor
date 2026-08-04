@@ -624,6 +624,76 @@ def test_discovery_observes_dirty_worktree_inside_excluded_container(
     assert linked_evidence["dirty"] is True
 
 
+def test_discovery_preserves_opaque_external_linked_worktree_evidence(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    repo = workspace / "Repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    external = tmp_path / "external-worktree-path-must-not-be-published"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "external", str(external), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+
+    collisions: list[dict] = []
+    projects = discover_workspace_projects(
+        workspace,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+    )
+
+    assert len(projects) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 2
+    assert collision["full_clone_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert (
+        collision["selection"]["reason_code"]
+        == "external_linked_worktree_unobserved"
+    )
+    external_evidence = next(
+        item
+        for item in collision["discarded_checkouts"]
+        if item["path"] == "external-worktree"
+    )
+    assert external_evidence["state"] == "unknown"
+    assert external_evidence["relation"] == "linked_worktree"
+    assert str(external) not in repr(collision)
+
+    summary = checkout_collision_summary(collisions)
+    assert summary["state"] == "unknown"
+    assert summary["group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert summary["discarded_checkout_count"] == 1
+
+
 def test_bare_coordinator_uses_worktree_inside_excluded_container(
     tmp_path: Path,
 ) -> None:

@@ -811,6 +811,100 @@ def test_external_declared_checkout_is_opaque_unknown(
     validate_truth_snapshot(result.snapshot)
 
 
+def test_external_linked_worktree_flows_through_truth_validation_and_report(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "ExternalWorktreeRepo"
+    repo.mkdir()
+    _write(repo / "README.md", "# ExternalWorktreeRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/ExternalWorktreeRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    external = (
+        portfolio_workspace.parent
+        / "external-worktree-path-must-not-be-published"
+    )
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "external", str(external), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/ExternalWorktreeRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 2
+    assert authority["full_clone_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert (
+        authority["selection"]["reason_code"]
+        == "external_linked_worktree_unobserved"
+    )
+    assert authority["discarded_checkouts"] == [
+        {
+            "path": "external-worktree",
+            "state": "unknown",
+            "relation": "linked_worktree",
+            "head": None,
+            "branch": None,
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": None,
+        }
+    ]
+    assert str(external) not in json.dumps(authority)
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:external_linked_worktree_unobserved"
+    validate_truth_snapshot(result.snapshot)
+
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "`external_linked_worktree_unobserved`" in markdown
+    assert "`external-worktree`: `linked_worktree`" in markdown
+    assert "No same-origin checkout collisions were observed." not in markdown
+    assert str(external) not in markdown
+    validate_portfolio_report_markdown(markdown)
+
+
 def test_prunable_linked_worktree_is_unknown_not_publication_failure(
     portfolio_workspace: Path,
     portfolio_catalog: Path,

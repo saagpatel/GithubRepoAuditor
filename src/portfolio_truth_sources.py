@@ -282,6 +282,8 @@ def _checkout_topology_group(
     known_paths = {
         Path(str(project["project_path"])).resolve() for project in group
     }
+    published_paths = {str(project.get("path") or "") for project in group}
+    external_worktree_count = 0
     for source_project in group:
         project_path = Path(str(source_project["project_path"]))
         try:
@@ -290,11 +292,41 @@ def _checkout_topology_group(
             continue
         for worktree_path in worktree_paths:
             resolved_path = worktree_path.resolve()
-            if resolved_path in known_paths or not _path_is_within(
-                resolved_path, resolved_root
-            ):
+            if resolved_path in known_paths:
                 continue
             known_paths.add(resolved_path)
+            if not _path_is_within(resolved_path, resolved_root):
+                external_worktree_count += 1
+                opaque_path = (
+                    "external-worktree"
+                    if external_worktree_count == 1
+                    else f"external-worktree-{external_worktree_count}"
+                )
+                while opaque_path in published_paths:
+                    external_worktree_count += 1
+                    opaque_path = f"external-worktree-{external_worktree_count}"
+                published_paths.add(opaque_path)
+                source_observation = _checkout_observation(source_project)
+                expanded.append(
+                    {
+                        "name": opaque_path,
+                        "path": opaque_path,
+                        "project_path": resolved_root / opaque_path,
+                        "repo_full_name": source_project.get("repo_full_name", ""),
+                        "_external_worktree": True,
+                        "_checkout_observation": {
+                            "state": "unknown",
+                            "head": None,
+                            "branch": None,
+                            "dirty": None,
+                            "dirty_path_count": None,
+                            "git_common_dir": source_observation.get("git_common_dir"),
+                            "bare": None,
+                            "declared_paths": [],
+                        },
+                    }
+                )
+                continue
             try:
                 linked_project = _inspect_project_dir(
                     resolved_path,
@@ -397,6 +429,9 @@ def _checkout_collision_record(
         and _checkout_observation(project).get("git_common_dir")
         for project in group
     )
+    has_external_worktree = any(
+        project.get("_external_worktree") is True for project in group
+    )
     conflicting_heads = len(clone_heads) > 1 or "" in clone_heads
 
     state = "selected"
@@ -406,6 +441,10 @@ def _checkout_collision_record(
         state = "unknown"
         reason_code = "checkout_observation_failed"
         reason = "one or more same-origin checkouts could not be observed completely"
+    elif has_external_worktree:
+        state = "unknown"
+        reason_code = "external_linked_worktree_unobserved"
+        reason = "one or more linked worktrees are outside the observed workspace"
     elif len(declared_checkout_paths) > 1:
         state = "unknown"
         reason_code = "conflicting_declared_checkout_paths"
@@ -487,7 +526,10 @@ def _checkout_collision_record(
 def _checkout_clone_key(project: dict[str, Any]) -> str:
     observation = _checkout_observation(project)
     common_dir = str(observation.get("git_common_dir") or "")
-    if observation.get("state") == "observed" and common_dir:
+    if common_dir and (
+        observation.get("state") == "observed"
+        or project.get("_external_worktree") is True
+    ):
         return f"observed:{common_dir}"
     return f"unknown:{project.get('path', '')}"
 
