@@ -78,6 +78,32 @@ def test_observation_reports_dirty_no_upstream_and_unknown_remote(
     assert state["remote_default_branch"]["state"] == "unknown"
 
 
+def test_local_branch_upstream_is_observed_and_divergence_fails_closed(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "branch", "topic")
+    _git(repo, "config", "branch.main.remote", ".")
+    _git(repo, "config", "branch.main.merge", "refs/heads/topic")
+    assert _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}") == "topic"
+
+    observed_at = datetime(2026, 7, 12, tzinfo=UTC)
+    state = observe_repository_state(repo, observed_at=observed_at)
+
+    assert state["local"]["upstream"] == "topic"
+    assert state["state"] == "unknown"
+    assert (
+        state["reason_code"]
+        == "nonstandard_upstream_requires_remote_default_evidence"
+    )
+    _validate_repository_state_shape(
+        state,
+        expected_remote=state["remote_default_branch"],
+        project_key="fixture/local-upstream",
+        generated_at=observed_at,
+    )
+
+
 def test_observation_reports_linked_worktree_without_file_names(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     linked = tmp_path / "linked"

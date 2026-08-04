@@ -287,6 +287,155 @@ def test_provider_rejects_coherently_fabricated_failure_reason() -> None:
 
 
 @pytest.mark.parametrize(
+    ("provider", "state", "kwargs"),
+    (
+        (
+            "dependabot",
+            "observed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 200,
+                "pagination_complete": True,
+                "counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+            },
+        ),
+        (
+            "dependabot",
+            "observed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 200,
+                "pagination_complete": True,
+                "counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+                "conditional_request": True,
+                "conditional_result": "modified",
+            },
+        ),
+        (
+            "dependabot",
+            "observed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 304,
+                "reason": "not_modified",
+                "pagination_complete": True,
+                "counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+                "conditional_request": True,
+                "conditional_result": "not_modified",
+            },
+        ),
+        (
+            "dependabot",
+            "not_requested",
+            {"reason": "collection_halted"},
+        ),
+        (
+            "dependabot",
+            "not_requested",
+            {
+                "reason": "base_request_limit",
+                "conditional_request": True,
+                "conditional_result": "incomplete",
+            },
+        ),
+        (
+            "dependabot",
+            "credential_unavailable",
+            {
+                "observed_at": NOW.isoformat(),
+                "reason": "github_authentication_missing",
+            },
+        ),
+        (
+            "dependabot",
+            "credential_unavailable",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 401,
+                "reason": "github_authentication_missing",
+                "conditional_request": True,
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "code_scanning",
+            "feature_unavailable",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 200,
+                "http_classification": "eligibility",
+                "reason": "private_user_repo_plan_unavailable",
+            },
+        ),
+        (
+            "code_scanning",
+            "not_found",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 404,
+                "reason": "github_not_found",
+                "conditional_request": True,
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "dependabot",
+            "transient_error",
+            {
+                "observed_at": NOW.isoformat(),
+                "reason": "network_error",
+                "conditional_result": "failed",
+            },
+        ),
+        (
+            "dependabot",
+            "malformed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 200,
+                "reason": "non_list_or_invalid_alert_payload",
+                "conditional_result": "malformed",
+            },
+        ),
+        (
+            "dependabot",
+            "malformed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 304,
+                "reason": "conditional_response_without_observed_prior",
+                "conditional_request": True,
+                "conditional_result": "invalid_prior",
+            },
+        ),
+        (
+            "dependabot",
+            "malformed",
+            {
+                "observed_at": NOW.isoformat(),
+                "http_status": 418,
+                "reason": "unexpected_http_418",
+                "conditional_result": "failed",
+            },
+        ),
+    ),
+)
+def test_provider_conditional_matrix_accepts_producer_paths(
+    provider: str,
+    state: str,
+    kwargs: dict[str, Any],
+) -> None:
+    result = _provider_result(provider, state=state, **kwargs)
+
+    assert validate_normalized_security_provider(provider, result) == result
+
+
+def test_stale_remote_constructor_requires_observation_time() -> None:
+    with pytest.raises(SecurityCoverageError, match="observed_at.*stale"):
+        _remote_repository_result(state="stale", reason="receipt_stale")
+
+
+@pytest.mark.parametrize(
     ("state", "mutation", "message"),
     (
         (
@@ -921,6 +1070,7 @@ def test_shared_branch_validator_matches_git_check_ref_format(branch: str) -> No
 @pytest.mark.parametrize(
     "upstream",
     (
+        "topic",
         "origin/main",
         "upstream/feature/topic",
         "@/main",

@@ -334,9 +334,9 @@ def _local_from_worktree(worktree: dict[str, Any]) -> dict[str, Any]:
 def _tracks_nonmatching_branch(local: dict[str, Any]) -> bool:
     branch = str(local.get("branch") or "")
     upstream = str(local.get("upstream") or "")
-    if not branch or "/" not in upstream:
+    if not branch or not upstream:
         return False
-    _remote_name, upstream_branch = upstream.split("/", 1)
+    upstream_branch = upstream.split("/", 1)[-1]
     return upstream_branch != branch
 
 

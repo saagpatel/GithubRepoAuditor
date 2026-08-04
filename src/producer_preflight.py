@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -24,10 +25,33 @@ def producer_evidence_receipt_id(
     verified_at: str,
 ) -> str:
     """Bind producer evidence to its exact serialized identity material."""
-    material = "\n".join(
-        (repository, commit, ref, checkout_role, checkout_path, verified_at)
+    material = json.dumps(
+        {
+            "checkout_path": checkout_path,
+            "checkout_role": checkout_role,
+            "commit": commit,
+            "ref": ref,
+            "repository": repository,
+            "verified_at": verified_at,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
     )
     return f"sha256:{hashlib.sha256(material.encode()).hexdigest()}"
+
+
+def _producer_identity_text(payload: dict[str, Any], field_name: str) -> str:
+    value = payload.get(field_name)
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or re.search(r"[\x00-\x1f\x7f]", value) is not None
+    ):
+        raise ValueError(
+            f"Producer evidence {field_name} must be nonempty control-free text."
+        )
+    return value
 
 
 @dataclass(frozen=True)
@@ -73,7 +97,14 @@ class ProducerEvidence:
         missing = sorted(required - payload.keys())
         if missing:
             raise ValueError(f"Producer evidence is missing fields: {missing}")
-        verified_at_text = str(payload["verified_at"])
+        repository = _producer_identity_text(payload, "repository")
+        commit = _producer_identity_text(payload, "commit")
+        ref = _producer_identity_text(payload, "ref")
+        checkout_role = _producer_identity_text(payload, "checkout_role")
+        checkout_path = _producer_identity_text(payload, "checkout_path")
+        verified_at_text = _producer_identity_text(payload, "verified_at")
+        if not Path(checkout_path).is_absolute():
+            raise ValueError("Producer evidence checkout_path must be absolute.")
         verified_at = verified_at_text
         if verified_at.endswith("Z"):
             verified_at = f"{verified_at[:-1]}+00:00"
@@ -83,7 +114,6 @@ class ProducerEvidence:
             raise ValueError("Producer evidence verified_at is not valid ISO-8601.") from exc
         if parsed_verified_at.tzinfo is None:
             raise ValueError("Producer evidence verified_at must include a timezone.")
-        commit = str(payload["commit"])
         if len(commit) != 40 or any(char not in "0123456789abcdef" for char in commit):
             raise ValueError("Producer evidence commit must be a lowercase 40-character SHA.")
         if payload["worktree_clean"] is not True:
@@ -91,11 +121,11 @@ class ProducerEvidence:
         if payload["dirty_path_count"] != 0:
             raise ValueError("Clean producer evidence must declare dirty_path_count=0.")
         expected_receipt_id = producer_evidence_receipt_id(
-            repository=str(payload["repository"]),
+            repository=repository,
             commit=commit,
-            ref=str(payload["ref"]),
-            checkout_role=str(payload["checkout_role"]),
-            checkout_path=str(payload["checkout_path"]),
+            ref=ref,
+            checkout_role=checkout_role,
+            checkout_path=checkout_path,
             verified_at=verified_at_text,
         )
         if payload["receipt_id"] != expected_receipt_id:
@@ -103,11 +133,11 @@ class ProducerEvidence:
                 "Producer evidence receipt_id does not match its serialized material."
             )
         return cls(
-            repository=str(payload["repository"]),
+            repository=repository,
             commit=commit,
-            ref=str(payload["ref"]),
-            checkout_role=str(payload["checkout_role"]),
-            checkout_path=str(payload["checkout_path"]),
+            ref=ref,
+            checkout_role=checkout_role,
+            checkout_path=checkout_path,
             worktree_clean=True,
             dirty_path_count=0,
             verified_at=parsed_verified_at.astimezone(UTC),
