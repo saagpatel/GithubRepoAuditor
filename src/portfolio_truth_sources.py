@@ -427,7 +427,7 @@ def _canonical_checkout_project(
     if identity_project is representative:
         return representative
     canonical = dict(representative)
-    for key in ("name", "path", "top_level_dir"):
+    for key in ("name", "path", "top_level_dir", "group_entry", "source"):
         if key in identity_project:
             canonical[key] = identity_project[key]
     return canonical

@@ -354,3 +354,64 @@ def test_prepare_pilot_blocks_unknown_checkout_authority(tmp_path):
             ),
         }
     ]
+
+
+def test_prepare_pilot_malformed_authority_never_redirects_error_path(tmp_path):
+    workspace = tmp_path / "ws"
+    repo = workspace / "CanonicalRepo"
+    repo.mkdir(parents=True)
+    (repo / "AGENTS.md").write_text("# CanonicalRepo\n")
+    snapshot = {
+        "workspace_root": str(workspace),
+        "generated_at": "2026-08-03T12:00:00+00:00",
+        "projects": [
+            {
+                "identity": {
+                    "project_key": "CanonicalRepo",
+                    "path": "CanonicalRepo",
+                    "display_name": "CanonicalRepo",
+                },
+                "derived": {
+                    "archived": False,
+                    "context_quality": "full",
+                    "context_files": ["AGENTS.md"],
+                    "run_instructions_present": False,
+                },
+                "repository_state": {
+                    "checkout_authority": {
+                        "schema_version": "CheckoutCollisionV1",
+                        "selection": {
+                            "state": "selected",
+                            "reason_code": "single_clone_topology",
+                            "representative_path": "redirected/Repo",
+                            "selected_path": "redirected/Repo",
+                        },
+                        "checkouts": [
+                            {
+                                "path": "redirected/Repo",
+                                "state": "observed",
+                                "relation": "representative",
+                                "bare": False,
+                            }
+                        ],
+                    }
+                },
+            }
+        ],
+    }
+    snap_path = tmp_path / "snap.json"
+    snap_path.write_text(json.dumps(snapshot))
+
+    result = prepare_pilot(str(snap_path), per_tier={"full": 1})
+
+    assert result["state"] == "blocked"
+    assert result["records"] == []
+    assert result["errors"] == [
+        {
+            "project_key": "CanonicalRepo",
+            "abs_path": str(repo),
+            "error": "checkout_authority_blocked",
+            "reason": "checkout-authority-path-mismatch",
+        }
+    ]
+    assert "redirected" not in result["errors"][0]["abs_path"]

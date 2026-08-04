@@ -90,10 +90,11 @@ def checkout_authority_path(project: Any) -> str:
         or authority.get("schema_version") != CHECKOUT_COLLISION_SCHEMA_VERSION
     ):
         return project_path
-    canonical_project_path = str(
-        authority.get("canonical_project_path") or project_path
-    )
-    if canonical_project_path != project_path:
+    declared_canonical_path = authority.get("canonical_project_path")
+    if not isinstance(declared_canonical_path, str):
+        return project_path
+    canonical_project_path = declared_canonical_path.strip()
+    if not canonical_project_path or canonical_project_path != project_path:
         return project_path
     selection = authority.get("selection")
     if not isinstance(selection, Mapping) or selection.get("state") != "selected":

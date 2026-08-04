@@ -1281,6 +1281,119 @@ repos:
     assert target.target_path.startswith(str(linked))
 
 
+def test_bare_coordinator_preserves_nested_canonical_group_policy(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    catalog = tmp_path / "portfolio-catalog.yaml"
+    catalog.write_text(
+        """
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+  category: default-category
+  tool_provenance: unknown
+
+groups:
+  canonical_infra:
+    section_marker: Infra/
+    section_label: Canonical Infrastructure
+    path_prefixes:
+      - Infra
+    owner: canonical-owner
+    lifecycle_state: active
+    review_cadence: weekly
+    category: infrastructure
+    tool_provenance: codex
+  physical_worktrees:
+    section_marker: Physical Worktrees/
+    section_label: Physical Worktrees
+    path_prefixes:
+      - _codex-worktrees
+    owner: wrong-physical-owner
+    lifecycle_state: parked
+    review_cadence: yearly
+    category: vanity
+    tool_provenance: unknown
+"""
+    )
+    registry = tmp_path / "project-registry.md"
+    registry.write_text("# Project Registry\n")
+
+    seed = workspace / "_backups" / "seed"
+    seed.mkdir(parents=True)
+    _write(seed / "README.md", "# Repo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = workspace / "Infra" / "Repo"
+    coordinator.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:owner/Repo.git"],
+        cwd=coordinator,
+        check=True,
+    )
+    linked = workspace / "_codex-worktrees" / "repo-main"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(linked), "main"],
+        cwd=coordinator,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog,
+        legacy_registry_path=registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/Repo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert project.identity.path == "Infra/Repo"
+    assert project.identity.group_key == "canonical_infra"
+    assert project.identity.section_marker == "Infra/"
+    assert project.identity.section_label == "Canonical Infrastructure"
+    assert project.declared.owner == "canonical-owner"
+    assert project.declared.lifecycle_state == "active"
+    assert project.declared.review_cadence == "weekly"
+    assert project.declared.category == "infrastructure"
+    assert project.declared.owner != "wrong-physical-owner"
+    assert authority["canonical_project_path"] == "Infra/Repo"
+    assert authority["selection"]["selected_path"] == (
+        "_codex-worktrees/repo-main"
+    )
+    assert checkout_authority_path(project) == "_codex-worktrees/repo-main"
+    assert project.repository_state["local"]["path"] == str(linked)
+    assert checkout_authority_blocker(project, workspace_root=workspace) is None
+    validate_truth_snapshot(result.snapshot)
+
+
 def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     tmp_path: Path,
 ) -> None:
@@ -4081,6 +4194,64 @@ def test_context_recovery_plan_skips_unknown_checkout_authority(
 
     assert target.status == "skipped"
     assert target.reason == "checkout-authority-unknown:conflicting_full_clone_heads"
+
+
+def test_context_recovery_malformed_authority_never_redirects_target_path(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "FreshMalformed"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# FreshMalformed\n\nFresh repo.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    projects = [
+        replace(
+            project,
+            repository_state={
+                **project.repository_state,
+                "checkout_authority": {
+                    "schema_version": "CheckoutCollisionV1",
+                    "selection": {
+                        "state": "selected",
+                        "reason_code": "single_clone_topology",
+                        "representative_path": "_codex-worktrees/malicious-target",
+                        "selected_path": "_codex-worktrees/malicious-target",
+                    },
+                    "checkouts": [
+                        {
+                            "path": "_codex-worktrees/malicious-target",
+                            "state": "observed",
+                            "relation": "representative",
+                            "bare": False,
+                        }
+                    ],
+                },
+            },
+        )
+        if project.identity.project_key == "FreshMalformed"
+        else project
+        for project in result.snapshot.projects
+    ]
+    snapshot = replace(result.snapshot, projects=projects)
+
+    plan = build_context_recovery_plan(snapshot, workspace_root=portfolio_workspace)
+    target = next(
+        item for item in plan.projects if item.project_key == "FreshMalformed"
+    )
+
+    assert target.status == "skipped"
+    assert target.reason == "checkout-authority-path-mismatch"
+    assert target.relative_path == "FreshMalformed"
+    assert target.target_path.startswith(str(target_repo))
+    assert "malicious-target" not in target.target_path
 
 
 def test_context_recovery_apply_writes_primary_context_and_catalog_seed(
