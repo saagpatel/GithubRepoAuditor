@@ -195,6 +195,72 @@ def test_observed_selected_checkout_authority_remains_eligible() -> None:
     assert result.blockers == ()
 
 
+def test_multiple_observed_worktrees_require_checkout_authority() -> None:
+    project = _project()
+    project["repository_state"] = {
+        "state": "observed",
+        "worktrees": [
+            {"state": "observed", "path": "/workspace/Repo", "dirty": False},
+            {
+                "state": "observed",
+                "path": "/workspace/_codex-worktrees/repo-feature",
+                "dirty": False,
+            },
+        ],
+    }
+
+    result = evaluate_automation_eligibility(
+        project,
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is False
+    assert result.blockers == ("checkout-authority-missing:multiple-worktrees",)
+
+
+def test_checkout_authority_must_cover_repository_worktree_topology() -> None:
+    project = _project(
+        checkout_authority={
+            "schema_version": "CheckoutCollisionV1",
+            "selection": {
+                "state": "selected",
+                "reason_code": "single_clone_topology",
+                "representative_path": "Repo",
+                "selected_path": "Repo",
+            },
+            "checkouts": [
+                {
+                    "path": "Repo",
+                    "state": "observed",
+                    "relation": "representative",
+                    "bare": False,
+                }
+            ],
+        }
+    )
+    project["repository_state"].update(
+        {
+            "state": "observed",
+            "worktrees": [
+                {"state": "observed", "path": "/workspace/Repo", "dirty": False},
+                {
+                    "state": "observed",
+                    "path": "/outside/repo-feature",
+                    "dirty": False,
+                },
+            ],
+        }
+    )
+
+    result = evaluate_automation_eligibility(
+        project,
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is False
+    assert result.blockers == ("checkout-authority-topology-mismatch",)
+
+
 # --- select_automation_candidates ------------------------------------------
 
 

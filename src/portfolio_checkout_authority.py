@@ -14,15 +14,16 @@ def checkout_authority_blocker(
 ) -> str | None:
     """Return a stable automation blocker for unresolved checkout authority.
 
-    Projects without collision evidence are single-checkout/legacy inputs and keep
-    their existing behavior. Once collision evidence is present, malformed,
-    UNKNOWN, or path-mismatched selection fails closed.
+    Legacy inputs without topology evidence keep their existing behavior. Fresh
+    repository topology fails closed when observation is unknown or multiple
+    worktrees lack matching collision authority. Once collision evidence is
+    present, malformed, UNKNOWN, or path-mismatched selection also fails closed.
     """
     identity = _project_section(project, "identity")
     repository_state = _project_section(project, "repository_state")
     authority = repository_state.get("checkout_authority")
     if authority is None:
-        return None
+        return _repository_topology_blocker(repository_state, authority=None)
     if not isinstance(authority, Mapping):
         return "checkout-authority-malformed"
     if authority.get("schema_version") != CHECKOUT_COLLISION_SCHEMA_VERSION:
@@ -71,6 +72,47 @@ def checkout_authority_blocker(
             resolved_target.relative_to(resolved_root)
         except (OSError, ValueError):
             return "checkout-authority-path-escape"
+    return _repository_topology_blocker(repository_state, authority=authority)
+
+
+def _repository_topology_blocker(
+    repository_state: Mapping[str, Any],
+    *,
+    authority: Mapping[str, Any] | None,
+) -> str | None:
+    state = str(repository_state.get("state") or "")
+    if state == "unknown":
+        reason_code = str(
+            repository_state.get("reason_code") or "repository_observation_failed"
+        )
+        return f"checkout-topology-unknown:{reason_code}"
+
+    worktrees = repository_state.get("worktrees")
+    if worktrees is None:
+        return None
+    if not isinstance(worktrees, list) or any(
+        not isinstance(item, Mapping) for item in worktrees
+    ):
+        return "checkout-topology-malformed"
+    if len(worktrees) <= 1:
+        return None
+    if authority is None:
+        return "checkout-authority-missing:multiple-worktrees"
+    if any(item.get("state") not in {"observed", "coordinator"} for item in worktrees):
+        return "checkout-topology-unknown:worktree_observation_failed"
+    if any(item.get("dirty") is True for item in worktrees):
+        return "checkout-topology-local-work-present"
+
+    authority_checkouts = authority.get("checkouts")
+    if not isinstance(authority_checkouts, list):
+        return "checkout-authority-malformed"
+    representative_clone_count = sum(
+        isinstance(item, Mapping)
+        and item.get("relation") in {"representative", "linked_worktree"}
+        for item in authority_checkouts
+    )
+    if representative_clone_count != len(worktrees):
+        return "checkout-authority-topology-mismatch"
     return None
 
 

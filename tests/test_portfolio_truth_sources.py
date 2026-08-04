@@ -524,6 +524,76 @@ def test_discovery_recognizes_conventional_bare_coordinator(tmp_path) -> None:
     assert project["_checkout_observation"]["bare"] is True
 
 
+def test_discovery_observes_dirty_worktree_inside_excluded_container(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "Repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    linked = tmp_path / "_codex-worktrees" / "repo-feature"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature", str(linked), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+    (linked / "preserve.txt").write_text("dirty\n")
+
+    collisions: list[dict] = []
+    exclusions: dict[str, int] = {}
+    projects = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+        exclusion_counts=exclusions,
+    )
+
+    repo_projects = [
+        project for project in projects if project["repo_full_name"] == "owner/Repo"
+    ]
+    assert len(repo_projects) == 1
+    assert repo_projects[0]["path"] == "Repo"
+    assert exclusions["linked-worktree-container"] == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 2
+    assert collision["full_clone_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert (
+        collision["selection"]["reason_code"]
+        == "linked_worktree_local_work_present"
+    )
+    linked_evidence = next(
+        item
+        for item in collision["discarded_checkouts"]
+        if item["path"] == "_codex-worktrees/repo-feature"
+    )
+    assert linked_evidence["relation"] == "linked_worktree"
+    assert linked_evidence["dirty"] is True
+
+
 def test_discovery_observes_conflicting_full_clones_without_count_inflation(
     tmp_path,
 ) -> None:

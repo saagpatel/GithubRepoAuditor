@@ -200,6 +200,7 @@ def discover_workspace_projects(
     return _dedupe_checkouts_by_origin(
         discovered,
         checkout_collisions=checkout_collisions,
+        workspace_root=workspace_root,
     )
 
 
@@ -207,6 +208,7 @@ def _dedupe_checkouts_by_origin(
     discovered: list[dict[str, Any]],
     *,
     checkout_collisions: list[dict[str, Any]] | None = None,
+    workspace_root: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Collapse multiple on-disk checkouts of the same repo to one canonical project.
 
@@ -232,11 +234,15 @@ def _dedupe_checkouts_by_origin(
 
     for origin_key, group in by_origin.items():
         representative = _checkout_representative(group, origin_key)
-        if len(group) > 1:
+        authority_group = _checkout_topology_group(
+            group,
+            workspace_root=workspace_root,
+        )
+        if len(authority_group) > 1:
             collision = _checkout_collision_record(
                 origin=str(representative.get("repo_full_name") or origin_key),
                 origin_key=origin_key,
-                group=group,
+                group=authority_group,
                 representative=representative,
             )
             representative["checkout_authority"] = collision
@@ -246,6 +252,62 @@ def _dedupe_checkouts_by_origin(
 
     canonical.sort(key=lambda p: str(p.get("name", "")).lower())
     return canonical
+
+
+def _checkout_topology_group(
+    group: list[dict[str, Any]],
+    *,
+    workspace_root: Path | None,
+) -> list[dict[str, Any]]:
+    """Add in-workspace linked worktrees as authority evidence, not projects."""
+    if workspace_root is None:
+        return list(group)
+
+    resolved_root = workspace_root.resolve()
+    expanded = list(group)
+    known_paths = {
+        Path(str(project["project_path"])).resolve() for project in group
+    }
+    for source_project in group:
+        project_path = Path(str(source_project["project_path"]))
+        try:
+            worktree_paths = _git_worktree_paths(project_path)
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            continue
+        for worktree_path in worktree_paths:
+            resolved_path = worktree_path.resolve()
+            if resolved_path in known_paths or not _path_is_within(
+                resolved_path, resolved_root
+            ):
+                continue
+            known_paths.add(resolved_path)
+            relative_path = resolved_path.relative_to(resolved_root).as_posix()
+            expanded.append(
+                {
+                    "name": resolved_path.name,
+                    "repo_full_name": source_project.get("repo_full_name", ""),
+                    "path": relative_path,
+                    "project_path": resolved_path,
+                    "_checkout_observation": _observe_checkout(
+                        resolved_path,
+                        workspace_root=resolved_root,
+                    ),
+                    "_checkout_evidence_only": True,
+                }
+            )
+    return expanded
+
+
+def _git_worktree_paths(project_path: Path) -> list[Path]:
+    output = _git_read(project_path, "worktree", "list", "--porcelain")
+    paths = [
+        Path(line.removeprefix("worktree "))
+        for line in output.splitlines()
+        if line.startswith("worktree ")
+    ]
+    if not paths:
+        raise ValueError("git worktree list returned no worktrees")
+    return paths
 
 
 def checkout_collision_summary(
@@ -363,6 +425,12 @@ def _checkout_collision_record(
                 "independent same-origin clones have equivalent observed heads; "
                 "the deterministic compatibility representative is selected"
             )
+    elif any(
+        _checkout_observation(project).get("dirty") is True for project in group
+    ):
+        state = "unknown"
+        reason_code = "linked_worktree_local_work_present"
+        reason = "a linked same-origin worktree contains local work"
 
     checkouts = [
         _published_checkout(
