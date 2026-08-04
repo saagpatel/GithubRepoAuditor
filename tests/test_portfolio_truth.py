@@ -1585,6 +1585,85 @@ def test_security_overlay_absent_leaves_repos_unscanned(
         assert project.risk.security_risk is False
 
 
+@pytest.mark.parametrize(
+    ("produced_offset", "loaded_age", "state", "expected_age"),
+    (
+        (timedelta(minutes=-3), -0.05, "fresh", 0.0),
+        (timedelta(seconds=4), 0.0, "fresh", 0.001),
+        (timedelta(), 0.0, "fresh", 0.0),
+        (timedelta(seconds=-36), -0.01, "fresh", 0.0),
+        (timedelta(hours=24, microseconds=-1), 24.0, "fresh", 24.0),
+        (timedelta(hours=24), 24.0, "fresh", 24.0),
+        (timedelta(hours=24, microseconds=1), 24.0, "stale", 24.0),
+    ),
+)
+def test_security_input_freshness_is_canonicalized_at_snapshot_clock(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    produced_offset: timedelta,
+    loaded_age: float,
+    state: str,
+    expected_age: float,
+) -> None:
+    evaluation_at = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    produced_at = evaluation_at - produced_offset
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": produced_at.isoformat(),
+        "state": state,
+        "age_hours": loaded_age,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+
+    built = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=evaluation_at,
+        security_coverage_metadata=metadata,
+    )
+
+    assert built.snapshot.inputs["github_security"]["age_hours"] == expected_age
+    validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
+
+
+def test_security_input_rejects_clock_skew_beyond_tolerance(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    evaluation_at = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    produced_at = evaluation_at + timedelta(minutes=3, microseconds=1)
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": produced_at.isoformat(),
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+    }
+    built = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=evaluation_at,
+        security_coverage_metadata=metadata,
+    )
+
+    with pytest.raises(ValueError, match="future-dated"):
+        validate_truth_snapshot(built.snapshot, security_max_age_hours=24)
+
+
 def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None:
     # GHAS is keyed by repo name ("signal-noise"); the local dir is "Signal & Noise".
     from src.portfolio_truth_reconcile import _select_security_entry
@@ -1948,6 +2027,7 @@ def test_registry_render_surfaces_security_and_round_trips(
     legacy_registry: Path,
     tmp_path: Path,
 ) -> None:
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
     security = {
         "Alpha": {
             "dependabot": {
@@ -1967,6 +2047,7 @@ def test_registry_render_surfaces_security_and_round_trips(
         catalog_path=portfolio_catalog,
         legacy_registry_path=legacy_registry,
         include_notion=False,
+        now=now,
         security_alerts_by_name=security,
     )
     markdown = render_registry_markdown(result.snapshot)
@@ -1998,6 +2079,28 @@ def test_registry_render_surfaces_security_and_round_trips(
         security_alerts_by_name=security,
     )
     assert published.latest_path.exists()
+
+
+def test_receipt_backed_security_publish_requires_explicit_evaluation_clock(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="Receipt-backed security publication requires an explicit evaluation clock",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=tmp_path / "security-output",
+            registry_output=portfolio_workspace / "security-registry.md",
+            portfolio_report_output=portfolio_workspace / "security-report.md",
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_coverage_metadata={},
+        )
 
 
 def test_registry_render_omits_security_flag_when_unscanned(
@@ -2390,6 +2493,7 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
         security_alerts_by_name=security,
         security_coverage_metadata=metadata,
         security_receipt_binding=binding,
+        now=now,
     )
     payload = json.loads(published.latest_path.read_text())
     alpha_payload = next(
@@ -2717,6 +2821,7 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
             security_alerts_by_name=loaded.entries_by_full_name,
             security_coverage_metadata=metadata,
             security_receipt_binding=binding,
+            now=now,
         )
 
     assert replaced is True
@@ -3069,9 +3174,11 @@ def test_portfolio_truth_app_threads_security_cohort_count(
 
     def fake_security_loader(**kwargs):
         captured.update(kwargs)
+        captured["security_now"] = kwargs["now"]
         return None
 
-    def fake_publish(**_kwargs):
+    def fake_publish(**kwargs):
+        captured["publish_now"] = kwargs["now"]
         return SimpleNamespace(
             latest_path=tmp_path / "latest.json",
             snapshot_path=tmp_path / "history.json",
@@ -3117,6 +3224,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     assert captured["max_age_hours"] == 12
     assert captured["expected_producer_commit"] is None
     assert captured["repo_status_cache"] is None
+    assert captured["security_now"] is captured["publish_now"]
 
 
 def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
@@ -3329,6 +3437,7 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     assert evidence.commit == "a" * 40
     assert captured["producer_repo_root"] == tmp_path / "producer-repo"
     assert captured["require_producer_evidence"] is True
+    assert captured["now"] is None
 
 
 def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
