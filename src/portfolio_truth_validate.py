@@ -40,6 +40,7 @@ from src.portfolio_truth_metadata import (
     build_warnings,
 )
 from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_sources import WORKSPACE_EXCLUSION_REASONS
 from src.portfolio_truth_types import (
@@ -133,6 +134,24 @@ def validate_truth_snapshot(
             for field_name, source in project.provenance.items()
         ):
             raise ValueError(f"Project provenance for {key} is invalid.")
+        missing_provenance = sorted(
+            REQUIRED_PROJECT_PROVENANCE_KEYS - project.provenance.keys()
+        )
+        if missing_provenance:
+            raise ValueError(
+                f"Project provenance for {key} is missing required fields: "
+                f"{missing_provenance}"
+            )
+        empty_sources = sorted(
+            field_name
+            for field_name in REQUIRED_PROJECT_PROVENANCE_KEYS
+            if not project.provenance[field_name]["source"].strip()
+        )
+        if empty_sources:
+            raise ValueError(
+                f"Project provenance for {key} has empty required sources: "
+                f"{empty_sources}"
+            )
         if project.derived.context_quality not in VALID_CONTEXT_QUALITY:
             raise ValueError(
                 f"Invalid context quality for {key}: {project.derived.context_quality}"
@@ -1759,6 +1778,7 @@ def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:
     if producer:
         required = {
             "repository",
+            "expected_repository",
             "commit",
             "ref",
             "checkout_role",
@@ -1781,7 +1801,12 @@ def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:
             or set(commit) == {"0"}
         ):
             raise ValueError("Producer commit must be a lowercase 40-character SHA.")
-        for field_name in ("repository", "ref", "checkout_role"):
+        for field_name in (
+            "repository",
+            "expected_repository",
+            "ref",
+            "checkout_role",
+        ):
             if not _nonempty_text(producer.get(field_name)):
                 raise ValueError(f"Producer {field_name} must be a nonempty string.")
         checkout_path = producer.get("checkout_path")

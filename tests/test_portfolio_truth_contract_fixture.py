@@ -14,7 +14,9 @@ import pytest
 from src.demo_portfolio import resolved_coverage_state
 from src.portfolio_truth_coverage import build_coverage_envelope
 from src.portfolio_truth_metadata import build_source_summary, build_warnings
+from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_contract_fixture import (
     CONTRACT_VERSION,
     EVALUATED_AT,
@@ -105,6 +107,74 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
     assert fixture["contract_fixture"]["contract_version"] == CONTRACT_VERSION
     assert fixture["contract_fixture"]["producer_evidence"] == "absent"
     assert "additive_contract_canary" in fixture["projects"][0]
+
+
+def test_contract_fixture_paths_match_the_production_helper() -> None:
+    fixture = build_contract_fixture()
+    projects = {
+        project["identity"]["display_name"]: project
+        for project in fixture["projects"]
+    }
+
+    for project in projects.values():
+        declared = project["declared"]
+        derived = project["derived"]
+        expected = build_operating_path_entry(
+            {**declared, "has_explicit_entry": True},
+            context_quality=derived["context_quality"],
+            archived=derived["archived"],
+        )
+        assert expected["operating_path_source"] == "explicit-operating-path"
+        assert declared["operating_path"] == expected["operating_path"]
+        assert derived["path_confidence"] == expected["path_confidence"]
+        assert derived["path_override"] == expected["path_override"]
+        assert derived["path_rationale"] == expected["path_rationale"]
+
+    assert {
+        name: (
+            project["derived"]["path_confidence"],
+            project["derived"]["path_override"],
+        )
+        for name, project in projects.items()
+    } == {
+        "Dovetail Forge": ("high", ""),
+        "Kestrel Loom": ("high", ""),
+        "Quartz Signal": ("medium", ""),
+        "Solstice Cairn": ("low", "investigate"),
+    }
+    assert projects["Solstice Cairn"]["risk"]["path_risk"] is True
+    assert projects["Solstice Cairn"]["risk"]["risk_tier"] == "elevated"
+    assert projects["Solstice Cairn"]["derived"]["attention_state"] == "manual-only"
+
+
+def test_contract_fixture_carries_the_required_project_provenance_set() -> None:
+    fixture = build_contract_fixture()
+
+    for project in fixture["projects"]:
+        provenance = project["provenance"]
+        assert REQUIRED_PROJECT_PROVENANCE_KEYS <= provenance.keys()
+        assert all(
+            provenance[key]["source"].strip()
+            for key in REQUIRED_PROJECT_PROVENANCE_KEYS
+        )
+
+
+def test_contract_rejects_missing_required_project_provenance() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["provenance"] = {}
+
+    with pytest.raises(ValueError, match="missing required fields"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_contract_allows_optional_github_archived_provenance() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["provenance"]["github.archived"] = {
+        "source": "github_api",
+        "detail": "false",
+    }
+
+    validate_truth_snapshot_payload(fixture)
 
 
 def test_fixture_stale_receipt_is_stale_at_the_manifest_evaluation_time() -> None:
@@ -556,6 +626,7 @@ def _valid_producer_evidence() -> dict[str, object]:
     verified_at = GENERATED_AT.isoformat()
     return ProducerEvidence(
         repository="saagpatel/GithubRepoAuditor",
+        expected_repository="saagpatel/GithubRepoAuditor",
         commit="a" * 40,
         ref="refs/heads/main",
         checkout_role="canonical-producer",
@@ -565,6 +636,7 @@ def _valid_producer_evidence() -> dict[str, object]:
         verified_at=GENERATED_AT,
         receipt_id=producer_evidence_receipt_id(
             repository="saagpatel/GithubRepoAuditor",
+            expected_repository="saagpatel/GithubRepoAuditor",
             commit="a" * 40,
             ref="refs/heads/main",
             checkout_role="canonical-producer",
@@ -619,6 +691,10 @@ def test_contract_binds_github_security_commit_to_producer_evidence() -> None:
     ("mutation", "message"),
     (
         (lambda value: value.update(repository=7), "repository"),
+        (
+            lambda value: value.update(expected_repository="other/repository"),
+            "does not match expected_repository",
+        ),
         (lambda value: value.update(ref=None), "ref"),
         (lambda value: value.update(checkout_role={}), "checkout_role"),
         (lambda value: value.update(checkout_path=7), "checkout_path"),
@@ -658,6 +734,7 @@ def test_contract_rejects_old_delimiter_collision_producer_identities(
     producer.update(ref=ref, checkout_role=checkout_role)
     producer["receipt_id"] = producer_evidence_receipt_id(
         repository=str(producer["repository"]),
+        expected_repository=str(producer["expected_repository"]),
         commit=str(producer["commit"]),
         ref=ref,
         checkout_role=checkout_role,

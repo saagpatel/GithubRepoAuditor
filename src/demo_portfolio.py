@@ -23,6 +23,7 @@ from src.github_security_coverage import (
     _remote_repository_result,
 )
 from src.portfolio_repository_state import _observed_result
+from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_truth_coverage import build_coverage_envelope
 from src.portfolio_truth_decisions import build_project_decision
 from src.portfolio_truth_metadata import (
@@ -32,6 +33,7 @@ from src.portfolio_truth_metadata import (
     build_warnings,
 )
 from src.portfolio_truth_precedence import build_precedence_matrix
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
 
 # The demo workspace is deliberately not a real filesystem path.
@@ -805,7 +807,8 @@ def build_projects(
             if spec.attention == "archived"
             else _CONTEXT_QUALITY_CYCLE[index % len(_CONTEXT_QUALITY_CYCLE)]
         )
-        operating_path, lifecycle_state = _ATTENTION_INTENT[spec.attention]
+        declared_operating_path, lifecycle_state = _ATTENTION_INTENT[spec.attention]
+        archived = spec.attention == "archived"
         security = _security_block(spec, _pressure_alerts(spec, index, pressure), stamp)
         repository_state = _repository_state(
             group=spec.group,
@@ -824,7 +827,7 @@ def build_projects(
             "full",
         }
         declared = {
-            "operating_path": operating_path,
+            "operating_path": declared_operating_path,
             "category": _category_for(spec),
             "tool_provenance": "codex" if index % 2 else "claude-code",
             "lifecycle_state": lifecycle_state,
@@ -841,10 +844,18 @@ def build_projects(
             "automation_eligible": context_quality
             in {"minimum-viable", "boilerplate"},
         }
+        path_entry = build_operating_path_entry(
+            {**declared, "has_explicit_entry": True},
+            context_quality=context_quality,
+            archived=archived,
+        )
+        operating_path = str(path_entry["operating_path"])
+        path_override = str(path_entry["path_override"])
+        declared["operating_path"] = operating_path
         derived = {
             "context_quality": context_quality,
             "activity_status": spec.activity,
-            "archived": spec.attention == "archived",
+            "archived": archived,
             "stack": list(spec.stack),
             "stack_present": has_minimum_context,
             "context_files": context_files,
@@ -863,16 +874,14 @@ def build_projects(
             "has_license": spec.attention != "archived",
             "readme_char_count": 900 + index * 137,
             "release_count": 3 if spec.group == "flagship" else 0,
-            "path_override": "",
-            "path_confidence": "high" if spec.group == "flagship" else "medium",
-            "path_rationale": (
-                f"Stable path is {operating_path} from explicit operating path."
-            ),
+            "path_override": path_override,
+            "path_confidence": path_entry["path_confidence"],
+            "path_rationale": path_entry["path_rationale"],
         }
         risk, attention_state = build_project_decision(
             display_name=spec.codename,
             operating_path=operating_path,
-            path_override="",
+            path_override=path_override,
             context_quality=context_quality,
             activity_status=spec.activity,
             archived=derived["archived"],
@@ -887,6 +896,52 @@ def build_projects(
             security_critical_alerts=security.get("dependabot_critical") or 0,
         )
         derived["attention_state"] = attention_state
+        provenance_values = {
+            "declared": declared,
+            "derived": derived,
+            "risk": risk,
+        }
+        provenance: dict[str, dict[str, str]] = {}
+        for key in sorted(REQUIRED_PROJECT_PROVENANCE_KEYS):
+            section, field = key.split(".", 1)
+            value = provenance_values[section][field]
+            if key == "derived.context_files":
+                detail = str(len(value))
+            elif isinstance(value, bool):
+                detail = str(value).lower()
+            elif isinstance(value, list):
+                detail = ", ".join(str(item) for item in value)
+            else:
+                detail = str(value)
+            provenance[key] = {"source": "demo-fixture", "detail": detail}
+        provenance.update(
+            {
+                "declared.operating_path": {
+                    "source": "normalized",
+                    "detail": str(path_entry["operating_path_source"]),
+                },
+                "derived.path_override": {
+                    "source": "normalized",
+                    "detail": path_override,
+                },
+                "derived.path_confidence": {
+                    "source": "normalized",
+                    "detail": str(path_entry["path_confidence"]),
+                },
+                "derived.path_rationale": {
+                    "source": "normalized",
+                    "detail": str(path_entry["path_rationale"]),
+                },
+                "risk.risk_tier": {
+                    "source": "derived",
+                    "detail": str(risk["risk_tier"]),
+                },
+                "risk.doctor_gap": {
+                    "source": "derived",
+                    "detail": str(risk["doctor_gap"]).lower(),
+                },
+            }
+        )
 
         projects.append(
             {
@@ -908,6 +963,7 @@ def build_projects(
                 "risk": risk,
                 "security": security,
                 "repository_state": repository_state,
+                "provenance": provenance,
                 "advisory": {
                     "notion_portfolio_call": "",
                     "notion_momentum": "",

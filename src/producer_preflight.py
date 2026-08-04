@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,12 +13,19 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-PREFLIGHT_SCHEMA_VERSION = "ghra_producer_preflight.v2"
+PREFLIGHT_SCHEMA_VERSION = "ghra_producer_preflight.v3"
+PREFLIGHT_PASS_CHECKS = {
+    "repository_identity": "pass",
+    "worktree_clean": "pass",
+    "expected_ref_available": "pass",
+    "head_matches_expected_ref": "pass",
+}
 
 
 def producer_evidence_receipt_id(
     *,
     repository: str,
+    expected_repository: str,
     commit: str,
     ref: str,
     checkout_role: str,
@@ -30,6 +38,7 @@ def producer_evidence_receipt_id(
             "checkout_path": checkout_path,
             "checkout_role": checkout_role,
             "commit": commit,
+            "expected_repository": expected_repository,
             "ref": ref,
             "repository": repository,
             "verified_at": verified_at,
@@ -57,6 +66,7 @@ def _producer_identity_text(payload: dict[str, Any], field_name: str) -> str:
 @dataclass(frozen=True)
 class ProducerEvidence:
     repository: str
+    expected_repository: str
     commit: str
     ref: str
     checkout_role: str
@@ -71,6 +81,7 @@ class ProducerEvidence:
         verified_at = self._verified_at_text or self.verified_at.isoformat()
         return {
             "repository": self.repository,
+            "expected_repository": self.expected_repository,
             "commit": self.commit,
             "ref": self.ref,
             "checkout_role": self.checkout_role,
@@ -85,6 +96,7 @@ class ProducerEvidence:
     def from_dict(cls, payload: dict[str, Any]) -> ProducerEvidence:
         required = {
             "repository",
+            "expected_repository",
             "commit",
             "ref",
             "checkout_role",
@@ -98,6 +110,7 @@ class ProducerEvidence:
         if missing:
             raise ValueError(f"Producer evidence is missing fields: {missing}")
         repository = _producer_identity_text(payload, "repository")
+        expected_repository = _producer_identity_text(payload, "expected_repository")
         commit = _producer_identity_text(payload, "commit")
         ref = _producer_identity_text(payload, "ref")
         checkout_role = _producer_identity_text(payload, "checkout_role")
@@ -120,8 +133,14 @@ class ProducerEvidence:
             raise ValueError("Producer evidence must declare a clean worktree.")
         if payload["dirty_path_count"] != 0:
             raise ValueError("Clean producer evidence must declare dirty_path_count=0.")
+        if repository != expected_repository:
+            raise ValueError(
+                "Producer evidence repository does not match expected_repository: "
+                f"observed={repository!r}; expected={expected_repository!r}"
+            )
         expected_receipt_id = producer_evidence_receipt_id(
             repository=repository,
+            expected_repository=expected_repository,
             commit=commit,
             ref=ref,
             checkout_role=checkout_role,
@@ -134,6 +153,7 @@ class ProducerEvidence:
             )
         return cls(
             repository=repository,
+            expected_repository=expected_repository,
             commit=commit,
             ref=ref,
             checkout_role=checkout_role,
@@ -202,6 +222,7 @@ def inspect_canonical_producer(
     verified_at_text = verified_at.isoformat()
     evidence = ProducerEvidence(
         repository=repository,
+        expected_repository=expected_repository,
         commit=commit,
         ref=expected_ref,
         checkout_role=checkout_role,
@@ -211,6 +232,7 @@ def inspect_canonical_producer(
         verified_at=verified_at,
         receipt_id=producer_evidence_receipt_id(
             repository=repository,
+            expected_repository=expected_repository,
             commit=commit,
             ref=expected_ref,
             checkout_role=checkout_role,
@@ -222,7 +244,27 @@ def inspect_canonical_producer(
 
 
 def verify_evidence_still_current(repo_root: Path, evidence: ProducerEvidence) -> None:
-    current = _git(repo_root, "rev-parse", "HEAD")
+    try:
+        evidence = ProducerEvidence.from_dict(evidence.to_dict())
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Producer evidence is invalid before currentness verification: {exc}"
+        ) from exc
+    repository = _verified_git_value(
+        repo_root,
+        "origin repository",
+        lambda: _origin_repository(repo_root),
+    )
+    if repository != evidence.repository:
+        raise ValueError(
+            "Producer origin repository changed after preflight: "
+            f"verified={evidence.repository}; current={repository}"
+        )
+    current = _verified_git_value(
+        repo_root,
+        "HEAD",
+        lambda: _git(repo_root, "rev-parse", "HEAD"),
+    )
     if current != evidence.commit:
         raise ValueError(
             "Producer HEAD changed after preflight: "
@@ -233,7 +275,21 @@ def verify_evidence_still_current(repo_root: Path, evidence: ProducerEvidence) -
             "Producer checkout changed after preflight: "
             f"verified={evidence.checkout_path}; current={repo_root.resolve()}"
         )
-    status = _git(repo_root, "status", "--porcelain", "--untracked-files=all")
+    ref_commit = _verified_git_value(
+        repo_root,
+        f"ref {evidence.ref!r}",
+        lambda: _git(repo_root, "rev-parse", "--verify", evidence.ref),
+    )
+    if ref_commit != evidence.commit:
+        raise ValueError(
+            "Producer ref changed after preflight: "
+            f"ref={evidence.ref}; verified={evidence.commit}; current={ref_commit}"
+        )
+    status = _verified_git_value(
+        repo_root,
+        "worktree cleanliness",
+        lambda: _git(repo_root, "status", "--porcelain", "--untracked-files=all"),
+    )
     if status:
         raise ValueError("Producer worktree became dirty after preflight.")
 
@@ -256,7 +312,25 @@ def load_producer_evidence(path: Path) -> ProducerEvidence:
         raise ValueError(
             f"Producer evidence did not pass preflight: state={payload.get('state')!r}"
         )
+    if payload.get("checks") != PREFLIGHT_PASS_CHECKS:
+        raise ValueError(
+            "Producer evidence checks must exactly match the v3 pass contract: "
+            f"declared={payload.get('checks')!r}; expected={PREFLIGHT_PASS_CHECKS!r}"
+        )
     return ProducerEvidence.from_dict(payload)
+
+
+def _verified_git_value(
+    repo_root: Path,
+    label: str,
+    operation: Callable[[], str],
+) -> str:
+    try:
+        return operation()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError(
+            f"Unable to verify producer {label} after preflight: {exc}"
+        ) from exc
 
 
 def _origin_repository(repo_root: Path) -> str:
