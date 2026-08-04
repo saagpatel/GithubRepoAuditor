@@ -118,7 +118,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "flagship",
+        "category": "commercial",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -182,7 +182,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -205,7 +205,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -228,7 +228,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -290,7 +290,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "flagship",
+        "category": "commercial",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -353,7 +353,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -376,7 +376,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -399,7 +399,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -461,7 +461,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "finish",
-        "category": "flagship",
+        "category": "commercial",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -524,7 +524,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -547,7 +547,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -570,7 +570,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -632,7 +632,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "platform",
+        "category": "infrastructure",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -694,7 +694,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -717,7 +717,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -740,7 +740,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -802,7 +802,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "platform",
+        "category": "infrastructure",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -865,7 +865,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -888,7 +888,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -911,7 +911,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -973,7 +973,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "platform",
+        "category": "infrastructure",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -1036,7 +1036,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1059,7 +1059,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1082,7 +1082,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1144,7 +1144,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "finish",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -1207,7 +1207,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1230,7 +1230,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1253,7 +1253,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1315,7 +1315,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "commercial",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -1378,7 +1378,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1401,7 +1401,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1424,7 +1424,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1486,7 +1486,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "platform",
+        "category": "infrastructure",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -1549,7 +1549,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1572,7 +1572,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1595,7 +1595,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1657,7 +1657,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -1719,7 +1719,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1742,7 +1742,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1765,7 +1765,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1827,7 +1827,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "finish",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -1889,7 +1889,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -1990,7 +1990,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "platform",
+        "category": "infrastructure",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -2052,7 +2052,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -2153,7 +2153,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "flagship",
+        "category": "infrastructure",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -2217,7 +2217,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -2318,7 +2318,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -2381,7 +2381,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -2482,7 +2482,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -2544,7 +2544,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -2645,7 +2645,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -2708,7 +2708,7 @@
             "reason": "observed",
             "reason_code": "observed",
             "http_status": 200,
-            "http_classification": "ok",
+            "http_classification": "success",
             "conditional": {
               "requested": true,
               "result": "modified"
@@ -2809,7 +2809,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -2969,7 +2969,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -3128,7 +3128,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -3232,7 +3232,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -3336,7 +3336,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -3442,7 +3442,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -3548,7 +3548,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -3652,7 +3652,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -3756,7 +3756,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -3862,7 +3862,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -3968,7 +3968,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -4072,7 +4072,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -4177,7 +4177,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -4282,7 +4282,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -4388,7 +4388,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "maintain",
-        "category": "studio",
+        "category": "fun",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -4492,7 +4492,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "experiment",
-        "category": "lab",
+        "category": "learning",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -4596,7 +4596,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -4700,7 +4700,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -4804,7 +4804,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -4907,7 +4907,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -5010,7 +5010,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -5114,7 +5114,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",
@@ -5217,7 +5217,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "claude-code",
         "notes": "",
         "doctor_standard": "",
@@ -5320,7 +5320,7 @@
         "maturity_program": "maintain",
         "target_maturity": "operating",
         "operating_path": "archive",
-        "category": "archive",
+        "category": "it-work",
         "tool_provenance": "codex",
         "notes": "",
         "doctor_standard": "",

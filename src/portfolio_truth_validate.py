@@ -8,6 +8,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    PROVIDER_NAMES,
+    PROVIDER_STATES,
+    _COUNT_KEYS,
+    _provider_reason_code,
+)
 from src.portfolio_pathing import (
     VALID_MATURITY_PROGRAMS,
     VALID_OPERATING_PATHS,
@@ -20,6 +27,7 @@ from src.portfolio_truth_types import (
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
     VALID_ATTENTION_STATES,
+    VALID_CATEGORY_TAGS,
     VALID_CONTEXT_QUALITY,
     VALID_DOCTOR_STANDARDS,
     VALID_LIFECYCLE_STATES,
@@ -71,6 +79,24 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             raise ValueError(
                 f"Invalid attention state for {key}: {project.derived.attention_state}"
             )
+        category = project.declared.category
+        if category and category not in VALID_CATEGORY_TAGS:
+            raise ValueError(f"Invalid category for {key}: {category}")
+        if (
+            project.derived.attention_state == "active-infra"
+            and category != "infrastructure"
+        ):
+            raise ValueError(
+                f"Active infrastructure attention for {key} requires the "
+                "infrastructure category."
+            )
+        if (
+            project.derived.attention_state == "active-product"
+            and category != "commercial"
+        ):
+            raise ValueError(
+                f"Active product attention for {key} requires the commercial category."
+            )
         completeness_flags = (
             project.derived.project_summary_present,
             project.derived.current_state_present,
@@ -108,6 +134,187 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         doctor_std = project.declared.doctor_standard
         if doctor_std and doctor_std not in VALID_DOCTOR_STANDARDS:
             raise ValueError(f"Invalid doctor standard for {key}: {doctor_std}")
+        _validate_security_fields(project.security, key)
+
+
+def _validate_security_fields(security: SecurityFields, project_key: str) -> None:
+    """Validate receipt-backed provider envelopes after receipt normalization."""
+    providers = security.providers
+    if not isinstance(providers, Mapping):
+        raise ValueError(
+            f"Security providers for {project_key} must be an object."
+        )
+
+    has_receipt_evidence = bool(
+        security.receipt_schema_version
+        or security.source_produced_at
+        or security.receipt_state in {"fresh", "stale"}
+    )
+    if not has_receipt_evidence:
+        return
+    if security.receipt_schema_version != GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION:
+        raise ValueError(
+            f"Invalid security receipt schema for {project_key}: "
+            f"{security.receipt_schema_version}"
+        )
+    if security.receipt_state not in {"fresh", "stale"}:
+        raise ValueError(
+            f"Invalid security receipt state for {project_key}: "
+            f"{security.receipt_state}"
+        )
+    _parse_datetime(
+        security.source_produced_at,
+        f"projects[{project_key}].security.source_produced_at",
+    )
+    if set(providers) != set(PROVIDER_NAMES):
+        raise ValueError(
+            f"Security providers for {project_key} must contain exactly: "
+            f"{', '.join(PROVIDER_NAMES)}"
+        )
+
+    states: dict[str, str] = {}
+    count_fields = {
+        "dependabot": {
+            "critical": "dependabot_critical",
+            "high": "dependabot_high",
+            "medium": "dependabot_medium",
+            "low": "dependabot_low",
+        },
+        "code_scanning": {
+            "critical": "code_scanning_critical",
+            "high": "code_scanning_high",
+        },
+        "secret_scanning": {"open": "secret_scanning_open"},
+    }
+    required_envelope_fields = {
+        "state",
+        "reason_code",
+        "observed_at",
+        "http_status",
+        "http_classification",
+        "reason",
+        "etag",
+        "last_modified",
+        "conditional",
+        "pagination_complete",
+        "completed",
+        "zero_findings",
+        "counts",
+    }
+    for name in PROVIDER_NAMES:
+        provider = providers[name]
+        if not isinstance(provider, Mapping):
+            raise ValueError(
+                f"Security provider {name} for {project_key} must be an object."
+            )
+        missing = sorted(required_envelope_fields - provider.keys())
+        if missing:
+            raise ValueError(
+                f"Security provider {name} for {project_key} is missing fields: "
+                f"{missing}"
+            )
+        state = provider.get("state")
+        if state not in PROVIDER_STATES:
+            raise ValueError(
+                f"Invalid security provider state for {project_key}/{name}: {state}"
+            )
+        states[name] = str(state)
+        if provider.get("reason_code") != _provider_reason_code(str(state)):
+            raise ValueError(
+                f"Security provider reason_code for {project_key}/{name} "
+                "does not match state."
+            )
+        if state in {"observed", "stale"}:
+            http_status = provider.get("http_status")
+            expected_classification = (
+                "success"
+                if http_status == 200
+                else "not_modified"
+                if http_status == 304
+                else None
+            )
+            if (
+                expected_classification is None
+                or provider.get("http_classification") != expected_classification
+            ):
+                raise ValueError(
+                    f"Security provider classification for {project_key}/{name} "
+                    "does not match its observed HTTP response."
+                )
+        counts = provider.get("counts")
+        if state == "observed":
+            if security.receipt_state == "stale":
+                raise ValueError(
+                    f"Stale security receipt for {project_key} cannot retain "
+                    f"an observed {name} provider."
+                )
+            if (
+                not isinstance(counts, Mapping)
+                or set(counts) != set(_COUNT_KEYS[name])
+                or any(
+                    not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value < 0
+                    for value in counts.values()
+                )
+            ):
+                raise ValueError(
+                    f"Observed security provider counts for {project_key}/{name} "
+                    "are invalid."
+                )
+            if provider.get("completed") is not True or provider.get(
+                "pagination_complete"
+            ) is not True:
+                raise ValueError(
+                    f"Observed security provider {project_key}/{name} must be "
+                    "complete."
+                )
+            if provider.get("zero_findings") is not (sum(counts.values()) == 0):
+                raise ValueError(
+                    f"Observed security provider {project_key}/{name} has an "
+                    "invalid zero_findings value."
+                )
+        else:
+            if counts is not None:
+                raise ValueError(
+                    f"Non-observed security provider {project_key}/{name} must "
+                    "clear counts."
+                )
+            if provider.get("completed") is not False or provider.get(
+                "zero_findings"
+            ) is not None:
+                raise ValueError(
+                    f"Non-observed security provider {project_key}/{name} cannot "
+                    "claim a completed observation."
+                )
+
+        for count_name, field_name in count_fields[name].items():
+            expected = counts[count_name] if state == "observed" else None
+            if getattr(security, field_name) != expected:
+                raise ValueError(
+                    f"Security count {field_name} for {project_key} does not "
+                    f"match the normalized {name} provider."
+                )
+
+    observed_count = sum(state == "observed" for state in states.values())
+    if security.receipt_state == "stale":
+        expected_coverage = "stale"
+    elif observed_count == len(PROVIDER_NAMES):
+        expected_coverage = "complete"
+    elif observed_count:
+        expected_coverage = "partial"
+    elif any(state == "stale" for state in states.values()):
+        expected_coverage = "stale"
+    else:
+        expected_coverage = "unknown"
+    if security.coverage_state != expected_coverage:
+        raise ValueError(
+            f"Security coverage state for {project_key} must be {expected_coverage}."
+        )
+    if security.alerts_available is not (expected_coverage == "complete"):
+        raise ValueError(
+            f"Security alerts_available for {project_key} does not match coverage."
+        )
 
 
 def validate_truth_snapshot_payload(payload: Mapping[str, Any]) -> None:

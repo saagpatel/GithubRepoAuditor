@@ -155,6 +155,84 @@ def test_canonical_payload_validation_rejects_tampered_project_rollup() -> None:
         validate_truth_snapshot_payload(fixture)
 
 
+def test_canonical_payload_validation_rejects_deleted_receipt_provider() -> None:
+    fixture = build_contract_fixture()
+    stale = next(
+        project["security"]
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "stale"
+    )
+    del stale["providers"]["dependabot"]
+
+    with pytest.raises(ValueError, match="must contain exactly"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_stale_provider_counts() -> None:
+    fixture = build_contract_fixture()
+    stale = next(
+        project["security"]
+        for project in fixture["projects"]
+        if project["security"]["receipt_state"] == "stale"
+    )
+    stale["providers"]["dependabot"]["counts"] = {
+        "critical": 1,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+    }
+
+    with pytest.raises(ValueError, match="must clear counts"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_invalid_provider_state() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["security"]["providers"]["dependabot"]["state"] = (
+        "fabricated"
+    )
+
+    with pytest.raises(ValueError, match="Invalid security provider state"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_observed_provider_count_shape() -> None:
+    fixture = build_contract_fixture()
+    counts = fixture["projects"][0]["security"]["providers"]["dependabot"][
+        "counts"
+    ]
+    del counts["low"]
+
+    with pytest.raises(ValueError, match="provider counts.*invalid"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_provider_classification_drift() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["security"]["providers"]["dependabot"][
+        "http_classification"
+    ] = "ok"
+
+    with pytest.raises(ValueError, match="provider classification"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_invalid_declared_category() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["declared"]["category"] = "platform"
+
+    with pytest.raises(ValueError, match="Invalid category"):
+        validate_truth_snapshot_payload(fixture)
+
+
+def test_canonical_payload_validation_rejects_invalid_active_infra_category() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["declared"]["category"] = "learning"
+
+    with pytest.raises(ValueError, match="requires the infrastructure category"):
+        validate_truth_snapshot_payload(fixture)
+
+
 @pytest.mark.parametrize(
     ("section", "field"),
     ((None, "repository_state"), ("security", "cohort_member")),

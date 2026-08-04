@@ -76,7 +76,7 @@
       },
       "declared": {
         "automation_eligible": false,
-        "category": "platform",
+        "category": "infrastructure",
         "criticality": "medium",
         "doctor_standard": "",
         "intended_disposition": "",
@@ -172,7 +172,7 @@
               "warning": 0
             },
             "etag": null,
-            "http_classification": "ok",
+            "http_classification": "success",
             "http_status": 200,
             "last_modified": null,
             "observed_at": "2026-08-01T00:00:00+00:00",
@@ -195,7 +195,7 @@
               "medium": 2
             },
             "etag": null,
-            "http_classification": "ok",
+            "http_classification": "success",
             "http_status": 200,
             "last_modified": null,
             "observed_at": "2026-08-01T00:00:00+00:00",
@@ -215,7 +215,7 @@
               "open": 0
             },
             "etag": null,
-            "http_classification": "ok",
+            "http_classification": "success",
             "http_status": 200,
             "last_modified": null,
             "observed_at": "2026-08-01T00:00:00+00:00",
@@ -245,7 +245,7 @@
       },
       "declared": {
         "automation_eligible": false,
-        "category": "studio",
+        "category": "fun",
         "criticality": "medium",
         "doctor_standard": "",
         "intended_disposition": "",
@@ -360,7 +360,7 @@
               "medium": 1
             },
             "etag": null,
-            "http_classification": "ok",
+            "http_classification": "success",
             "http_status": 200,
             "last_modified": null,
             "observed_at": "2026-08-01T00:00:00+00:00",
@@ -408,7 +408,7 @@
       },
       "declared": {
         "automation_eligible": true,
-        "category": "lab",
+        "category": "learning",
         "criticality": "medium",
         "doctor_standard": "",
         "intended_disposition": "",
@@ -567,7 +567,7 @@
       },
       "declared": {
         "automation_eligible": true,
-        "category": "lab",
+        "category": "learning",
         "criticality": "medium",
         "doctor_standard": "",
         "intended_disposition": "",
