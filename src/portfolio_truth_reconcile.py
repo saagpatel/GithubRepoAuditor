@@ -286,6 +286,7 @@ def build_portfolio_truth_snapshot(
             legacy_rows=legacy_rows,
             notion_context=notion_context,
             now=now,
+            workspace_root=workspace_root,
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
             repo_status_by_name=repo_status_by_name,
@@ -855,6 +856,7 @@ def _build_truth_project(
     legacy_rows: dict[str, dict[str, str]],
     notion_context: dict[str, dict[str, str]],
     now: datetime,
+    workspace_root: Path,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
@@ -1246,6 +1248,7 @@ def _build_truth_project(
             project_path,
             observed_at=now,
             remote_default_branch=remote_default_branch,
+            workspace_root=workspace_root,
         )
         if project_path is not None and has_git
         else {

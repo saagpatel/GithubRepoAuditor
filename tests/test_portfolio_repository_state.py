@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import src.portfolio_repository_state as repository_state
 from src.portfolio_repository_state import observe_repository_state
 
 
@@ -84,6 +85,47 @@ def test_observation_reports_linked_worktree_without_file_names(tmp_path: Path) 
     assert linked_state["dirty"] is True
     assert linked_state["dirty_path_count"] == 1
     assert "untracked.txt" not in str(state)
+
+
+def test_external_worktree_is_opaque_and_not_observed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    repo = _repo(workspace)
+    external = tmp_path / "external-worktree-path-must-not-be-published"
+    _git(repo, "worktree", "add", "-b", "external", str(external), "HEAD")
+
+    original_observer = repository_state._observe_working_tree
+    observed_paths: list[Path] = []
+
+    def _record_observation(path: Path) -> dict[str, Any]:
+        observed_paths.append(path)
+        return original_observer(path)
+
+    monkeypatch.setattr(
+        repository_state,
+        "_observe_working_tree",
+        _record_observation,
+    )
+
+    state = observe_repository_state(
+        repo,
+        observed_at=datetime.now(UTC),
+        workspace_root=workspace,
+    )
+
+    assert observed_paths
+    assert set(observed_paths) == {repo}
+    assert external not in observed_paths
+    external_state = next(
+        item for item in state["worktrees"] if item["path"] == "external-worktree"
+    )
+    assert external_state["state"] == "unknown"
+    assert external_state["reason_code"] == "external_worktree_outside_workspace"
+    assert external_state["dirty"] is None
+    assert str(external) not in str(state)
 
 
 def test_dangling_bare_head_uses_clean_matching_linked_worktree(

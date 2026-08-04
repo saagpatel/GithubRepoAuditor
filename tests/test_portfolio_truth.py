@@ -891,6 +891,7 @@ def test_external_linked_worktree_flows_through_truth_validation_and_report(
         }
     ]
     assert str(external) not in json.dumps(authority)
+    assert str(external) not in json.dumps(result.snapshot.to_dict())
     assert checkout_authority_blocker(
         project,
         workspace_root=portfolio_workspace,
