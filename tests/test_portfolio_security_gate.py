@@ -12,6 +12,21 @@ from src.portfolio_security_gate import (
     render_security_gate_markdown,
 )
 
+OBSERVED_AT = "2026-07-04T11:03:00+00:00"
+PRODUCED_AT = "2026-07-04T11:04:00+00:00"
+
+
+def _provider(counts: dict[str, int], *, observed: bool) -> dict:
+    return {
+        "state": "observed" if observed else "not_requested",
+        "reason_code": "observed" if observed else "not_requested",
+        "observed_at": OBSERVED_AT if observed else None,
+        "pagination_complete": observed,
+        "completed": observed,
+        "zero_findings": sum(counts.values()) == 0 if observed else None,
+        "counts": counts if observed else None,
+    }
+
 
 def _project(
     name: str,
@@ -31,11 +46,30 @@ def _project(
             "alerts_available": alerts_available,
             "cohort_member": True,
             "coverage_state": "complete" if alerts_available else "unknown",
+            "receipt_state": "fresh",
+            "source_produced_at": PRODUCED_AT,
             "providers": {
-                provider: {
-                    "state": "observed" if alerts_available else "not_requested"
-                }
-                for provider in ("dependabot", "code_scanning", "secret_scanning")
+                "dependabot": _provider(
+                    {
+                        "critical": critical,
+                        "high": high,
+                        "medium": 0,
+                        "low": 0,
+                    },
+                    observed=alerts_available,
+                ),
+                "code_scanning": _provider(
+                    {
+                        "critical": code_critical,
+                        "high": code_high,
+                        "warning": 0,
+                        "note": 0,
+                    },
+                    observed=alerts_available,
+                ),
+                "secret_scanning": _provider(
+                    {"open": secrets}, observed=alerts_available
+                ),
             },
             "dependabot_critical": critical,
             "dependabot_high": high,
@@ -173,9 +207,23 @@ def test_security_gate_treats_missing_overlay_as_unknown_not_pass() -> None:
     assert report.passed is False
     assert report.status == "unknown"
     assert report.scanned_count == 0
-    assert "security coverage is missing or incomplete" in render_security_gate_markdown(
-        report
+    assert (
+        "security coverage is missing or incomplete"
+        in render_security_gate_markdown(report)
     )
+
+
+def test_security_gate_surfaces_admission_reason_for_contradictory_counts() -> None:
+    project = _project("Contradictory")
+    project["security"]["code_scanning_high"] = 4
+
+    report = build_security_gate_report({"projects": [project]})
+
+    assert report.status == "unknown"
+    assert report.complete_count == 0
+    [unadmitted] = report.unadmitted_repos
+    assert "SECURITY_PROVIDER_CODE_SCANNING_COUNT_CONFLICT" in (unadmitted.reason_codes)
+    assert "SECURITY_ADMISSION_UNKNOWN" in render_security_gate_markdown(report)
 
 
 @pytest.mark.parametrize("coverage_state", ["partial", "stale", "unknown"])
@@ -220,7 +268,12 @@ def test_security_gate_cli_json_exits_zero_on_clear_snapshot(tmp_path, capsys) -
 
 def test_security_gate_cli_exits_nonzero_on_stale_snapshot(tmp_path) -> None:
     (tmp_path / "portfolio-truth-latest.json").write_text(
-        json.dumps({"generated_at": "2026-07-01T11:00:00+00:00", "projects": [_project("Clear")]}),
+        json.dumps(
+            {
+                "generated_at": "2026-07-01T11:00:00+00:00",
+                "projects": [_project("Clear")],
+            }
+        ),
         encoding="utf-8",
     )
 

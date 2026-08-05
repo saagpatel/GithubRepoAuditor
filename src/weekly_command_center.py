@@ -13,6 +13,7 @@ from src.portfolio_truth_trends import (
     render_movement_summary,
 )
 from src.report_enrichment import build_weekly_review_pack
+from src.security_admission import derive_security_admission
 
 CONTRACT_VERSION = "weekly_command_center_digest_v1"
 AUTHORITY_CAP = "bounded-automation"
@@ -321,7 +322,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Operating Paths: {_safe_text(digest.get('operating_paths_summary')) or 'No operating-path summary is recorded yet.'}",
         f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active registry entries, {portfolio_truth.get('default_attention_count', 0)} default attention, {portfolio_truth.get('decision_queue_count', 0)} decision queue",
         f"- Risk Posture: {risk_posture.get('elevated_count', 0)} elevated, {tier_counts.get('moderate', 0)} moderate, {tier_counts.get('baseline', 0)} baseline",
-        f"- Security Posture: {security_posture.get('scanned_count', 0)} scanned, {security_posture.get('repos_with_open_high_critical', 0)} with open high/critical Dependabot alerts ({security_posture.get('total_open_critical', 0)} critical, {security_posture.get('total_open_high', 0)} high)",
+        f"- Security Posture: {security_posture.get('scanned_count', 0)} admitted, {security_posture.get('repos_with_blocking_findings', 0)} with blocking GitHub security findings ({security_posture.get('total_open_critical', 0)} critical, {security_posture.get('total_open_high', 0)} high, {security_posture.get('total_open_secrets', 0)} open secrets; {security_posture.get('unadmitted_count', 0)} unadmitted)",
         "",
         "## Decision Queue",
     ]
@@ -380,12 +381,18 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         for item in security_items:
             lines.append(
                 f"- **{item['repo']}** [{item['risk_tier']}]: "
-                f"{item['dependabot_critical']} critical, {item['dependabot_high']} high "
-                "open Dependabot alerts"
+                f"{item['total_open_critical']} critical, {item['total_open_high']} high, "
+                f"{item['secret_scanning_open']} open secrets "
+                f"(admission {item['security_admission_status']})"
             )
-    elif scanned_count > 0:
+    elif scanned_count > 0 and not security_posture.get("unadmitted_count"):
         lines.append(
-            f"- All {scanned_count} scanned repos are clear of open high/critical Dependabot alerts."
+            f"- All {scanned_count} admitted repos are clear of blocking GitHub security findings."
+        )
+    elif security_posture.get("unadmitted_count"):
+        lines.append(
+            "- Security evidence remains UNKNOWN for "
+            f"{security_posture['unadmitted_count']} repo(s); do not treat them as clear."
         )
     else:
         lines.append(
@@ -588,46 +595,52 @@ def _build_risk_attention_items(
 
 
 def _build_security_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
-    """Aggregate the opt-in security overlay across scanned repos. scanned_count is
-    repos with alerts_available=True (the security overlay ran for them); a scanned
-    repo with zero open alerts is genuinely clear, distinct from an unscanned one."""
+    """Aggregate the canonical security admission across overlay-backed repos."""
     projects = list(portfolio_truth.get("projects") or [])
     scanned = 0
     repos_with_open = 0
+    unadmitted = 0
     total_critical = 0
     total_high = 0
+    total_secrets = 0
+    status_counts: dict[str, int] = {}
     for project in projects:
         security = _mapping(project.get("security"))
-        if not security.get("alerts_available"):
+        if not security.get("cohort_member"):
             continue
-        scanned += 1
-        critical = int(security.get("dependabot_critical") or 0)
-        high = int(security.get("dependabot_high") or 0)
-        total_critical += critical
-        total_high += high
-        if critical > 0 or high > 0:
+        admission = derive_security_admission(security)
+        status_counts[admission.status] = status_counts.get(admission.status, 0) + 1
+        scanned += int(admission.evidence_complete)
+        unadmitted += int(not admission.evidence_complete)
+        total_critical += admission.total_open_critical
+        total_high += admission.total_open_high
+        total_secrets += admission.total_open_secrets
+        if admission.has_findings:
             repos_with_open += 1
     return {
         "scanned_count": scanned,
         "repos_with_open_high_critical": repos_with_open,
+        "repos_with_blocking_findings": repos_with_open,
+        "unadmitted_count": unadmitted,
+        "admission_status_counts": status_counts,
         "total_open_critical": total_critical,
         "total_open_high": total_high,
+        "total_open_secrets": total_secrets,
     }
 
 
 def _build_security_attention_items(
     portfolio_truth: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Top scanned repos carrying open high/critical Dependabot alerts, critical-first."""
+    """Top repos carrying known blocking findings, using canonical admission."""
     projects = list(portfolio_truth.get("projects") or [])
     items: list[dict[str, Any]] = []
     for project in projects:
         security = _mapping(project.get("security"))
-        if not security.get("alerts_available"):
+        if not security.get("cohort_member"):
             continue
-        critical = int(security.get("dependabot_critical") or 0)
-        high = int(security.get("dependabot_high") or 0)
-        if critical <= 0 and high <= 0:
+        admission = derive_security_admission(security)
+        if not admission.has_findings:
             continue
         identity = _mapping(project.get("identity"))
         risk = _mapping(project.get("risk"))
@@ -635,10 +648,22 @@ def _build_security_attention_items(
         items.append(
             {
                 "repo": repo,
-                "dependabot_critical": critical,
-                "dependabot_high": high,
+                "dependabot_critical": admission.dependabot_critical,
+                "dependabot_high": admission.dependabot_high,
+                "code_scanning_critical": admission.code_scanning_critical,
+                "code_scanning_high": admission.code_scanning_high,
+                "secret_scanning_open": admission.secret_scanning_open,
+                "total_open_critical": admission.total_open_critical,
+                "total_open_high": admission.total_open_high,
+                "security_admission_status": admission.status,
+                "security_admission_evidence_complete": (admission.evidence_complete),
+                "security_admission_reason_codes": list(admission.reason_codes),
                 "risk_tier": _safe_text(risk.get("risk_tier")) or "baseline",
-                "_sort_key": (-critical, -high, repo),
+                "_sort_key": (
+                    -(admission.total_open_critical + admission.total_open_secrets),
+                    -admission.total_open_high,
+                    repo,
+                ),
             }
         )
     items.sort(key=lambda x: x["_sort_key"])

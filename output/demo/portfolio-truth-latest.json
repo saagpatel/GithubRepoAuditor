@@ -2609,7 +2609,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -2973,7 +2973,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -3336,7 +3336,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -3701,7 +3701,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -4916,7 +4916,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -7776,7 +7776,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -8502,7 +8502,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -8867,7 +8867,7 @@
           "no-run-instructions",
           "active-high-severity-alerts"
         ],
-        "risk_summary": "4 risk factor(s): weak context quality, investigate override active, run instructions missing, open high/critical security alerts.",
+        "risk_summary": "4 risk factor(s): weak context quality, investigate override active, run instructions missing, blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": true,
         "path_risk": true,
@@ -10081,7 +10081,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -11169,7 +11169,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false,
@@ -13050,8 +13050,10 @@
       "remote_default_branch_unavailable_count": 22,
       "coverage_state": "partial",
       "repos_with_open_high_critical": 10,
-      "total_open_high": 20,
-      "total_open_critical": 5
+      "total_open_high": 24,
+      "total_open_critical": 6,
+      "total_open_secrets": 1,
+      "security_admission_schema_version": "SecurityAdmissionV1"
     },
     "decision": {
       "decision_needed_count": 9,

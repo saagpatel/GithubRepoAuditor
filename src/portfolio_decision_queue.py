@@ -17,6 +17,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from src.security_admission import derive_security_admission
+
 CONTRACT_VERSION = "decision_queue_v2"
 DIGEST_CONTRACT_VERSION = "portfolio_decision_digest_v2"
 ITEM_SCHEMA_VERSION = "portfolio_decision_item_v2"
@@ -188,6 +190,9 @@ def _readback_contract(project_identity: str) -> dict[str, Any]:
         "success_condition": {
             "dependabot_critical": 0,
             "dependabot_high": 0,
+            "code_scanning_critical": 0,
+            "code_scanning_high": 0,
+            "secret_scanning_open": 0,
         },
         "preserve_if": "matching newer receipt still reports open high or critical alerts",
         "reopen_if": "a newer receipt yields a different nonzero decision fingerprint",
@@ -242,8 +247,7 @@ def _security_decision(
     basics = _project_basics(project)
     declared = _mapping(project.get("declared"))
     security = _mapping(project.get("security"))
-    providers = _mapping(security.get("providers"))
-    dependabot = _mapping(providers.get("dependabot"))
+    admission = derive_security_admission(security)
     github_source = _mapping(
         _mapping(portfolio_truth.get("inputs")).get("github_security")
     )
@@ -295,16 +299,6 @@ def _security_decision(
             "SECURITY_SOURCE_PRODUCER_MISMATCH",
             "PortfolioTruth and the GitHub security receipt name different producer commits.",
         )
-    if _text(security.get("coverage_state")) != "complete":
-        return refuse(
-            "SECURITY_COVERAGE_INCOMPLETE",
-            "Repository security coverage is not complete.",
-        )
-    if _text(security.get("receipt_state")) != "fresh":
-        return refuse(
-            "SECURITY_PROJECT_RECEIPT_NOT_FRESH",
-            "The repository security envelope is not fresh.",
-        )
     if _text(security.get("source_produced_at")) != _text(
         github_source.get("produced_at")
     ):
@@ -312,22 +306,27 @@ def _security_decision(
             "SECURITY_SOURCE_MISMATCH",
             "The project security envelope does not match the admitted receipt generation.",
         )
-    if _text(dependabot.get("state")) not in {"observed", "not_modified"}:
-        return refuse(
-            "SECURITY_PROVIDER_NOT_OBSERVED",
-            "Dependabot evidence is not in an observed state.",
+    if not admission.evidence_complete:
+        reason_code = next(
+            (
+                code
+                for code in admission.reason_codes
+                if code
+                not in {
+                    "SECURITY_ADMISSION_FINDINGS",
+                    "SECURITY_ADMISSION_UNKNOWN",
+                }
+            ),
+            "SECURITY_ADMISSION_UNKNOWN",
         )
-    if (
-        dependabot.get("pagination_complete") is not True
-        or dependabot.get("completed") is not True
-    ):
         return refuse(
-            "SECURITY_PROVIDER_INCOMPLETE",
-            "Dependabot evidence is incomplete or pagination is not closed.",
+            reason_code,
+            "Canonical security admission failed closed: "
+            + ", ".join(admission.reason_codes),
         )
 
     evaluated = _parse_datetime(portfolio_truth.get("generated_at"))
-    evidence_observed = _parse_datetime(dependabot.get("observed_at"))
+    evidence_observed = _parse_datetime(admission.evidence_observed_at)
     receipt_produced = _parse_datetime(github_source.get("produced_at"))
     if not evaluated:
         return refuse(
@@ -337,7 +336,7 @@ def _security_decision(
     if not evidence_observed:
         return refuse(
             "EVIDENCE_CLOCK_MISSING",
-            "Dependabot observed_at is missing or invalid.",
+            "Canonical security admission observed_at is missing or invalid.",
         )
     if not receipt_produced:
         return refuse(
@@ -355,21 +354,16 @@ def _security_decision(
     if evaluated > valid_until_dt:
         return refuse(
             "SECURITY_EVIDENCE_EXPIRED",
-            "The underlying Dependabot observation expired; projection regeneration cannot rejuvenate it.",
+            "The oldest admitted security observation expired; projection regeneration cannot rejuvenate it.",
         )
 
-    try:
-        critical = int(security.get("dependabot_critical"))
-        high = int(security.get("dependabot_high"))
-    except (TypeError, ValueError):
-        return refuse(
-            "SECURITY_COUNTS_INVALID",
-            "Dependabot high and critical counts are not valid integers.",
-        )
-    if critical < 0 or high < 0 or critical + high <= 0:
+    critical = admission.total_open_critical
+    high = admission.total_open_high
+    secrets = admission.total_open_secrets
+    if critical + high + secrets <= 0:
         return refuse(
             "SECURITY_RISK_COUNT_MISMATCH",
-            "Security risk is set without a positive high or critical Dependabot count.",
+            "Security risk is set without an admitted blocking GitHub security finding.",
         )
 
     valid_until = _iso(valid_until_dt)
@@ -381,7 +375,7 @@ def _security_decision(
     question = (
         f"Should {owner} approve one repository-scoped security follow-up for "
         f"{basics['project']} against {critical} critical and {high} high "
-        f"Dependabot alerts before {valid_until}?"
+        f"alerts plus {secrets} open secret-scanning findings before {valid_until}?"
     )
     evidence_reference = {
         "source_id": _text(github_source.get("source_id")),
@@ -390,10 +384,16 @@ def _security_decision(
         "content_sha256": _text(github_source.get("content_sha256")),
         "path": _text(github_source.get("path")),
         "project_identity": basics["project_identity"],
-        "provider": "dependabot",
+        "security_admission_schema": admission.schema_version,
+        "security_admission_status": admission.status,
+        "provider": "github_security_combined",
         "provider_observed_at": evidence_observed_at,
-        "dependabot_critical": critical,
-        "dependabot_high": high,
+        "provider_observed_at_by_name": admission.provider_observed_at,
+        "dependabot_critical": admission.dependabot_critical,
+        "dependabot_high": admission.dependabot_high,
+        "code_scanning_critical": admission.code_scanning_critical,
+        "code_scanning_high": admission.code_scanning_high,
+        "secret_scanning_open": admission.secret_scanning_open,
     }
     fingerprint_payload = {
         "schema_version": FINGERPRINT_SCHEMA_VERSION,
@@ -419,9 +419,11 @@ def _security_decision(
         "owner": owner,
         "allowed_outcomes": allowed_outcomes,
         "approval_boundary": approval_boundary,
-        "why_now": "Current authoritative GitHub security evidence reports open high or critical Dependabot alerts.",
+        "why_now": "Current authoritative GitHub security evidence reports admitted blocking findings.",
         "evidence": [
-            f"security_risk=true; dependabot critical={critical}, high={high}"
+            "security_risk=true; "
+            f"critical={critical}, high={high}, open_secrets={secrets}; "
+            f"admission={admission.schema_version}"
         ],
         "authoritative_source": "github-security-coverage-receipt",
         "evidence_reference": evidence_reference,
@@ -459,7 +461,8 @@ def _build_candidates(
         if basics["attention_state"] in {"archived", "evidence-history"}:
             continue
         risk = _mapping(project.get("risk"))
-        if bool(risk.get("security_risk")):
+        admission = derive_security_admission(project.get("security"))
+        if bool(risk.get("security_risk")) or admission.has_findings:
             item, refused = _security_decision(
                 project,
                 portfolio_truth=portfolio_truth,

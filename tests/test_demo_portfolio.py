@@ -85,8 +85,7 @@ def _expected_inputs(snapshot: dict) -> dict:
             "producer_commit": "a" * 40,
             "cohort_policy": "portfolio-default-attention-v1",
             "cohort_repository_count": sum(
-                project["security"]["cohort_member"]
-                for project in snapshot["projects"]
+                project["security"]["cohort_member"] for project in snapshot["projects"]
             ),
             "path": "/demo-workspace/github-security-coverage.json",
             "receipt_id": "sha256:" + "b" * 64,
@@ -224,9 +223,10 @@ def test_every_demo_row_carries_meaningful_production_shaped_provenance() -> Non
             provenance["derived.activity_status"]["detail"]
             == project["derived"]["activity_status"]
         )
-        assert provenance["derived.archived"]["detail"] == str(
-            project["derived"]["archived"]
-        ).lower()
+        assert (
+            provenance["derived.archived"]["detail"]
+            == str(project["derived"]["archived"]).lower()
+        )
         assert (
             provenance["derived.context_quality"]["detail"]
             == project["derived"]["context_quality"]
@@ -324,29 +324,43 @@ def test_rollups_agree_with_the_project_records() -> None:
         )
 
 
-def test_risk_text_and_tiers_use_canonical_dependabot_alert_counts() -> None:
+def test_risk_text_and_tiers_use_canonical_security_admission_counts() -> None:
     snapshot = _snapshot()
     repos_with_open_high_critical = 0
 
     for project in snapshot["projects"]:
         security = project["security"]
         risk = project["risk"]
-        canonical_count = (security["dependabot_critical"] or 0) + (
+        legacy_dependabot_count = (security["dependabot_critical"] or 0) + (
             security["dependabot_high"] or 0
         )
+        blocking_critical = (
+            (security["dependabot_critical"] or 0)
+            + (security["code_scanning_critical"] or 0)
+            + (security["secret_scanning_open"] or 0)
+        )
+        blocking_high = (security["dependabot_high"] or 0) + (
+            security["code_scanning_high"] or 0
+        )
+        canonical_count = blocking_critical + blocking_high
         factor = "active-high-severity-alerts"
 
-        assert security["open_high_critical"] == canonical_count
+        assert security["open_high_critical"] == legacy_dependabot_count
         assert risk["security_risk"] is (canonical_count > 0)
         assert (factor in risk["risk_factors"]) is (canonical_count > 0)
         if canonical_count > 0:
             repos_with_open_high_critical += 1
-        if (security["dependabot_critical"] or 0) > 0:
+        if blocking_critical > 0:
             assert risk["risk_tier"] == "elevated"
 
-    assert snapshot["rollups"]["security"][
-        "repos_with_open_high_critical"
-    ] == repos_with_open_high_critical
+    assert (
+        snapshot["rollups"]["security"]["repos_with_open_high_critical"]
+        == repos_with_open_high_critical
+    )
+    assert snapshot["rollups"]["security"]["total_open_secrets"] == sum(
+        (project["security"]["secret_scanning_open"] or 0)
+        for project in snapshot["projects"]
+    )
 
 
 def test_attention_state_counts_match_the_project_records() -> None:
@@ -400,19 +414,43 @@ def test_proposals_present_a_mixed_state_triage_queue() -> None:
 
 
 def test_weekly_digest_and_burndown_agree_with_the_snapshot() -> None:
+    from src.security_admission import derive_security_admission
+
     snapshot = _snapshot()
     digest = build_weekly_digest(snapshot)
     burndown = build_security_burndown(snapshot)
+    admissions = [
+        derive_security_admission(project["security"])
+        for project in snapshot["projects"]
+        if project["security"]["cohort_member"]
+    ]
 
     assert digest["generated_at"] == snapshot["generated_at"]
     assert (
         digest["risk_posture"]["risk_tier_counts"]
         == (snapshot["rollups"]["risk_tier_counts"])
     )
-    assert (
-        digest["security_posture"]["total_open_high"]
-        == (snapshot["rollups"]["security"]["total_open_high"])
+    posture = digest["security_posture"]
+    assert posture["scanned_count"] == sum(
+        admission.evidence_complete for admission in admissions
     )
+    assert posture["unadmitted_count"] == sum(
+        not admission.evidence_complete for admission in admissions
+    )
+    assert posture["repos_with_blocking_findings"] == sum(
+        admission.has_findings for admission in admissions
+    )
+    assert posture["total_open_high"] == sum(
+        admission.total_open_high for admission in admissions
+    )
+    assert posture["total_open_critical"] == sum(
+        admission.total_open_critical for admission in admissions
+    )
+    assert posture["total_open_secrets"] == sum(
+        admission.total_open_secrets for admission in admissions
+    )
+    assert digest["headline"].endswith("blocking GitHub security findings.")
+    assert all("security_admission_status" in item for item in posture["top_alerts"])
     assert burndown["repos_touched"] == sum(
         1
         for p in snapshot["projects"]

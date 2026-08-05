@@ -64,7 +64,7 @@ Output lands in `output/ghas-alerts-<user>-<date>.json`. Excel and control-cente
 Run `audit security-gate --output-dir output` after generating portfolio truth with
 `--portfolio-truth-include-security`. The gate reads
 `output/portfolio-truth-latest.json` and exits nonzero when any scanned repo has open
-high/critical Dependabot alerts.
+high/critical Dependabot or CodeQL alerts, or an open secret-scanning finding.
 
 Use `--max-age-hours N` when the caller needs freshness enforcement. For example,
 `audit security-gate --output-dir output --max-age-hours 168` fails as `STALE` when
@@ -73,6 +73,23 @@ the portfolio truth snapshot is more than seven days old.
 The gate is deliberately strict: a snapshot with no scanned security overlay is
 reported as `UNKNOWN`, not clear. This prevents a missing GHAS overlay from looking
 like a clean portfolio.
+
+All PortfolioTruth security consumers now use the same internal
+`SecurityAdmissionV1` derivation. It admits a repo as clear only when the receipt is
+fresh, coverage is complete, all three provider observations are complete, clocks
+are monotonic, compatibility counts match provider counts, and no blocking finding
+is present. Partial, stale, missing, malformed, or contradictory evidence carries
+explicit `SECURITY_*` reason codes and cannot render green. Known findings remain
+visible even when another provider is unavailable, but the evidence stays
+unadmitted and the decision queue withholds actionability until the complete
+evidence contract is restored.
+
+This is a consumer-semantics convergence, not a PortfolioTruth schema migration:
+the producer remains at `0.11.0`, existing compatibility count fields remain, and
+the legacy Dependabot-only `open_high_critical` project field is retained for old
+readers. Risk/attention, the strict gate, portfolio rollups, registry/report
+rendering, the decision digest, and the weekly command-center security posture use
+the combined admission result.
 
 ## OSSF Scorecard
 
