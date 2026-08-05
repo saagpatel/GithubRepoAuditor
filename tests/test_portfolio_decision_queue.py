@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -469,3 +471,48 @@ def test_cli_json_and_markdown_are_deterministic(
     markdown = capsys.readouterr().out
     assert "## Portfolio Decision Digest — 2026-08-05" in markdown
     assert "**MCPAudit** [security follow-up]" in markdown
+
+
+def test_absolute_cli_entrypoint_runs_from_arbitrary_cwd(tmp_path: Path) -> None:
+    truth_path = tmp_path / "portfolio-truth.json"
+    truth_path.write_text(
+        json.dumps(
+            _truth(
+                [
+                    _project(
+                        "MCPAudit",
+                        attention_state="decision-needed",
+                        security_risk=True,
+                        code_scanning_high=1,
+                    )
+                ]
+            )
+        ),
+        encoding="utf-8",
+    )
+    script = Path(__file__).resolve().parents[1] / "src" / "portfolio_decision_queue.py"
+    unrelated_cwd = tmp_path / "unrelated-cwd"
+    unrelated_cwd.mkdir()
+
+    run = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            str(script),
+            "--truth",
+            str(truth_path),
+            "--format",
+            "json",
+        ],
+        cwd=unrelated_cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert run.returncode == 0, run.stderr
+    digest = json.loads(run.stdout)
+    assert digest["contract_version"] == DIGEST_CONTRACT_VERSION
+    assert digest["decision_queue"][0]["evidence_reference"]["provider"] == (
+        "github_security_combined"
+    )
