@@ -28,7 +28,7 @@ from src.portfolio_truth_lineage import resolve_notion_origin
 from src.portfolio_truth_types import truth_latest_path
 from src.producer_preflight import ProducerEvidence, verify_evidence_still_current
 from src.portfolio_truth_validate import (
-    canonicalize_truth_snapshot_payload,
+    canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
     validate_publish_targets,
     validate_registry_markdown,
@@ -104,7 +104,7 @@ def _load_prior_security_alerts(
         payload = json.loads(content)
         if not isinstance(payload, dict):
             raise ValueError("snapshot must be an object")
-        canonical = canonicalize_truth_snapshot_payload(
+        canonical = canonicalize_prior_security_truth_payload(
             payload,
             security_max_age_hours=security_max_age_hours,
         )

@@ -1802,6 +1802,106 @@ def canonicalize_truth_snapshot_payload(
     return snapshot.to_dict()
 
 
+_LEGACY_PRIOR_SECURITY_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
+
+
+def canonicalize_prior_security_truth_payload(
+    payload: Mapping[str, Any],
+    *,
+    security_max_age_hours: int = 24,
+) -> dict[str, Any]:
+    """Canonicalize prior security evidence across one bounded metadata upgrade.
+
+    Current snapshots always take the ordinary strict path. The compatibility
+    path accepts only the immediately preceding discovery envelope, before
+    checkout-collision metadata existed, and reconstructs those two unrelated
+    metadata envelopes in memory before running the complete current validator.
+    """
+    try:
+        return canonicalize_truth_snapshot_payload(
+            payload,
+            security_max_age_hours=security_max_age_hours,
+        )
+    except ValueError as strict_error:
+        summary = payload.get("source_summary")
+        exclusions = payload.get("exclusions")
+        is_bounded_legacy_payload = (
+            isinstance(summary, Mapping)
+            and "checkout_collisions" not in summary
+            and isinstance(exclusions, Mapping)
+            and exclusions.get("policy_version")
+            == _LEGACY_PRIOR_SECURITY_DISCOVERY_POLICY_VERSION
+        )
+        if not is_bounded_legacy_payload:
+            raise
+
+        try:
+            snapshot = _snapshot_from_payload(payload)
+            _validate_runtime_dataclass(snapshot, "snapshot")
+            if any(
+                "checkout_authority" in project.repository_state
+                for project in snapshot.projects
+            ):
+                raise ValueError(
+                    "Legacy prior PortfolioTruth cannot contain checkout authority "
+                    "without a collision summary."
+                )
+
+            current_summary = build_source_summary(
+                workspace_root=snapshot.workspace_root,
+                projects=snapshot.projects,
+                catalog_errors=summary["catalog_errors"],
+                catalog_warnings=summary["catalog_warnings"],
+                legacy_registry_rows=summary["legacy_registry_rows"],
+                notion_context_rows=summary["notion_context_rows"],
+                notion_context_carried_forward=summary[
+                    "notion_context_carried_forward"
+                ],
+                checkout_collisions=[],
+            )
+            expected_legacy_summary = deepcopy(current_summary)
+            expected_legacy_summary.pop("checkout_collisions")
+            if dict(summary) != expected_legacy_summary:
+                raise ValueError(
+                    "Legacy prior PortfolioTruth source summary differs from "
+                    "producer facts."
+                )
+            expected_warnings = build_warnings(
+                catalog_errors=summary["catalog_errors"],
+                catalog_warnings=summary["catalog_warnings"],
+                unresolved_duplicates=summary[
+                    "unresolved_duplicate_display_names"
+                ],
+                checkout_collisions=[],
+            )
+            if snapshot.warnings != expected_warnings:
+                raise ValueError(
+                    "Legacy prior PortfolioTruth warnings differ from producer facts."
+                )
+
+            exclusion_counts = exclusions.get("counts")
+            if set(exclusions) != {"policy_version", "counts"} or not isinstance(
+                exclusion_counts, Mapping
+            ):
+                raise ValueError(
+                    "Legacy prior PortfolioTruth exclusions envelope is invalid."
+                )
+
+            migrated = deepcopy(dict(payload))
+            migrated["source_summary"] = current_summary
+            migrated["exclusions"] = build_exclusions(dict(exclusion_counts))
+            return canonicalize_truth_snapshot_payload(
+                migrated,
+                security_max_age_hours=security_max_age_hours,
+            )
+        except (KeyError, TypeError) as legacy_error:
+            raise ValueError(
+                "Legacy prior PortfolioTruth metadata envelope is invalid."
+            ) from legacy_error
+        except ValueError as legacy_error:
+            raise legacy_error from strict_error
+
+
 def _without_documented_contract_canaries(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:

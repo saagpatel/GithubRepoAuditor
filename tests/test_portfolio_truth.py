@@ -53,6 +53,7 @@ from src.portfolio_truth_sources import (
     load_safe_notion_project_context,
 )
 from src.portfolio_truth_validate import (
+    canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
     validate_truth_snapshot,
 )
@@ -517,6 +518,186 @@ def legacy_registry(tmp_path: Path) -> Path:
 """
     )
     return path
+
+
+def _legacy_prior_security_payload(
+    *,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> tuple[dict, dict]:
+    now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
+    alpha = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha, capture_output=True, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/d/Alpha.git",
+        ],
+        cwd=alpha,
+        capture_output=True,
+        check=True,
+    )
+    observed_at = now.isoformat()
+    provider_counts = {
+        "dependabot": {"critical": 0, "high": 1, "medium": 0, "low": 0},
+        "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0},
+        "secret_scanning": {"open": 0},
+    }
+    security = {
+        "d/Alpha": {
+            "repo_full_name": "d/Alpha",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at,
+            "repository": _remote_repository_result(
+                state="observed",
+                observed_at=observed_at,
+                default_branch="main",
+                head_sha="b" * 40,
+                archived=False,
+            ),
+            "providers": {
+                provider: _provider_result(
+                    provider,
+                    state="observed",
+                    observed_at=observed_at,
+                    http_status=200,
+                    pagination_complete=True,
+                    counts=counts,
+                )
+                for provider, counts in provider_counts.items()
+            },
+        }
+    }
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+        "produced_at": observed_at,
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+        "receipt_id": "sha256:" + "c" * 64,
+        "content_sha256": "d" * 64,
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+    )
+    payload = result.snapshot.to_dict()
+    payload["source_summary"].pop("checkout_collisions")
+    payload["exclusions"]["policy_version"] = "workspace_discovery.v2"
+    return payload, metadata
+
+
+def test_prior_security_loader_accepts_bounded_legacy_truth(
+    tmp_path: Path,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    import src.portfolio_truth_publish as publish_mod
+
+    payload, metadata = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+    )
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(json.dumps(payload), encoding="utf-8")
+    current_metadata = {
+        **metadata,
+        "produced_at": "2026-08-04T12:01:00+00:00",
+    }
+
+    evidence = publish_mod._load_prior_security_alerts(
+        latest,
+        current_security_metadata=current_metadata,
+        security_max_age_hours=24,
+    )
+
+    assert evidence.final_cohort_repositories == ("d/Alpha",)
+    assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
+    assert evidence.content_sha256 == hashlib.sha256(latest.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_message"),
+    (
+        ("duplicate-repository", "one canonical project per origin"),
+        ("receipt-binding", "requires both receipt_id and content_sha256"),
+        ("provider-count", "does not match the normalized dependabot provider"),
+        ("future-receipt", "GitHub security input is future-dated"),
+    ),
+)
+def test_bounded_legacy_prior_security_remains_fail_closed(
+    mutation: str,
+    expected_message: str,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    payload, _ = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+    )
+    if mutation == "duplicate-repository":
+        other = next(
+            project
+            for project in payload["projects"]
+            if project["identity"]["project_key"] != "Alpha"
+        )
+        other["identity"]["repo_full_name"] = "d/Alpha"
+    elif mutation == "receipt-binding":
+        payload["inputs"]["github_security"].pop("content_sha256")
+    elif mutation == "provider-count":
+        alpha = next(
+            project
+            for project in payload["projects"]
+            if project["identity"]["project_key"] == "Alpha"
+        )
+        alpha["security"]["providers"]["dependabot"]["counts"]["high"] = 2
+    else:
+        payload["inputs"]["github_security"]["produced_at"] = (
+            "2026-08-05T12:00:00+00:00"
+        )
+
+    with pytest.raises(ValueError, match=expected_message):
+        canonicalize_prior_security_truth_payload(payload)
+
+
+def test_current_prior_truth_failure_cannot_use_legacy_fallback(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    legacy, _ = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+    )
+    current = canonicalize_prior_security_truth_payload(legacy)
+    current["source_summary"]["checkout_collisions"]["state"] = "unknown"
+
+    with pytest.raises(
+        ValueError,
+        match="Checkout collision summary state does not match group authority",
+    ):
+        canonicalize_prior_security_truth_payload(current)
 
 
 def test_truth_snapshot_respects_declared_and_derived_fields(
