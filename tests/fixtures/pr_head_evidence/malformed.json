@@ -1,0 +1,13 @@
+{
+  "schema_version": "PRHeadEvidenceV1",
+  "pull_request": {
+    "repository": "octo/example",
+    "number": 42,
+    "head_sha": "not-a-full-sha"
+  },
+  "reviews": [
+    {
+      "state": "APPROVED"
+    }
+  ]
+}

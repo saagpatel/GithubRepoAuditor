@@ -10,6 +10,8 @@ output/.cache/
 output/history/
 output/badges/
 output/.badge-gist-id
+# Stable flock inode used to serialize security coverage receipt readers/writers.
+output/.github-security-coverage-latest.json.lock
 output/PORTFOLIO.md
 !output/.gitkeep
 config/notion-config.json

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_automation import select_automation_candidates
-from src.portfolio_decision_queue import build_decision_queue, summarize_decision_queue
+from src.portfolio_decision_queue import build_decision_digest
 from src.portfolio_truth_types import display_activity_status, truth_latest_path
 from src.portfolio_truth_trends import (
     build_verdict_transition_ledger,
@@ -169,8 +169,9 @@ def build_weekly_command_center_digest(
         else build_verdict_transition_ledger(max_snapshots=0)
     )
     movement["summary_text"] = render_movement_summary(movement)
-    decision_queue = build_decision_queue(truth)
-    decision_queue_summary = summarize_decision_queue(decision_queue)
+    decision_digest = build_decision_digest(truth)
+    decision_queue = list(decision_digest["decision_queue"])
+    decision_queue_summary = dict(decision_digest["summary"])
     operator_decision = _operator_decision(operator_summary, operator_queue)
     operator_why = _safe_text(operator_summary.get("trend_summary")) or _safe_text(
         operator_summary.get("why_it_matters")

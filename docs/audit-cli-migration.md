@@ -1,6 +1,6 @@
 # CLI Migration: flat form → subcommand form
 
-Arc F Sprint 4.3 introduced four subcommands — `run`, `triage`, `report`, and `serve` —
+Arc F Sprint 4.3 introduced four workflow subcommands — `run`, `triage`, `report`, and `serve` —
 to replace the flat `audit <username> --flag` invocation style. The flat form still
 works and emits a deprecation warning; it will not be removed until a future major
 version bump.
@@ -19,6 +19,12 @@ The mapping is:
 | `audit triage` | Control-center, approval queues, acknowledgments, semantic search |
 | `audit report` | Portfolio truth, Excel workbooks, campaigns, writeback, exports |
 | `audit serve` | Local FastAPI + HTMX web UI |
+
+Specialized read-only gates can also have standalone subcommands. In
+particular, `audit pr-evidence <snapshot.json>` evaluates a local
+`PRHeadEvidenceV1` document without a username, credential lookup, network
+request, output directory, or legacy flat-form equivalent. See
+[pr-head-evidence.md](pr-head-evidence.md).
 
 ## Flag family mapping
 

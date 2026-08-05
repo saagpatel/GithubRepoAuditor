@@ -1,0 +1,90 @@
+{
+  "acceptance": {
+    "coverage_cases": [
+      {
+        "case_id": "valid-current-schema",
+        "expected": "accept",
+        "source": "artifact"
+      },
+      {
+        "case_id": "additive-canary",
+        "expected": "accept-ignore-addition",
+        "pointer": "/projects/0/additive_contract_canary",
+        "source": "artifact"
+      },
+      {
+        "case_id": "missing-schema-version",
+        "expected": "reject",
+        "mutation": {
+          "op": "remove",
+          "path": "/schema_version"
+        },
+        "source": "artifact"
+      },
+      {
+        "case_id": "malformed-root",
+        "expected": "reject",
+        "source": "literal",
+        "value": []
+      },
+      {
+        "case_id": "non-allowlisted-project",
+        "expected": "aggregate-only",
+        "source": "artifact"
+      },
+      {
+        "case_id": "missing-projects",
+        "expected": "reject",
+        "mutation": {
+          "op": "remove",
+          "path": "/projects"
+        },
+        "source": "artifact"
+      },
+      {
+        "case_id": "malformed-projects",
+        "expected": "reject",
+        "mutation": {
+          "op": "replace",
+          "path": "/projects",
+          "value": "invalid"
+        },
+        "source": "artifact"
+      }
+    ],
+    "fail_closed_behavior": "unknown-project-identities-remain-anonymous",
+    "public_projection": {
+      "allowlisted_repo_slugs": [
+        "dovetail-forge",
+        "kestrel-loom"
+      ],
+      "expected_curated_repo_slugs": [
+        "dovetail-forge",
+        "kestrel-loom"
+      ]
+    }
+  },
+  "consumer_profile": {
+    "compatibility_policy": "additive-0.x",
+    "id": "public-site-projection-v1"
+  },
+  "contract_version": "ghra-portfolio-truth-portable.v1",
+  "fixture": {
+    "additive_canary_paths": [
+      "contract_fixture",
+      "projects[0].additive_contract_canary"
+    ],
+    "evaluation_time": "2026-08-01T06:00:00+00:00",
+    "generated_at": "2026-08-01T00:00:00+00:00",
+    "producer_evidence": "absent",
+    "project_count": 4
+  },
+  "portfolio_truth_schema_version": "0.11.0",
+  "producer": {
+    "artifact_path": "fixtures/contracts/portable-consumers-v1/portfolio-truth.json",
+    "artifact_sha256": "8af46309e1b7a891edf7489dcbfa5971cc3453fe983b9a824098d87dc42105d3",
+    "generator": "src.portfolio_truth_contract_fixture:build_portable_contract_fixture",
+    "manifest_path": "fixtures/contracts/public-site-projection-v1/manifest.json",
+    "repository": "saagpatel/GithubRepoAuditor"
+  }
+}
