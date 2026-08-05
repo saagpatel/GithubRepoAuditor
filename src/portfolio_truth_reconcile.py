@@ -509,7 +509,10 @@ def build_portfolio_truth_snapshot(
         catalog_errors=source_summary["catalog_errors"],
         catalog_warnings=source_summary["catalog_warnings"],
         unresolved_duplicates=source_summary["unresolved_duplicate_display_names"],
-        checkout_collisions=checkout_collisions,
+        # The summary owns the canonical origin ordering. Building the warning
+        # from discovery order makes the snapshot disagree with its own stored
+        # facts whenever filesystem order differs from origin order.
+        checkout_collisions=source_summary["checkout_collisions"]["groups"],
     )
 
     snapshot = PortfolioTruthSnapshot(

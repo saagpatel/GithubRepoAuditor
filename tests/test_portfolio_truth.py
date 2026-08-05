@@ -771,6 +771,55 @@ def test_current_prior_truth_failure_cannot_use_legacy_fallback(
         canonicalize_prior_security_truth_payload(current)
 
 
+def test_collision_warning_uses_canonical_summary_order(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    collisions = [
+        {
+            "origin": "owner/Zeta",
+            "selection": {"state": "unknown"},
+            "full_clone_count": 1,
+            "discarded_checkouts": [],
+        },
+        {
+            "origin": "owner/Alpha",
+            "selection": {"state": "unknown"},
+            "full_clone_count": 1,
+            "discarded_checkouts": [],
+        },
+    ]
+
+    def discover_with_unsorted_collisions(
+        _workspace_root: Path, **kwargs: object
+    ) -> list[dict[str, object]]:
+        observed = kwargs["checkout_collisions"]
+        assert isinstance(observed, list)
+        observed.extend(collisions)
+        return []
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_reconcile.discover_workspace_projects",
+        discover_with_unsorted_collisions,
+    )
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 5, tzinfo=timezone.utc),
+    )
+
+    groups = result.snapshot.source_summary["checkout_collisions"]["groups"]
+    assert [group["origin"] for group in groups] == ["owner/Alpha", "owner/Zeta"]
+    assert result.snapshot.warnings[-1] == (
+        "Checkout authority is UNKNOWN for same-origin checkout groups: "
+        "owner/Alpha, owner/Zeta"
+    )
+
+
 def test_truth_snapshot_respects_declared_and_derived_fields(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
