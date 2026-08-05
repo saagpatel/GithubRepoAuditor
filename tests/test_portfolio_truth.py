@@ -2589,6 +2589,7 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
                     "state": "observed",
                     "observed_at": observed_at,
                     "pagination_complete": True,
+                    "completed": True,
                     "counts": {"critical": 0, "high": 2, "medium": 1, "low": 0},
                 },
                 "code_scanning": {
