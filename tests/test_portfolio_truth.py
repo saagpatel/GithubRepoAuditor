@@ -591,6 +591,7 @@ def _legacy_prior_security_payload(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
     legacy_registry: Path,
+    snapshot_generated_at: datetime | None = None,
 ) -> tuple[dict, dict, dict]:
     now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
     alpha = portfolio_workspace / "Alpha"
@@ -659,7 +660,7 @@ def _legacy_prior_security_payload(
         catalog_path=portfolio_catalog,
         legacy_registry_path=legacy_registry,
         include_notion=False,
-        now=now,
+        now=snapshot_generated_at or now,
         security_alerts_by_name=security,
         security_coverage_metadata=metadata,
     )
@@ -704,6 +705,72 @@ def test_prior_security_loader_accepts_bounded_legacy_truth(
     assert evidence.final_cohort_repositories == ("d/Alpha",)
     assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
     assert evidence.content_sha256 == hashlib.sha256(latest.read_bytes()).hexdigest()
+
+
+def test_prior_security_loader_allows_same_receipt_truth_generated_after_receipt(
+    tmp_path: Path,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    import src.portfolio_truth_publish as publish_mod
+
+    _, metadata, payload = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+        snapshot_generated_at=datetime(2026, 8, 4, 12, 0, 1, tzinfo=timezone.utc),
+    )
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(json.dumps(payload), encoding="utf-8")
+
+    evidence = publish_mod._load_prior_security_alerts(
+        latest,
+        current_security_metadata=metadata,
+        security_max_age_hours=24,
+    )
+
+    assert evidence.final_cohort_repositories == ("d/Alpha",)
+    assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
+
+
+@pytest.mark.parametrize(
+    ("binding_field", "replacement"),
+    (
+        ("receipt_id", "sha256:" + "e" * 64),
+        ("content_sha256", "f" * 64),
+        ("producer_commit", "b" * 40),
+    ),
+)
+def test_prior_security_loader_refuses_future_truth_from_different_receipt(
+    binding_field: str,
+    replacement: str,
+    tmp_path: Path,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    import src.portfolio_truth_publish as publish_mod
+
+    _, metadata, payload = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+        snapshot_generated_at=datetime(2026, 8, 4, 12, 0, 1, tzinfo=timezone.utc),
+    )
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(json.dumps(payload), encoding="utf-8")
+    current_metadata = {**metadata, binding_field: replacement}
+
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="generated after the current security receipt",
+    ):
+        publish_mod._load_prior_security_alerts(
+            latest,
+            current_security_metadata=current_metadata,
+            security_max_age_hours=24,
+        )
 
 
 @pytest.mark.parametrize(
