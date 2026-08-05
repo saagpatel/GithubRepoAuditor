@@ -55,14 +55,18 @@ def _write_dismissed_with_events(
 
 
 class TestInitiativesDismissedGet:
-    def test_no_dismissed_file_returns_200_empty_state(self, client: TestClient) -> None:
+    def test_no_dismissed_file_returns_200_empty_state(
+        self, client: TestClient
+    ) -> None:
         """GET with no dismissed file → 200 + empty-state message."""
         resp = client.get("/initiatives/dismissed")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
         assert "No dismissed suggestions" in resp.text
 
-    def test_two_dismissed_entries_both_visible(self, output_dir: Path, client: TestClient) -> None:
+    def test_two_dismissed_entries_both_visible(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """GET with 2 dismissed entries → 200, both repo names appear."""
         _write_dismissed(
             output_dir,
@@ -109,7 +113,9 @@ class TestInitiativesDismissedGet:
         assert resp.status_code == 200
         assert "permanent" in resp.text
 
-    def test_expires_at_date_shown_when_set(self, output_dir: Path, client: TestClient) -> None:
+    def test_expires_at_date_shown_when_set(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """GET row: expires_at loaded from JSON and rendered by the template (Arc G S12.1).
 
         Sprint 12.1 added expires_at to DismissedSuggestion; the template renders the
@@ -123,7 +129,9 @@ class TestInitiativesDismissedGet:
                     "reason": "will reconsider",
                     "dismissed_at": "2026-05-01T10:00:00",
                     "dismissed_by": "operator",
-                    "expires_at": "2026-08-01T00:00:00",
+                    # Far future on purpose: a near-future literal here expired on
+                    # 2026-08-01 and started failing every branch the day after.
+                    "expires_at": "2099-01-01T00:00:00",
                 }
             ],
         )
@@ -131,7 +139,7 @@ class TestInitiativesDismissedGet:
         assert resp.status_code == 200
         assert "expiring-repo" in resp.text
         # expires_at is now on the dataclass → template renders the date, not "permanent"
-        assert "2026-08-01" in resp.text
+        assert "2099-01-01" in resp.text
 
 
 # ── POST /initiatives/dismissed/undo ─────────────────────────────────────────
@@ -167,7 +175,9 @@ class TestUndoDismissPost:
     ) -> None:
         """POST undo with unknown repo → 404 + error fragment."""
         _write_dismissed(output_dir, [])
-        resp = client.post("/initiatives/dismissed/undo", data={"repo_name": "ghost-repo"})
+        resp = client.post(
+            "/initiatives/dismissed/undo", data={"repo_name": "ghost-repo"}
+        )
         assert resp.status_code == 404
         assert "not currently dismissed" in resp.text
         assert "ghost-repo" in resp.text

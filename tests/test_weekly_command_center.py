@@ -91,7 +91,7 @@ def _make_portfolio_truth() -> dict:
                     "path_risk": False,
                 },
             },
-        ]
+        ],
     }
 
 
@@ -142,21 +142,25 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert digest["portfolio_truth"]["active_project_count"] == 3
     assert digest["portfolio_truth"]["default_attention_count"] == 2
     assert digest["portfolio_truth"]["decision_needed_count"] == 2
-    assert digest["portfolio_truth"]["decision_queue_count"] == 2
-    assert digest["portfolio_truth"]["decision_queue_type_counts"] == {
-        "owner or human decision": 2
+    assert digest["portfolio_truth"]["decision_queue_count"] == 0
+    assert digest["portfolio_truth"]["decision_queue_type_counts"] == {}
+    assert digest["portfolio_truth"]["withheld_decision_count"] == 2
+    assert digest["portfolio_truth"]["withheld_reason_counts"] == {
+        "OWNER_DECISION_SPEC_INCOMPLETE": 2
     }
     assert digest["portfolio_truth"]["investigate_override_count"] == 2
     assert digest["portfolio_truth"]["attention_state_counts"]["manual-only"] == 1
-    assert [item["project"] for item in digest["decision_queue"]] == [
-        "GithubRepoAuditor",
-        "JobCommandCenter",
-    ]
+    assert digest["decision_queue"] == []
     assert digest["path_attention"][0]["repo"] == "JobCommandCenter"
     assert digest["path_attention"][0]["headline"] == "Unspecified stable path"
-    assert all(item["attention_state"] == "decision-needed" for item in digest["path_attention"])
+    assert all(
+        item["attention_state"] == "decision-needed"
+        for item in digest["path_attention"]
+    )
     assert "QuietActive" not in {item["repo"] for item in digest["path_attention"]}
-    assert digest["report_only_guardrail"].startswith("This digest is descriptive only.")
+    assert digest["report_only_guardrail"].startswith(
+        "This digest is descriptive only."
+    )
 
     # Risk posture assertions
     assert digest["risk_posture"]["elevated_count"] == 2
@@ -166,13 +170,15 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
 
     rendered_md = render_weekly_command_center_markdown(digest)
     assert "## Decision Queue" in rendered_md
-    assert "owner or human decision" in rendered_md
+    assert "owner or human decision" not in rendered_md
     assert "## Risk Posture" in rendered_md
     assert "GithubRepoAuditor" in rendered_md
     assert "JobCommandCenter" in rendered_md
 
 
-def test_build_weekly_command_center_digest_prefers_control_center_snapshot_focus() -> None:
+def test_build_weekly_command_center_digest_prefers_control_center_snapshot_focus() -> (
+    None
+):
     stale_job_item = {
         "repo": "JobCommandCenter",
         "title": "JobCommandCenter security posture changed",
@@ -264,18 +270,24 @@ def test_build_weekly_command_center_digest_prefers_control_center_snapshot_focu
     assert "codexkit" in digest["why_this_week"]
     assert "10 urgent" not in digest["queue_pressure_summary"]
     weekly_priority = next(
-        section for section in digest["section_digest"] if section["id"] == "weekly-priority"
+        section
+        for section in digest["section_digest"]
+        if section["id"] == "weekly-priority"
     )
     assert "codexkit" in weekly_priority["headline"]
     assert "Inspect the repo security state" not in weekly_priority["next_step"]
     operator_focus = next(
-        section for section in digest["section_digest"] if section["id"] == "operator-focus"
+        section
+        for section in digest["section_digest"]
+        if section["id"] == "operator-focus"
     )
     assert "codexkit" in operator_focus["headline"]
     assert digest["top_repo_briefings"][0]["repo"] == "codexkit"
 
 
-def test_build_weekly_command_center_digest_blocks_stale_queue_when_truth_is_newer() -> None:
+def test_build_weekly_command_center_digest_blocks_stale_queue_when_truth_is_newer() -> (
+    None
+):
     portfolio_truth = _make_portfolio_truth()
     portfolio_truth["generated_at"] = "2026-04-15T12:00:00+00:00"
     report_data = {
@@ -317,6 +329,18 @@ def test_build_weekly_command_center_digest_blocks_stale_queue_when_truth_is_new
 def _sec(available: bool, critical: int = 0, high: int = 0) -> dict:
     return {
         "alerts_available": available,
+        "coverage_state": "complete" if available else "unavailable",
+        "receipt_state": "fresh" if available else "unknown",
+        "source_produced_at": "2026-04-14T11:58:00+00:00" if available else None,
+        "providers": {
+            "dependabot": {
+                "state": "observed" if available else "unavailable",
+                "observed_at": "2026-04-14T11:57:00+00:00" if available else None,
+                "pagination_complete": available,
+                "completed": available,
+                "counts": {"critical": critical, "high": high},
+            }
+        },
         "dependabot_critical": critical,
         "dependabot_high": high,
         "dependabot_medium": 0,
@@ -327,11 +351,19 @@ def _sec(available: bool, critical: int = 0, high: int = 0) -> dict:
     }
 
 
-def _security_project(name: str, tier: str, security: dict, factors: list | None = None) -> dict:
+def _security_project(
+    name: str, tier: str, security: dict, factors: list | None = None
+) -> dict:
     return {
-        "identity": {"display_name": name},
-        "declared": {"operating_path": "maintain"},
+        "identity": {
+            "project_key": name,
+            "display_name": name,
+            "path": name,
+            "repo_full_name": f"saagpatel/{name}",
+        },
+        "declared": {"operating_path": "maintain", "owner": "d"},
         "derived": {
+            "attention_state": "decision-needed",
             "activity_status": "active",
             "path_override": "",
             "path_confidence": "high",
@@ -353,13 +385,37 @@ def _security_project(name: str, tier: str, security: dict, factors: list | None
 
 
 def _digest_for(portfolio_truth: dict) -> dict:
+    portfolio_truth = {
+        "schema_version": "0.11.0",
+        "generated_at": "2026-04-14T12:00:00+00:00",
+        "producer": {
+            "commit": "a" * 40,
+            "receipt_id": "sha256:" + "b" * 64,
+        },
+        "inputs": {
+            "github_security": {
+                "source_id": "github-security-coverage-receipt",
+                "schema_version": "GitHubSecurityCoverageReceiptV1",
+                "produced_at": "2026-04-14T11:58:00+00:00",
+                "state": "fresh",
+                "producer_commit": "a" * 40,
+                "path": "/evidence/github-security-coverage-latest.json",
+                "receipt_id": "sha256:" + "c" * 64,
+                "content_sha256": "d" * 64,
+            }
+        },
+        **portfolio_truth,
+    }
     report_data = {
         "username": "testuser",
         "generated_at": "2026-04-14T12:00:00+00:00",
         "operator_summary": {"decision_quality_v1": {}},
         "audits": [],
     }
-    snapshot = {"operator_summary": report_data["operator_summary"], "operator_queue": []}
+    snapshot = {
+        "operator_summary": report_data["operator_summary"],
+        "operator_queue": [],
+    }
     return build_weekly_command_center_digest(
         report_data,
         snapshot,

@@ -8,18 +8,52 @@ so they don't inflate the project count and pollute catalog-completeness.
 
 from __future__ import annotations
 
+import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.portfolio_truth_sources import (
+    WORKSPACE_EXCLUSION_REASONS,
     _dedupe_checkouts_by_origin,
     _is_ignored_project_dir,
+    checkout_collision_summary,
     discover_workspace_projects,
     workspace_exclusion_reason,
 )
 
 
-def _p(name: str, repo_full_name: str = "", path: str | None = None) -> dict:
-    return {"name": name, "repo_full_name": repo_full_name, "path": path or name}
+def _p(
+    name: str,
+    repo_full_name: str = "",
+    path: str | None = None,
+    *,
+    head: str | None = None,
+    branch: str | None = "main",
+    common_dir: str | None = None,
+    dirty: bool | None = False,
+    dirty_path_count: int | None = 0,
+    bare: bool = False,
+    declared_paths: list[dict[str, str]] | None = None,
+) -> dict:
+    relative_path = path or name
+    project = {
+        "name": name,
+        "repo_full_name": repo_full_name,
+        "path": relative_path,
+        "project_path": Path("/workspace") / relative_path,
+    }
+    if head is not None or common_dir is not None:
+        project["_checkout_observation"] = {
+            "state": "observed",
+            "head": head,
+            "branch": branch,
+            "dirty": dirty,
+            "dirty_path_count": dirty_path_count,
+            "git_common_dir": common_dir,
+            "bare": bare,
+            "declared_paths": declared_paths or [],
+        }
+    return project
 
 
 def test_collapses_same_origin_checkouts_to_one() -> None:
@@ -85,6 +119,403 @@ def test_result_is_sorted_by_name_case_insensitively() -> None:
     assert [p["name"] for p in result] == ["Alpha", "mike", "zeta"]
 
 
+def test_linked_worktrees_keep_discarded_checkout_evidence() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo/.git",
+        ),
+        _p(
+            "Repo-fix",
+            "owner/Repo",
+            head="2" * 40,
+            branch="fix",
+            common_dir="/git/Repo/.git",
+        ),
+    ]
+
+    result = _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=collisions,
+    )
+
+    assert len(result) == 1
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "selected"
+    assert collision["selection"]["reason_code"] == "single_clone_topology"
+    assert collision["full_clone_count"] == 1
+    assert collision["discarded_checkouts"] == [
+        {
+            "path": "Repo-fix",
+            "state": "observed",
+            "relation": "linked_worktree",
+            "head": "2" * 40,
+            "branch": "fix",
+            "dirty": False,
+            "dirty_path_count": 0,
+            "bare": False,
+        }
+    ]
+
+
+def test_conflicting_independent_full_clone_heads_are_unknown() -> None:
+    collisions: list[dict] = []
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head="1" * 40,
+            common_dir="/git/Repo/.git",
+        ),
+        _p(
+            "Archive/Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head="2" * 40,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+    ]
+
+    result = _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=collisions,
+    )
+
+    assert len(result) == 1
+    collision = collisions[0]
+    assert collision["full_clone_count"] == 2
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "conflicting_full_clone_heads"
+    assert collision["discarded_checkouts"][0]["relation"] == "independent_full_clone"
+
+    summary = checkout_collision_summary(collisions)
+    assert summary["state"] == "unknown"
+    assert summary["group_count"] == 1
+    assert summary["full_clone_group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert summary["discarded_checkout_count"] == 1
+
+
+def test_dirty_linked_worktree_in_independent_clone_is_unknown() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo/.git",
+        ),
+        _p(
+            "Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head=head,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+        _p(
+            "Repo-fix",
+            "owner/Repo",
+            path="Archive/Repo-fix",
+            head="2" * 40,
+            branch="fix",
+            common_dir="/git/Archive/Repo/.git",
+            dirty=True,
+            dirty_path_count=1,
+        ),
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    collision = collisions[0]
+    assert collision["full_clone_count"] == 2
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "full_clone_local_work_present"
+    assert any(
+        checkout["path"] == "Archive/Repo-fix" and checkout["dirty"] is True
+        for checkout in collision["discarded_checkouts"]
+    )
+
+
+def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo.git",
+            bare=True,
+            dirty=None,
+            dirty_path_count=None,
+        ),
+        _p(
+            "Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head=head,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+    ]
+
+    result = _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=collisions,
+    )
+
+    assert result[0]["path"] == "Repo"
+    assert result[0]["project_path"] == Path("/workspace/Archive/Repo")
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "selected"
+    assert collision["selection"]["selected_path"] == "Archive/Repo"
+    assert collision["checkouts"] == [
+        {
+            "path": "Archive/Repo",
+            "state": "observed",
+            "relation": "representative",
+            "head": head,
+            "branch": "main",
+            "dirty": False,
+            "dirty_path_count": 0,
+            "bare": False,
+        },
+        {
+            "path": "Repo",
+            "state": "observed",
+            "relation": "independent_full_clone",
+            "head": head,
+            "branch": "main",
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": True,
+        },
+    ]
+
+
+def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p("Repo", "owner/Repo"),
+        _p(
+            "Repo",
+            "owner/Repo",
+            path="Archive/Repo",
+            head=head,
+            common_dir="/git/Archive/Repo/.git",
+        ),
+    ]
+
+    result = _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=collisions,
+    )
+
+    assert result[0]["path"] == "Repo"
+    assert result[0]["project_path"] == Path("/workspace/Archive/Repo")
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["reason_code"] == "checkout_observation_failed"
+    assert collision["selection"]["representative_path"] == "Archive/Repo"
+
+
+def test_discovered_linked_worktree_preserves_coordinator_catalog_identity() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    coordinator = _p(
+        "Repo",
+        "owner/Repo",
+        head=head,
+        common_dir="/git/Repo.git",
+        bare=True,
+        dirty=None,
+        dirty_path_count=None,
+    )
+    coordinator.update(
+        {
+            "group_entry": {"owner": "coordinator-owner"},
+            "source": "coordinator-source",
+        }
+    )
+    linked = _p(
+        "Repo-main",
+        "owner/Repo",
+        head=head,
+        common_dir="/git/Repo.git",
+    )
+    linked.update(
+        {
+            "group_entry": {"owner": "linked-owner"},
+            "source": "linked-source",
+        }
+    )
+
+    result = _dedupe_checkouts_by_origin(
+        [coordinator, linked],
+        checkout_collisions=collisions,
+    )
+
+    assert result[0]["name"] == "Repo"
+    assert result[0]["path"] == "Repo"
+    assert result[0]["group_entry"] == {"owner": "coordinator-owner"}
+    assert result[0]["source"] == "coordinator-source"
+    assert result[0]["project_path"] == Path("/workspace/Repo-main")
+    assert collisions[0]["selection"]["selected_path"] == "Repo-main"
+
+
+def test_declared_bare_singleton_is_unknown() -> None:
+    declaration = {
+        "absolute_path": "/workspace/Repo",
+        "workspace_relative_path": "Repo",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head="1" * 40,
+            common_dir="/git/Repo.git",
+            bare=True,
+            dirty=None,
+            dirty_path_count=None,
+            declared_paths=[declaration],
+        )
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "bare_representative_unusable"
+
+
+def test_declared_linked_worktree_conflicts_with_representative() -> None:
+    declaration = {
+        "absolute_path": "/workspace/Repo-fix/src",
+        "workspace_relative_path": "Repo-fix/src",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    head = "1" * 40
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head=head,
+            common_dir="/git/Repo/.git",
+            declared_paths=[declaration],
+        ),
+        _p(
+            "Repo-fix",
+            "owner/Repo",
+            head=head,
+            branch="fix",
+            common_dir="/git/Repo/.git",
+            declared_paths=[declaration],
+        ),
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    collision = collisions[0]
+    assert collision["full_clone_count"] == 1
+    assert collision["declared_checkout_paths"] == ["Repo-fix"]
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert (
+        collision["selection"]["reason_code"]
+        == "declared_path_conflicts_with_representative"
+    )
+
+
+def test_declared_undiscovered_checkout_is_unknown() -> None:
+    declaration = {
+        "absolute_path": "/workspace/_codex-worktrees/repo-retired/src",
+        "workspace_relative_path": "_codex-worktrees/repo-retired/src",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    discovered = [
+        _p(
+            "Repo",
+            "owner/Repo",
+            head="1" * 40,
+            common_dir="/git/Repo/.git",
+            declared_paths=[declaration],
+        )
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert collision["selection"]["selected_path"] is None
+    assert collision["selection"]["reason_code"] == "declared_checkout_path_unresolved"
+    assert collision["unresolved_declared_paths"] == [
+        "_codex-worktrees/repo-retired/src"
+    ]
+
+
+def test_declared_path_to_other_full_clone_overrides_head_reason() -> None:
+    nested_declaration = {
+        "absolute_path": "/workspace/Money/AIGCCore/src",
+        "workspace_relative_path": "Money/AIGCCore/src",
+        "source_file": "AGENTS.md",
+    }
+    collisions: list[dict] = []
+    discovered = [
+        _p(
+            "AIGCCore",
+            "owner/AIGCCore",
+            head="1" * 40,
+            common_dir="/git/AIGCCore/.git",
+            declared_paths=[nested_declaration],
+        ),
+        _p(
+            "AIGCCore",
+            "owner/AIGCCore",
+            path="Money/AIGCCore",
+            head="2" * 40,
+            common_dir="/git/Money/AIGCCore/.git",
+            declared_paths=[nested_declaration],
+        ),
+    ]
+
+    _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "unknown"
+    assert (
+        collision["selection"]["reason_code"]
+        == "declared_path_conflicts_with_representative"
+    )
+    assert collision["declared_checkout_paths"] == ["Money/AIGCCore"]
+    assert collision["declared_path_evidence"] == [
+        {
+            "source_path": "AIGCCore/AGENTS.md",
+            "target_checkout_path": "Money/AIGCCore",
+        },
+        {
+            "source_path": "Money/AIGCCore/AGENTS.md",
+            "target_checkout_path": "Money/AIGCCore",
+        },
+    ]
+
+
 # --- discovery ignore-list: transient / non-project directories ---
 # NoGoPRJs (operator-flagged never-pursued), `*-smoke-export` (generated
 # AuraForge bundles), and `*-tmp-<ts>` clones are scratch artifacts, not real
@@ -117,6 +548,26 @@ def test_ignore_predicate_matches_transient_dirs() -> None:
     assert workspace_exclusion_reason("packets") is None
     assert workspace_exclusion_reason("packets", nested=True) == "nested-content"
     assert workspace_exclusion_reason("prompts", nested=True) == "nested-content"
+
+
+def test_workspace_exclusion_reason_domain_matches_every_policy_branch() -> None:
+    cases = (
+        ("Codex Backups", False),
+        ("_preserved-local-artifacts", False),
+        ("scratch", False),
+        ("sweep-reports", False),
+        ("_fable-worktrees", False),
+        ("packets", True),
+        ("Misc:NoGoPRJs", False),
+        ("auraforge-smoke-export", False),
+        ("repo-tmp-1776063720", False),
+    )
+    observed = {
+        workspace_exclusion_reason(name, nested=nested)
+        for name, nested in cases
+    }
+
+    assert observed == WORKSPACE_EXCLUSION_REASONS
 
 
 def test_ignore_predicate_keeps_real_projects() -> None:
@@ -174,3 +625,302 @@ def test_discovery_skips_ignored_subtrees(tmp_path) -> None:
         "scratch-container": 1,
         "temporary-checkout": 1,
     }
+
+
+def test_discovery_recognizes_conventional_bare_coordinator(tmp_path) -> None:
+    coordinator = tmp_path / "bare-coordinator"
+    subprocess.run(
+        ["git", "init", "--bare", str(coordinator)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 7, 30, tzinfo=timezone.utc),
+    )
+
+    project = next(item for item in result if item["name"] == coordinator.name)
+    assert project["has_git"] is True
+    assert project["project_path"] == coordinator
+    assert project["_checkout_observation"]["state"] == "observed"
+    assert project["_checkout_observation"]["head"] is None
+    assert project["_checkout_observation"]["git_common_dir"] == str(coordinator)
+    assert project["_checkout_observation"]["bare"] is True
+
+
+def test_discovery_observes_dirty_worktree_inside_excluded_container(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "Repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    linked = tmp_path / "_codex-worktrees" / "repo-feature"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature", str(linked), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+    (linked / "preserve.txt").write_text("dirty\n")
+
+    collisions: list[dict] = []
+    exclusions: dict[str, int] = {}
+    projects = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+        exclusion_counts=exclusions,
+    )
+
+    repo_projects = [
+        project for project in projects if project["repo_full_name"] == "owner/Repo"
+    ]
+    assert len(repo_projects) == 1
+    assert repo_projects[0]["path"] == "Repo"
+    assert exclusions["linked-worktree-container"] == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 2
+    assert collision["full_clone_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert (
+        collision["selection"]["reason_code"]
+        == "linked_worktree_local_work_present"
+    )
+    linked_evidence = next(
+        item
+        for item in collision["discarded_checkouts"]
+        if item["path"] == "_codex-worktrees/repo-feature"
+    )
+    assert linked_evidence["relation"] == "linked_worktree"
+    assert linked_evidence["dirty"] is True
+
+
+def test_discovery_preserves_opaque_external_linked_worktree_evidence(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    repo = workspace / "Repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    external = tmp_path / "external-worktree-path-must-not-be-published"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "external", str(external), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+
+    collisions: list[dict] = []
+    projects = discover_workspace_projects(
+        workspace,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+    )
+
+    assert len(projects) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 2
+    assert collision["full_clone_count"] == 1
+    assert collision["selection"]["state"] == "unknown"
+    assert (
+        collision["selection"]["reason_code"]
+        == "external_linked_worktree_unobserved"
+    )
+    external_evidence = next(
+        item
+        for item in collision["discarded_checkouts"]
+        if item["path"] == "external-worktree"
+    )
+    assert external_evidence["state"] == "unknown"
+    assert external_evidence["relation"] == "linked_worktree"
+    assert str(external) not in repr(collision)
+
+    summary = checkout_collision_summary(collisions)
+    assert summary["state"] == "unknown"
+    assert summary["group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert summary["discarded_checkout_count"] == 1
+
+
+def test_bare_coordinator_uses_worktree_inside_excluded_container(
+    tmp_path: Path,
+) -> None:
+    seed = tmp_path / "_backups" / "seed"
+    seed.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    (seed / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = tmp_path / "Repo"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:owner/Repo.git"],
+        cwd=coordinator,
+        check=True,
+    )
+    linked = tmp_path / "_codex-worktrees" / "repo-main"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(linked), "main"],
+        cwd=coordinator,
+        check=True,
+    )
+
+    collisions: list[dict] = []
+    projects = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+    )
+
+    repo_projects = [
+        project for project in projects if project["repo_full_name"] == "owner/Repo"
+    ]
+    assert len(repo_projects) == 1
+    assert repo_projects[0]["name"] == "Repo"
+    assert repo_projects[0]["path"] == "Repo"
+    assert repo_projects[0]["project_path"] == linked
+    collision = collisions[0]
+    assert collision["selection"]["state"] == "selected"
+    assert collision["canonical_project_path"] == "Repo"
+    assert collision["selection"]["representative_path"] == (
+        "_codex-worktrees/repo-main"
+    )
+    representative = next(
+        item for item in collision["checkouts"] if item["relation"] == "representative"
+    )
+    assert representative["bare"] is False
+
+
+def test_discovery_observes_conflicting_full_clones_without_count_inflation(
+    tmp_path,
+) -> None:
+    root_clone = tmp_path / "Widget"
+    nested_clone = tmp_path / "Archive" / "Widget"
+    for index, clone in enumerate((root_clone, nested_clone), start=1):
+        clone.mkdir(parents=True)
+        (clone / "README.md").write_text(f"# Widget {index}\n")
+        if clone == root_clone:
+            (clone / "AGENTS.md").write_text(
+                "# Instructions\n\n## Canonical Paths\n\n"
+                f"- Source: `{nested_clone / 'src'}`\n"
+            )
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main"],
+            cwd=clone,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:owner/Widget.git"],
+            cwd=clone,
+            check=True,
+        )
+        subprocess.run(["git", "add", "."], cwd=clone, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                f"fixture {index}",
+            ],
+            cwd=clone,
+            check=True,
+        )
+
+    collisions: list[dict] = []
+    projects = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+    )
+
+    widget_projects = [
+        project for project in projects if project["repo_full_name"] == "owner/Widget"
+    ]
+    assert len(widget_projects) == 1
+    assert widget_projects[0]["path"] == "Widget"
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision["checkout_count"] == 2
+    assert collision["full_clone_count"] == 2
+    assert collision["selection"]["state"] == "unknown"
+    assert (
+        collision["selection"]["reason_code"]
+        == "declared_path_conflicts_with_representative"
+    )
+    assert collision["declared_checkout_paths"] == ["Archive/Widget"]
+    assert all(checkout["state"] == "observed" for checkout in collision["checkouts"])
+    assert all(len(checkout["head"]) == 40 for checkout in collision["checkouts"])

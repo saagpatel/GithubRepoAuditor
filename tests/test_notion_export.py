@@ -141,6 +141,28 @@ class TestProjectMappingLookup:
         assert _lookup_project_mapping("MCPAudit", mapping)["localProjectId"] == "mcp-id"
 
 
+def test_lookup_project_mapping_rejects_ambiguous_normalized_aliases() -> None:
+    mapping = {
+        "Foo Bar": {"localProjectId": "space"},
+        "Foo-Bar": {"localProjectId": "dash"},
+        "Foo_Bar": {"localProjectId": "underscore"},
+    }
+
+    assert _lookup_project_mapping("foo.bar", mapping) is None
+
+
+def test_lookup_project_mapping_accepts_aliases_for_the_same_page() -> None:
+    mapping = {
+        "GitHub Repo Auditor": {"localProjectId": "same-page", "sourceId": "one"},
+        "GithubRepoAuditor": {"localProjectId": "same-page", "sourceId": "two"},
+    }
+
+    resolved = _lookup_project_mapping("github repo auditor", mapping)
+
+    assert resolved is not None
+    assert resolved["localProjectId"] == "same-page"
+
+
 class TestBiggestDrag:
     def test_finds_lowest(self):
         audit = _make_report()["audits"][0]

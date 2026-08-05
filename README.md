@@ -113,6 +113,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Public-safe recording plan: [DEMO-PLAN.md](DEMO-PLAN.md)
 - Product brief: [docs/product/operator-os-product-brief.md](docs/product/operator-os-product-brief.md)
 - Public fixture proof package: [docs/demo-proof/public-fixture/README.md](docs/demo-proof/public-fixture/README.md)
+- Portable PCC contract: [fixtures/contracts/portfolio-command-center-v1/manifest.json](fixtures/contracts/portfolio-command-center-v1/manifest.json)
 - proof-pr dogfood: [docs/proof-pr-dogfood.md](docs/proof-pr-dogfood.md)
 - Product modes: [docs/modes.md](docs/modes.md)
 - Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
@@ -226,6 +227,19 @@ audit serve --output-dir output/demo
 
 To record the Portfolio Command Center wedge from the same fixture, follow
 [DEMO-PLAN.md](DEMO-PLAN.md) and point the desktop app at `output/demo/`.
+
+The smaller PCC compatibility fixture is fixed-clock and deterministic. GHRA
+owns its manifest, schema identity, generator, and digest; PCC pins the exact
+producer commit separately so the artifact never needs a self-referential Git
+hash. Because the synthetic fixture is not emitted by an attested producer
+checkout, its canonical `producer` evidence is intentionally empty; partial or
+invented producer evidence fails the same validation gate used for publication.
+Regenerate or verify it with:
+
+```bash
+python scripts/generate_portfolio_truth_contract_fixture.py
+python scripts/generate_portfolio_truth_contract_fixture.py --check
+```
 
 ### Quick start (subcommand form)
 

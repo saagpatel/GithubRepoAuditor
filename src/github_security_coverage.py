@@ -8,14 +8,18 @@ alerts, or secret-scanning payloads.
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
 import json
 import os
 import re
 import subprocess
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import requests
 
@@ -27,7 +31,7 @@ REMOTE_REPOSITORY_SOURCE = "github-graphql-default-branch-head-v1"
 DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
-DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 9
+DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 11
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
 ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
 ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"
@@ -57,6 +61,17 @@ PROVIDER_STATES = frozenset(
         "stale",
     }
 )
+PROVIDER_CONDITIONAL_RESULTS = frozenset(
+    {
+        "not_used",
+        "modified",
+        "not_modified",
+        "failed",
+        "malformed",
+        "incomplete",
+        "invalid_prior",
+    }
+)
 REMOTE_REPOSITORY_STATES = frozenset(
     {
         "observed",
@@ -76,6 +91,103 @@ DEFAULT_TOTAL_REQUEST_LIMIT = 75
 DEFAULT_QUOTA_RESERVE = 100
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_RECEIPT_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+_PROVIDER_NOT_REQUESTED_REASONS = frozenset(
+    {
+        "authentication_missing",
+        "base_request_limit",
+        "collection_halted",
+        "fixture_not_requested",
+        "quota_reserve",
+        "quota_reserve_before_pagination_complete",
+        "rate_limited",
+        "total_request_limit",
+    }
+)
+_REMOTE_REASON_DOMAINS = {
+    "observed": frozenset({None}),
+    "partial": frozenset({"default_branch_head_unavailable"}),
+    "not_requested": frozenset(
+        {
+            "authentication_missing",
+            "base_request_limit",
+            "quota_reserve",
+            "rate_limited",
+            "remote_observation_not_in_receipt",
+            "total_request_limit",
+        }
+    ),
+    "credential_unavailable": frozenset(
+        {
+            "github_authentication_missing",
+            "github_graphql_authentication_missing",
+        }
+    ),
+    "forbidden": frozenset(
+        {"github_forbidden", "github_graphql_forbidden"}
+    ),
+    "not_found": frozenset(
+        {"github_graphql_repository_not_found", "repository_not_returned"}
+    ),
+    "rate_limited": frozenset(
+        {"github_graphql_rate_limited", "github_rate_limit"}
+    ),
+    "transient_error": frozenset({"network_error"}),
+    "malformed": frozenset(
+        {
+            "github_gone",
+            "github_graphql_error",
+            "github_not_found",
+            "non_object_payload",
+            "repository_archived_state_invalid",
+            "repository_identity_mismatch",
+        }
+    ),
+    "stale": frozenset({"receipt_stale"}),
+}
+
+
+def _valid_git_oid(value: Any) -> bool:
+    """Return whether *value* is a nonzero full lowercase SHA-1 or SHA-256 id."""
+    return (
+        isinstance(value, str)
+        and len(value) in {40, 64}
+        and re.fullmatch(r"[0-9a-f]+", value) is not None
+        and set(value) != {"0"}
+    )
+
+
+def _valid_git_ref_name(value: Any, *, branch: bool = False) -> bool:
+    """Mirror Git ref-format rules for branch and remote-tracking names."""
+    if not isinstance(value, str) or not value or (value == "@" and not branch):
+        return False
+    if branch and (value.startswith("-") or value == "HEAD"):
+        return False
+    if (
+        value.startswith("/")
+        or value.endswith(("/", "."))
+        or "//" in value
+        or ".." in value
+        or "@{" in value
+        or re.search(r"[\x00-\x20\x7f~^:?*\[\\]", value) is not None
+    ):
+        return False
+    return all(
+        component
+        and not component.startswith(".")
+        and not component.endswith(".lock")
+        for component in value.split("/")
+    )
+
+
+def _valid_git_branch(value: Any) -> bool:
+    return _valid_git_ref_name(value, branch=True)
+
+
+def _valid_git_upstream(value: Any) -> bool:
+    return _valid_git_ref_name(value, branch=True)
 
 _ENDPOINTS = {
     "dependabot": "dependabot/alerts",
@@ -103,6 +215,19 @@ class SecurityCoverageError(ValueError):
 
 
 @dataclass(frozen=True)
+class SecurityCoverageReceiptBinding:
+    """Immutable identity needed to authorize a PortfolioTruth publication."""
+
+    source_path: str
+    receipt_id: str
+    content_sha256: str
+    receipt_state: str
+    max_age_hours: int
+    expected_cohort_count: int
+    expected_producer_commit: str | None
+
+
+@dataclass(frozen=True)
 class LoadedSecurityCoverage:
     entries_by_full_name: dict[str, dict[str, Any]]
     produced_at: str
@@ -113,6 +238,64 @@ class LoadedSecurityCoverage:
     receipt_state: str
     age_hours: float
     source_path: str
+    receipt_id: str | None = None
+    content_sha256: str | None = None
+    max_age_hours: int = 24
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    expected_producer_commit: str | None = None
+
+    def binding(self) -> SecurityCoverageReceiptBinding:
+        """Return the strict byte binding used by canonical publication.
+
+        Legacy V1 receipts remain readable, but they cannot authorize a new
+        canonical PortfolioTruth publication because they do not identify the
+        exact semantic receipt or the exact file bytes that were consumed.
+        """
+        if not self.receipt_id:
+            raise SecurityCoverageError(
+                "security coverage receipt is missing immutable receipt_id provenance"
+            )
+        if not self.content_sha256:
+            raise SecurityCoverageError(
+                "security coverage receipt is missing an exact content digest"
+            )
+        if not self.source_path:
+            raise SecurityCoverageError(
+                "security coverage receipt is missing its canonical source path"
+            )
+        return SecurityCoverageReceiptBinding(
+            source_path=self.source_path,
+            receipt_id=self.receipt_id,
+            content_sha256=self.content_sha256,
+            receipt_state=self.receipt_state,
+            max_age_hours=self.max_age_hours,
+            expected_cohort_count=self.expected_cohort_count,
+            expected_producer_commit=self.expected_producer_commit,
+        )
+
+
+@dataclass(frozen=True)
+class SecurityCoverageReceiptWriter:
+    """Exclusive writer intent for one canonical security receipt.
+
+    The lock is intentionally held before the prior receipt is read and remains
+    held until the replacement bytes land.  That gives PortfolioTruth a
+    concrete signal that a newer same-cycle receipt is in flight even before
+    the canonical pointer has changed.
+    """
+
+    path: Path
+    expected_cohort_count: int
+
+    def load_prior(self) -> dict[str, Any] | None:
+        return _load_json_object(self.path) if self.path.is_file() else None
+
+    def write(self, payload: dict[str, Any]) -> LoadedSecurityCoverage:
+        return _write_security_coverage_receipt_unlocked(
+            payload,
+            self.path,
+            expected_cohort_count=self.expected_cohort_count,
+        )
 
 
 @dataclass
@@ -159,6 +342,83 @@ def _mapping(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _receipt_id_for_payload(payload: dict[str, Any]) -> str:
+    """Return a deterministic semantic identity for a receipt payload."""
+    unsigned = {key: value for key, value in payload.items() if key != "receipt_id"}
+    canonical = json.dumps(
+        unsigned,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(canonical).hexdigest()}"
+
+
+def _with_receipt_id(payload: dict[str, Any]) -> dict[str, Any]:
+    bound = dict(payload)
+    declared = bound.get("receipt_id")
+    expected = _receipt_id_for_payload(bound)
+    if declared is None:
+        bound["receipt_id"] = expected
+    elif declared != expected:
+        raise SecurityCoverageError(
+            "security coverage receipt_id does not match the receipt payload"
+        )
+    return bound
+
+
+def _receipt_lock_path(path: Path) -> Path:
+    return path.with_name(f".{path.name}.lock")
+
+
+@contextmanager
+def _receipt_lock(
+    path: Path,
+    *,
+    exclusive: bool,
+    create: bool,
+    blocking: bool = True,
+) -> Iterator[None]:
+    lock_path = _receipt_lock_path(path)
+    flags = os.O_RDWR | (os.O_CREAT if create else 0)
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except FileNotFoundError as exc:
+        raise SecurityCoverageError(
+            f"security coverage receipt lock is missing: {lock_path}"
+        ) from exc
+    try:
+        operation = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+        if not blocking:
+            operation |= fcntl.LOCK_NB
+        try:
+            fcntl.flock(descriptor, operation)
+        except BlockingIOError as exc:
+            raise SecurityCoverageError(
+                "security coverage receipt collection is active; retry "
+                "PortfolioTruth publication after the current receipt lands"
+            ) from exc
+        yield
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+@contextmanager
+def security_coverage_receipt_writer(
+    path: Path,
+    *,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+) -> Iterator[SecurityCoverageReceiptWriter]:
+    """Hold exclusive writer intent across collection and receipt replacement."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _receipt_lock(path, exclusive=True, create=True):
+        yield SecurityCoverageReceiptWriter(
+            path=path,
+            expected_cohort_count=expected_cohort_count,
+        )
+
+
 def _canonical_repo(value: Any) -> str:
     full_name = _text(value)
     if not _REPOSITORY_RE.fullmatch(full_name):
@@ -171,19 +431,23 @@ def derive_default_attention_cohort(
     *,
     expected_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
 ) -> tuple[str, ...]:
-    """Return the repo-backed default-attention cohort, failing on expansion."""
+    """Return the repo-backed default-attention cohort, failing on size drift."""
     repos: list[str] = []
     for project in portfolio_truth.get("projects") or []:
         if not isinstance(project, dict):
             continue
+        identity = _mapping(project.get("identity"))
+        project_key = _text(identity.get("project_key"))
+        repo_full_name = _text(identity.get("repo_full_name"))
+        if project_key.startswith("supp:") and repo_full_name:
+            raise SecurityCoverageError(
+                "supplementary project identity cannot declare a repository: "
+                f"{project_key}"
+            )
         derived = _mapping(project.get("derived"))
         if derived.get("attention_state") not in DEFAULT_ATTENTION_STATES:
             continue
-        identity = _mapping(project.get("identity"))
-        repo_full_name = identity.get("repo_full_name")
-        if not _text(repo_full_name) and _text(identity.get("project_key")).startswith(
-            "supp:"
-        ):
+        if project_key.startswith("supp:"):
             # Supplementary projects such as personal-ops are real portfolio
             # identities, but they do not have a GitHub repository to query.
             continue
@@ -236,6 +500,210 @@ def _remote_reason_code(state: str) -> str:
     }[state]
 
 
+def _validate_provider_reason_domain(
+    provider: str,
+    *,
+    state: str,
+    http_status: int | None,
+    reason: str | None,
+    conditional_result: str,
+) -> None:
+    valid = False
+    if state in {"observed", "stale"}:
+        return
+    if state == "not_requested":
+        valid = reason in _PROVIDER_NOT_REQUESTED_REASONS
+    elif state == "credential_unavailable":
+        valid = reason == "github_authentication_missing"
+    elif state == "forbidden":
+        valid = reason == "github_forbidden"
+    elif state == "feature_unavailable":
+        valid = (
+            provider == "code_scanning"
+            and http_status == 403
+            and reason == "code_scanning_not_enabled"
+        ) or (
+            provider in {"code_scanning", "secret_scanning"}
+            and http_status == 200
+            and reason == ELIGIBILITY_REASON
+        )
+    elif state == "not_found":
+        valid = reason == "github_not_found"
+    elif state == "gone":
+        valid = reason == "github_gone"
+    elif state == "rate_limited":
+        valid = reason == "github_rate_limit"
+    elif state == "transient_error":
+        valid = reason == "network_error" if http_status is None else (
+            http_status >= 500 and reason == f"github_http_{http_status}"
+        )
+    elif state == "malformed":
+        valid = (
+            http_status == 200
+            and reason == "non_list_or_invalid_alert_payload"
+            and conditional_result == "malformed"
+        ) or (
+            http_status == 304
+            and reason == "conditional_response_without_observed_prior"
+            and conditional_result == "invalid_prior"
+        ) or (
+            http_status is not None
+            and http_status < 500
+            and http_status not in {200, 304, 401, 403, 404, 410, 429}
+            and reason == f"unexpected_http_{http_status}"
+        )
+    if not valid:
+        raise SecurityCoverageError(
+            f"{provider}.{state} reason is outside the producer reason domain"
+        )
+
+
+def _validate_provider_conditional_domain(
+    provider: str,
+    *,
+    state: str,
+    http_status: int | None,
+    reason: str | None,
+    conditional: dict[str, Any],
+) -> None:
+    requested = conditional["requested"]
+    result = conditional["result"]
+    valid = False
+    if state in {"observed", "stale"}:
+        valid = (
+            http_status == 200
+            and result == ("modified" if requested else "not_used")
+        ) or (http_status == 304 and requested and result == "not_modified")
+    elif state == "not_requested":
+        incomplete_reasons = {
+            "base_request_limit",
+            "quota_reserve_before_pagination_complete",
+            "total_request_limit",
+        }
+        valid = (not requested and result == "not_used") or (
+            reason in incomplete_reasons and result == "incomplete"
+        )
+    elif state == "credential_unavailable":
+        valid = (
+            http_status is None and not requested and result == "not_used"
+        ) or (http_status == 401 and result == "failed")
+    elif state == "feature_unavailable" and reason == ELIGIBILITY_REASON:
+        valid = not requested and result == "not_used"
+    elif state == "malformed":
+        valid = (
+            http_status == 200 and result == "malformed"
+        ) or (
+            http_status == 304 and requested and result == "invalid_prior"
+        ) or (
+            reason is not None
+            and reason.startswith("unexpected_http_")
+            and result == "failed"
+        )
+    elif state in {
+        "forbidden",
+        "feature_unavailable",
+        "not_found",
+        "gone",
+        "rate_limited",
+        "transient_error",
+    }:
+        valid = result == "failed"
+    if not valid:
+        raise SecurityCoverageError(
+            f"{provider}.{state} conditional metadata is outside the producer domain"
+        )
+
+
+def _validate_remote_reason_domain(state: str, reason: Any) -> None:
+    domain = _REMOTE_REASON_DOMAINS[state]
+    valid = reason in domain
+    if state == "transient_error" and isinstance(reason, str):
+        match = re.fullmatch(r"github_http_(\d+)", reason)
+        valid = valid or (match is not None and int(match.group(1)) >= 500)
+    elif state == "malformed" and isinstance(reason, str):
+        match = re.fullmatch(r"unexpected_http_(-?\d+)", reason)
+        valid = valid or (
+            match is not None
+            and int(match.group(1)) < 500
+            and int(match.group(1))
+            not in {200, 304, 401, 403, 404, 410, 429}
+        )
+    if not valid:
+        raise SecurityCoverageError(
+            f"repository.{state} reason is outside the producer reason domain"
+        )
+
+
+def _validate_normalized_remote_repository(value: dict[str, Any]) -> None:
+    required = {
+        "source",
+        "state",
+        "reason_code",
+        "reason",
+        "observed_at",
+        "default_branch",
+        "head_sha",
+        "archived",
+    }
+    if set(value) != required:
+        raise SecurityCoverageError(
+            "normalized repository observation fields are invalid"
+        )
+    if value.get("source") != REMOTE_REPOSITORY_SOURCE:
+        raise SecurityCoverageError("repository observation source is invalid")
+    state = _text(value.get("state"))
+    if state not in REMOTE_REPOSITORY_STATES:
+        raise SecurityCoverageError(
+            f"repository observation state is invalid: {state!r}"
+        )
+    if value.get("reason_code") != _remote_reason_code(state):
+        raise SecurityCoverageError(
+            "repository observation reason_code does not match state"
+        )
+    _validate_remote_reason_domain(state, value.get("reason"))
+
+    observed_at = value.get("observed_at")
+    if observed_at is not None:
+        _parse_datetime(observed_at, field_name="repository.observed_at")
+    default_branch = value.get("default_branch")
+    head_sha = value.get("head_sha")
+    archived = value.get("archived")
+    if state == "observed":
+        if observed_at is None:
+            raise SecurityCoverageError(
+                "repository.observed_at is required when observed"
+            )
+        if not _valid_git_branch(default_branch):
+            raise SecurityCoverageError(
+                "repository.default_branch is invalid when observed"
+            )
+        if not _valid_git_oid(head_sha):
+            raise SecurityCoverageError(
+                "repository.head_sha is invalid when observed"
+            )
+        if not isinstance(archived, bool):
+            raise SecurityCoverageError(
+                "repository.archived must be boolean when observed"
+            )
+    elif state == "partial":
+        if observed_at is None or not isinstance(archived, bool):
+            raise SecurityCoverageError(
+                "partial repository observation requires timestamp and archived state"
+            )
+        if default_branch is not None or head_sha is not None:
+            raise SecurityCoverageError(
+                "partial repository observation cannot claim branch or head"
+            )
+    elif state == "stale" and observed_at is None:
+        raise SecurityCoverageError(
+            "repository.observed_at is required when stale"
+        )
+    elif any(item is not None for item in (default_branch, head_sha, archived)):
+        raise SecurityCoverageError(
+            "unobserved repository state cannot claim remote values"
+        )
+
+
 def _provider_result(
     provider: str,
     *,
@@ -258,7 +726,7 @@ def _provider_result(
         and pagination_complete
         and isinstance(counts, dict)
     )
-    return {
+    result = {
         "state": state,
         "reason_code": _provider_reason_code(state),
         "observed_at": observed_at,
@@ -287,6 +755,289 @@ def _provider_result(
         ),
         "counts": counts if state == "observed" else None,
     }
+    validate_normalized_security_provider(provider, result)
+    return result
+
+
+def validate_normalized_security_provider(
+    provider: str,
+    value: Any,
+    *,
+    produced_at: datetime | None = None,
+    current: datetime | None = None,
+    max_age_hours: int | None = None,
+    receipt_is_stale: bool = False,
+) -> dict[str, Any]:
+    """Validate one provider envelope after receipt normalization."""
+    if provider not in PROVIDER_NAMES:
+        raise SecurityCoverageError(f"invalid security provider: {provider}")
+    if not isinstance(value, dict):
+        raise SecurityCoverageError(f"{provider} normalized result must be an object")
+    required = {
+        "state",
+        "reason_code",
+        "observed_at",
+        "http_status",
+        "http_classification",
+        "reason",
+        "etag",
+        "last_modified",
+        "conditional",
+        "pagination_complete",
+        "completed",
+        "zero_findings",
+        "counts",
+    }
+    missing = sorted(required - value.keys())
+    if missing:
+        raise SecurityCoverageError(
+            f"{provider} normalized result is missing fields: {missing}"
+        )
+    unexpected = sorted(value.keys() - required)
+    if unexpected:
+        raise SecurityCoverageError(
+            f"{provider} normalized result has unexpected fields: {unexpected}"
+        )
+
+    state = _text(value.get("state"))
+    if state not in PROVIDER_STATES:
+        raise SecurityCoverageError(f"{provider}.state is invalid: {state!r}")
+    if value.get("reason_code") != _provider_reason_code(state):
+        raise SecurityCoverageError(f"{provider}.reason_code does not match state")
+
+    conditional = value.get("conditional")
+    if (
+        not isinstance(conditional, dict)
+        or set(conditional) != {"requested", "result"}
+        or not isinstance(conditional.get("requested"), bool)
+        or conditional.get("result") not in PROVIDER_CONDITIONAL_RESULTS
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.conditional metadata is invalid"
+        )
+
+    observed_at_value = value.get("observed_at")
+    observed_at = None
+    if observed_at_value is not None:
+        observed_at = _parse_datetime(
+            observed_at_value,
+            field_name=f"{provider}.observed_at",
+        )
+        if produced_at is not None and observed_at > produced_at:
+            raise SecurityCoverageError(
+                f"{provider}.observed_at is later than receipt produced_at"
+            )
+        if current is not None and (
+            current - observed_at
+        ).total_seconds() / 3600 < -0.05:
+            raise SecurityCoverageError(f"{provider}.observed_at is future-dated")
+    elif state != "not_requested":
+        raise SecurityCoverageError(f"{provider}.observed_at is required for {state}")
+
+    if max_age_hours is not None:
+        if max_age_hours <= 0:
+            raise SecurityCoverageError("max_age_hours must be positive")
+        if current is None:
+            raise SecurityCoverageError(
+                "current is required when validating provider freshness"
+            )
+        provider_age_hours = (
+            (current - observed_at).total_seconds() / 3600
+            if observed_at is not None
+            else None
+        )
+        if state == "observed" and (
+            receipt_is_stale
+            or provider_age_hours is None
+            or provider_age_hours > max_age_hours
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.observed is older than the configured freshness window"
+            )
+        if state == "stale" and not receipt_is_stale and (
+            provider_age_hours is None or provider_age_hours <= max_age_hours
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.stale is not justified by receipt or provider age"
+            )
+
+    http_status = value.get("http_status")
+    if http_status is not None and (
+        not isinstance(http_status, int) or isinstance(http_status, bool)
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.http_status must be an integer or null"
+        )
+    reason = value.get("reason")
+    if reason is not None and not isinstance(reason, str):
+        raise SecurityCoverageError(f"{provider}.reason must be a string or null")
+    if state not in {"observed", "stale"} and not _text(reason):
+        raise SecurityCoverageError(f"{provider}.reason is required for {state}")
+    _validate_provider_reason_domain(
+        provider,
+        state=state,
+        http_status=http_status,
+        reason=reason,
+        conditional_result=conditional["result"],
+    )
+    _validate_provider_conditional_domain(
+        provider,
+        state=state,
+        http_status=http_status,
+        reason=reason,
+        conditional=conditional,
+    )
+    for field_name in ("etag", "last_modified"):
+        field_value = value.get(field_name)
+        if field_value is not None and not isinstance(field_value, str):
+            raise SecurityCoverageError(
+                f"{provider}.{field_name} must be a string or null"
+            )
+    if not isinstance(value.get("pagination_complete"), bool):
+        raise SecurityCoverageError(
+            f"{provider}.pagination_complete must be boolean"
+        )
+    if not isinstance(value.get("completed"), bool):
+        raise SecurityCoverageError(f"{provider}.completed must be boolean")
+
+    if state in {"observed", "stale"}:
+        if http_status not in {200, 304}:
+            raise SecurityCoverageError(
+                f"{provider}.{state} requires HTTP 200 or 304"
+            )
+        expected_classification = (
+            "success" if http_status == 200 else "not_modified"
+        )
+        expected_result = "not_modified" if http_status == 304 else (
+            "modified" if conditional["requested"] else "not_used"
+        )
+        if value.get("http_classification") != expected_classification:
+            raise SecurityCoverageError(
+                f"{provider}.http_classification does not match {state} response"
+            )
+        if conditional["result"] != expected_result or (
+            http_status == 304 and conditional["requested"] is not True
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.conditional metadata does not match {state} response"
+            )
+        if value.get("pagination_complete") is not True:
+            raise SecurityCoverageError(
+                f"{provider}.{state} requires complete pagination"
+            )
+        if state == "observed":
+            expected_reason = None if http_status == 200 else "not_modified"
+            if reason != expected_reason:
+                raise SecurityCoverageError(
+                    f"{provider}.reason does not match observed response"
+                )
+    elif value.get("pagination_complete") is not False:
+        raise SecurityCoverageError(
+            f"{provider}.{state} cannot claim complete pagination"
+        )
+
+    if state == "not_requested":
+        if http_status is not None or value.get("http_classification") is not None:
+            raise SecurityCoverageError(
+                f"{provider}.not_requested cannot claim an HTTP response"
+            )
+        if conditional["result"] not in {"not_used", "incomplete"}:
+            raise SecurityCoverageError(
+                f"{provider}.not_requested conditional result is invalid"
+            )
+        if conditional["result"] == "not_used" and conditional["requested"]:
+            raise SecurityCoverageError(
+                f"{provider}.not_requested cannot claim an unused request"
+            )
+    elif state == "credential_unavailable" and http_status not in {None, 401}:
+        raise SecurityCoverageError(
+            f"{provider}.credential_unavailable requires HTTP 401 or no response"
+        )
+    elif state == "forbidden" and http_status != 403:
+        raise SecurityCoverageError(f"{provider}.forbidden requires HTTP 403")
+    elif state == "feature_unavailable":
+        if reason == ELIGIBILITY_REASON:
+            if (
+                http_status != 200
+                or value.get("http_classification") != "eligibility"
+                or conditional != {"requested": False, "result": "not_used"}
+            ):
+                raise SecurityCoverageError(
+                    f"{provider}.feature_unavailable eligibility result is invalid"
+                )
+        elif http_status not in {403, 404}:
+            raise SecurityCoverageError(
+                f"{provider}.feature_unavailable requires HTTP 403 or 404"
+            )
+    elif state == "not_found" and http_status != 404:
+        raise SecurityCoverageError(f"{provider}.not_found requires HTTP 404")
+    elif state == "gone" and http_status != 410:
+        raise SecurityCoverageError(f"{provider}.gone requires HTTP 410")
+    elif state == "rate_limited" and http_status not in {403, 429}:
+        raise SecurityCoverageError(
+            f"{provider}.rate_limited requires HTTP 403 or 429"
+        )
+    elif state == "transient_error" and not (
+        http_status is None or http_status >= 500
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.transient_error requires a network failure or HTTP 5xx"
+        )
+
+    if state not in {"observed", "stale", "not_requested"}:
+        expected_classification = (
+            None
+            if http_status is None
+            else "eligibility"
+            if state == "feature_unavailable" and reason == ELIGIBILITY_REASON
+            else "success"
+            if http_status == 200
+            else "not_modified"
+            if http_status == 304
+            else reason
+        )
+        if value.get("http_classification") != expected_classification:
+            raise SecurityCoverageError(
+                f"{provider}.http_classification does not match its HTTP response"
+            )
+
+    counts = value.get("counts")
+    if state == "observed":
+        if (
+            not isinstance(counts, dict)
+            or set(counts) != set(_COUNT_KEYS[provider])
+            or any(
+                not isinstance(count, int)
+                or isinstance(count, bool)
+                or count < 0
+                for count in counts.values()
+            )
+        ):
+            raise SecurityCoverageError(
+                f"{provider}.counts are invalid for an observed result"
+            )
+        if value.get("completed") is not True:
+            raise SecurityCoverageError(
+                f"{provider}.observed must be completed"
+            )
+        if value.get("zero_findings") is not (sum(counts.values()) == 0):
+            raise SecurityCoverageError(
+                f"{provider}.zero_findings does not match observed counts"
+            )
+    else:
+        if counts is not None:
+            raise SecurityCoverageError(
+                f"{provider}.{state} must clear counts"
+            )
+        if value.get("completed") is not False or value.get("zero_findings") is not None:
+            raise SecurityCoverageError(
+                f"{provider}.{state} cannot claim a completed observation"
+            )
+        if state == "stale" and reason != "receipt_stale":
+            raise SecurityCoverageError(
+                f"{provider}.stale requires receipt_stale reason"
+            )
+    return dict(value)
 
 
 def _response_message(response: requests.Response) -> str:
@@ -809,7 +1560,7 @@ def _remote_repository_result(
 ) -> dict[str, Any]:
     if state not in REMOTE_REPOSITORY_STATES:
         raise SecurityCoverageError(f"invalid remote repository state: {state}")
-    return {
+    result = {
         "source": REMOTE_REPOSITORY_SOURCE,
         "state": state,
         "reason_code": _remote_reason_code(state),
@@ -819,6 +1570,8 @@ def _remote_repository_result(
         "head_sha": head_sha if state == "observed" else None,
         "archived": archived if state in {"observed", "partial"} else None,
     }
+    _validate_normalized_remote_repository(result)
+    return result
 
 
 def _remote_failure_results(
@@ -996,7 +1749,7 @@ def _collect_remote_repository_observations(
                 observed_at=now_iso,
                 reason="repository_archived_state_invalid",
             )
-        elif not default_branch or not re.fullmatch(r"[0-9a-f]{40,64}", head_sha):
+        elif not _valid_git_branch(default_branch) or not _valid_git_oid(head_sha):
             results[expected_repo] = _remote_repository_result(
                 state="partial",
                 observed_at=now_iso,
@@ -1372,15 +2125,7 @@ def _validate_provider(
     conditional = _mapping(data.get("conditional"))
     if not isinstance(conditional.get("requested"), bool) or conditional.get(
         "result"
-    ) not in {
-        "not_used",
-        "modified",
-        "not_modified",
-        "failed",
-        "malformed",
-        "incomplete",
-        "invalid_prior",
-    }:
+    ) not in PROVIDER_CONDITIONAL_RESULTS:
         raise SecurityCoverageError(f"{provider}.conditional metadata is invalid")
     if http_status is not None and (
         not isinstance(http_status, int) or isinstance(http_status, bool)
@@ -1491,7 +2236,7 @@ def _validate_provider(
         state = "stale"
         counts = None
     normalized_completed = state == "observed" and raw_completed
-    return {
+    normalized = {
         "state": state,
         "reason_code": _provider_reason_code(state),
         "observed_at": data.get("observed_at"),
@@ -1506,6 +2251,14 @@ def _validate_provider(
         "zero_findings": raw_zero_findings if normalized_completed else None,
         "counts": counts,
     }
+    return validate_normalized_security_provider(
+        provider,
+        normalized,
+        produced_at=produced_at,
+        current=current,
+        max_age_hours=max_age_hours,
+        receipt_is_stale=receipt_is_stale,
+    )
 
 
 def _validate_remote_repository(
@@ -1561,19 +2314,21 @@ def _validate_remote_repository(
             raise SecurityCoverageError(
                 "repository.observed_at is required when observed"
             )
-        if not isinstance(default_branch, str) or not default_branch.strip():
+        if not _valid_git_branch(default_branch):
             raise SecurityCoverageError(
-                "repository.default_branch is required when observed"
+                "repository.default_branch is invalid when observed"
             )
-        if not isinstance(head_sha, str) or not re.fullmatch(
-            r"[0-9a-f]{40,64}", head_sha
-        ):
+        if not _valid_git_oid(head_sha):
             raise SecurityCoverageError(
                 "repository.head_sha is invalid when observed"
             )
         if not isinstance(archived, bool):
             raise SecurityCoverageError(
                 "repository.archived must be boolean when observed"
+            )
+        if data.get("reason") is not None:
+            raise SecurityCoverageError(
+                "repository.reason must be null when observed"
             )
     elif state == "partial":
         if observed_at is None or not isinstance(archived, bool):
@@ -1584,10 +2339,15 @@ def _validate_remote_repository(
             raise SecurityCoverageError(
                 "partial repository observation cannot claim branch or head"
             )
+    elif state == "stale" and observed_at is None:
+        raise SecurityCoverageError(
+            "repository.observed_at is required when stale"
+        )
     elif any(value is not None for value in (default_branch, head_sha, archived)):
         raise SecurityCoverageError(
             "unobserved repository state cannot claim remote values"
         )
+    _validate_remote_reason_domain(state, data.get("reason"))
 
     if state in {"observed", "partial"} and observed_at is not None:
         observation_age_hours = (current - observed_at).total_seconds() / 3600
@@ -1596,7 +2356,7 @@ def _validate_remote_repository(
             default_branch = None
             head_sha = None
             archived = None
-    return {
+    normalized = {
         "source": REMOTE_REPOSITORY_SOURCE,
         "state": state,
         "reason_code": _remote_reason_code(state),
@@ -1606,6 +2366,8 @@ def _validate_remote_repository(
         "head_sha": head_sha,
         "archived": archived,
     }
+    _validate_normalized_remote_repository(normalized)
+    return normalized
 
 
 def validate_security_coverage_receipt(
@@ -1616,6 +2378,7 @@ def validate_security_coverage_receipt(
     expected_producer_commit: str | None = None,
     now: datetime | None = None,
     source_path: str = "",
+    content_sha256: str | None = None,
 ) -> LoadedSecurityCoverage:
     """Validate provenance/freshness and return normalized full-name entries."""
     if max_age_hours <= 0:
@@ -1626,6 +2389,22 @@ def validate_security_coverage_receipt(
         raise SecurityCoverageError(
             "unexpected security coverage receipt schema: "
             f"{payload.get('schema_version')!r}"
+        )
+    receipt_id_value = payload.get("receipt_id")
+    receipt_id: str | None = None
+    if receipt_id_value is not None:
+        receipt_id = _text(receipt_id_value)
+        if not _RECEIPT_ID_RE.fullmatch(receipt_id):
+            raise SecurityCoverageError(
+                "security coverage receipt_id must be a sha256 identity"
+            )
+        if receipt_id != _receipt_id_for_payload(payload):
+            raise SecurityCoverageError(
+                "security coverage receipt_id does not match the receipt payload"
+            )
+    if content_sha256 is not None and not _SHA256_RE.fullmatch(content_sha256):
+        raise SecurityCoverageError(
+            "security coverage content_sha256 must be a lowercase SHA-256 digest"
         )
     produced_at = _parse_datetime(payload.get("produced_at"), field_name="produced_at")
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -1752,6 +2531,11 @@ def validate_security_coverage_receipt(
         receipt_state="stale" if receipt_is_stale else "fresh",
         age_hours=round(age_hours, 3),
         source_path=source_path,
+        receipt_id=receipt_id,
+        content_sha256=content_sha256,
+        max_age_hours=max_age_hours,
+        expected_cohort_count=expected_cohort_count,
+        expected_producer_commit=expected_producer_commit,
     )
 
 
@@ -1763,8 +2547,26 @@ def load_security_coverage_receipt(
     expected_producer_commit: str | None = None,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage:
+    return _load_security_coverage_receipt_unlocked(
+        path,
+        max_age_hours=max_age_hours,
+        expected_cohort_count=expected_cohort_count,
+        expected_producer_commit=expected_producer_commit,
+        now=now,
+    )
+
+
+def _load_security_coverage_receipt_unlocked(
+    path: Path,
+    *,
+    max_age_hours: int,
+    expected_cohort_count: int,
+    expected_producer_commit: str | None,
+    now: datetime | None,
+) -> LoadedSecurityCoverage:
     try:
-        payload = json.loads(path.read_text())
+        raw_bytes = path.read_bytes()
+        payload = json.loads(raw_bytes)
     except FileNotFoundError as exc:
         raise SecurityCoverageError(
             f"security coverage receipt not found: {path}"
@@ -1780,7 +2582,37 @@ def load_security_coverage_receipt(
         expected_producer_commit=expected_producer_commit,
         now=now,
         source_path=str(path),
+        content_sha256=hashlib.sha256(raw_bytes).hexdigest(),
     )
+
+
+@contextmanager
+def verified_security_coverage_receipt_binding(
+    binding: SecurityCoverageReceiptBinding,
+) -> Iterator[LoadedSecurityCoverage]:
+    """Hold the collector lock while revalidating the bound receipt bytes."""
+    path = Path(binding.source_path)
+    with _receipt_lock(path, exclusive=False, create=False, blocking=False):
+        loaded = _load_security_coverage_receipt_unlocked(
+            path,
+            max_age_hours=binding.max_age_hours,
+            expected_cohort_count=binding.expected_cohort_count,
+            expected_producer_commit=binding.expected_producer_commit,
+            now=None,
+        )
+        if loaded.receipt_id != binding.receipt_id:
+            raise SecurityCoverageError(
+                "security coverage receipt identity changed after it was loaded"
+            )
+        if loaded.content_sha256 != binding.content_sha256:
+            raise SecurityCoverageError(
+                "security coverage receipt bytes changed after they were loaded"
+            )
+        if loaded.receipt_state != binding.receipt_state:
+            raise SecurityCoverageError(
+                "security coverage receipt freshness changed after it was loaded"
+            )
+        yield loaded
 
 
 def write_security_coverage_receipt(
@@ -1788,17 +2620,56 @@ def write_security_coverage_receipt(
     path: Path,
     *,
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
-) -> None:
-    """Atomically write a validated receipt payload."""
-    validate_security_coverage_receipt(
-        payload,
+) -> LoadedSecurityCoverage:
+    """Atomically write a validated, identity-bound receipt payload."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _receipt_lock(path, exclusive=True, create=True):
+        return _write_security_coverage_receipt_unlocked(
+            payload,
+            path,
+            expected_cohort_count=expected_cohort_count,
+        )
+
+
+def _write_security_coverage_receipt_unlocked(
+    payload: dict[str, Any],
+    path: Path,
+    *,
+    expected_cohort_count: int,
+) -> LoadedSecurityCoverage:
+    """Write a receipt while the caller already holds exclusive writer intent."""
+    bound_payload = _with_receipt_id(payload)
+    serialized = (
+        json.dumps(bound_payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    content_sha256 = hashlib.sha256(serialized).hexdigest()
+    loaded = validate_security_coverage_receipt(
+        bound_payload,
         max_age_hours=24 * 365,
         expected_cohort_count=expected_cohort_count,
+        source_path=str(path),
+        content_sha256=content_sha256,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    temporary.replace(path)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "wb",
+            delete=False,
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return loaded
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:
@@ -1873,27 +2744,29 @@ def main() -> None:
                         "receipt_state": loaded.receipt_state,
                         "age_hours": loaded.age_hours,
                         "cohort_count": len(loaded.cohort_repositories),
+                        "receipt_id": loaded.receipt_id,
+                        "content_sha256": loaded.content_sha256,
                     },
                     indent=2,
                 )
             )
             return
-        truth = _load_json_object(args.truth)
-        prior = _load_json_object(args.output) if args.output.is_file() else None
-        receipt = collect_security_coverage(
-            truth,
-            token=os.environ.get("GITHUB_TOKEN"),
-            expected_cohort_count=args.expected_cohort_count,
-            base_request_limit=args.base_request_limit,
-            total_request_limit=args.total_request_limit,
-            quota_reserve=args.quota_reserve,
-            prior_receipt=prior,
-        )
-        write_security_coverage_receipt(
-            receipt,
+        with security_coverage_receipt_writer(
             args.output,
             expected_cohort_count=args.expected_cohort_count,
-        )
+        ) as writer:
+            truth = _load_json_object(args.truth)
+            prior = writer.load_prior()
+            receipt = collect_security_coverage(
+                truth,
+                token=os.environ.get("GITHUB_TOKEN"),
+                expected_cohort_count=args.expected_cohort_count,
+                base_request_limit=args.base_request_limit,
+                total_request_limit=args.total_request_limit,
+                quota_reserve=args.quota_reserve,
+                prior_receipt=prior,
+            )
+            written = writer.write(receipt)
     except SecurityCoverageError as exc:
         raise SystemExit(str(exc)) from exc
     print(
@@ -1903,6 +2776,8 @@ def main() -> None:
                 "path": str(args.output),
                 "cohort_count": receipt["cohort"]["repository_count"],
                 "request_budget": receipt["request_budget"],
+                "receipt_id": written.receipt_id,
+                "content_sha256": written.content_sha256,
             },
             indent=2,
         )
