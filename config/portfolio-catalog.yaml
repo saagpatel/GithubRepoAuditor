@@ -1079,7 +1079,7 @@ repos:
     notes: Not a product repo; the product surface is portfolio-index. Keep this workspace out of default attention except when the site-rebuild campaign is actively being dispatched.
   portfolio-index:
     owner: d
-    purpose: public-safe static portfolio index for hiring-manager review
+    purpose: public-safe static index for the Tier-0 public workshop and canonical portfolio front door
     lifecycle_state: active
     criticality: high
     review_cadence: monthly
