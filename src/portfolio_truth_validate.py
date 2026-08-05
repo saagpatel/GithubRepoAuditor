@@ -1811,6 +1811,50 @@ def canonicalize_truth_snapshot_payload(
 
 
 _LEGACY_PRIOR_SECURITY_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
+_LEGACY_SECURITY_RISK_LABEL = "open high/critical security alerts"
+_CURRENT_SECURITY_RISK_LABEL = "blocking GitHub security findings"
+
+
+def _project_decision_for_security_policy(
+    project: PortfolioTruthProject,
+    *,
+    legacy_dependabot_only: bool,
+) -> tuple[dict[str, Any], str]:
+    if legacy_dependabot_only:
+        coverage_state = project.security.coverage_state
+        high_alerts = project.security.dependabot_high or 0
+        critical_alerts = project.security.dependabot_critical or 0
+    else:
+        security_admission = derive_security_admission(project.security.to_dict())
+        coverage_state = security_admission.effective_coverage_state
+        high_alerts = security_admission.total_open_high
+        critical_alerts = (
+            security_admission.total_open_critical
+            + security_admission.total_open_secrets
+        )
+    risk, attention = build_project_decision(
+        display_name=project.identity.display_name,
+        operating_path=project.declared.operating_path,
+        path_override=project.derived.path_override,
+        context_quality=project.derived.context_quality,
+        activity_status=project.derived.activity_status,
+        archived=project.derived.archived,
+        lifecycle_state=project.declared.lifecycle_state,
+        category=project.declared.category,
+        criticality=project.declared.criticality,
+        doctor_standard=project.declared.doctor_standard,
+        known_risks_present=project.derived.known_risks_present,
+        run_instructions_present=project.derived.run_instructions_present,
+        security_coverage_state=coverage_state,
+        security_high_alerts=high_alerts,
+        security_critical_alerts=critical_alerts,
+    )
+    if legacy_dependabot_only:
+        risk["risk_summary"] = risk["risk_summary"].replace(
+            _CURRENT_SECURITY_RISK_LABEL,
+            _LEGACY_SECURITY_RISK_LABEL,
+        )
+    return risk, attention
 
 
 def canonicalize_prior_security_truth_payload(
@@ -1854,6 +1898,21 @@ def canonicalize_prior_security_truth_payload(
                     "Legacy prior PortfolioTruth cannot contain checkout authority "
                     "without a collision summary."
                 )
+            for project in snapshot.projects:
+                legacy_risk, legacy_attention = _project_decision_for_security_policy(
+                    project,
+                    legacy_dependabot_only=True,
+                )
+                if project.risk.to_dict() != legacy_risk:
+                    raise ValueError(
+                        "Legacy prior PortfolioTruth project risk differs from "
+                        f"its bounded derivation: {project.identity.project_key}."
+                    )
+                if project.derived.attention_state != legacy_attention:
+                    raise ValueError(
+                        "Legacy prior PortfolioTruth project attention differs from "
+                        f"its bounded derivation: {project.identity.project_key}."
+                    )
 
             current_summary = build_source_summary(
                 workspace_root=snapshot.workspace_root,
@@ -1896,12 +1955,51 @@ def canonicalize_prior_security_truth_payload(
                 )
 
             migrated = deepcopy(dict(payload))
-            migrated["source_summary"] = current_summary
+            migrated_projects = migrated.get("projects")
+            if not isinstance(migrated_projects, list) or len(migrated_projects) != len(
+                snapshot.projects
+            ):
+                raise ValueError(
+                    "Legacy prior PortfolioTruth project envelope is invalid."
+                )
+            for raw_project, project in zip(
+                migrated_projects,
+                snapshot.projects,
+                strict=True,
+            ):
+                if not isinstance(raw_project, dict) or not isinstance(
+                    raw_project.get("derived"), dict
+                ):
+                    raise ValueError(
+                        "Legacy prior PortfolioTruth project envelope is invalid."
+                    )
+                current_risk, current_attention = (
+                    _project_decision_for_security_policy(
+                        project,
+                        legacy_dependabot_only=False,
+                    )
+                )
+                raw_project["risk"] = current_risk
+                raw_project["derived"]["attention_state"] = current_attention
+            migrated_snapshot = _snapshot_from_payload(migrated)
+            migrated["source_summary"] = build_source_summary(
+                workspace_root=migrated_snapshot.workspace_root,
+                projects=migrated_snapshot.projects,
+                catalog_errors=summary["catalog_errors"],
+                catalog_warnings=summary["catalog_warnings"],
+                legacy_registry_rows=summary["legacy_registry_rows"],
+                notion_context_rows=summary["notion_context_rows"],
+                notion_context_carried_forward=summary[
+                    "notion_context_carried_forward"
+                ],
+                checkout_collisions=[],
+            )
             migrated["exclusions"] = build_exclusions(dict(exclusion_counts))
-            return canonicalize_truth_snapshot_payload(
+            canonicalize_truth_snapshot_payload(
                 migrated,
                 security_max_age_hours=security_max_age_hours,
             )
+            return snapshot.to_dict()
         except (KeyError, TypeError) as legacy_error:
             raise ValueError(
                 "Legacy prior PortfolioTruth metadata envelope is invalid."

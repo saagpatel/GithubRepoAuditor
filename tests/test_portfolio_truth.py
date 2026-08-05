@@ -591,7 +591,7 @@ def _legacy_prior_security_payload(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
     legacy_registry: Path,
-) -> tuple[dict, dict]:
+) -> tuple[dict, dict, dict]:
     now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
     alpha = portfolio_workspace / "Alpha"
     subprocess.run(["git", "init"], cwd=alpha, capture_output=True, check=True)
@@ -663,10 +663,16 @@ def _legacy_prior_security_payload(
         security_alerts_by_name=security,
         security_coverage_metadata=metadata,
     )
-    payload = result.snapshot.to_dict()
+    current = result.snapshot.to_dict()
+    payload = deepcopy(current)
     payload["source_summary"].pop("checkout_collisions")
     payload["exclusions"]["policy_version"] = "workspace_discovery.v2"
-    return payload, metadata
+    for project in payload["projects"]:
+        project["risk"]["risk_summary"] = project["risk"]["risk_summary"].replace(
+            "blocking GitHub security findings",
+            "open high/critical security alerts",
+        )
+    return payload, metadata, current
 
 
 def test_prior_security_loader_accepts_bounded_legacy_truth(
@@ -677,7 +683,7 @@ def test_prior_security_loader_accepts_bounded_legacy_truth(
 ) -> None:
     import src.portfolio_truth_publish as publish_mod
 
-    payload, metadata = _legacy_prior_security_payload(
+    payload, metadata, _ = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
         portfolio_catalog=portfolio_catalog,
         legacy_registry=legacy_registry,
@@ -716,7 +722,7 @@ def test_bounded_legacy_prior_security_remains_fail_closed(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    payload, _ = _legacy_prior_security_payload(
+    payload, _, _ = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
         portfolio_catalog=portfolio_catalog,
         legacy_registry=legacy_registry,
@@ -751,12 +757,11 @@ def test_current_prior_truth_failure_cannot_use_legacy_fallback(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    legacy, _ = _legacy_prior_security_payload(
+    _, _, current = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
         portfolio_catalog=portfolio_catalog,
         legacy_registry=legacy_registry,
     )
-    current = canonicalize_prior_security_truth_payload(legacy)
     current["source_summary"]["checkout_collisions"]["state"] = "unknown"
 
     with pytest.raises(
