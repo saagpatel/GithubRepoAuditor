@@ -1,0 +1,56 @@
+{
+  "consumer_owned": [
+    "threshold-values",
+    "ui-language",
+    "alert-policy",
+    "build-versus-reader-behavior",
+    "production-calculator"
+  ],
+  "consumer_profiles": {
+    "desktop-command-center": {
+      "state_mapping": {
+        "aging": "aging",
+        "fresh": "fresh",
+        "stale": "stale",
+        "unavailable": "unknown",
+        "unknown": "unknown"
+      }
+    },
+    "operator-control-plane": {
+      "state_mapping": {
+        "aging": "aging",
+        "fresh": "fresh",
+        "stale": "stale",
+        "unavailable": "unavailable",
+        "unknown": "unverified"
+      }
+    },
+    "public-site-projection": {
+      "state_mapping": {
+        "aging": "resting",
+        "fresh": "fresh",
+        "stale": "cold",
+        "unavailable": "unknown",
+        "unknown": "unknown"
+      }
+    }
+  },
+  "contract_version": "1.0.0",
+  "non_goals": [
+    "shared-runtime-library",
+    "shared-alert-policy",
+    "shared-ui-copy"
+  ],
+  "owner": {
+    "artifact_path": "fixtures/contracts/evidence-freshness-conformance-v1/vectors.json",
+    "artifact_sha256": "3111e2dd43b12f74481450b4ad07e7b8f285ff9b5e6931fd1ea3ded521fc0e7c",
+    "generator": "src.evidence_freshness_conformance:build_vectors",
+    "manifest_path": "fixtures/contracts/evidence-freshness-conformance-v1/manifest.json",
+    "repository": "saagpatel/GithubRepoAuditor"
+  },
+  "schema": "EvidenceFreshnessConformanceManifestV1",
+  "versioning": {
+    "compatibility": "consumers-must-ignore-unknown-top-level-fields-and-new-cases",
+    "policy": "additive-minor-breaking-major"
+  }
+}
