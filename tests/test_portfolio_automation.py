@@ -8,6 +8,8 @@ no changes — proposal creation and execution land in later Arc D phases.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from src.portfolio_automation import (
     AutomationCandidate,
     AutomationEligibility,
@@ -27,15 +29,68 @@ def _project(
     activity_status: str = "active",
     path_confidence: str = "high",
     context_quality: str = "standard",
+    checkout_authority: dict | None = None,
 ) -> dict:
-    return {
-        "identity": {"display_name": display_name, "repo_full_name": repo_full_name},
+    project = {
+        "identity": {
+            "display_name": display_name,
+            "repo_full_name": repo_full_name,
+            "path": display_name,
+        },
         "declared": {"operating_path": "maintain"},
         "derived": {
             "activity_status": activity_status,
             "path_confidence": path_confidence,
             "context_quality": context_quality,
         },
+    }
+    if checkout_authority is not None:
+        project["repository_state"] = {"checkout_authority": checkout_authority}
+    return project
+
+
+def _authority(*, state: str = "selected", reason_code: str = "single_clone_topology") -> dict:
+    representative = {
+        "path": "Repo",
+        "state": "observed",
+        "relation": "representative",
+        "head": "1" * 40,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    other = {
+        "path": "Repo-linked" if state == "selected" else "Archive/Repo",
+        "state": "observed",
+        "relation": (
+            "linked_worktree" if state == "selected" else "independent_full_clone"
+        ),
+        "head": ("1" if state == "selected" else "2") * 40,
+        "branch": "feature",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    return {
+        "schema_version": "CheckoutCollisionV1",
+        "origin": "owner/Repo",
+        "canonical_project_path": "Repo",
+        "checkout_count": 2,
+        "full_clone_count": 1 if state == "selected" else 2,
+        "declared_checkout_paths": [],
+        "declared_path_evidence": [],
+        "unresolved_declared_paths": [],
+        "selection": {
+            "state": state,
+            "reason_code": reason_code,
+            "reason": "fixture authority",
+            "representative_path": "Repo",
+            "selected_path": "Repo" if state == "selected" else None,
+            "rationale": "fixture selection",
+        },
+        "checkouts": [representative, other],
+        "discarded_checkouts": [other],
     }
 
 
@@ -135,6 +190,114 @@ def test_multiple_blockers_accumulate() -> None:
         "path-confidence-not-high",
         "context-quality-too-weak",
     }
+
+
+def test_unknown_checkout_authority_blocks_automation_candidate() -> None:
+    result = evaluate_automation_eligibility(
+        _project(
+            checkout_authority=_authority(
+                state="unknown",
+                reason_code="conflicting_full_clone_heads",
+            )
+        ),
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is False
+    assert result.blockers == (
+        "checkout-authority-unknown:conflicting_full_clone_heads",
+    )
+
+
+def test_observed_selected_checkout_authority_remains_eligible() -> None:
+    result = evaluate_automation_eligibility(
+        _project(checkout_authority=_authority()),
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is True
+    assert result.blockers == ()
+
+
+def test_multiple_observed_worktrees_require_checkout_authority() -> None:
+    project = _project()
+    project["repository_state"] = {
+        "state": "observed",
+        "worktrees": [
+            {"state": "observed", "path": "/workspace/Repo", "dirty": False},
+            {
+                "state": "observed",
+                "path": "/workspace/_codex-worktrees/repo-feature",
+                "dirty": False,
+            },
+        ],
+    }
+
+    result = evaluate_automation_eligibility(
+        project,
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is False
+    assert result.blockers == ("checkout-authority-missing:multiple-worktrees",)
+
+
+def test_checkout_authority_must_cover_repository_worktree_topology() -> None:
+    project = _project(checkout_authority=_authority())
+    project["repository_state"].update(
+        {
+            "state": "observed",
+            "worktrees": [
+                {"state": "observed", "path": "/workspace/Repo", "dirty": False},
+                {
+                    "state": "observed",
+                    "path": "/outside/repo-feature",
+                    "dirty": False,
+                },
+                {
+                    "state": "observed",
+                    "path": "/outside/repo-review",
+                    "dirty": False,
+                },
+            ],
+        }
+    )
+
+    result = evaluate_automation_eligibility(
+        project,
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is False
+    assert result.blockers == ("checkout-authority-topology-mismatch",)
+
+
+def test_malformed_checkout_authority_variants_block_automation() -> None:
+    variants = []
+
+    missing_field = _authority()
+    missing_field.pop("origin")
+    variants.append(missing_field)
+
+    invalid_type = _authority()
+    invalid_type["selection"] = "selected"
+    variants.append(invalid_type)
+
+    invalid_count = _authority()
+    invalid_count["checkout_count"] = 3
+    variants.append(invalid_count)
+
+    malformed_record = _authority()
+    del malformed_record["checkouts"][0]["head"]
+    variants.append(malformed_record)
+
+    for authority in variants:
+        result = evaluate_automation_eligibility(
+            _project(checkout_authority=deepcopy(authority)),
+            decision_quality_status="trusted",
+        )
+        assert result.eligible is False
+        assert result.blockers == ("checkout-authority-malformed",)
 
 
 # --- select_automation_candidates ------------------------------------------

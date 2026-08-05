@@ -10,7 +10,10 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_truth_coverage import ProjectLike
-from src.portfolio_truth_sources import WORKSPACE_DISCOVERY_POLICY_VERSION
+from src.portfolio_truth_sources import (
+    WORKSPACE_DISCOVERY_POLICY_VERSION,
+    checkout_collision_summary,
+)
 
 
 def _section(project: ProjectLike, name: str) -> Any:
@@ -77,11 +80,13 @@ def build_source_summary(
     legacy_registry_rows: int,
     notion_context_rows: int,
     notion_context_carried_forward: bool,
+    checkout_collisions: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Build the exact producer summary from bounded inputs and project facts."""
     return {
         "workspace_root": workspace_root,
         "project_count": len(projects),
+        "checkout_collisions": checkout_collision_summary(list(checkout_collisions)),
         "catalog_errors": list(catalog_errors),
         "catalog_warnings": list(catalog_warnings),
         "legacy_registry_rows": legacy_registry_rows,
@@ -130,12 +135,23 @@ def build_warnings(
     catalog_errors: Sequence[str],
     catalog_warnings: Sequence[str],
     unresolved_duplicates: Sequence[str],
+    checkout_collisions: Sequence[dict[str, Any]] = (),
 ) -> list[str]:
     warnings = [*catalog_errors, *catalog_warnings]
     if unresolved_duplicates:
         warnings.append(
             "Duplicate project display names require path-qualified registry labels: "
             + ", ".join(unresolved_duplicates)
+        )
+    ambiguous_checkout_origins = [
+        str(group["origin"])
+        for group in checkout_collisions
+        if group.get("selection", {}).get("state") == "unknown"
+    ]
+    if ambiguous_checkout_origins:
+        warnings.append(
+            "Checkout authority is UNKNOWN for same-origin checkout groups: "
+            + ", ".join(ambiguous_checkout_origins)
         )
     return warnings
 

@@ -64,7 +64,7 @@
   "derivation_policy_version": "portfolio_attention.v3",
   "exclusions": {
     "counts": {},
-    "policy_version": "workspace_discovery.v2"
+    "policy_version": "workspace_discovery.v3"
   },
   "generated_at": "2026-08-01T00:00:00+00:00",
   "inputs": {
@@ -1632,6 +1632,15 @@
     },
     "catalog_errors": [],
     "catalog_warnings": [],
+    "checkout_collisions": {
+      "ambiguous_group_count": 0,
+      "discarded_checkout_count": 0,
+      "full_clone_group_count": 0,
+      "group_count": 0,
+      "groups": [],
+      "schema_version": "CheckoutCollisionSummaryV1",
+      "state": "observed"
+    },
     "context_quality_counts": {
       "boilerplate": 1,
       "full": 1,

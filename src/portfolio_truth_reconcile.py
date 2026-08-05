@@ -419,11 +419,13 @@ def build_portfolio_truth_snapshot(
         )
 
     exclusion_counts: dict[str, int] = {}
+    checkout_collisions: list[dict[str, Any]] = []
     workspace_projects = discover_workspace_projects(
         workspace_root,
         catalog_data=catalog_data,
         now=now,
         exclusion_counts=exclusion_counts,
+        checkout_collisions=checkout_collisions,
     )
     workspace_projects = _merge_supplementary_discoveries(
         discovered=workspace_projects,
@@ -445,6 +447,7 @@ def build_portfolio_truth_snapshot(
                 legacy_rows=legacy_rows,
                 notion_context=notion_context,
                 now=now,
+                workspace_root=workspace_root,
                 release_count_by_name=release_count_by_name,
                 security_alerts_by_name=security_lookup,
                 repo_status_by_name=repo_status_lookup,
@@ -501,11 +504,13 @@ def build_portfolio_truth_snapshot(
         legacy_registry_rows=len(legacy_rows),
         notion_context_rows=len(notion_context),
         notion_context_carried_forward=notion_context_carried_forward,
+        checkout_collisions=checkout_collisions,
     )
     warnings = build_warnings(
         catalog_errors=source_summary["catalog_errors"],
         catalog_warnings=source_summary["catalog_warnings"],
         unresolved_duplicates=source_summary["unresolved_duplicate_display_names"],
+        checkout_collisions=checkout_collisions,
     )
 
     snapshot = PortfolioTruthSnapshot(
@@ -793,6 +798,7 @@ def _build_truth_project(
     legacy_rows: dict[str, dict[str, str]],
     notion_context: dict[str, dict[str, str]],
     now: datetime,
+    workspace_root: Path,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
@@ -1170,6 +1176,7 @@ def _build_truth_project(
             project_path,
             observed_at=now,
             remote_default_branch=remote_default_branch,
+            workspace_root=workspace_root,
         )
         if project_path is not None and has_git
         else {
@@ -1186,6 +1193,12 @@ def _build_truth_project(
             },
         }
     )
+    checkout_authority = raw_project.get("checkout_authority")
+    if isinstance(checkout_authority, dict):
+        repository_state = {
+            **repository_state,
+            "checkout_authority": checkout_authority,
+        }
     return PortfolioTruthProject(
         identity=identity,
         declared=declared,

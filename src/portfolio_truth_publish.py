@@ -50,6 +50,9 @@ class PortfolioTruthPublishResult:
     registry_changed: bool
     report_changed: bool
     project_registry_path: Path | None = None
+    checkout_collision_group_count: int = 0
+    checkout_authority_unknown_count: int = 0
+    discarded_checkout_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -530,6 +533,7 @@ def _publish_portfolio_truth_locked(
     for staged in temp_files.values():
         staged.unlink(missing_ok=True)
 
+    collision_summary = build_result.snapshot.source_summary["checkout_collisions"]
     return PortfolioTruthPublishResult(
         snapshot_path=snapshot_path,
         latest_path=latest_path,
@@ -539,6 +543,11 @@ def _publish_portfolio_truth_locked(
         registry_changed=changed[registry_output],
         report_changed=changed[portfolio_report_output],
         project_registry_path=project_registry_path,
+        checkout_collision_group_count=int(collision_summary["group_count"]),
+        checkout_authority_unknown_count=int(
+            collision_summary["ambiguous_group_count"]
+        ),
+        discarded_checkout_count=int(collision_summary["discarded_checkout_count"]),
     )
 
 

@@ -1,17 +1,17 @@
 {
   "schema_version": "0.11.0",
-  "generated_at": "2026-08-03T22:09:43.833784+00:00",
+  "generated_at": "2026-08-04T20:46:39.243078+00:00",
   "derivation_policy_version": "portfolio_attention.v3",
   "producer": {},
   "inputs": {
     "catalog": {
       "source_id": "portfolio-catalog",
       "sha256": null,
-      "observed_at": "2026-08-03T22:09:43.833784+00:00"
+      "observed_at": "2026-08-04T20:46:39.243078+00:00"
     },
     "workspace": {
       "source_id": "projects-root",
-      "observed_at": "2026-08-03T22:09:43.833784+00:00"
+      "observed_at": "2026-08-04T20:46:39.243078+00:00"
     },
     "notion": {
       "mode": "unavailable",
@@ -21,7 +21,7 @@
     "github_security": {
       "source_id": "github-security-coverage-receipt",
       "schema_version": "GitHubSecurityCoverageReceiptV1",
-      "produced_at": "2026-08-03T22:09:43.833784+00:00",
+      "produced_at": "2026-08-04T20:46:39.243078+00:00",
       "state": "fresh",
       "age_hours": 0.0,
       "producer_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -89,13 +89,22 @@
     }
   ],
   "exclusions": {
-    "policy_version": "workspace_discovery.v2",
+    "policy_version": "workspace_discovery.v3",
     "counts": {}
   },
   "workspace_root": "/demo-workspace",
   "source_summary": {
     "workspace_root": "/demo-workspace",
     "project_count": 40,
+    "checkout_collisions": {
+      "schema_version": "CheckoutCollisionSummaryV1",
+      "state": "observed",
+      "group_count": 0,
+      "full_clone_group_count": 0,
+      "ambiguous_group_count": 0,
+      "discarded_checkout_count": 0,
+      "groups": []
+    },
     "catalog_errors": [],
     "catalog_warnings": [],
     "legacy_registry_rows": 40,
@@ -299,7 +308,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -350,7 +359,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/gossamer-ridge",
           "head": "8adcd37f116d59aaf20b40eaa0cdeab86dfb94991e5a55bc38d5dd9fe605999a",
@@ -488,7 +497,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -584,7 +593,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -635,7 +644,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/hollow-tessera",
           "head": "2bde0b8985233649f988ae61d8e1a350bd9b26afe38ba77b1574fc9c7c62ddde",
@@ -773,7 +782,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -869,7 +878,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -920,7 +929,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/indigo-palisade",
           "head": "f0dbcdef099e2f12e660a25ffb9724167b98e93d62a073c88ba225ab08c72b01",
@@ -1058,7 +1067,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -1154,7 +1163,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -1205,7 +1214,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/jetty-marquee",
           "head": "4e37a4b211dcf18c9df7cc6741b9553564f7833d2c15bae2391c3ad96ab523a7",
@@ -1343,7 +1352,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -1439,7 +1448,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -1490,7 +1499,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/kindling-arbor",
           "head": "f20d19345ed9ba389f768e1a1655904e97a05296ed26879867f8d512e8b60e55",
@@ -1628,7 +1637,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -1724,7 +1733,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -1775,7 +1784,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/lattice-bezel",
           "head": "2610bee9ecd0d6021c000352f707de6bd4b14266961546fde08835a4501e1f8f",
@@ -1913,7 +1922,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -2009,7 +2018,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -2060,7 +2069,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/mica-turnstile",
           "head": "db63c3180e5bc5c00c912da9d9cca2b89034693953974b9892be5b94062b1e82",
@@ -2198,7 +2207,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -2294,7 +2303,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": true,
         "attention_state": "archived",
@@ -2345,7 +2354,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/archive/nocturne-spar",
           "head": "6f5e62b92a004211d4adc5986895c2b75063d4eb7400b67dba09befb5d02ca69",
@@ -2483,7 +2492,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -2582,7 +2591,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "decision-needed",
@@ -2613,7 +2622,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2628,7 +2637,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -2651,7 +2660,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2674,7 +2683,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -2702,7 +2711,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/flagship/aurora-ledger",
           "head": "3fe2c06cdac61e60f0abced439f4c0ea2312d54dd314cf09631cc032f5f30549",
@@ -2721,7 +2730,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "3fe2c06cdac61e60f0abced439f4c0ea2312d54dd314cf09631cc032f5f30549",
           "archived": false
@@ -2848,7 +2857,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -2946,7 +2955,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "decision-needed",
@@ -2977,7 +2986,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2992,7 +3001,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -3015,7 +3024,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -3038,7 +3047,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -3066,7 +3075,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/flagship/basalt-relay",
           "head": "5756778ed7c8d9b653dc146593c1e6d370d8db2c2e3d9d4a482928cef1535a75",
@@ -3085,7 +3094,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "5756778ed7c8d9b653dc146593c1e6d370d8db2c2e3d9d4a482928cef1535a75",
           "archived": false
@@ -3212,7 +3221,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -3309,7 +3318,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "decision-needed",
@@ -3340,7 +3349,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -3355,7 +3364,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 2,
@@ -3378,7 +3387,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -3401,7 +3410,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 1
@@ -3429,7 +3438,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/flagship/cinder-atlas",
           "head": "44f9898452a5ffbf49c27bcc50158bbb5e74cc21b81132031e80205f3bc3c777",
@@ -3448,7 +3457,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "44f9898452a5ffbf49c27bcc50158bbb5e74cc21b81132031e80205f3bc3c777",
           "archived": false
@@ -3575,7 +3584,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -3674,7 +3683,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "decision-needed",
@@ -3705,7 +3714,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -3720,7 +3729,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -3743,7 +3752,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -3761,7 +3770,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -3787,7 +3796,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/flagship/meridian-vault",
           "head": "9d60c05a561dbebe1bd61215141fb9b7b96c011f8d15c7013c6a2c762bd91f5d",
@@ -3806,7 +3815,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "9d60c05a561dbebe1bd61215141fb9b7b96c011f8d15c7013c6a2c762bd91f5d",
           "archived": false
@@ -3933,7 +3942,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -4029,7 +4038,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "experiment",
@@ -4080,7 +4089,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/bramble-cistern",
           "head": "11e2cfd5e731c86319b7c599c190f10a8a83c8e398cc1b3ffa1d58e811c00b8b",
@@ -4218,7 +4227,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -4315,7 +4324,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "experiment",
@@ -4366,7 +4375,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/dusk-pergola",
           "head": "c8a3e36a9b65dfab4ca9f568cb429bd974c5f20dca7d428217be29b381a61675",
@@ -4504,7 +4513,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -4600,7 +4609,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "experiment",
@@ -4655,7 +4664,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/foxglove-mast",
           "head": "abb74ce2b39179f881bf62ada601b549a2e982b67c136e6613886449fea8d2d0",
@@ -4793,7 +4802,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -4889,7 +4898,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "experiment",
@@ -4920,7 +4929,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -4935,7 +4944,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -4958,7 +4967,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -4976,7 +4985,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -5002,7 +5011,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/onyx-placard",
           "head": "ee62b3c5ff1c6a16ff0044f27d295ec0d0e2edb1c76550a46ed8586945b30bc4",
@@ -5021,7 +5030,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "ee62b3c5ff1c6a16ff0044f27d295ec0d0e2edb1c76550a46ed8586945b30bc4",
           "archived": false
@@ -5148,7 +5157,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -5244,7 +5253,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "experiment",
@@ -5277,7 +5286,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -5292,7 +5301,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -5315,7 +5324,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -5333,7 +5342,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -5359,7 +5368,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/pallas-runner",
           "head": "b3617c50b2f66229297747d9d163c1c59fb6dc1bffd236386c7908df64fed5d9",
@@ -5378,7 +5387,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "b3617c50b2f66229297747d9d163c1c59fb6dc1bffd236386c7908df64fed5d9",
           "archived": false
@@ -5505,7 +5514,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -5603,7 +5612,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "parked",
@@ -5632,7 +5641,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
-        "source_produced_at": "2026-08-02T21:09:43.833784+00:00",
+        "source_produced_at": "2026-08-03T19:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "stale",
@@ -5647,7 +5656,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-02T21:09:43.833784+00:00",
+            "observed_at": "2026-08-03T19:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": null,
             "zero_findings": null
@@ -5665,7 +5674,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-02T21:09:43.833784+00:00",
+            "observed_at": "2026-08-03T19:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": null,
             "zero_findings": null
@@ -5683,7 +5692,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-02T21:09:43.833784+00:00",
+            "observed_at": "2026-08-03T19:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": null,
             "zero_findings": null
@@ -5709,7 +5718,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/quartz-signal",
           "head": "f0880b359ae6df38b4ea8eae386c6eca43085e5cfe95ccb0814289e3427cbac2",
@@ -5728,7 +5737,7 @@
           "state": "stale",
           "reason_code": "stale_observation",
           "reason": "receipt_stale",
-          "observed_at": "2026-08-02T21:09:43.833784+00:00",
+          "observed_at": "2026-08-03T19:46:39.243078+00:00",
           "default_branch": null,
           "head_sha": null,
           "archived": null
@@ -5852,7 +5861,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -5948,7 +5957,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "manual-only",
@@ -5999,7 +6008,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/solstice-cairn",
           "head": "f88738445f00c41b9915812a478d50676b4a5a3a9902d61950cc26be60d266d4",
@@ -6137,7 +6146,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -6233,7 +6242,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "experiment",
@@ -6288,7 +6297,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/tabard-anvil",
           "head": "810f41c9b80370b07f6f369cf2d57c632042cfb404b9bc322a7742d0a28bad66",
@@ -6426,7 +6435,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -6523,7 +6532,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "experiment",
@@ -6574,7 +6583,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/vellum-compass",
           "head": "bcb52534ec707361ab9aa2ac06fc7c683f36ce7278036da6a4ae63995862cbe8",
@@ -6712,7 +6721,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -6808,7 +6817,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "manual-only",
@@ -6863,7 +6872,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/xenon-parapet",
           "head": "d41a80f04e11746d8954d38993b1eb6bb11d93d755d8897e8193f7334bea2a1c",
@@ -7001,7 +7010,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -7098,7 +7107,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "manual-only",
@@ -7149,7 +7158,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/lab/zephyr-bastion",
           "head": "6ce88af17eef7c334102ca9a51db1a3c16498068ede5418ba7522a8950a7abfb",
@@ -7287,7 +7296,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -7383,7 +7392,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "active-infra",
@@ -7416,7 +7425,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -7431,7 +7440,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -7454,7 +7463,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -7477,7 +7486,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -7505,7 +7514,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/platform/dovetail-forge",
           "head": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
@@ -7524,7 +7533,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "e5ce82b2aef5e7bcce252f7d044b0c1f5d9c4b70b4e18e334e97f66015d57a51",
           "archived": false
@@ -7651,7 +7660,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -7749,7 +7758,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "decision-needed",
@@ -7780,7 +7789,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -7795,7 +7804,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -7818,7 +7827,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -7841,7 +7850,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -7869,7 +7878,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/platform/ember-conduit",
           "head": "7d6de2172b1a99f291f42d5446b59a127ca77cceeffde0606ba5a10c3a7fc6ec",
@@ -7888,7 +7897,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "7d6de2172b1a99f291f42d5446b59a127ca77cceeffde0606ba5a10c3a7fc6ec",
           "archived": false
@@ -8015,7 +8024,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -8113,7 +8122,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "active-infra",
@@ -8142,7 +8151,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -8157,7 +8166,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -8180,7 +8189,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -8203,7 +8212,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -8231,7 +8240,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/platform/fathom-beacon",
           "head": "9144f55af9d0578de78750f15f3159d9307d511bff03c84d7a26a96ac8f875e3",
@@ -8250,7 +8259,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "9144f55af9d0578de78750f15f3159d9307d511bff03c84d7a26a96ac8f875e3",
           "archived": false
@@ -8377,7 +8386,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -8475,7 +8484,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "decision-needed",
@@ -8506,7 +8515,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -8521,7 +8530,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -8544,7 +8553,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -8567,7 +8576,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -8595,7 +8604,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/platform/ivory-sextant",
           "head": "fceecb2f58cfb099cb8993bf43d8f5f202aaaf627a969443e5f0d0bc79ade496",
@@ -8614,7 +8623,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "fceecb2f58cfb099cb8993bf43d8f5f202aaaf627a969443e5f0d0bc79ade496",
           "archived": false
@@ -8741,7 +8750,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -8837,7 +8846,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "decision-needed",
@@ -8871,7 +8880,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -8886,7 +8895,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -8909,7 +8918,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -8927,7 +8936,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -8953,7 +8962,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/platform/lumen-ferry",
           "head": "4cfc26b6cb6c7333e739a3cc92b62e0bdf05ebfc3217b71ecd683bdb6ef16856",
@@ -8972,7 +8981,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "4cfc26b6cb6c7333e739a3cc92b62e0bdf05ebfc3217b71ecd683bdb6ef16856",
           "archived": false
@@ -9099,7 +9108,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -9196,7 +9205,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "parked",
@@ -9247,7 +9256,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/amber-thicket",
           "head": "158951110177edfc830cac9d9408da0cd4cc2648c1ddd64c2c01de93246c33cd",
@@ -9385,7 +9394,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -9483,7 +9492,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "manual-only",
@@ -9534,7 +9543,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/cobalt-wharf",
           "head": "96d808457f65942c1e59aa8bf76d2b22a496b0547a337fba3f1dd213db4a15b6",
@@ -9672,7 +9681,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -9768,7 +9777,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "parked",
@@ -9819,7 +9828,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/errant-fathom",
           "head": "aff68be828532af2d227ad40dc7c05c87ff033b41c960e38bd0f700058479339",
@@ -9957,7 +9966,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -10054,7 +10063,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "decision-needed",
@@ -10085,7 +10094,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -10100,7 +10109,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -10123,7 +10132,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -10146,7 +10155,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -10174,7 +10183,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/glacier-quill",
           "head": "ff82186195d84e2a61120341abd83b50d18695c3f03b6db8f0a4bca885f1b7c2",
@@ -10193,7 +10202,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "ff82186195d84e2a61120341abd83b50d18695c3f03b6db8f0a4bca885f1b7c2",
           "archived": false
@@ -10320,7 +10329,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -10417,7 +10426,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "active-product",
@@ -10450,7 +10459,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -10465,7 +10474,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -10488,7 +10497,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -10511,7 +10520,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -10539,7 +10548,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/harbor-lantern",
           "head": "85eb7bda87cc4133d3934c192471717b579ee9c7828153ae1f880938f8747cb3",
@@ -10558,7 +10567,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "85eb7bda87cc4133d3934c192471717b579ee9c7828153ae1f880938f8747cb3",
           "archived": false
@@ -10685,7 +10694,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -10782,7 +10791,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-08-01T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-08-02T20:46:39.243078+00:00",
         "activity_status": "active",
         "archived": false,
         "attention_state": "experiment",
@@ -10811,7 +10820,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -10826,7 +10835,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -10849,7 +10858,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -10872,7 +10881,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -10900,7 +10909,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/juniper-kiln",
           "head": "5a26267fed059db4575fa389c1cf7712acc9c5979f16ccdc7affbebcffdeb54c",
@@ -10919,7 +10928,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "5a26267fed059db4575fa389c1cf7712acc9c5979f16ccdc7affbebcffdeb54c",
           "archived": false
@@ -11046,7 +11055,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-08-01T22:09:43.833784+00:00"
+          "detail": "2026-08-02T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -11142,7 +11151,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-13T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-07-14T20:46:39.243078+00:00",
         "activity_status": "recent",
         "archived": false,
         "attention_state": "decision-needed",
@@ -11173,7 +11182,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -11188,7 +11197,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -11211,7 +11220,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -11229,7 +11238,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -11255,7 +11264,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/kestrel-loom",
           "head": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
@@ -11274,7 +11283,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "def1e22cfe8a27746f826754683cb03ed9a56dffacdf8552654a5d7dc026aa4b",
           "archived": false
@@ -11401,7 +11410,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-07-13T22:09:43.833784+00:00"
+          "detail": "2026-07-14T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -11498,7 +11507,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "parked",
@@ -11527,7 +11536,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-03T22:09:43.833784+00:00",
+        "source_produced_at": "2026-08-04T20:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -11542,7 +11551,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -11565,7 +11574,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -11583,7 +11592,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-03T22:09:43.833784+00:00",
+            "observed_at": "2026-08-04T20:46:39.243078+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -11609,7 +11618,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/nimbus-charter",
           "head": "188af92bf3e2774a55bdfb97d15c601b1130142a1efcc145c37237df33afc20b",
@@ -11628,7 +11637,7 @@
           "state": "observed",
           "reason_code": "observed",
           "reason": null,
-          "observed_at": "2026-08-03T22:09:43.833784+00:00",
+          "observed_at": "2026-08-04T20:46:39.243078+00:00",
           "default_branch": "main",
           "head_sha": "188af92bf3e2774a55bdfb97d15c601b1130142a1efcc145c37237df33afc20b",
           "archived": false
@@ -11755,7 +11764,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -11852,7 +11861,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "manual-only",
@@ -11881,7 +11890,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
-        "source_produced_at": "2026-08-02T21:09:43.833784+00:00",
+        "source_produced_at": "2026-08-03T19:46:39.243078+00:00",
         "providers": {
           "dependabot": {
             "state": "stale",
@@ -11896,7 +11905,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-02T21:09:43.833784+00:00",
+            "observed_at": "2026-08-03T19:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": null,
             "zero_findings": null
@@ -11914,7 +11923,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-02T21:09:43.833784+00:00",
+            "observed_at": "2026-08-03T19:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": null,
             "zero_findings": null
@@ -11932,7 +11941,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-02T21:09:43.833784+00:00",
+            "observed_at": "2026-08-03T19:46:39.243078+00:00",
             "pagination_complete": true,
             "counts": null,
             "zero_findings": null
@@ -11958,7 +11967,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/rialto-pennant",
           "head": "44a43057b9f899b01b1549ac4784c57c6ee9ba43424481bd97662a0635a7b651",
@@ -11977,7 +11986,7 @@
           "state": "stale",
           "reason_code": "stale_observation",
           "reason": "receipt_stale",
-          "observed_at": "2026-08-02T21:09:43.833784+00:00",
+          "observed_at": "2026-08-03T19:46:39.243078+00:00",
           "default_branch": null,
           "head_sha": null,
           "archived": null
@@ -12101,7 +12110,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -12199,7 +12208,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "parked",
@@ -12250,7 +12259,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/umbra-trellis",
           "head": "da48454b7c95b5f168f6696f170b02f445ada6b828e138b1ae9c3aded27a592e",
@@ -12388,7 +12397,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -12484,7 +12493,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "parked",
@@ -12535,7 +12544,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/wicker-obelisk",
           "head": "b82ff66969a92f7a5bc3f63f744a2e5dc5caa0b2d6fa4cbe05ee7ff13a7eb0ab",
@@ -12673,7 +12682,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",
@@ -12771,7 +12780,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-25T22:09:43.833784+00:00",
+        "last_meaningful_activity_at": "2026-01-26T20:46:39.243078+00:00",
         "activity_status": "stale",
         "archived": false,
         "attention_state": "parked",
@@ -12822,7 +12831,7 @@
       },
       "repository_state": {
         "state": "observed",
-        "observed_at": "2026-08-03T22:09:43.833784+00:00",
+        "observed_at": "2026-08-04T20:46:39.243078+00:00",
         "local": {
           "path": "/demo-workspace/studio/yarrow-spindle",
           "head": "f618c22516c338789613aa8b2c965c88debc501e1932019921254bd1efc8b012",
@@ -12960,7 +12969,7 @@
         },
         "derived.last_meaningful_activity_at": {
           "source": "demo-fixture",
-          "detail": "2026-01-25T22:09:43.833784+00:00"
+          "detail": "2026-01-26T20:46:39.243078+00:00"
         },
         "derived.next_recommended_move_present": {
           "source": "demo-fixture",

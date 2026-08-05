@@ -326,7 +326,7 @@ def test_contract_shadow_fails_when_excluded_backup_leaks_into_projects(
             "source_summary": {"attention_state_counts": {"decision-needed": 1}},
             "rollups": {"decision": {"decision_needed_count": 1}},
             "exclusions": {
-                "policy_version": "workspace_discovery.v2",
+                "policy_version": "workspace_discovery.v3",
                 "counts": {},
             },
             "projects": [

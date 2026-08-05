@@ -20,6 +20,7 @@ from src.github_security_coverage import (
     _validate_remote_repository,
     validate_normalized_security_provider,
 )
+from src.portfolio_checkout_authority import validate_checkout_authority_envelope
 from src.portfolio_pathing import (
     VALID_MATURITY_PROGRAMS,
     VALID_OPERATING_PATHS,
@@ -44,6 +45,7 @@ from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_sources import WORKSPACE_EXCLUSION_REASONS
 from src.portfolio_truth_types import (
+    CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
     DERIVATION_POLICY_VERSION,
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
@@ -83,6 +85,7 @@ def validate_truth_snapshot(
             f"{snapshot.derivation_policy_version}"
         )
     _validate_contract_envelope(snapshot.to_dict())
+    _validate_checkout_collisions(snapshot)
     expected_order = sorted(
         snapshot.projects,
         key=lambda project: (
@@ -290,6 +293,102 @@ def validate_truth_snapshot(
         raise ValueError("PortfolioTruth coverage differs from the producer envelope.")
 
 
+def _validate_checkout_collisions(snapshot: PortfolioTruthSnapshot) -> None:
+    summary = snapshot.source_summary.get("checkout_collisions")
+    if not isinstance(summary, dict):
+        raise ValueError("Portfolio truth checkout collision summary is required.")
+    required_summary = {
+        "schema_version",
+        "state",
+        "group_count",
+        "full_clone_group_count",
+        "ambiguous_group_count",
+        "discarded_checkout_count",
+        "groups",
+    }
+    missing = sorted(required_summary - summary.keys())
+    if missing:
+        raise ValueError(f"Checkout collision summary is missing fields: {missing}")
+    if summary.get("schema_version") != CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION:
+        raise ValueError("Unexpected checkout collision summary schema version.")
+    groups = summary.get("groups")
+    if not isinstance(groups, list):
+        raise ValueError("Checkout collision groups must be a list.")
+    _require_nonnegative_count(summary, "group_count")
+    _require_nonnegative_count(summary, "full_clone_group_count")
+    _require_nonnegative_count(summary, "ambiguous_group_count")
+    _require_nonnegative_count(summary, "discarded_checkout_count")
+    if summary["group_count"] != len(groups):
+        raise ValueError("Checkout collision group_count does not match groups.")
+
+    project_by_origin = {}
+    for project in snapshot.projects:
+        origin_key = project.identity.repo_full_name.lower()
+        if not origin_key:
+            continue
+        if origin_key in project_by_origin:
+            raise ValueError(
+                "Portfolio truth must contain one canonical project per origin: "
+                f"{project.identity.repo_full_name}"
+            )
+        project_by_origin[origin_key] = project
+    seen_origins: set[str] = set()
+    ambiguous = 0
+    full_clone_groups = 0
+    discarded_count = 0
+    for group in groups:
+        if not isinstance(group, dict):
+            raise ValueError("Checkout collision group must be an object.")
+        origin = group.get("origin")
+        if not isinstance(origin, str) or not origin.strip():
+            raise ValueError("Checkout collision origin must be non-empty.")
+        origin_key = origin.lower()
+        project = project_by_origin.get(origin_key)
+        if project is None:
+            raise ValueError(f"Checkout collision has no canonical project: {origin}")
+        validated = validate_checkout_authority_envelope(
+            group,
+            identity_path=project.identity.path,
+            repo_full_name=project.identity.repo_full_name,
+        )
+        if origin_key in seen_origins:
+            raise ValueError(f"Duplicate checkout collision origin: {origin}")
+        seen_origins.add(origin_key)
+        full_clone_groups += int(validated.full_clone_count > 1)
+        ambiguous += int(validated.state == "unknown")
+        discarded_count += validated.discarded_count
+        if project.repository_state.get("checkout_authority") != group:
+            raise ValueError(
+                "Project checkout authority differs from collision summary."
+            )
+
+    if summary["full_clone_group_count"] != full_clone_groups:
+        raise ValueError("Checkout full_clone_group_count does not match groups.")
+    if summary["ambiguous_group_count"] != ambiguous:
+        raise ValueError("Checkout ambiguous_group_count does not match groups.")
+    if summary["discarded_checkout_count"] != discarded_count:
+        raise ValueError("Checkout discarded_checkout_count does not match groups.")
+    for project in snapshot.projects:
+        authority = project.repository_state.get("checkout_authority")
+        origin_key = project.identity.repo_full_name.lower()
+        if authority is not None and origin_key not in seen_origins:
+            raise ValueError(
+                "Project checkout authority is missing from the collision summary."
+            )
+    expected_state = "unknown" if ambiguous else "observed"
+    if summary.get("state") != expected_state:
+        raise ValueError(
+            "Checkout collision summary state does not match group authority."
+        )
+
+
+def _require_nonnegative_count(value: dict, key: str) -> int:
+    count = value.get(key)
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise ValueError(f"{key} must be a non-negative integer.")
+    return count
+
+
 def _validate_runtime_dataclass(value: object, path: str) -> None:
     """Recursively enforce postponed dataclass annotations at runtime."""
     hints = get_type_hints(type(value))
@@ -423,6 +522,7 @@ def _validate_snapshot_metadata(
         legacy_registry_rows=legacy_registry_rows,
         notion_context_rows=notion_context_rows,
         notion_context_carried_forward=notion_context_carried_forward,
+        checkout_collisions=summary["checkout_collisions"]["groups"],
     )
     if summary != expected_summary:
         raise ValueError("PortfolioTruth source summary differs from producer facts.")
@@ -430,6 +530,7 @@ def _validate_snapshot_metadata(
         catalog_errors=catalog_errors,
         catalog_warnings=catalog_warnings,
         unresolved_duplicates=summary["unresolved_duplicate_display_names"],
+        checkout_collisions=summary["checkout_collisions"]["groups"],
     )
     if snapshot.warnings != expected_warnings:
         raise ValueError("PortfolioTruth warnings differ from producer facts.")
@@ -1013,6 +1114,9 @@ def _validate_repository_state_shape(
     project_key: str,
     generated_at: datetime,
 ) -> None:
+    checkout_authority_key = (
+        {"checkout_authority"} if "checkout_authority" in repository_state else set()
+    )
     state = repository_state.get("state")
     if state not in {"observed", "unknown", "not_a_repository"}:
         raise ValueError(f"Invalid repository state for {project_key}.")
@@ -1027,7 +1131,8 @@ def _validate_repository_state_shape(
     if state == "not_a_repository":
         _require_repository_keys(
             repository_state,
-            {"state", "observed_at", "remote_default_branch"},
+            {"state", "observed_at", "remote_default_branch"}
+            | checkout_authority_key,
             project_key,
             "repository state",
         )
@@ -1041,7 +1146,8 @@ def _validate_repository_state_shape(
                 "reason_code",
                 "reason",
                 "remote_default_branch",
-            },
+            }
+            | checkout_authority_key,
             project_key,
             "repository state",
         )
@@ -1072,6 +1178,7 @@ def _validate_repository_state_shape(
                     f"Unknown repository state for {project_key} must omit null local."
                 )
             required.add("local")
+    required.update(checkout_authority_key)
     _require_repository_keys(
         repository_state,
         required,
@@ -1119,10 +1226,6 @@ def _validate_repository_state_shape(
     expected_linked_count = len(worktrees) - coordinator_count
     if kind == "working_repository":
         expected_linked_count -= 1
-        if coordinator_count:
-            raise ValueError(
-                f"Working repository topology for {project_key} has a coordinator."
-            )
     elif coordinator_count != 1:
         raise ValueError(
             f"Bare repository topology for {project_key} requires one coordinator."
@@ -1387,19 +1490,33 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
             project_key,
             label,
         )
+        observation_failed = (
+            value.get("reason_code") == "worktree_observation_failed"
+            and value.get("reason") == "git could not observe the linked worktree"
+            and _nonempty_text(value.get("path"))
+            and _optional_git_head(value.get("head"))
+            and _optional_git_branch(value.get("branch"))
+            and isinstance(value.get("detached"), bool)
+            and value.get("bare") is False
+        )
+        external_opaque = (
+            value.get("reason_code") == "external_worktree_outside_workspace"
+            and value.get("reason")
+            == "the linked worktree is outside the observed workspace"
+            and isinstance(value.get("path"), str)
+            and value["path"].startswith("external-worktree")
+            and value.get("head") is None
+            and value.get("branch") is None
+            and value.get("detached") is False
+            and isinstance(value.get("bare"), bool)
+        )
         if (
-            value.get("reason_code") != "worktree_observation_failed"
-            or value.get("reason") != "git could not observe the linked worktree"
-            or not _nonempty_text(value.get("path"))
-            or not _optional_git_head(value.get("head"))
-            or not _optional_git_branch(value.get("branch"))
-            or not isinstance(value.get("detached"), bool)
-            or value.get("bare") is not False
+            not (observation_failed or external_opaque)
             or value.get("dirty") is not None
             or value.get("dirty_path_count") is not None
         ):
             raise ValueError(f"Repository {label} for {project_key} is invalid.")
-        if (value["branch"] is None) is not value["detached"]:
+        if observation_failed and (value["branch"] is None) is not value["detached"]:
             raise ValueError(
                 f"Repository {label} branch state for {project_key} is invalid."
             )
@@ -1976,6 +2093,7 @@ def validate_portfolio_report_markdown(markdown: str) -> None:
         "# Portfolio Audit Report",
         "canonical machine-readable artifact",
         "derived from the portfolio truth snapshot",
+        "## Checkout Authority",
         "## Audit Methodology",
         "## Canonical Portfolio Truth Table",
         "## Coverage Summary",

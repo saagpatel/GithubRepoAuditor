@@ -33,6 +33,10 @@ from src.github_security_coverage import (
     _provider_result,
 )
 from src.portfolio_pathing import build_operating_path_entry
+from src.portfolio_truth_sources import (
+    WORKSPACE_DISCOVERY_POLICY_VERSION,
+    checkout_collision_summary,
+)
 from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
@@ -98,9 +102,12 @@ def test_schema_version_tracks_the_producer_constant() -> None:
 def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
     snapshot = _snapshot()
 
+    assert snapshot["source_summary"]["checkout_collisions"] == (
+        checkout_collision_summary([])
+    )
     assert snapshot["inputs"] == _expected_inputs(snapshot)
     assert snapshot["exclusions"] == {
-        "policy_version": "workspace_discovery.v2",
+        "policy_version": WORKSPACE_DISCOVERY_POLICY_VERSION,
         "counts": {},
     }
     assert snapshot["producer"] == {}
@@ -121,7 +128,7 @@ def test_committed_demo_truth_artifacts_match_the_canonical_envelope() -> None:
         snapshot = json.loads(path.read_text())
         assert snapshot["inputs"] == _expected_inputs(snapshot)
         assert snapshot["exclusions"] == {
-            "policy_version": "workspace_discovery.v2",
+            "policy_version": WORKSPACE_DISCOVERY_POLICY_VERSION,
             "counts": {},
         }
         assert snapshot["producer"] == {}

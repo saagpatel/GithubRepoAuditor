@@ -19,6 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.portfolio_checkout_authority import checkout_authority_blocker
+
 CONTRACT_VERSION = "automation_candidates_v1"
 
 # Trust-bar thresholds. Kept as module constants so later phases (proposal
@@ -86,6 +88,9 @@ def evaluate_automation_eligibility(
         blockers.append("path-confidence-not-high")
     if _text(derived.get("context_quality")) not in ELIGIBLE_CONTEXT_QUALITY:
         blockers.append("context-quality-too-weak")
+    authority_reason = checkout_authority_blocker(project)
+    if authority_reason:
+        blockers.append(authority_reason)
     return AutomationEligibility(eligible=not blockers, blockers=tuple(blockers))
 
 

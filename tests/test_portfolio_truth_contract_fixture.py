@@ -30,6 +30,7 @@ from src.portfolio_truth_contract_fixture import (
     manifest_bytes,
 )
 from src.portfolio_truth_reconcile import _build_security_fields
+from src.portfolio_truth_sources import WORKSPACE_DISCOVERY_POLICY_VERSION
 from src.portfolio_truth_types import SCHEMA_VERSION
 from src.portfolio_truth_validate import (
     _snapshot_from_payload,
@@ -100,7 +101,7 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
         },
     }
     assert fixture["exclusions"] == {
-        "policy_version": "workspace_discovery.v2",
+        "policy_version": WORKSPACE_DISCOVERY_POLICY_VERSION,
         "counts": {},
     }
     assert sorted(states) == ["complete", "partial", "stale", "unknown"]

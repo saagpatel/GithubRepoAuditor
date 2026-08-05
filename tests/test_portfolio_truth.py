@@ -6,6 +6,8 @@ import os
 import subprocess
 import threading
 import time
+from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -27,6 +29,11 @@ from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
 )
+from src.portfolio_checkout_authority import (
+    checkout_authority_blocker,
+    checkout_authority_path,
+    validate_checkout_authority_envelope,
+)
 from src.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
@@ -41,6 +48,7 @@ from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
+    _git_read,
     _git_remote_full_name,
     load_safe_notion_project_context,
 )
@@ -60,9 +68,62 @@ def _write(path: Path, content: str) -> None:
 def _set_mtime(path: Path, timestamp: float) -> None:
     path.touch()
     path.chmod(0o644)
-    import os
-
     os.utime(path, (timestamp, timestamp))
+
+
+def _checkout_authority_fixture(
+    *,
+    canonical_path: str,
+    origin: str,
+    state: str = "selected",
+    reason_code: str = "single_clone_topology",
+) -> dict:
+    representative = {
+        "path": canonical_path,
+        "state": "observed",
+        "relation": "representative",
+        "head": "1" * 40,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    other = {
+        "path": (
+            f"{canonical_path}-linked"
+            if state == "selected"
+            else f"Archive/{canonical_path}"
+        ),
+        "state": "observed",
+        "relation": (
+            "linked_worktree" if state == "selected" else "independent_full_clone"
+        ),
+        "head": ("1" if state == "selected" else "2") * 40,
+        "branch": "feature",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "bare": False,
+    }
+    return {
+        "schema_version": "CheckoutCollisionV1",
+        "origin": origin,
+        "canonical_project_path": canonical_path,
+        "checkout_count": 2,
+        "full_clone_count": 1 if state == "selected" else 2,
+        "declared_checkout_paths": [],
+        "declared_path_evidence": [],
+        "unresolved_declared_paths": [],
+        "selection": {
+            "state": state,
+            "reason_code": reason_code,
+            "reason": "fixture authority",
+            "representative_path": canonical_path,
+            "selected_path": canonical_path if state == "selected" else None,
+            "rationale": "fixture selection",
+        },
+        "checkouts": [representative, other],
+        "discarded_checkouts": [other],
+    }
 
 
 def _security_test_project(
@@ -513,13 +574,22 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.exclusions == {
-        "policy_version": "workspace_discovery.v2",
+        "policy_version": "workspace_discovery.v3",
         "counts": {},
     }
     assert (
         result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
     )
     assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
+    assert result.snapshot.source_summary["checkout_collisions"] == {
+        "schema_version": "CheckoutCollisionSummaryV1",
+        "state": "observed",
+        "group_count": 0,
+        "full_clone_group_count": 0,
+        "ambiguous_group_count": 0,
+        "discarded_checkout_count": 0,
+        "groups": [],
+    }
 
     # Derived rollups are emitted so downstream consumers (command-center) read
     # them instead of re-deriving the auditor's risk/security logic.
@@ -572,6 +642,899 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     )
     # Per-project open_high_critical is emitted in the security block.
     assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
+
+
+def test_checkout_collision_flows_through_truth_validation_and_report(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    root_clone = portfolio_workspace / "Widget"
+    nested_clone = portfolio_workspace / "Archive" / "Widget"
+    heads: list[str] = []
+    for index, clone in enumerate((root_clone, nested_clone), start=1):
+        clone.mkdir(parents=True)
+        _write(clone / "README.md", f"# Widget {index}\n")
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main"],
+            cwd=clone,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:owner/Widget.git"],
+            cwd=clone,
+            check=True,
+        )
+        subprocess.run(["git", "add", "README.md"], cwd=clone, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                f"fixture {index}",
+            ],
+            cwd=clone,
+            check=True,
+        )
+        heads.append(
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=clone,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    widget_projects = [
+        project
+        for project in result.snapshot.projects
+        if project.identity.repo_full_name == "owner/Widget"
+    ]
+    assert len(widget_projects) == 1
+    assert widget_projects[0].identity.path == "Widget"
+    summary = result.snapshot.source_summary["checkout_collisions"]
+    assert summary["group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert summary["discarded_checkout_count"] == 1
+    group = summary["groups"][0]
+    assert group["selection"]["state"] == "unknown"
+    assert group["selection"]["reason_code"] == "conflicting_full_clone_heads"
+    assert widget_projects[0].repository_state["checkout_authority"] == group
+    validate_truth_snapshot(result.snapshot)
+
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "## Checkout Authority" in markdown
+    assert "`owner/Widget`" in markdown
+    assert "`conflicting_full_clone_heads`" in markdown
+    assert "`Archive/Widget`" in markdown
+    assert heads[1] in markdown
+    validate_portfolio_report_markdown(markdown)
+
+    duplicate_project = replace(
+        widget_projects[0],
+        identity=replace(
+            widget_projects[0].identity,
+            project_key="widget-duplicate",
+            path="Archive/Widget",
+        ),
+    )
+    duplicate_snapshot = replace(
+        result.snapshot,
+        projects=[*result.snapshot.projects, duplicate_project],
+    )
+    with pytest.raises(ValueError, match="one canonical project per origin"):
+        validate_truth_snapshot(duplicate_snapshot)
+
+    summary["discarded_checkout_count"] += 1
+    with pytest.raises(ValueError, match="discarded_checkout_count"):
+        validate_truth_snapshot(result.snapshot)
+
+
+def test_unresolved_declared_checkout_flows_through_truth_validation(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "Repo"
+    repo.mkdir()
+    missing_target = portfolio_workspace / "_codex-worktrees" / "repo-retired" / "src"
+    _write(
+        repo / "AGENTS.md",
+        "# Repo\n\n## Canonical Paths\n\n"
+        f"- Source: `{missing_target}`\n",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "AGENTS.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/Repo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert (
+        authority["selection"]["reason_code"]
+        == "declared_checkout_path_unresolved"
+    )
+    assert authority["unresolved_declared_paths"] == [
+        "_codex-worktrees/repo-retired/src"
+    ]
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_failed_singleton_observation_with_declaration_is_valid_unknown(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    monkeypatch,
+) -> None:
+    repo = portfolio_workspace / "ObservationRepo"
+    repo.mkdir()
+    declared_target = repo / "src"
+    _write(
+        repo / "AGENTS.md",
+        "# ObservationRepo\n\n## Canonical Paths\n\n"
+        f"- Source: `{declared_target}`\n",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/ObservationRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "AGENTS.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    def _timeout_status(project_path: Path, *args: str) -> str:
+        if args and args[0] == "status":
+            raise subprocess.TimeoutExpired(["git", "status"], timeout=5)
+        return _git_read(project_path, *args)
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources._git_read",
+        _timeout_status,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/ObservationRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["reason_code"] == "checkout_observation_failed"
+    assert authority["selection"]["selected_path"] is None
+    assert authority["declared_checkout_paths"] == ["ObservationRepo"]
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:checkout_observation_failed"
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_declared_bare_singleton_publishes_unknown_and_blocks_consumers(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    seed = portfolio_workspace / "_backups" / "bare-seed"
+    seed.mkdir(parents=True)
+    _write(seed / "README.md", "# BareRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = portfolio_workspace / "BareRepo"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "set-url",
+            "origin",
+            "git@github.com:owner/BareRepo.git",
+        ],
+        cwd=coordinator,
+        check=True,
+    )
+    _write(
+        coordinator / "AGENTS.md",
+        "# BareRepo\n\n## Canonical Paths\n\n"
+        f"- Source: `{coordinator}`\n",
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/BareRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["selected_path"] is None
+    assert authority["selection"]["reason_code"] == "bare_representative_unusable"
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:bare_representative_unusable"
+    validate_truth_snapshot(result.snapshot)
+
+    plan = build_context_recovery_plan(
+        result.snapshot,
+        workspace_root=portfolio_workspace,
+    )
+    target = next(item for item in plan.projects if item.project_key == "BareRepo")
+    assert target.status == "skipped"
+    assert target.reason == "checkout-authority-unknown:bare_representative_unusable"
+
+
+def test_worktree_enumeration_failure_is_explicit_unknown_summary(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    monkeypatch,
+) -> None:
+    repo = portfolio_workspace / "TopologyRepo"
+    repo.mkdir()
+    _write(repo / "README.md", "# TopologyRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/TopologyRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    def _timeout_worktree_enumeration(_project_path: Path) -> list[Path]:
+        raise subprocess.TimeoutExpired(["git", "worktree", "list"], timeout=5)
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources._git_worktree_paths",
+        _timeout_worktree_enumeration,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/TopologyRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["reason_code"] == "worktree_enumeration_failed"
+    summary = result.snapshot.source_summary["checkout_collisions"]
+    assert summary["state"] == "unknown"
+    assert summary["group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:worktree_enumeration_failed"
+    assert any(
+        "same-origin checkout groups" in warning
+        for warning in result.snapshot.warnings
+    )
+    assert all(
+        "same-origin full-clone groups" not in warning
+        for warning in result.snapshot.warnings
+    )
+    validate_truth_snapshot(result.snapshot)
+
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "`worktree_enumeration_failed`" in markdown
+    assert "No same-origin checkout collisions were observed." not in markdown
+    validate_portfolio_report_markdown(markdown)
+
+
+def test_external_declared_checkout_is_opaque_unknown(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "ExternalRepo"
+    repo.mkdir()
+    external_root = portfolio_workspace.parent / "outside"
+    external_root.mkdir()
+    escape = portfolio_workspace / "escape"
+    escape.symlink_to(external_root, target_is_directory=True)
+    external_target = escape / "ExternalRepo" / "src"
+    _write(
+        repo / "AGENTS.md",
+        "# ExternalRepo\n\n## Canonical Paths\n\n"
+        f"- Source: `{external_target}`\n",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/ExternalRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "AGENTS.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/ExternalRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["selection"]["state"] == "unknown"
+    assert (
+        authority["selection"]["reason_code"]
+        == "declared_checkout_path_unresolved"
+    )
+    assert authority["unresolved_declared_paths"] == ["external-checkout"]
+    assert str(external_target) not in json.dumps(authority)
+    assert str(external_target.resolve()) not in json.dumps(authority)
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:declared_checkout_path_unresolved"
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_external_linked_worktree_flows_through_truth_validation_and_report(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "ExternalWorktreeRepo"
+    repo.mkdir()
+    _write(repo / "README.md", "# ExternalWorktreeRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/ExternalWorktreeRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    external = (
+        portfolio_workspace.parent
+        / "external-worktree-path-must-not-be-published"
+    )
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "external", str(external), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/ExternalWorktreeRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["checkout_count"] == 2
+    assert authority["full_clone_count"] == 1
+    assert authority["selection"]["state"] == "unknown"
+    assert (
+        authority["selection"]["reason_code"]
+        == "external_linked_worktree_unobserved"
+    )
+    assert authority["discarded_checkouts"] == [
+        {
+            "path": "external-worktree",
+            "state": "unknown",
+            "relation": "linked_worktree",
+            "head": None,
+            "branch": None,
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": None,
+        }
+    ]
+    assert str(external) not in json.dumps(authority)
+    assert str(external) not in json.dumps(result.snapshot.to_dict())
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:external_linked_worktree_unobserved"
+    validate_truth_snapshot(result.snapshot)
+
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "`external_linked_worktree_unobserved`" in markdown
+    assert "`external-worktree`: `linked_worktree`" in markdown
+    assert "No same-origin checkout collisions were observed." not in markdown
+    assert str(external) not in markdown
+    validate_portfolio_report_markdown(markdown)
+
+
+def test_prunable_linked_worktree_is_unknown_not_publication_failure(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    repo = portfolio_workspace / "PrunableRepo"
+    repo.mkdir()
+    _write(repo / "README.md", "# PrunableRepo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:owner/PrunableRepo.git",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    linked = portfolio_workspace / "_codex-worktrees" / "prunable-repo"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature", str(linked), "HEAD"],
+        cwd=repo,
+        check=True,
+    )
+    preserved = portfolio_workspace / "_backups" / "prunable-repo"
+    preserved.parent.mkdir()
+    linked.rename(preserved)
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/PrunableRepo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert authority["selection"]["state"] == "unknown"
+    assert authority["selection"]["reason_code"] == "checkout_observation_failed"
+    missing = next(
+        item
+        for item in authority["discarded_checkouts"]
+        if item["path"] == "_codex-worktrees/prunable-repo"
+    )
+    assert missing["state"] == "unknown"
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) == "checkout-authority-unknown:checkout_observation_failed"
+    validate_truth_snapshot(result.snapshot)
+
+
+def test_discovered_bare_coordinator_sibling_preserves_identity_and_mutation_path(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    monkeypatch,
+) -> None:
+    portfolio_catalog.write_text(
+        """
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+  category: default-category
+  tool_provenance: unknown
+
+repos:
+  Repo:
+    owner: coordinator-owner
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: codex
+"""
+    )
+    legacy_registry.write_text(
+        """
+# Project Registry
+
+## Standalone Projects (Root Level)
+
+| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |
+|---------|--------|------|-----------------|-------|---------------|----------|-------|
+| Repo | parked | codex | standard | Python | README.md | unknown | Coordinator legacy |
+"""
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_reconcile.load_safe_notion_project_context",
+        lambda: {
+            "repo": {
+                "portfolio_call": "Maintain",
+                "momentum": "Stable",
+                "current_state": "Coordinator identity retained",
+            }
+        },
+    )
+    seed = portfolio_workspace / "_backups" / "seed"
+    seed.mkdir(parents=True)
+    _write(seed / "README.md", "# Repo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = portfolio_workspace / "Repo"
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:owner/Repo.git"],
+        cwd=coordinator,
+        check=True,
+    )
+    linked = portfolio_workspace / "Repo-main"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(linked), "main"],
+        cwd=coordinator,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=True,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/Repo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert project.identity.display_name == "Repo"
+    assert project.identity.path == "Repo"
+    assert project.identity.project_key == "Repo"
+    assert project.declared.owner == "coordinator-owner"
+    assert project.declared.lifecycle_state == "active"
+    assert project.declared.review_cadence == "weekly"
+    assert project.declared.category == "unknown"
+    assert project.advisory.legacy_status == "parked"
+    assert project.advisory.notion_portfolio_call == "Maintain"
+    assert project.advisory.notion_current_state == "Coordinator identity retained"
+    assert authority["selection"]["state"] == "selected"
+    assert authority["canonical_project_path"] == "Repo"
+    assert authority["selection"]["selected_path"] == "Repo-main"
+    assert checkout_authority_path(project) == "Repo-main"
+    assert project.repository_state["local"]["path"] == str(linked)
+    assert checkout_authority_blocker(
+        project,
+        workspace_root=portfolio_workspace,
+    ) is None
+    validate_truth_snapshot(result.snapshot)
+
+    plan = build_context_recovery_plan(
+        result.snapshot,
+        workspace_root=portfolio_workspace,
+    )
+    target = next(item for item in plan.projects if item.project_key == "Repo")
+    assert target.relative_path == "Repo-main"
+    assert target.target_path.startswith(str(linked))
+
+
+def test_bare_coordinator_preserves_nested_canonical_group_policy(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    catalog = tmp_path / "portfolio-catalog.yaml"
+    catalog.write_text(
+        """
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+  category: default-category
+  tool_provenance: unknown
+
+groups:
+  canonical_infra:
+    section_marker: Infra/
+    section_label: Canonical Infrastructure
+    path_prefixes:
+      - Infra
+    owner: canonical-owner
+    lifecycle_state: active
+    review_cadence: weekly
+    category: infrastructure
+    tool_provenance: codex
+  physical_worktrees:
+    section_marker: Physical Worktrees/
+    section_label: Physical Worktrees
+    path_prefixes:
+      - _codex-worktrees
+    owner: wrong-physical-owner
+    lifecycle_state: parked
+    review_cadence: yearly
+    category: vanity
+    tool_provenance: unknown
+"""
+    )
+    registry = tmp_path / "project-registry.md"
+    registry.write_text("# Project Registry\n")
+
+    seed = workspace / "_backups" / "seed"
+    seed.mkdir(parents=True)
+    _write(seed / "README.md", "# Repo\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=seed,
+        check=True,
+    )
+    coordinator = workspace / "Infra" / "Repo"
+    coordinator.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "-q", "--bare", str(seed), str(coordinator)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:owner/Repo.git"],
+        cwd=coordinator,
+        check=True,
+    )
+    linked = workspace / "_codex-worktrees" / "repo-main"
+    linked.parent.mkdir()
+    subprocess.run(
+        ["git", "worktree", "add", "-q", str(linked), "main"],
+        cwd=coordinator,
+        check=True,
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog,
+        legacy_registry_path=registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.repo_full_name == "owner/Repo"
+    )
+    authority = project.repository_state["checkout_authority"]
+    assert project.identity.path == "Infra/Repo"
+    assert project.identity.group_key == "canonical_infra"
+    assert project.identity.section_marker == "Infra/"
+    assert project.identity.section_label == "Canonical Infrastructure"
+    assert project.declared.owner == "canonical-owner"
+    assert project.declared.lifecycle_state == "active"
+    assert project.declared.review_cadence == "weekly"
+    assert project.declared.category == "infrastructure"
+    assert project.declared.owner != "wrong-physical-owner"
+    assert authority["canonical_project_path"] == "Infra/Repo"
+    assert authority["selection"]["selected_path"] == (
+        "_codex-worktrees/repo-main"
+    )
+    assert checkout_authority_path(project) == "_codex-worktrees/repo-main"
+    assert project.repository_state["local"]["path"] == str(linked)
+    assert checkout_authority_blocker(project, workspace_root=workspace) is None
+    validate_truth_snapshot(result.snapshot)
 
 
 def test_live_catalog_produces_exact_tier_zero_attention_semantics(
@@ -4813,6 +5776,7 @@ def test_report_subcommand_parses_security_cohort_count() -> None:
 def test_portfolio_truth_app_threads_security_cohort_count(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     from types import SimpleNamespace
 
@@ -4835,6 +5799,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
             project_count=0,
             registry_changed=False,
             report_changed=False,
+            checkout_collision_group_count=2,
+            checkout_authority_unknown_count=1,
+            discarded_checkout_count=4,
         )
 
     monkeypatch.setattr(
@@ -5227,6 +6194,175 @@ def test_context_recovery_plan_freezes_and_filters_targets(
     assert targets["Fresh"].status == "eligible"
     assert targets["tmp-scaffold"].status == "excluded"
     assert targets["tmp-scaffold"].reason == "temporary-or-generated"
+
+
+def test_context_recovery_plan_skips_unknown_checkout_authority(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "FreshCollision"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# FreshCollision\n\nFresh repo.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    projects = [
+        replace(
+            project,
+            repository_state={
+                **project.repository_state,
+                "checkout_authority": _checkout_authority_fixture(
+                    canonical_path=project.identity.path,
+                    origin=project.identity.repo_full_name or "fixture/FreshCollision",
+                    state="unknown",
+                    reason_code="conflicting_full_clone_heads",
+                ),
+            },
+        )
+        if project.identity.project_key == "FreshCollision"
+        else project
+        for project in result.snapshot.projects
+    ]
+    snapshot = replace(result.snapshot, projects=projects)
+
+    plan = build_context_recovery_plan(snapshot, workspace_root=portfolio_workspace)
+    target = next(
+        item for item in plan.projects if item.project_key == "FreshCollision"
+    )
+
+    assert target.status == "skipped"
+    assert target.reason == "checkout-authority-unknown:conflicting_full_clone_heads"
+
+
+def test_context_recovery_malformed_authority_never_redirects_target_path(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "FreshMalformed"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# FreshMalformed\n\nFresh repo.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    projects = [
+        replace(
+            project,
+            repository_state={
+                **project.repository_state,
+                "checkout_authority": {
+                    "schema_version": "CheckoutCollisionV1",
+                    "selection": {
+                        "state": "selected",
+                        "reason_code": "single_clone_topology",
+                        "representative_path": "_codex-worktrees/malicious-target",
+                        "selected_path": "_codex-worktrees/malicious-target",
+                    },
+                    "checkouts": [
+                        {
+                            "path": "_codex-worktrees/malicious-target",
+                            "state": "observed",
+                            "relation": "representative",
+                            "bare": False,
+                        }
+                    ],
+                },
+            },
+        )
+        if project.identity.project_key == "FreshMalformed"
+        else project
+        for project in result.snapshot.projects
+    ]
+    snapshot = replace(result.snapshot, projects=projects)
+
+    plan = build_context_recovery_plan(snapshot, workspace_root=portfolio_workspace)
+    target = next(
+        item for item in plan.projects if item.project_key == "FreshMalformed"
+    )
+
+    assert target.status == "skipped"
+    assert target.reason == "checkout-authority-malformed"
+    assert target.relative_path == "FreshMalformed"
+    assert target.target_path.startswith(str(target_repo))
+    assert "malicious-target" not in target.target_path
+
+
+def test_checkout_authority_path_falls_back_for_malformed_envelope_variants() -> None:
+    variants = []
+
+    missing_field = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    missing_field.pop("origin")
+    variants.append(missing_field)
+
+    invalid_type = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    invalid_type["selection"] = "selected"
+    variants.append(invalid_type)
+
+    invalid_count = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    invalid_count["checkout_count"] = 3
+    variants.append(invalid_count)
+
+    malformed_record = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    del malformed_record["checkouts"][0]["head"]
+    variants.append(malformed_record)
+
+    unknown_discarded = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    unknown_discarded["checkouts"][1].update(
+        {
+            "state": "unknown",
+            "head": None,
+            "branch": None,
+            "dirty": None,
+            "dirty_path_count": None,
+            "bare": None,
+        }
+    )
+    variants.append(unknown_discarded)
+
+    dirty_discarded = _checkout_authority_fixture(
+        canonical_path="Repo", origin="owner/Repo"
+    )
+    dirty_discarded["checkouts"][1].update(
+        {"dirty": True, "dirty_path_count": 1}
+    )
+    variants.append(dirty_discarded)
+
+    for authority in variants:
+        project = {
+            "identity": {"path": "Repo", "repo_full_name": "owner/Repo"},
+            "repository_state": {
+                "checkout_authority": deepcopy(authority),
+            },
+        }
+        with pytest.raises(ValueError):
+            validate_checkout_authority_envelope(
+                authority,
+                identity_path="Repo",
+                repo_full_name="owner/Repo",
+            )
+        assert checkout_authority_path(project) == "Repo"
+        assert checkout_authority_blocker(project) == "checkout-authority-malformed"
 
 
 def test_context_recovery_apply_writes_primary_context_and_catalog_seed(
