@@ -84,6 +84,70 @@ def test_observation_reports_dirty_no_upstream_and_unknown_remote(
     assert state["remote_default_branch"]["state"] == "unknown"
 
 
+def test_configured_local_reuses_one_worktree_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    head = _git(repo, "rev-parse", "HEAD")
+    observations = [
+        {
+            "path": str(repo),
+            "head": head,
+            "branch": "main",
+            "dirty": False,
+            "dirty_path_count": 0,
+            "upstream": None,
+            "upstream_branch": None,
+            "upstream_remote": None,
+            "upstream_observation_source": "unavailable",
+            "ahead": None,
+            "behind": None,
+        },
+        {
+            "path": str(repo),
+            "head": head,
+            "branch": "main",
+            "dirty": True,
+            "dirty_path_count": 1,
+            "upstream": None,
+            "upstream_branch": None,
+            "upstream_remote": None,
+            "upstream_observation_source": "unavailable",
+            "ahead": None,
+            "behind": None,
+        },
+    ]
+    call_count = 0
+
+    def changing_observation(_path: Path) -> dict[str, Any]:
+        nonlocal call_count
+        observation = observations[min(call_count, len(observations) - 1)]
+        call_count += 1
+        return observation
+
+    monkeypatch.setattr(
+        repository_state, "_observe_working_tree", changing_observation
+    )
+    observed_at = datetime(2026, 7, 12, tzinfo=UTC)
+    state = observe_repository_state(
+        repo,
+        observed_at=observed_at,
+        remote_default_branch=_remote_default("f" * 40),
+    )
+
+    assert call_count == 1
+    assert state["state"] == "unknown"
+    assert state["reason_code"] == "remote_default_worktree_not_found"
+    assert state["local"] == _local_from_worktree(state["worktrees"][0])
+    assert state["local"]["dirty"] is False
+    _validate_repository_state_shape(
+        state,
+        expected_remote=state["remote_default_branch"],
+        project_key="fixture/changing-configured-worktree",
+        generated_at=observed_at,
+    )
+
+
 def test_local_branch_upstream_is_observed_and_divergence_fails_closed(
     tmp_path: Path,
 ) -> None:
