@@ -82,7 +82,7 @@
   "portfolio_truth_schema_version": "0.11.0",
   "producer": {
     "artifact_path": "fixtures/contracts/portable-consumers-v1/portfolio-truth.json",
-    "artifact_sha256": "8af46309e1b7a891edf7489dcbfa5971cc3453fe983b9a824098d87dc42105d3",
+    "artifact_sha256": "e79ca6b203ff58b8b6ffbb01e778305887dfba4e4caf66334defea6ccc1713df",
     "generator": "src.portfolio_truth_contract_fixture:build_portable_contract_fixture",
     "manifest_path": "fixtures/contracts/public-site-projection-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"

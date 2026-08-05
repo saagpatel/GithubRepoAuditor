@@ -35,6 +35,7 @@ from src.portfolio_truth_metadata import (
 from src.portfolio_truth_precedence import build_precedence_matrix
 from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
+from src.security_admission import derive_security_admission
 
 # The demo workspace is deliberately not a real filesystem path.
 DEMO_WORKSPACE_ROOT = "/demo-workspace"
@@ -448,6 +449,7 @@ def _category_for(spec: DemoProject) -> str:
         return "commercial"
     return _GROUP_CATEGORIES[spec.group]
 
+
 _PURPOSES = {
     "flagship": "Operator-facing product surface with an active release lane.",
     "platform": "Shared platform service other demo projects depend on.",
@@ -843,8 +845,7 @@ def build_projects(
             "target_maturity": "operating",
             "notes": "",
             "doctor_standard": "",
-            "automation_eligible": context_quality
-            in {"minimum-viable", "boilerplate"},
+            "automation_eligible": context_quality in {"minimum-viable", "boilerplate"},
         }
         path_entry = build_operating_path_entry(
             {**declared, "has_explicit_entry": True},
@@ -880,6 +881,7 @@ def build_projects(
             "path_confidence": path_entry["path_confidence"],
             "path_rationale": path_entry["path_rationale"],
         }
+        security_admission = derive_security_admission(security)
         risk, attention_state = build_project_decision(
             display_name=spec.codename,
             operating_path=operating_path,
@@ -893,9 +895,12 @@ def build_projects(
             doctor_standard=declared["doctor_standard"],
             known_risks_present=derived["known_risks_present"],
             run_instructions_present=derived["run_instructions_present"],
-            security_coverage_state=security["coverage_state"],
-            security_high_alerts=security.get("dependabot_high") or 0,
-            security_critical_alerts=security.get("dependabot_critical") or 0,
+            security_coverage_state=security_admission.effective_coverage_state,
+            security_high_alerts=security_admission.total_open_high,
+            security_critical_alerts=(
+                security_admission.total_open_critical
+                + security_admission.total_open_secrets
+            ),
         )
         derived["attention_state"] = attention_state
         provenance_values = {
@@ -978,7 +983,6 @@ def build_projects(
             }
         )
     return projects
-
 
 
 def build_snapshot(
@@ -1093,18 +1097,38 @@ def build_weekly_digest(snapshot: dict[str, Any]) -> dict[str, Any]:
     projects = snapshot["projects"]
     rollups = snapshot["rollups"]
     elevated = [p for p in projects if p["risk"]["risk_tier"] == "elevated"]
-    open_alerts = sorted(
-        (p for p in projects if (p["security"]["open_high_critical"] or 0) > 0),
-        key=lambda p: p["security"]["open_high_critical"],
-        reverse=True,
+    admitted_security = [
+        (p, derive_security_admission(p["security"]))
+        for p in projects
+        if p["security"].get("cohort_member")
+    ]
+    blocking = sorted(
+        (
+            (p, admission)
+            for p, admission in admitted_security
+            if admission.has_findings
+        ),
+        key=lambda item: (
+            -(
+                item[1].total_open_critical
+                + item[1].total_open_secrets
+                + item[1].total_open_high
+            ),
+            item[0]["identity"]["display_name"],
+        ),
     )
-    lead = (
-        open_alerts[0]["identity"]["display_name"] if open_alerts else "the portfolio"
-    )
+    lead = blocking[0][0]["identity"]["display_name"] if blocking else "the portfolio"
+    admission_status_counts: dict[str, int] = {}
+    for _, admission in admitted_security:
+        admission_status_counts[admission.status] = (
+            admission_status_counts.get(admission.status, 0) + 1
+        )
     return {
         "username": "demo-operator",
         "generated_at": snapshot["generated_at"],
-        "headline": f"{len(elevated)} projects carry open high or critical alerts.",
+        "headline": (
+            f"{len(blocking)} projects carry blocking GitHub security findings."
+        ),
         "decision": f"Clear {lead} before starting lower-pressure cleanup.",
         "why_this_week": (
             f"{lead} holds the largest observed alert backlog and is the only "
@@ -1124,20 +1148,42 @@ def build_weekly_digest(snapshot: dict[str, Any]) -> dict[str, Any]:
             ],
         },
         "security_posture": {
-            "scanned_count": rollups["security"]["scanned_count"],
-            "repos_with_open_high_critical": rollups["security"][
-                "repos_with_open_high_critical"
-            ],
-            "total_open_critical": rollups["security"]["total_open_critical"],
-            "total_open_high": rollups["security"]["total_open_high"],
+            "scanned_count": sum(
+                admission.evidence_complete for _, admission in admitted_security
+            ),
+            "repos_with_open_high_critical": len(blocking),
+            "repos_with_blocking_findings": len(blocking),
+            "unadmitted_count": sum(
+                not admission.evidence_complete for _, admission in admitted_security
+            ),
+            "admission_status_counts": admission_status_counts,
+            "total_open_critical": sum(
+                admission.total_open_critical for _, admission in admitted_security
+            ),
+            "total_open_high": sum(
+                admission.total_open_high for _, admission in admitted_security
+            ),
+            "total_open_secrets": sum(
+                admission.total_open_secrets for _, admission in admitted_security
+            ),
             "top_alerts": [
                 {
                     "repo": p["identity"]["project_key"],
                     "risk_tier": p["risk"]["risk_tier"],
-                    "dependabot_critical": p["security"]["dependabot_critical"],
-                    "dependabot_high": p["security"]["dependabot_high"],
+                    "dependabot_critical": admission.dependabot_critical,
+                    "dependabot_high": admission.dependabot_high,
+                    "code_scanning_critical": admission.code_scanning_critical,
+                    "code_scanning_high": admission.code_scanning_high,
+                    "secret_scanning_open": admission.secret_scanning_open,
+                    "total_open_critical": admission.total_open_critical,
+                    "total_open_high": admission.total_open_high,
+                    "security_admission_status": admission.status,
+                    "security_admission_evidence_complete": (
+                        admission.evidence_complete
+                    ),
+                    "security_admission_reason_codes": list(admission.reason_codes),
                 }
-                for p in open_alerts[:5]
+                for p, admission in blocking[:5]
             ],
         },
         "path_attention": [

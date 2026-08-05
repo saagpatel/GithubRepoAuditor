@@ -6,6 +6,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.security_admission import (
+    SECURITY_ADMISSION_SCHEMA_VERSION,
+    derive_security_admission,
+)
+
 SCHEMA_VERSION = "0.11.0"
 CHECKOUT_COLLISION_SCHEMA_VERSION = "CheckoutCollisionV1"
 CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION = "CheckoutCollisionSummaryV1"
@@ -232,7 +237,7 @@ class SecurityFields:
 
     @property
     def open_high_critical(self) -> int:
-        """Dependabot high + critical — the security-risk-factor trigger surface."""
+        """Legacy Dependabot-only compatibility field for pre-admission readers."""
         return (self.dependabot_high or 0) + (self.dependabot_critical or 0)
 
     def provider_state(self, provider: str) -> str:
@@ -296,6 +301,7 @@ class PortfolioTruthRollups:
         repos_with_open_high_critical = 0
         total_open_high = 0
         total_open_critical = 0
+        total_open_secrets = 0
         unavailable_count = 0
         complete_repo_count = 0
         partial_repo_count = 0
@@ -324,6 +330,7 @@ class PortfolioTruthRollups:
                 risk_tier_counts[tier] += 1
             if not project.identity.project_key.startswith("supp:"):
                 security = project.security
+                security_admission = derive_security_admission(security.to_dict())
                 if security.cohort_member:
                     cohort_repository_count += 1
                 provider_states = {
@@ -333,10 +340,11 @@ class PortfolioTruthRollups:
                 dependabot_observed = provider_states["dependabot"] == "observed"
                 if dependabot_observed:
                     dependabot_observed_count += 1
-                    if security.open_high_critical > 0:
-                        repos_with_open_high_critical += 1
-                    total_open_high += security.dependabot_high or 0
-                    total_open_critical += security.dependabot_critical or 0
+                if security_admission.has_findings:
+                    repos_with_open_high_critical += 1
+                total_open_high += security_admission.total_open_high
+                total_open_critical += security_admission.total_open_critical
+                total_open_secrets += security_admission.total_open_secrets
                 if provider_states["code_scanning"] == "observed":
                     code_scanning_observed_count += 1
                 if provider_states["secret_scanning"] == "observed":
@@ -346,9 +354,7 @@ class PortfolioTruthRollups:
                     is True
                 )
                 code_scanning_zero_finding_count += int(
-                    (security.providers.get("code_scanning") or {}).get(
-                        "zero_findings"
-                    )
+                    (security.providers.get("code_scanning") or {}).get("zero_findings")
                     is True
                 )
                 secret_scanning_zero_finding_count += int(
@@ -435,6 +441,10 @@ class PortfolioTruthRollups:
                 "repos_with_open_high_critical": repos_with_open_high_critical,
                 "total_open_high": total_open_high,
                 "total_open_critical": total_open_critical,
+                "total_open_secrets": total_open_secrets,
+                "security_admission_schema_version": (
+                    SECURITY_ADMISSION_SCHEMA_VERSION
+                ),
             },
             decision={
                 "decision_needed_count": decision_needed_count,

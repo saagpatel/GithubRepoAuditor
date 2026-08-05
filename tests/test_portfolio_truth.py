@@ -162,10 +162,76 @@ def _security_test_project(
         risk=RiskFields(risk_tier=tier),
         security=SecurityFields(
             alerts_available=available,
+            coverage_state="complete" if available else "unknown",
+            cohort_member=available,
+            receipt_state="fresh" if available else "unknown",
+            source_produced_at=("2026-08-04T12:00:00+00:00" if available else None),
+            providers={
+                "dependabot": {
+                    "state": "observed" if available else "not_requested",
+                    "observed_at": ("2026-08-04T11:59:00+00:00" if available else None),
+                    "pagination_complete": available,
+                    "counts": (
+                        {"critical": critical, "high": high, "medium": 0, "low": 0}
+                        if available
+                        else None
+                    ),
+                },
+                "code_scanning": {
+                    "state": "observed" if available else "not_requested",
+                    "observed_at": ("2026-08-04T11:59:00+00:00" if available else None),
+                    "pagination_complete": available,
+                    "counts": (
+                        {"critical": 0, "high": 0, "warning": 0, "note": 0}
+                        if available
+                        else None
+                    ),
+                },
+                "secret_scanning": {
+                    "state": "observed" if available else "not_requested",
+                    "observed_at": ("2026-08-04T11:59:00+00:00" if available else None),
+                    "pagination_complete": available,
+                    "counts": {"open": 0} if available else None,
+                },
+            },
             dependabot_critical=critical,
             dependabot_high=high,
+            code_scanning_critical=0 if available else None,
+            code_scanning_high=0 if available else None,
+            secret_scanning_open=0 if available else None,
         ),
     )
+
+
+def _security_overlay_entry(
+    *,
+    dependabot_critical: int = 0,
+    dependabot_high: int = 0,
+    code_scanning_critical: int = 0,
+    code_scanning_high: int = 0,
+    secret_scanning_open: int = 0,
+) -> dict:
+    # The display-name keyed test seam intentionally uses the supported legacy
+    # envelope. It can surface known findings but cannot prove evidence clear.
+    return {
+        "cohort_member": True,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "dependabot": {
+            "critical": dependabot_critical,
+            "high": dependabot_high,
+            "medium": 0,
+            "low": 0,
+            "available": True,
+        },
+        "code_scanning": {
+            "critical": code_scanning_critical,
+            "high": code_scanning_high,
+            "warning": 0,
+            "note": 0,
+            "available": True,
+        },
+        "secret_scanning": {"open": secret_scanning_open, "available": True},
+    }
 
 
 def test_extract_github_full_name_uses_exact_github_host() -> None:
@@ -809,6 +875,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "repos_with_open_high_critical",
         "total_open_high",
         "total_open_critical",
+        "total_open_secrets",
+        "security_admission_schema_version",
     }
     assert rollups["security"]["cohort_repository_count"] == 1
     assert rollups["security"]["cohort_unknown_count"] == 1
@@ -935,8 +1003,7 @@ def test_unresolved_declared_checkout_flows_through_truth_validation(
     missing_target = portfolio_workspace / "_codex-worktrees" / "repo-retired" / "src"
     _write(
         repo / "AGENTS.md",
-        "# Repo\n\n## Canonical Paths\n\n"
-        f"- Source: `{missing_target}`\n",
+        f"# Repo\n\n## Canonical Paths\n\n- Source: `{missing_target}`\n",
     )
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
     subprocess.run(
@@ -977,10 +1044,7 @@ def test_unresolved_declared_checkout_flows_through_truth_validation(
     authority = project.repository_state["checkout_authority"]
     assert authority["checkout_count"] == 1
     assert authority["selection"]["state"] == "unknown"
-    assert (
-        authority["selection"]["reason_code"]
-        == "declared_checkout_path_unresolved"
-    )
+    assert authority["selection"]["reason_code"] == "declared_checkout_path_unresolved"
     assert authority["unresolved_declared_paths"] == [
         "_codex-worktrees/repo-retired/src"
     ]
@@ -998,8 +1062,7 @@ def test_failed_singleton_observation_with_declaration_is_valid_unknown(
     declared_target = repo / "src"
     _write(
         repo / "AGENTS.md",
-        "# ObservationRepo\n\n## Canonical Paths\n\n"
-        f"- Source: `{declared_target}`\n",
+        f"# ObservationRepo\n\n## Canonical Paths\n\n- Source: `{declared_target}`\n",
     )
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
     subprocess.run(
@@ -1059,10 +1122,13 @@ def test_failed_singleton_observation_with_declaration_is_valid_unknown(
     assert authority["selection"]["reason_code"] == "checkout_observation_failed"
     assert authority["selection"]["selected_path"] is None
     assert authority["declared_checkout_paths"] == ["ObservationRepo"]
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) == "checkout-authority-unknown:checkout_observation_failed"
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        == "checkout-authority-unknown:checkout_observation_failed"
+    )
     validate_truth_snapshot(result.snapshot)
 
 
@@ -1109,8 +1175,7 @@ def test_declared_bare_singleton_publishes_unknown_and_blocks_consumers(
     )
     _write(
         coordinator / "AGENTS.md",
-        "# BareRepo\n\n## Canonical Paths\n\n"
-        f"- Source: `{coordinator}`\n",
+        f"# BareRepo\n\n## Canonical Paths\n\n- Source: `{coordinator}`\n",
     )
 
     result = build_portfolio_truth_snapshot(
@@ -1131,10 +1196,13 @@ def test_declared_bare_singleton_publishes_unknown_and_blocks_consumers(
     assert authority["selection"]["state"] == "unknown"
     assert authority["selection"]["selected_path"] is None
     assert authority["selection"]["reason_code"] == "bare_representative_unusable"
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) == "checkout-authority-unknown:bare_representative_unusable"
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        == "checkout-authority-unknown:bare_representative_unusable"
+    )
     validate_truth_snapshot(result.snapshot)
 
     plan = build_context_recovery_plan(
@@ -1213,13 +1281,15 @@ def test_worktree_enumeration_failure_is_explicit_unknown_summary(
     assert summary["state"] == "unknown"
     assert summary["group_count"] == 1
     assert summary["ambiguous_group_count"] == 1
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) == "checkout-authority-unknown:worktree_enumeration_failed"
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        == "checkout-authority-unknown:worktree_enumeration_failed"
+    )
     assert any(
-        "same-origin checkout groups" in warning
-        for warning in result.snapshot.warnings
+        "same-origin checkout groups" in warning for warning in result.snapshot.warnings
     )
     assert all(
         "same-origin full-clone groups" not in warning
@@ -1247,8 +1317,7 @@ def test_external_declared_checkout_is_opaque_unknown(
     external_target = escape / "ExternalRepo" / "src"
     _write(
         repo / "AGENTS.md",
-        "# ExternalRepo\n\n## Canonical Paths\n\n"
-        f"- Source: `{external_target}`\n",
+        f"# ExternalRepo\n\n## Canonical Paths\n\n- Source: `{external_target}`\n",
     )
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
     subprocess.run(
@@ -1294,17 +1363,17 @@ def test_external_declared_checkout_is_opaque_unknown(
     )
     authority = project.repository_state["checkout_authority"]
     assert authority["selection"]["state"] == "unknown"
-    assert (
-        authority["selection"]["reason_code"]
-        == "declared_checkout_path_unresolved"
-    )
+    assert authority["selection"]["reason_code"] == "declared_checkout_path_unresolved"
     assert authority["unresolved_declared_paths"] == ["external-checkout"]
     assert str(external_target) not in json.dumps(authority)
     assert str(external_target.resolve()) not in json.dumps(authority)
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) == "checkout-authority-unknown:declared_checkout_path_unresolved"
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        == "checkout-authority-unknown:declared_checkout_path_unresolved"
+    )
     validate_truth_snapshot(result.snapshot)
 
 
@@ -1345,8 +1414,7 @@ def test_external_linked_worktree_flows_through_truth_validation_and_report(
         check=True,
     )
     external = (
-        portfolio_workspace.parent
-        / "external-worktree-path-must-not-be-published"
+        portfolio_workspace.parent / "external-worktree-path-must-not-be-published"
     )
     subprocess.run(
         ["git", "worktree", "add", "-q", "-b", "external", str(external), "HEAD"],
@@ -1372,8 +1440,7 @@ def test_external_linked_worktree_flows_through_truth_validation_and_report(
     assert authority["full_clone_count"] == 1
     assert authority["selection"]["state"] == "unknown"
     assert (
-        authority["selection"]["reason_code"]
-        == "external_linked_worktree_unobserved"
+        authority["selection"]["reason_code"] == "external_linked_worktree_unobserved"
     )
     assert authority["discarded_checkouts"] == [
         {
@@ -1389,10 +1456,13 @@ def test_external_linked_worktree_flows_through_truth_validation_and_report(
     ]
     assert str(external) not in json.dumps(authority)
     assert str(external) not in json.dumps(result.snapshot.to_dict())
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) == "checkout-authority-unknown:external_linked_worktree_unobserved"
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        == "checkout-authority-unknown:external_linked_worktree_unobserved"
+    )
     validate_truth_snapshot(result.snapshot)
 
     markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
@@ -1472,10 +1542,13 @@ def test_prunable_linked_worktree_is_unknown_not_publication_failure(
         if item["path"] == "_codex-worktrees/prunable-repo"
     )
     assert missing["state"] == "unknown"
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) == "checkout-authority-unknown:checkout_observation_failed"
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        == "checkout-authority-unknown:checkout_observation_failed"
+    )
     validate_truth_snapshot(result.snapshot)
 
 
@@ -1590,10 +1663,13 @@ repos:
     assert authority["selection"]["selected_path"] == "Repo-main"
     assert checkout_authority_path(project) == "Repo-main"
     assert project.repository_state["local"]["path"] == str(linked)
-    assert checkout_authority_blocker(
-        project,
-        workspace_root=portfolio_workspace,
-    ) is None
+    assert (
+        checkout_authority_blocker(
+            project,
+            workspace_root=portfolio_workspace,
+        )
+        is None
+    )
     validate_truth_snapshot(result.snapshot)
 
     plan = build_context_recovery_plan(
@@ -1709,9 +1785,7 @@ groups:
     assert project.declared.category == "infrastructure"
     assert project.declared.owner != "wrong-physical-owner"
     assert authority["canonical_project_path"] == "Infra/Repo"
-    assert authority["selection"]["selected_path"] == (
-        "_codex-worktrees/repo-main"
-    )
+    assert authority["selection"]["selected_path"] == ("_codex-worktrees/repo-main")
     assert checkout_authority_path(project) == "_codex-worktrees/repo-main"
     assert project.repository_state["local"]["path"] == str(linked)
     assert checkout_authority_blocker(project, workspace_root=workspace) is None
@@ -1792,9 +1866,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         by_display_name[project.identity.display_name] = project
         if project.derived.attention_state not in {"active-infra", "active-product"}:
             continue
-        logical_key = (
-            project.identity.repo_full_name or project.identity.display_name
-        )
+        logical_key = project.identity.repo_full_name or project.identity.display_name
         active[logical_key] = project.derived.attention_state
 
     assert active == {
@@ -1816,14 +1888,10 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         result.snapshot.to_dict(),
         overrides_config_path=None,
     )
-    registry_by_key = {
-        entry["canonical_key"]: entry for entry in registry["entries"]
-    }
+    registry_by_key = {entry["canonical_key"]: entry for entry in registry["entries"]}
     assert registry_by_key["supp:personal-ops"]["lifecycle_state"] == "active"
     assert registry_by_key["supp:personal-ops"]["group_key"] == "operator_infra"
-    coverage_by_source = {
-        row["source"]: row for row in result.snapshot.coverage
-    }
+    coverage_by_source = {row["source"]: row for row in result.snapshot.coverage}
     assert coverage_by_source["workspace"]["project_count"] == 15
     assert coverage_by_source["git"]["project_count"] == 15
     assert coverage_by_source["supplementary_registry"]["project_count"] == 1
@@ -1832,9 +1900,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     security_rollup = result.snapshot.to_dict()["rollups"]["security"]
     assert security_rollup["unknown_count"] == 15
     assert security_rollup["unavailable_count"] == 15
-    assert (
-        result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
-    )
+    assert result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
     personal_ops = by_display_name["personal-ops"]
     assert personal_ops.identity.project_key == "supp:personal-ops"
     assert personal_ops.identity.group_key == "operator_infra"
@@ -1923,8 +1989,9 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
     for name in excluded_egress_repositories:
         assert by_display_name[name].derived.attention_state == "manual-only"
     assert (
-        by_display_name["egress-guard-oss"]
-        .provenance["declared.lifecycle_state"]["detail"]
+        by_display_name["egress-guard-oss"].provenance["declared.lifecycle_state"][
+            "detail"
+        ]
         == "cross-provider-egress-guard"
     )
     for name in ("agent-permission-diff-bot", "proof-pr"):
@@ -1957,8 +2024,10 @@ def test_discovered_personal_ops_replaces_supplementary_registry_identity(
     assert len(matches) == 1
     assert matches[0].identity.project_key == "supp:personal-ops"
     assert matches[0].security.cohort_member is False
-    assert matches[0].provenance["derived.context_quality"]["source"].startswith(
-        "workspace+supplementary-registry"
+    assert (
+        matches[0]
+        .provenance["derived.context_quality"]["source"]
+        .startswith("workspace+supplementary-registry")
     )
     by_source = {row["source"]: row for row in result.snapshot.coverage}
     assert by_source["workspace"]["project_count"] == 0
@@ -2422,12 +2491,8 @@ def test_receipt_archived_state_is_fallback_when_live_status_is_unavailable(
                 ),
                 "reason": None,
                 "observed_at": now.isoformat(),
-                "default_branch": (
-                    "main" if remote_state == "observed" else None
-                ),
-                "head_sha": (
-                    "b" * 40 if remote_state == "observed" else None
-                ),
+                "default_branch": ("main" if remote_state == "observed" else None),
+                "head_sha": ("b" * 40 if remote_state == "observed" else None),
                 "archived": True,
             },
             "providers": {},
@@ -2680,8 +2745,9 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
         if item["source"] == "github_security"
     )
     assert github_coverage["remote_default_branch_counts"]["transient_error"] == 1
-    assert sum(github_coverage["remote_default_branch_counts"].values()) == (
-        github_coverage["project_count"]
+    assert (
+        sum(github_coverage["remote_default_branch_counts"].values())
+        == (github_coverage["project_count"])
     )
 
 
@@ -2730,6 +2796,56 @@ def test_security_overlay_populates_and_force_elevates(
     alpha_dict = alpha.to_dict()
     assert "security" in alpha_dict
     assert alpha_dict["security"]["dependabot_critical"] == 1
+
+
+@pytest.mark.parametrize(
+    "provider_counts",
+    [
+        {"code_scanning": {"critical": 0, "high": 1, "available": True}},
+        {"secret_scanning": {"open": 1, "available": True}},
+    ],
+)
+def test_non_dependabot_findings_drive_risk_and_attention(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    provider_counts: dict[str, dict[str, int | bool]],
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    security = {
+        "Alpha": {
+            "dependabot": {
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+                "available": True,
+            },
+            "code_scanning": {"critical": 0, "high": 0, "available": True},
+            "secret_scanning": {"open": 0, "available": True},
+            **provider_counts,
+        }
+    }
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    alpha = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+
+    assert alpha.security.dependabot_critical == 0
+    assert alpha.security.dependabot_high == 0
+    assert alpha.risk.security_risk is True
+    assert "active-high-severity-alerts" in alpha.risk.risk_factors
+    assert alpha.derived.attention_state == "decision-needed"
 
 
 def test_bound_security_identity_and_high_findings_reach_decision_queue(
@@ -2861,9 +2977,7 @@ repos:
         readme = project / "README.md"
         _write(readme, f"# {name}\n\nCohort rollover fixture.\n")
         _set_mtime(readme, (now - timedelta(days=31)).timestamp())
-        subprocess.run(
-            ["git", "init"], cwd=project, capture_output=True, check=True
-        )
+        subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
         subprocess.run(
             [
                 "git",
@@ -2936,9 +3050,7 @@ repos:
     category: vanity
 """
     )
-    replacement_security = {
-        "d/New": {**security["d/Old"], "repo_full_name": "d/New"}
-    }
+    replacement_security = {"d/New": {**security["d/Old"], "repo_full_name": "d/New"}}
     with pytest.raises(
         ValueError,
         match=(
@@ -2955,9 +3067,7 @@ repos:
             security_coverage_metadata=metadata,
             prior_security_alerts_by_name=security,
             prior_security_cohort_repositories=("d/Old",),
-            repo_status_by_name={
-                "Old": {"source": "github_api", "archived": True}
-            },
+            repo_status_by_name={"Old": {"source": "github_api", "archived": True}},
         )
 
 
@@ -3155,9 +3265,7 @@ def test_security_cohort_identity_rejects_case_only_drift() -> None:
 
     with pytest.raises(
         ValueError,
-        match=(
-            "receipt_only=\\['D/Alpha'\\]; derived_only=\\['d/Alpha'\\]"
-        ),
+        match=("receipt_only=\\['D/Alpha'\\]; derived_only=\\['d/Alpha'\\]"),
     ):
         _validate_security_receipt_cohort_identity(
             projects=[project],
@@ -3404,9 +3512,7 @@ repos:
             security_alerts_by_name={"d/Manual": contradictory_archive},
             security_coverage_metadata=metadata,
             prior_security_alerts_by_name=prior_security,
-            repo_status_by_name={
-                "Manual": {"source": "github_api", "archived": False}
-            },
+            repo_status_by_name={"Manual": {"source": "github_api", "archived": False}},
         )
 
 
@@ -3476,9 +3582,7 @@ repos:
         "cohort_repository_count": 1,
         "path": "/evidence/github-security-coverage-latest.json",
     }
-    live_archived_status = {
-        "Active": {"source": "github_api", "archived": True}
-    }
+    live_archived_status = {"Active": {"source": "github_api", "archived": True}}
     prior_active_security = {"d/Active": receipt_entry(archived=False)}
 
     with pytest.raises(ValueError, match="without fresh observed Dependabot"):
@@ -3523,12 +3627,8 @@ repos:
         now=now,
         security_alerts_by_name={"d/Active": receipt_entry(archived=False)},
         security_coverage_metadata=metadata,
-        prior_security_alerts_by_name={
-            "d/Active": receipt_entry(archived=True)
-        },
-        repo_status_by_name={
-            "Active": {"source": "github_api", "archived": False}
-        },
+        prior_security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
+        repo_status_by_name={"Active": {"source": "github_api", "archived": False}},
     )
     reactivated = unarchived.snapshot.projects[0]
     assert reactivated.derived.archived is False
@@ -3543,12 +3643,8 @@ repos:
             now=now,
             security_alerts_by_name={},
             security_coverage_metadata=empty_metadata,
-            prior_security_alerts_by_name={
-                "d/Active": receipt_entry(archived=True)
-            },
-            repo_status_by_name={
-                "Active": {"source": "github_api", "archived": False}
-            },
+            prior_security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
+            repo_status_by_name={"Active": {"source": "github_api", "archived": False}},
         )
 
     with pytest.raises(ValueError, match="post-receipt attention contains"):
@@ -3559,9 +3655,7 @@ repos:
             now=now,
             security_alerts_by_name={},
             security_coverage_metadata=empty_metadata,
-            prior_security_alerts_by_name={
-                "d/Active": receipt_entry(archived=True)
-            },
+            prior_security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
             repo_status_by_name={
                 "Active": {"source": "audit_report", "archived": False}
             },
@@ -3574,9 +3668,7 @@ repos:
         now=now,
         security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
         security_coverage_metadata=metadata,
-        prior_security_alerts_by_name={
-            "d/Active": receipt_entry(archived=True)
-        },
+        prior_security_alerts_by_name={"d/Active": receipt_entry(archived=True)},
         # The prior canonical truth kept this identity in its final cohort because
         # live GitHub status contradicted the receipt's archive claim.
         prior_security_cohort_repositories=("d/Active",),
@@ -3685,15 +3777,15 @@ repos:
         now=first_at,
         security_alerts_by_name={"d/Active": security_entry(first_at)},
         security_coverage_metadata=metadata(first_at, "a"),
-        repo_status_by_name={
-            "Active": {"source": "github_api", "archived": False}
-        },
+        repo_status_by_name={"Active": {"source": "github_api", "archived": False}},
     )
     first_payload = json.loads(first.latest_path.read_text())
     first_project = first_payload["projects"][0]
     assert first_project["derived"]["archived"] is False
     assert first_project["derived"]["attention_state"] == "active-infra"
-    assert first_project["repository_state"]["remote_default_branch"]["archived"] is True
+    assert (
+        first_project["repository_state"]["remote_default_branch"]["archived"] is True
+    )
 
     second_at = first_at + timedelta(hours=1)
     second = publish_portfolio_truth(
@@ -4294,9 +4386,7 @@ repos:
     assert infra.security.cohort_member is True
     assert infra.security.coverage_state == "unknown"
     security_coverage = next(
-        row
-        for row in result.snapshot.coverage
-        if row["source"] == "github_security"
+        row for row in result.snapshot.coverage if row["source"] == "github_security"
     )
     assert security_coverage["cohort_repository_count"] == 1
     assert security_coverage["cohort_unknown_count"] == 1
@@ -4427,18 +4517,12 @@ def test_registry_render_surfaces_security_and_round_trips(
 ) -> None:
     now = datetime(2026, 8, 4, 12, tzinfo=timezone.utc)
     security = {
-        "Alpha": {
-            "dependabot": {
-                "critical": 2,
-                "high": 1,
-                "medium": 0,
-                "low": 0,
-                "receipt_id": 7,
-                "available": True,
-            },
-            "code_scanning": {"available": True},
-            "secret_scanning": {"open": 0, "available": True},
-        }
+        "Alpha": _security_overlay_entry(
+            dependabot_critical=2,
+            dependabot_high=1,
+            code_scanning_high=2,
+            secret_scanning_open=1,
+        )
     }
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -4450,13 +4534,15 @@ def test_registry_render_surfaces_security_and_round_trips(
     )
     markdown = render_registry_markdown(result.snapshot)
 
-    # Per-repo Notes flag fires for the scanned repo carrying open high/critical alerts.
-    assert "[security: 2 critical / 1 high open Dependabot alerts]" in markdown
+    # Per-repo Notes flag reflects the same combined admitted result as other surfaces.
+    assert "[security: 2 critical / 3 high / 1 open secrets]" in markdown
     # Aggregate rows land in the Portfolio Summary table.
-    assert "| Repos scanned for security alerts | 1 |" in markdown
-    assert "| Repos with open high/critical alerts | 1 |" in markdown
-    assert "| Open critical Dependabot alerts | 2 |" in markdown
-    assert "| Open high Dependabot alerts | 1 |" in markdown
+    assert "| Repos admitted for security findings | 0 |" in markdown
+    assert "| Repos with blocking GitHub security findings | 1 |" in markdown
+    assert "| Repos with unadmitted security evidence | 1 |" in markdown
+    assert "| Open critical GitHub security findings | 2 |" in markdown
+    assert "| Open high GitHub security findings | 3 |" in markdown
+    assert "| Open secret-scanning findings | 1 |" in markdown
 
     # The security flag is pipe-free + digit summary rows, so the parser round-trip is
     # unchanged: same project row count, no inflation from the new content.
@@ -4515,8 +4601,8 @@ def test_registry_render_omits_security_flag_when_unscanned(
     markdown = render_registry_markdown(result.snapshot)
     assert "[security:" not in markdown
     # Summary rows stay present, all zero, documenting that the overlay was not run.
-    assert "| Repos scanned for security alerts | 0 |" in markdown
-    assert "| Repos with open high/critical alerts | 0 |" in markdown
+    assert "| Repos admitted for security findings | 0 |" in markdown
+    assert "| Repos with blocking GitHub security findings | 0 |" in markdown
 
 
 def test_portfolio_report_security_posture_lists_open_alerts(
@@ -4525,17 +4611,13 @@ def test_portfolio_report_security_posture_lists_open_alerts(
     legacy_registry: Path,
 ) -> None:
     security = {
-        "Alpha": {
-            "dependabot": {
-                "critical": 1,
-                "high": 2,
-                "medium": 0,
-                "low": 0,
-                "available": True,
-            },
-            "code_scanning": {"available": True},
-            "secret_scanning": {"open": 0, "available": True},
-        }
+        "Alpha": _security_overlay_entry(
+            dependabot_critical=1,
+            dependabot_high=2,
+            code_scanning_critical=1,
+            code_scanning_high=3,
+            secret_scanning_open=1,
+        )
     }
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -4549,10 +4631,11 @@ def test_portfolio_report_security_posture_lists_open_alerts(
     assert "## Security Posture" in markdown
     assert "[Security Posture](#security-posture)" in markdown
     assert (
-        "- **Alpha** [elevated]: 1 critical, 2 high open Dependabot alerts" in markdown
+        "- **Alpha** [elevated]: 2 critical, 5 high, 1 open secrets (admission fail)"
+        in markdown
     )
     assert (
-        "- Security posture: scanned `1`, with open high/critical Dependabot alerts `1`"
+        "- Security posture: admitted `0`, with blocking GitHub security findings `1`"
         in markdown
     )
     # The new section keeps the report validator green.
@@ -4564,40 +4647,38 @@ def test_portfolio_report_security_posture_scanned_clear(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    # Scanned with zero open high/critical reads as "all clear", distinct from "not run".
-    security = {
-        "Alpha": {
-            "dependabot": {
-                "critical": 0,
-                "high": 0,
-                "medium": 3,
-                "low": 0,
-                "available": True,
-            },
-            "code_scanning": {"available": True},
-            "secret_scanning": {"open": 0, "available": True},
-        }
-    }
+    # A complete, fresh, zero-finding admission reads as clear.
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
         catalog_path=portfolio_catalog,
         legacy_registry_path=legacy_registry,
         include_notion=False,
-        security_alerts_by_name=security,
     )
-    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    complete_clear = _security_test_project(
+        "Alpha", critical=0, high=0, available=True, tier="baseline"
+    ).security
+    snapshot = replace(
+        result.snapshot,
+        projects=[
+            replace(project, security=complete_clear)
+            if project.identity.display_name == "Alpha"
+            else project
+            for project in result.snapshot.projects
+        ],
+    )
+    markdown = render_portfolio_report_markdown(snapshot, "output/x.json")
     assert (
-        "All 1 scanned repos are clear of open high/critical Dependabot alerts."
+        "All 1 admitted repos are clear of blocking GitHub security findings."
         in markdown
     )
     validate_portfolio_report_markdown(markdown)
 
     # Same guard governs the registry: a scanned repo with only medium alerts gets no
     # per-repo flag, but it still counts as scanned in the summary table.
-    registry_md = render_registry_markdown(result.snapshot)
+    registry_md = render_registry_markdown(snapshot)
     assert "[security:" not in registry_md
-    assert "| Repos scanned for security alerts | 1 |" in registry_md
-    assert "| Repos with open high/critical alerts | 0 |" in registry_md
+    assert "| Repos admitted for security findings | 1 |" in registry_md
+    assert "| Repos with blocking GitHub security findings | 0 |" in registry_md
 
 
 def test_security_attention_items_caps_at_five_and_sorts_critical_first() -> None:
@@ -4639,8 +4720,9 @@ def test_portfolio_report_security_posture_not_run(
         include_notion=False,
     )
     markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
-    assert "Security overlay not run for this snapshot" in markdown
-    assert "- Security posture: scanned `0`," in markdown
+    assert "Security evidence remains UNKNOWN for 1 repo(s)" in markdown
+    assert "- Security posture: admitted `0`," in markdown
+    assert "unadmitted `1`" in markdown
     validate_portfolio_report_markdown(markdown)
 
 
@@ -4796,9 +4878,7 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
         cwd=alpha,
         check=True,
     )
-    subprocess.run(
-        ["git", "config", "user.name", "Tests"], cwd=alpha, check=True
-    )
+    subprocess.run(["git", "config", "user.name", "Tests"], cwd=alpha, check=True)
     subprocess.run(
         ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
         cwd=alpha,
@@ -4895,9 +4975,14 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
     )
     payload = json.loads(published.latest_path.read_text())
     alpha_payload = next(
-        project for project in payload["projects"] if project["identity"]["path"] == "Alpha"
+        project
+        for project in payload["projects"]
+        if project["identity"]["path"] == "Alpha"
     )
-    assert alpha_payload["repository_state"]["remote_default_branch"]["state"] == "observed"
+    assert (
+        alpha_payload["repository_state"]["remote_default_branch"]["state"]
+        == "observed"
+    )
 
     second_at = now + timedelta(hours=1)
     second_security = json.loads(json.dumps(security))
@@ -5458,24 +5543,25 @@ def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
         now=now + timedelta(seconds=1),
     )
     assert loaded.receipt_id == at_boundary.receipt_id == reloaded.receipt_id
-    assert loaded.content_sha256 == at_boundary.content_sha256 == reloaded.content_sha256
+    assert (
+        loaded.content_sha256 == at_boundary.content_sha256 == reloaded.content_sha256
+    )
     assert loaded.receipt_state == at_boundary.receipt_state == "fresh"
     assert reloaded.receipt_state == "fresh"
-    assert loaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
-        "state"
-    ] == "observed"
-    assert reloaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
-        "state"
-    ] == "stale"
-    assert at_boundary.entries_by_full_name["d/Alpha"]["providers"]["dependabot"][
-        "state"
-    ] == "observed"
-    assert loaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
-        "observed"
+    assert (
+        loaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"]["state"]
+        == "observed"
     )
-    assert reloaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
-        "stale"
+    assert (
+        reloaded.entries_by_full_name["d/Alpha"]["providers"]["dependabot"]["state"]
+        == "stale"
     )
+    assert (
+        at_boundary.entries_by_full_name["d/Alpha"]["providers"]["dependabot"]["state"]
+        == "observed"
+    )
+    assert loaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == ("observed")
+    assert reloaded.entries_by_full_name["d/Alpha"]["repository"]["state"] == ("stale")
     assert at_boundary.entries_by_full_name["d/Alpha"]["repository"]["state"] == (
         "observed"
     )
@@ -5993,8 +6079,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
         "src.app.portfolio_truth.load_live_repo_status_by_name",
-        lambda **kwargs: captured.setdefault("repo_status_cache", kwargs["cache"])
-        or {},
+        lambda **kwargs: (
+            captured.setdefault("repo_status_cache", kwargs["cache"]) or {}
+        ),
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     args = SimpleNamespace(
@@ -6525,9 +6612,7 @@ def test_checkout_authority_path_falls_back_for_malformed_envelope_variants() ->
     dirty_discarded = _checkout_authority_fixture(
         canonical_path="Repo", origin="owner/Repo"
     )
-    dirty_discarded["checkouts"][1].update(
-        {"dirty": True, "dirty_path_count": 1}
-    )
+    dirty_discarded["checkouts"][1].update({"dirty": True, "dirty_path_count": 1})
     variants.append(dirty_discarded)
 
     for authority in variants:
