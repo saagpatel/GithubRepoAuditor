@@ -1,0 +1,114 @@
+{
+  "portfolio_truth": {
+    "schema_version": "0.11.0",
+    "generated_at": "2026-08-05T05:00:25.858137+00:00",
+    "producer": {
+      "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "receipt_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "inputs": {
+      "github_security": {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": "GitHubSecurityCoverageReceiptV1",
+        "produced_at": "2026-08-05T05:00:16.563112+00:00",
+        "state": "fresh",
+        "producer_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/fixtures/github-security-coverage-latest.json",
+        "receipt_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    "projects": [
+      {
+        "identity": { "project_key": "payments-api", "display_name": "payments-api", "path": "payments-api", "repo_full_name": "fixture-org/payments-api" },
+        "declared": { "owner": "fixture-owner" },
+        "derived": { "attention_state": "decision-needed" },
+        "risk": { "security_risk": true },
+        "security": {
+          "coverage_state": "complete",
+          "receipt_state": "fresh",
+          "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
+          "dependabot_critical": 0,
+          "dependabot_high": 1,
+          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+        }
+      },
+      {
+        "identity": { "project_key": "audit-engine", "display_name": "audit-engine", "path": "audit-engine", "repo_full_name": "fixture-org/audit-engine" },
+        "declared": { "owner": "fixture-owner" },
+        "derived": { "attention_state": "decision-needed" },
+        "risk": { "security_risk": true },
+        "security": {
+          "coverage_state": "complete",
+          "receipt_state": "fresh",
+          "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
+          "dependabot_critical": 0,
+          "dependabot_high": 4,
+          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+        }
+      },
+      {
+        "identity": { "project_key": "trust-store", "display_name": "trust-store", "path": "trust-store", "repo_full_name": "fixture-org/trust-store" },
+        "declared": { "owner": "fixture-owner" },
+        "derived": { "attention_state": "decision-needed" },
+        "risk": { "security_risk": true },
+        "security": {
+          "coverage_state": "complete",
+          "receipt_state": "fresh",
+          "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
+          "dependabot_critical": 0,
+          "dependabot_high": 2,
+          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+        }
+      },
+      {
+        "identity": { "project_key": "security-console", "display_name": "security-console", "path": "security-console", "repo_full_name": "fixture-org/security-console" },
+        "declared": { "owner": "fixture-owner" },
+        "derived": { "attention_state": "decision-needed" },
+        "risk": { "security_risk": true },
+        "security": {
+          "coverage_state": "complete",
+          "receipt_state": "fresh",
+          "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
+          "dependabot_critical": 0,
+          "dependabot_high": 1,
+          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+        }
+      },
+      {
+        "identity": { "project_key": "policy-bot", "display_name": "policy-bot", "path": "policy-bot", "repo_full_name": "fixture-org/policy-bot" },
+        "declared": { "owner": "fixture-owner" },
+        "derived": { "attention_state": "decision-needed" },
+        "risk": { "security_risk": false }
+      },
+      {
+        "identity": { "project_key": "proof-pipeline", "display_name": "proof-pipeline", "path": "proof-pipeline", "repo_full_name": "fixture-org/proof-pipeline" },
+        "declared": { "owner": "fixture-owner" },
+        "derived": { "attention_state": "decision-needed" },
+        "risk": { "security_risk": false }
+      }
+    ]
+  },
+  "expected_security_decisions": {
+    "payments-api": {
+      "decision_key": "sha256:fddaff8be63ec131629eb8b3eb2f2232b999f3730748fcfc407f467a915a23cd",
+      "decision_fingerprint": "sha256:71bf4b0914e8d34be50369d084e45407ccf733a021b5cb97bad6097e04b305e0"
+    },
+    "audit-engine": {
+      "decision_key": "sha256:595399eab7f31296ce96f7277673d955ad7fd0d540e37da54b5ce12f4cc5eb6e",
+      "decision_fingerprint": "sha256:e16817a5216a197802f71c11931391ec77e310435781b9c599da3c24d1293d99"
+    },
+    "trust-store": {
+      "decision_key": "sha256:98e4e3ebbadc0a4479704f33e0ca9d991fdb87defa6eb7ce8eb7654d821066f8",
+      "decision_fingerprint": "sha256:f7a589059d617bc5759b03ff418a1a4ffb61ac8e1bab92b858ed7a61101c026c"
+    },
+    "security-console": {
+      "decision_key": "sha256:2fec2aef256380d1957c3cbf6cf332bf04d04050e62bf5d8cf5413e3ae2fe89f",
+      "decision_fingerprint": "sha256:ff5107001f3e30f062e01816ea6b4240533de7a7eafd21ae5784a816f2c2057e"
+    }
+  },
+  "expected_withheld": {
+    "policy-bot": "OWNER_DECISION_SPEC_INCOMPLETE",
+    "proof-pipeline": "OWNER_DECISION_SPEC_INCOMPLETE"
+  }
+}
