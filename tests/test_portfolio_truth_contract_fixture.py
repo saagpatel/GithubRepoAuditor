@@ -84,10 +84,16 @@ def test_portable_profiles_share_one_public_safe_artifact() -> None:
     assert len(
         {manifest["producer"]["artifact_sha256"] for manifest in manifests}
     ) == 1
+    assert {
+        manifest["consumer_profile"]["id"] for manifest in manifests
+    } == {
+        "operator-control-plane-v1",
+        "public-site-projection-v1",
+    }
 
     rendered = json.dumps(manifests, sort_keys=True).lower()
-    assert "personal-ops" not in rendered
-    assert "portfolio-index" not in rendered
+    assert "consumer_repository" not in rendered
+    assert "consumer_name" not in rendered
     assert "/users/" not in rendered
 
 
