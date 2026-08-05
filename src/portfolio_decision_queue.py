@@ -13,9 +13,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+# Keep the documented absolute-path entrypoint portable. When Python executes
+# this file directly it puts ``src/`` on sys.path, which otherwise makes the
+# package-qualified ``src.security_admission`` import impossible outside the
+# repository root. Module and test imports already have the repository root.
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.security_admission import derive_security_admission
 
