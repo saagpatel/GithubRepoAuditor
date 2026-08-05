@@ -13,6 +13,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+### Added
+- Added the local-only `audit pr-evidence <snapshot.json>` operator path with
+  strict `PRHeadEvidenceV1` input validation and deterministic
+  `PRHeadEvidenceVerdictV1` output. Reviews retain actor, state, dismissal, and
+  `commit_id`; checks and suites retain status, conclusion, and `head_sha`;
+  required approvals/checks come only from supplied rules; latest-push
+  approval, stale head evidence, non-success conclusions, missing permissions,
+  incomplete pagination, missing rules, and malformed input remain explicit.
+  The fixture-first evaluator does not consult credentials or GitHub, write
+  files, alter portfolio scoring, or regenerate portfolio truth.
+
 ### Changed
 - Kept PortfolioTruth `0.11.0` and
   `GitHubSecurityCoverageReceiptV1` read-compatible while adding normalized

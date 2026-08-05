@@ -77,7 +77,7 @@ Recommended defaults:
   - Use --control-center for read-only daily triage
   - Treat campaigns, writeback, catalog overrides, scorecards overrides, and GitHub Projects as advanced workflows"""
 
-CLI_MODE_EXAMPLES = """Subcommands: run, triage, report, serve
+CLI_MODE_EXAMPLES = """Subcommands: run, triage, report, serve, pr-evidence
   Run `audit run --help`, `audit triage --help`, or `audit report --help` for flags.
 
 Subcommand form (preferred):
@@ -88,6 +88,7 @@ Subcommand form (preferred):
   audit report <github-username> --portfolio-truth
   audit report <github-username> --campaign security-review --writeback-target github
   audit security-gate --output-dir output
+  audit pr-evidence path/to/pr-head-evidence.json
   audit serve  [--port 8080]
 
 Legacy flat form (deprecated, still supported):
@@ -1617,6 +1618,36 @@ def _build_security_gate_subparser(subparsers: argparse._SubParsersAction) -> No
     )
 
 
+def _build_pr_head_evidence_subparser(
+    subparsers: argparse._SubParsersAction,  # type: ignore[type-arg]
+) -> None:
+    """Subcommand: `audit pr-evidence` — bind local evidence to a PR head."""
+    p = subparsers.add_parser(
+        "pr-evidence",
+        help="Evaluate whether a local PR evidence snapshot is current for its head",
+        description=(
+            "Read one PRHeadEvidenceV1 JSON snapshot and emit a deterministic "
+            "PRHeadEvidenceVerdictV1 JSON verdict. This command performs no "
+            "GitHub requests and writes no files."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("snapshot", help="Path to a local PRHeadEvidenceV1 JSON snapshot")
+
+
+def build_pr_head_evidence_parser() -> argparse.ArgumentParser:
+    """Build the token-free parser used by the local-only pr-evidence path."""
+    parser = argparse.ArgumentParser(
+        prog="audit pr-evidence",
+        description=(
+            "Evaluate a local PRHeadEvidenceV1 snapshot without network access "
+            "or external writes."
+        ),
+    )
+    parser.add_argument("snapshot", help="Path to a local PRHeadEvidenceV1 JSON snapshot")
+    return parser
+
+
 def build_subcommand_parser() -> argparse.ArgumentParser:
     """Return the subcommand-aware parser used by main().
 
@@ -1647,6 +1678,7 @@ def build_subcommand_parser() -> argparse.ArgumentParser:
     _build_serve_subparser(subparsers)
     _build_security_burndown_subparser(subparsers)
     _build_security_gate_subparser(subparsers)
+    _build_pr_head_evidence_subparser(subparsers)
     return parser
 
 
@@ -1885,7 +1917,15 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
 
 
 _KNOWN_SUBCOMMANDS: frozenset[str] = frozenset(
-    {"run", "triage", "report", "serve", "security-burndown", "security-gate"}
+    {
+        "run",
+        "triage",
+        "report",
+        "serve",
+        "security-burndown",
+        "security-gate",
+        "pr-evidence",
+    }
 )
 
 
@@ -1998,9 +2038,22 @@ def _run_security_gate_mode(args) -> None:
     run_security_gate_mode(args)
 
 
+def _run_pr_head_evidence_mode(args) -> None:
+    from src.app.pr_head_evidence import run_pr_head_evidence_mode
+
+    run_pr_head_evidence_mode(args)
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     raw_argv = sys.argv[1:]
+
+    # This local-only command must not construct the legacy parser because its
+    # global token default may consult `gh auth token`.
+    if raw_argv and raw_argv[0] == "pr-evidence":
+        pr_args = build_pr_head_evidence_parser().parse_args(raw_argv[1:])
+        _run_pr_head_evidence_mode(pr_args)
+        return
 
     # ── Choose parser based on invocation form ───────────────────────
     # Subcommand form:  audit run|triage|report|serve [args...]
