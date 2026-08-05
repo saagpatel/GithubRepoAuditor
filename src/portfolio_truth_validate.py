@@ -1652,9 +1652,17 @@ def validate_truth_snapshot_payload(
     contract_fixture = payload.get("contract_fixture")
     is_documented_contract_matrix = (
         isinstance(contract_fixture, Mapping)
-        and contract_fixture
+        and contract_fixture.get("contract_version")
+        in {
+            "ghra-pcc-portfolio-truth.v1",
+            "ghra-portfolio-truth-portable.v1",
+        }
+        and {
+            key: value
+            for key, value in contract_fixture.items()
+            if key != "contract_version"
+        }
         == {
-            "contract_version": "ghra-pcc-portfolio-truth.v1",
             "deterministic": True,
             "producer_evidence": "absent",
             "security_evidence_semantics": (

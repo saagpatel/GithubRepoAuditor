@@ -12,25 +12,42 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.portfolio_truth_contract_fixture import (  # noqa: E402
+    CONSUMER_PROFILE_MANIFEST_PATHS,
     FIXTURE_RELATIVE_PATH,
     MANIFEST_RELATIVE_PATH,
+    PORTABLE_FIXTURE_RELATIVE_PATH,
     build_contract_fixture,
+    build_portable_contract_fixture,
+    consumer_profile_manifest_bytes,
     fixture_bytes,
     manifest_bytes,
+    portable_fixture_bytes,
 )
 from src.portfolio_truth_validate import validate_truth_snapshot_payload  # noqa: E402
 
 
 def _expected_artifacts() -> tuple[tuple[Path, bytes], ...]:
+    profile_manifests = tuple(
+        (
+            REPO_ROOT / manifest_path,
+            consumer_profile_manifest_bytes(profile_id),
+        )
+        for profile_id, manifest_path in sorted(
+            CONSUMER_PROFILE_MANIFEST_PATHS.items()
+        )
+    )
     return (
         (REPO_ROOT / FIXTURE_RELATIVE_PATH, fixture_bytes()),
         (REPO_ROOT / MANIFEST_RELATIVE_PATH, manifest_bytes()),
+        (REPO_ROOT / PORTABLE_FIXTURE_RELATIVE_PATH, portable_fixture_bytes()),
+        *profile_manifests,
     )
 
 
 def _check() -> int:
     try:
         validate_truth_snapshot_payload(build_contract_fixture())
+        validate_truth_snapshot_payload(build_portable_contract_fixture())
     except ValueError as exc:
         print(
             f"Portable PortfolioTruth consumer contract is invalid: {exc}",
