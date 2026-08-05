@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import json
+import os
 import tempfile
-from contextlib import nullcontext
+import threading
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Iterable, Iterator
 
 from src.github_security_coverage import (
+    DEFAULT_ATTENTION_STATES,
     SecurityCoverageError,
     SecurityCoverageReceiptBinding,
+    derive_default_attention_cohort,
     verified_security_coverage_receipt_binding,
 )
 from src.portfolio_truth_reconcile import (
@@ -20,12 +28,16 @@ from src.portfolio_truth_lineage import resolve_notion_origin
 from src.portfolio_truth_types import truth_latest_path
 from src.producer_preflight import ProducerEvidence, verify_evidence_still_current
 from src.portfolio_truth_validate import (
+    canonicalize_truth_snapshot_payload,
     validate_portfolio_report_markdown,
     validate_publish_targets,
     validate_registry_markdown,
     validate_truth_snapshot,
 )
 from src.project_registry import build_project_registry, load_source_paths
+
+
+_PORTFOLIO_TRUTH_IN_PROCESS_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -38,14 +50,191 @@ class PortfolioTruthPublishResult:
     registry_changed: bool
     report_changed: bool
     project_registry_path: Path | None = None
+    checkout_collision_group_count: int = 0
+    checkout_authority_unknown_count: int = 0
+    discarded_checkout_count: int = 0
+
+
+@dataclass(frozen=True)
+class _PriorSecurityEvidence:
+    path: Path
+    content_sha256: str | None
+    alerts_by_full_name: dict[str, dict]
+    final_cohort_repositories: tuple[str, ...] | None
 
 
 class PortfolioTruthPublishError(RuntimeError):
     """Raised when publishing would corrupt or misrepresent portfolio truth."""
 
 
+def _parse_bound_datetime(value: object, *, field: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise PortfolioTruthPublishError(f"{field} is required.")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise PortfolioTruthPublishError(f"{field} is invalid.") from exc
+    if parsed.tzinfo is None:
+        raise PortfolioTruthPublishError(f"{field} must include a timezone.")
+    return parsed
+
+
+def _load_prior_security_alerts(
+    latest_path: Path,
+    *,
+    current_security_metadata: dict[str, object],
+    security_max_age_hours: int,
+) -> _PriorSecurityEvidence:
+    """Load validated prior receipt and final-cohort evidence."""
+    try:
+        content = latest_path.read_bytes()
+    except FileNotFoundError:
+        return _PriorSecurityEvidence(
+            path=latest_path,
+            content_sha256=None,
+            alerts_by_full_name={},
+            final_cohort_repositories=None,
+        )
+    except OSError as exc:
+        raise PortfolioTruthPublishError(
+            f"Prior PortfolioTruth cannot authorize security cohort derivation: {exc}"
+        ) from exc
+
+    try:
+        payload = json.loads(content)
+        if not isinstance(payload, dict):
+            raise ValueError("snapshot must be an object")
+        canonical = canonicalize_truth_snapshot_payload(
+            payload,
+            security_max_age_hours=security_max_age_hours,
+        )
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise PortfolioTruthPublishError(
+            f"Prior PortfolioTruth cannot authorize security cohort derivation: {exc}"
+        ) from exc
+
+    projects = canonical.get("projects") or []
+    prior_final_cohort_count = sum(
+        (project.get("derived") or {}).get("attention_state")
+        in DEFAULT_ATTENTION_STATES
+        and not str((project.get("identity") or {}).get("project_key") or "").startswith(
+            "supp:"
+        )
+        for project in projects
+    )
+    try:
+        final_cohort_repositories = derive_default_attention_cohort(
+            canonical,
+            expected_count=prior_final_cohort_count,
+        )
+    except SecurityCoverageError as exc:
+        raise PortfolioTruthPublishError(
+            f"Prior PortfolioTruth final security cohort is invalid: {exc}"
+        ) from exc
+    receipt_projects = [
+        project
+        for project in projects
+        if (project.get("security") or {}).get("receipt_schema_version")
+    ]
+    if receipt_projects:
+        github_security = (canonical.get("inputs") or {}).get("github_security") or {}
+        if not github_security.get("receipt_id") or not github_security.get(
+            "content_sha256"
+        ):
+            raise PortfolioTruthPublishError(
+                "Prior PortfolioTruth security evidence is not immutably bound."
+            )
+
+    prior_generated_at = _parse_bound_datetime(
+        canonical.get("generated_at"),
+        field="Prior PortfolioTruth generated_at",
+    )
+    current_produced_at = _parse_bound_datetime(
+        current_security_metadata.get("produced_at"),
+        field="Current security receipt produced_at",
+    )
+    if prior_generated_at > current_produced_at:
+        raise PortfolioTruthPublishError(
+            "Prior PortfolioTruth was generated after the current security receipt."
+        )
+
+    alerts: dict[str, dict] = {}
+    for project in receipt_projects:
+        identity = project.get("identity") or {}
+        security = project.get("security") or {}
+        repository = str(identity.get("repo_full_name") or "").strip()
+        if not repository or security.get("cohort_member") is not True:
+            continue
+        if repository in alerts:
+            raise PortfolioTruthPublishError(
+                "Prior PortfolioTruth security cohort contains duplicate repository "
+                f"identity: {repository}."
+            )
+        remote = (project.get("repository_state") or {}).get(
+            "remote_default_branch"
+        ) or {}
+        alerts[repository] = {
+            **security,
+            "repo_full_name": repository,
+            "repository": remote,
+        }
+    return _PriorSecurityEvidence(
+        path=latest_path,
+        content_sha256=hashlib.sha256(content).hexdigest(),
+        alerts_by_full_name=alerts,
+        final_cohort_repositories=final_cohort_repositories,
+    )
+
+
+def _verify_prior_security_evidence_current(
+    evidence: _PriorSecurityEvidence,
+) -> None:
+    """Fail closed if the canonical truth pointer changed after candidate derivation."""
+    try:
+        content = evidence.path.read_bytes()
+    except FileNotFoundError:
+        if evidence.content_sha256 is None:
+            return
+        raise PortfolioTruthPublishError(
+            "Prior PortfolioTruth disappeared after it authorized security cohort "
+            "derivation."
+        ) from None
+    except OSError as exc:
+        raise PortfolioTruthPublishError(
+            "Prior PortfolioTruth could not be revalidated before publication: "
+            f"{exc}"
+        ) from exc
+
+    observed_sha256 = hashlib.sha256(content).hexdigest()
+    if evidence.content_sha256 is None or observed_sha256 != evidence.content_sha256:
+        raise PortfolioTruthPublishError(
+            "Prior PortfolioTruth changed after it authorized security cohort "
+            "derivation."
+        )
+
+
+@contextmanager
+def _portfolio_truth_publication_lock(latest_path: Path) -> Iterator[None]:
+    """Serialize complete truth builds and replacement across local publishers."""
+    lock_path = latest_path.with_name(f".{latest_path.name}.lock")
+    with _PORTFOLIO_TRUTH_IN_PROCESS_LOCK:
+        try:
+            descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError as exc:
+            raise PortfolioTruthPublishError(
+                f"PortfolioTruth publication lock is unavailable: {lock_path}: {exc}"
+            ) from exc
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CONFIG_DIR = _REPO_ROOT / "config"
+_PUBLISH_JOURNAL_NAME = ".portfolio-truth-publish-journal.json"
 
 
 def _build_project_registry_json(snapshot, *, include_notion: bool) -> str:
@@ -102,7 +291,15 @@ def publish_portfolio_truth(
     producer_evidence: ProducerEvidence | None = None,
     producer_repo_root: Path | None = None,
     require_producer_evidence: bool = False,
+    now: datetime | None = None,
 ) -> PortfolioTruthPublishResult:
+    if (
+        security_coverage_metadata is not None
+        or security_receipt_binding is not None
+    ) and now is None:
+        raise PortfolioTruthPublishError(
+            "Receipt-backed security publication requires an explicit evaluation clock."
+        )
     if require_producer_evidence and producer_evidence is None:
         raise PortfolioTruthPublishError(
             "Canonical publication requires validated producer evidence."
@@ -132,10 +329,104 @@ def publish_portfolio_truth(
         portfolio_report_output=portfolio_report_output,
     )
     latest_path = truth_latest_path(output_dir)
+    with _portfolio_truth_publication_lock(latest_path):
+        return _publish_portfolio_truth_locked(
+            workspace_root=workspace_root,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=portfolio_report_output,
+            catalog_path=catalog_path,
+            legacy_registry_path=legacy_registry_path,
+            include_notion=include_notion,
+            allow_empty_notion=allow_empty_notion,
+            release_count_by_name=release_count_by_name,
+            security_alerts_by_name=security_alerts_by_name,
+            security_coverage_metadata=security_coverage_metadata,
+            security_receipt_binding=security_receipt_binding,
+            repo_status_by_name=repo_status_by_name,
+            producer_evidence=producer_evidence,
+            producer_repo_root=producer_repo_root,
+            require_producer_evidence=require_producer_evidence,
+            now=now,
+        )
+
+
+def _publish_portfolio_truth_locked(
+    *,
+    workspace_root: Path,
+    output_dir: Path,
+    registry_output: Path,
+    portfolio_report_output: Path,
+    catalog_path: Path | None = None,
+    legacy_registry_path: Path | None = None,
+    include_notion: bool = True,
+    allow_empty_notion: bool = False,
+    release_count_by_name: dict[str, int] | None = None,
+    security_alerts_by_name: dict[str, dict] | None = None,
+    security_coverage_metadata: dict[str, object] | None = None,
+    security_receipt_binding: SecurityCoverageReceiptBinding | None = None,
+    repo_status_by_name: dict[str, dict] | None = None,
+    producer_evidence: ProducerEvidence | None = None,
+    producer_repo_root: Path | None = None,
+    require_producer_evidence: bool = False,
+    now: datetime | None = None,
+) -> PortfolioTruthPublishResult:
+    if (
+        security_coverage_metadata is not None
+        or security_receipt_binding is not None
+    ) and now is None:
+        raise PortfolioTruthPublishError(
+            "Receipt-backed security publication requires an explicit evaluation clock."
+        )
+    if require_producer_evidence and producer_evidence is None:
+        raise PortfolioTruthPublishError(
+            "Canonical publication requires validated producer evidence."
+        )
+    _validate_security_receipt_binding(
+        metadata=security_coverage_metadata,
+        binding=security_receipt_binding,
+        required=require_producer_evidence
+        and (
+            security_alerts_by_name is not None
+            or security_coverage_metadata is not None
+        ),
+    )
+    validate_publish_targets(
+        workspace_root=workspace_root,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=portfolio_report_output,
+    )
+    security_max_age_hours = (
+        security_receipt_binding.max_age_hours
+        if security_receipt_binding is not None
+        else 24
+    )
+    latest_path = truth_latest_path(output_dir)
+    project_registry_path = output_dir / "project-registry.json"
+    _recover_interrupted_publication(
+        output_dir,
+        allowed_targets={
+            latest_path,
+            registry_output,
+            portfolio_report_output,
+            project_registry_path,
+        },
+    )
     notion_context_fallback = (
         load_prior_notion_context(latest_path) if allow_empty_notion else None
     )
     prior_notion_generated_at = resolve_notion_origin(latest_path)
+    prior_security_evidence = (
+        _load_prior_security_alerts(
+            latest_path,
+            current_security_metadata=security_coverage_metadata,
+            security_max_age_hours=security_max_age_hours,
+        )
+        if security_coverage_metadata is not None
+        and security_alerts_by_name is not None
+        else None
+    )
     build_result = build_portfolio_truth_snapshot(
         workspace_root=workspace_root,
         catalog_path=catalog_path,
@@ -145,11 +436,25 @@ def publish_portfolio_truth(
         release_count_by_name=release_count_by_name,
         security_alerts_by_name=security_alerts_by_name,
         security_coverage_metadata=security_coverage_metadata,
+        prior_security_alerts_by_name=(
+            prior_security_evidence.alerts_by_full_name
+            if prior_security_evidence is not None
+            else None
+        ),
+        prior_security_cohort_repositories=(
+            prior_security_evidence.final_cohort_repositories
+            if prior_security_evidence is not None
+            else None
+        ),
         repo_status_by_name=repo_status_by_name,
         producer=producer_evidence.to_dict() if producer_evidence else {},
         prior_notion_generated_at=prior_notion_generated_at,
+        now=now,
     )
-    validate_truth_snapshot(build_result.snapshot)
+    validate_truth_snapshot(
+        build_result.snapshot,
+        security_max_age_hours=security_max_age_hours,
+    )
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
@@ -161,7 +466,6 @@ def publish_portfolio_truth(
     )
     latest_name = latest_path.name
     snapshot_json = json.dumps(build_result.snapshot.to_dict(), indent=2) + "\n"
-    project_registry_path = output_dir / "project-registry.json"
     project_registry_json = _build_project_registry_json(
         build_result.snapshot, include_notion=include_notion
     )
@@ -194,40 +498,55 @@ def publish_portfolio_truth(
         project_registry_path: True,
     }
     temp_files = {path: _stage_text(path, content) for path, content in targets.items()}
-    originals = {path: (path.read_text() if path.exists() else None) for path in targets}
-    published: list[Path] = []
+    backups = {
+        path: (_stage_bytes(path, path.read_bytes()) if path.exists() else None)
+        for path in targets
+    }
+    journal_path = output_dir / _PUBLISH_JOURNAL_NAME
+    _write_publish_journal(journal_path, temp_files=temp_files, backups=backups)
 
+    # This live guard is intentionally separate from the snapshot's shared
+    # evaluation clock: it catches receipt replacement or expiry before writes.
     publication_guard = (
         verified_security_coverage_receipt_binding(security_receipt_binding)
         if security_receipt_binding is not None
         else nullcontext()
     )
     try:
-        with publication_guard:
-            if producer_evidence is not None and producer_repo_root is not None:
-                verify_evidence_still_current(producer_repo_root, producer_evidence)
+        if producer_evidence is not None and producer_repo_root is not None:
+            verify_evidence_still_current(producer_repo_root, producer_evidence)
+        with publication_guard as live_security:
+            if (
+                live_security is not None
+                and live_security.entries_by_full_name != security_alerts_by_name
+            ):
+                raise PortfolioTruthPublishError(
+                    "Security receipt normalized evidence changed after it was loaded."
+                )
+            if prior_security_evidence is not None:
+                _verify_prior_security_evidence_current(prior_security_evidence)
             for path, staged in temp_files.items():
                 if path in {registry_output, portfolio_report_output} and not changed[path]:
-                    staged.unlink(missing_ok=True)
                     continue
                 staged.replace(path)
-                published.append(path)
-    except Exception as exc:
-        for path in reversed(published):
-            original = originals[path]
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_text(original)
-        for staged in temp_files.values():
-            staged.unlink(missing_ok=True)
+                _fsync_directory(path.parent)
+    except BaseException as exc:
+        _recover_interrupted_publication(
+            output_dir,
+            allowed_targets={
+                latest_path,
+                registry_output,
+                portfolio_report_output,
+                project_registry_path,
+            },
+        )
         if isinstance(exc, (SecurityCoverageError, ValueError)):
             raise PortfolioTruthPublishError(str(exc)) from exc
         raise
 
-    for staged in temp_files.values():
-        staged.unlink(missing_ok=True)
+    _cleanup_publish_transaction(journal_path, temp_files.values(), backups.values())
 
+    collision_summary = build_result.snapshot.source_summary["checkout_collisions"]
     return PortfolioTruthPublishResult(
         snapshot_path=snapshot_path,
         latest_path=latest_path,
@@ -237,6 +556,11 @@ def publish_portfolio_truth(
         registry_changed=changed[registry_output],
         report_changed=changed[portfolio_report_output],
         project_registry_path=project_registry_path,
+        checkout_collision_group_count=int(collision_summary["group_count"]),
+        checkout_authority_unknown_count=int(
+            collision_summary["ambiguous_group_count"]
+        ),
+        discarded_checkout_count=int(collision_summary["discarded_checkout_count"]),
     )
 
 
@@ -276,7 +600,151 @@ def _stage_text(target: Path, content: str) -> Path:
         "w", delete=False, dir=target.parent, suffix=f".{target.name}.tmp"
     ) as handle:
         handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
         return Path(handle.name)
+
+
+def _stage_bytes(target: Path, content: bytes) -> Path:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "wb", delete=False, dir=target.parent, suffix=f".{target.name}.bak"
+    ) as handle:
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
+        return Path(handle.name)
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _write_publish_journal(
+    journal_path: Path,
+    *,
+    temp_files: dict[Path, Path],
+    backups: dict[Path, Path | None],
+) -> None:
+    journal_targets: list[dict[str, object]] = []
+    for target in temp_files:
+        backup = backups[target]
+        journal_targets.append(
+            {
+                "target": str(target.resolve()),
+                "staged": str(temp_files[target].resolve()),
+                "backup": str(backup.resolve()) if backup is not None else None,
+                "existed": backup is not None,
+            }
+        )
+    payload = {
+        "schema": "PortfolioTruthPublishJournalV1",
+        "targets": journal_targets,
+    }
+    staged_journal = _stage_text(
+        journal_path, json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    )
+    staged_journal.replace(journal_path)
+    _fsync_directory(journal_path.parent)
+
+
+def _allowed_recovery_target(
+    target: Path, *, output_dir: Path, allowed_targets: set[Path]
+) -> bool:
+    resolved = target.resolve()
+    if resolved in {path.resolve() for path in allowed_targets}:
+        return True
+    return (
+        resolved.parent == output_dir.resolve()
+        and resolved.name.startswith("portfolio-truth-")
+        and resolved.name.endswith(".json")
+        and resolved.name != "portfolio-truth-latest.json"
+    )
+
+
+def _recover_interrupted_publication(
+    output_dir: Path, *, allowed_targets: set[Path]
+) -> None:
+    journal_path = output_dir / _PUBLISH_JOURNAL_NAME
+    if not journal_path.exists():
+        return
+    try:
+        payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PortfolioTruthPublishError(
+            f"Cannot recover interrupted publication: invalid journal {journal_path}"
+        ) from exc
+    if payload.get("schema") != "PortfolioTruthPublishJournalV1":
+        raise PortfolioTruthPublishError(
+            f"Cannot recover interrupted publication: unsupported journal {journal_path}"
+        )
+    rows = payload.get("targets")
+    if not isinstance(rows, list):
+        raise PortfolioTruthPublishError(
+            f"Cannot recover interrupted publication: malformed journal {journal_path}"
+        )
+
+    staged_paths: list[Path] = []
+    backup_paths: list[Path] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication: malformed journal {journal_path}"
+            )
+        target = Path(str(row.get("target", "")))
+        staged = Path(str(row.get("staged", "")))
+        backup_value = row.get("backup")
+        backup = Path(str(backup_value)) if backup_value else None
+        if not _allowed_recovery_target(
+            target, output_dir=output_dir, allowed_targets=allowed_targets
+        ):
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication target outside contract: {target}"
+            )
+        if staged.resolve().parent != target.resolve().parent:
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication: invalid staged path for {target}"
+            )
+        if backup is not None and backup.resolve().parent != target.resolve().parent:
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication: invalid backup path for {target}"
+            )
+        if backup is None:
+            target.unlink(missing_ok=True)
+        else:
+            if not backup.exists():
+                raise PortfolioTruthPublishError(
+                    f"Cannot recover interrupted publication: backup missing for {target}"
+                )
+            restored = _stage_bytes(target, backup.read_bytes())
+            restored.replace(target)
+            backup_paths.append(backup)
+        staged_paths.append(staged)
+        _fsync_directory(target.parent)
+
+    _cleanup_publish_transaction(journal_path, staged_paths, backup_paths)
+
+
+def _cleanup_publish_transaction(
+    journal_path: Path,
+    staged_paths: Iterable[Path],
+    backup_paths: Iterable[Path | None],
+) -> None:
+    # The journal is the recovery authority. Retire and fsync it before deleting
+    # backups so a process death during cleanup can leave only harmless orphans,
+    # never a live journal that points at already-deleted recovery material.
+    journal_path.unlink(missing_ok=True)
+    if journal_path.parent.exists():
+        _fsync_directory(journal_path.parent)
+    for path in staged_paths:
+        path.unlink(missing_ok=True)
+    for backup_path in backup_paths:
+        if backup_path is not None:
+            backup_path.unlink(missing_ok=True)
 
 
 def _content_changed(path: Path, content: str) -> bool:

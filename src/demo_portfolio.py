@@ -13,23 +13,40 @@ a schema bump can never leave the demo fixture silently behind.
 
 from __future__ import annotations
 
-from collections import Counter
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from src.github_security_coverage import GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+    _remote_repository_result,
+)
+from src.portfolio_repository_state import _observed_result
+from src.portfolio_pathing import build_operating_path_entry
+from src.portfolio_truth_coverage import build_coverage_envelope
+from src.portfolio_truth_decisions import build_project_decision
+from src.portfolio_truth_metadata import (
+    build_exclusions,
+    build_input_envelope,
+    build_source_summary,
+    build_warnings,
+)
+from src.portfolio_truth_precedence import build_precedence_matrix
+from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
 
 # The demo workspace is deliberately not a real filesystem path.
 DEMO_WORKSPACE_ROOT = "/demo-workspace"
 DEMO_ORG = "demo-org"
 COHORT_POLICY = "portfolio-default-attention-v1"
+DEMO_SECURITY_PRODUCER_COMMIT = "a" * 40
 
 # Hours between the fixture timestamp and generation time. Comfortably inside
 # the consumer's 48h "fresh" band, and far enough from zero to look like a real
 # overnight run rather than a synthetic instant.
 FRESH_OFFSET_HOURS = 6
+STALE_RECEIPT_AGE_HOURS = 25
 
 # Number of timestamped snapshots emitted for the trends view, newest first.
 HISTORY_POINTS = 9
@@ -42,7 +59,7 @@ _ACTIVITY_AGE_DAYS = {"active": 2, "recent": 21, "stale": 190}
 
 # attention_state -> (operating_path, lifecycle_state)
 _ATTENTION_INTENT = {
-    "active-product": ("operate", "active"),
+    "active-product": ("maintain", "active"),
     "active-infra": ("maintain", "active"),
     "decision-needed": ("finish", "active"),
     "experiment": ("experiment", "active"),
@@ -415,6 +432,22 @@ _GROUP_LABELS = {
     "archive": "Archived",
 }
 
+_GROUP_CATEGORIES = {
+    "flagship": "commercial",
+    "platform": "infrastructure",
+    "studio": "fun",
+    "lab": "learning",
+    "archive": "it-work",
+}
+
+
+def _category_for(spec: DemoProject) -> str:
+    if spec.attention == "active-infra":
+        return "infrastructure"
+    if spec.attention == "active-product":
+        return "commercial"
+    return _GROUP_CATEGORIES[spec.group]
+
 _PURPOSES = {
     "flagship": "Operator-facing product surface with an active release lane.",
     "platform": "Shared platform service other demo projects depend on.",
@@ -444,10 +477,10 @@ def _observed_provider(
     return {
         "state": "observed",
         "completed": True,
-        "reason": "observed",
+        "reason": None,
         "reason_code": "observed",
         "http_status": 200,
-        "http_classification": "ok",
+        "http_classification": "success",
         "conditional": {"requested": True, "result": "modified"},
         "etag": None,
         "last_modified": None,
@@ -471,6 +504,24 @@ def _unavailable_provider(observed_at: str) -> dict[str, Any]:
         "last_modified": None,
         "observed_at": observed_at,
         "pagination_complete": False,
+        "counts": None,
+        "zero_findings": None,
+    }
+
+
+def _stale_provider(observed_at: str) -> dict[str, Any]:
+    return {
+        "state": "stale",
+        "completed": False,
+        "reason": "receipt_stale",
+        "reason_code": "stale_observation",
+        "http_status": 200,
+        "http_classification": "success",
+        "conditional": {"requested": True, "result": "modified"},
+        "etag": None,
+        "last_modified": None,
+        "observed_at": observed_at,
+        "pagination_complete": True,
         "counts": None,
         "zero_findings": None,
     }
@@ -503,6 +554,10 @@ def _security_block(
         }
 
     if spec.coverage == "stale":
+        source_produced_at = _iso(
+            datetime.fromisoformat(observed_at)
+            - timedelta(hours=STALE_RECEIPT_AGE_HOURS)
+        )
         return {
             "alerts_available": False,
             "coverage_state": "stale",
@@ -510,8 +565,11 @@ def _security_block(
             "cohort_policy": COHORT_POLICY,
             "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
             "receipt_state": "stale",
-            "source_produced_at": observed_at,
-            "providers": {},
+            "source_produced_at": source_produced_at,
+            "providers": {
+                name: _stale_provider(source_produced_at)
+                for name in ("dependabot", "code_scanning", "secret_scanning")
+            },
             "dependabot_critical": None,
             "dependabot_high": None,
             "dependabot_medium": None,
@@ -580,8 +638,98 @@ def _security_block(
         "code_scanning_critical": cs_crit,
         "code_scanning_high": cs_high,
         "secret_scanning_open": secrets,
-        "open_high_critical": dep_crit + dep_high + cs_crit + cs_high,
+        "open_high_critical": dep_crit + dep_high,
     }
+
+
+def _repository_state(
+    *,
+    group: str,
+    slug: str,
+    observed_at: str,
+    security: dict[str, Any],
+) -> dict[str, Any]:
+    source_produced_at = security["source_produced_at"]
+    if security["receipt_state"] == "stale":
+        remote = _remote_repository_result(
+            state="stale",
+            observed_at=source_produced_at,
+            reason="receipt_stale",
+        )
+    elif security["receipt_schema_version"]:
+        remote = _remote_repository_result(
+            state="observed",
+            observed_at=source_produced_at,
+            reason=None,
+            default_branch="main",
+            head_sha=hashlib.sha256(f"{DEMO_ORG}/{slug}".encode()).hexdigest(),
+            archived=False,
+        )
+    else:
+        remote = {
+            "state": "unknown",
+            "reason_code": "not_requested",
+            "reason": (
+                "no independent live remote read was performed by portfolio generation"
+            ),
+        }
+    path = f"{DEMO_WORKSPACE_ROOT}/{group}/{slug}"
+    head = remote.get("head_sha") or hashlib.sha256(path.encode()).hexdigest()
+    local = {
+        "path": path,
+        "head": head,
+        "branch": "main",
+        "dirty": False,
+        "dirty_path_count": 0,
+        "upstream": "origin/main",
+        "upstream_branch": "main",
+        "upstream_remote": "origin",
+        "upstream_observation_source": "local_tracking_ref",
+        "ahead": 0,
+        "behind": 0,
+    }
+    worktree = {
+        "state": "observed",
+        **local,
+        "detached": False,
+        "bare": False,
+    }
+    if remote["state"] == "observed":
+        selection = {
+            "source": remote["source"],
+            "state": "selected",
+            "reason_code": "unique_remote_head_match",
+            "reason": None,
+            "candidate_count": 1,
+            "path": path,
+            "head": head,
+            "branch": "main",
+        }
+    else:
+        selection = {
+            "source": remote.get("source", "remote_default_branch"),
+            "state": "unknown",
+            "reason_code": "remote_default_branch_unavailable",
+            "reason": (
+                "independent remote-default evidence is not observed "
+                f"(state={remote['state']})"
+            ),
+            "candidate_count": 0,
+        }
+    topology = {
+        "kind": "working_repository",
+        "configured_path": path,
+        "worktree_count": 1,
+        "linked_worktree_count": 0,
+        "selection": selection,
+    }
+    return _observed_result(
+        observed_at=datetime.fromisoformat(observed_at),
+        remote=remote,
+        worktrees=[worktree],
+        topology=topology,
+        local=local,
+    )
 
 
 def resolved_coverage_state(security: dict[str, Any]) -> str:
@@ -631,50 +779,6 @@ def resolved_coverage_state(security: dict[str, Any]) -> str:
     return "partial" if any(observed(name) for name in required) else "unknown"
 
 
-def _risk(
-    spec: DemoProject, security: dict[str, Any], context_quality: str
-) -> dict[str, Any]:
-    open_high_critical = security.get("open_high_critical") or 0
-    factors: list[str] = []
-    if open_high_critical:
-        factors.append(f"{open_high_critical} open high/critical security alerts")
-    if not spec.has_tests:
-        factors.append("no automated tests")
-    if not spec.has_ci:
-        factors.append("no CI workflow")
-    if context_quality in {"minimum-viable", "boilerplate"}:
-        factors.append("thin project context")
-    if spec.activity == "stale" and spec.attention != "archived":
-        factors.append("no meaningful activity in the recent window")
-    if resolved_coverage_state(security) in {"stale", "unknown"}:
-        factors.append("security coverage unobserved")
-
-    if spec.attention == "archived":
-        tier = "deferred"
-    elif open_high_critical:
-        tier = "elevated"
-    elif spec.attention == "decision-needed" or len(factors) >= 3:
-        tier = "moderate"
-    else:
-        tier = "baseline"
-
-    summaries = {
-        "elevated": "Open high or critical alerts need an operator decision.",
-        "moderate": "Context or coverage gaps are worth closing this cycle.",
-        "baseline": "No elevated pressure; routine cadence is sufficient.",
-        "deferred": "Archived project; risk is accepted and not tracked.",
-    }
-    return {
-        "risk_tier": tier,
-        "risk_factors": factors,
-        "risk_summary": summaries[tier],
-        "security_risk": open_high_critical > 0,
-        "doctor_gap": not spec.has_ci,
-        "context_risk": context_quality in {"minimum-viable", "boilerplate"},
-        "path_risk": spec.attention == "decision-needed",
-    }
-
-
 def _pressure_alerts(spec: DemoProject, index: int, pressure: int) -> tuple[int, ...]:
     """Scale a project's alert counts by historical backlog pressure.
 
@@ -690,25 +794,156 @@ def _pressure_alerts(spec: DemoProject, index: int, pressure: int) -> tuple[int,
 
 
 def build_projects(
-    generated_at: datetime, *, pressure: int = 0
+    generated_at: datetime,
+    *,
+    pressure: int = 0,
+    project_specs: tuple[DemoProject, ...] = DEMO_PROJECTS,
 ) -> list[dict[str, Any]]:
     """Build the synthetic project records for one point in time."""
     stamp = _iso(generated_at)
     projects: list[dict[str, Any]] = []
-    for index, spec in enumerate(DEMO_PROJECTS):
+    for index, spec in enumerate(project_specs):
         slug = _slug(spec.codename)
         context_quality = (
             "none"
             if spec.attention == "archived"
             else _CONTEXT_QUALITY_CYCLE[index % len(_CONTEXT_QUALITY_CYCLE)]
         )
-        operating_path, lifecycle_state = _ATTENTION_INTENT[spec.attention]
+        declared_operating_path, lifecycle_state = _ATTENTION_INTENT[spec.attention]
+        archived = spec.attention == "archived"
         security = _security_block(spec, _pressure_alerts(spec, index, pressure), stamp)
-        context_files = ["README.md"]
+        repository_state = _repository_state(
+            group=spec.group,
+            slug=slug,
+            observed_at=stamp,
+            security=security,
+        )
+        context_files = ["AGENTS.md"]
         if context_quality in {"full", "standard"}:
             context_files.append("docs/current-state.md")
         if context_quality == "full":
             context_files.append("docs/architecture.md")
+        has_minimum_context = context_quality in {
+            "minimum-viable",
+            "standard",
+            "full",
+        }
+        declared = {
+            "operating_path": declared_operating_path,
+            "category": _category_for(spec),
+            "tool_provenance": "codex" if index % 2 else "claude-code",
+            "lifecycle_state": lifecycle_state,
+            "purpose": _PURPOSES[spec.group],
+            "owner": "demo-operator",
+            "team": "",
+            "criticality": "high" if spec.group == "flagship" else "medium",
+            "review_cadence": "weekly" if spec.group == "flagship" else "monthly",
+            "intended_disposition": "",
+            "maturity_program": "maintain",
+            "target_maturity": "operating",
+            "notes": "",
+            "doctor_standard": "",
+            "automation_eligible": context_quality
+            in {"minimum-viable", "boilerplate"},
+        }
+        path_entry = build_operating_path_entry(
+            {**declared, "has_explicit_entry": True},
+            context_quality=context_quality,
+            archived=archived,
+        )
+        operating_path = str(path_entry["operating_path"])
+        path_override = str(path_entry["path_override"])
+        declared["operating_path"] = operating_path
+        derived = {
+            "context_quality": context_quality,
+            "activity_status": spec.activity,
+            "archived": archived,
+            "stack": list(spec.stack),
+            "stack_present": has_minimum_context,
+            "context_files": context_files,
+            "context_file_count": len(context_files),
+            "primary_context_file": "AGENTS.md",
+            "project_summary_present": context_quality != "none",
+            "current_state_present": has_minimum_context,
+            "run_instructions_present": has_minimum_context,
+            "known_risks_present": has_minimum_context,
+            "next_recommended_move_present": has_minimum_context,
+            "last_meaningful_activity_at": _iso(
+                generated_at - timedelta(days=_ACTIVITY_AGE_DAYS[spec.activity])
+            ),
+            "has_tests": spec.has_tests,
+            "has_ci": spec.has_ci,
+            "has_license": spec.attention != "archived",
+            "readme_char_count": 900 + index * 137,
+            "release_count": 3 if spec.group == "flagship" else 0,
+            "path_override": path_override,
+            "path_confidence": path_entry["path_confidence"],
+            "path_rationale": path_entry["path_rationale"],
+        }
+        risk, attention_state = build_project_decision(
+            display_name=spec.codename,
+            operating_path=operating_path,
+            path_override=path_override,
+            context_quality=context_quality,
+            activity_status=spec.activity,
+            archived=derived["archived"],
+            lifecycle_state=lifecycle_state,
+            category=declared["category"],
+            criticality=declared["criticality"],
+            doctor_standard=declared["doctor_standard"],
+            known_risks_present=derived["known_risks_present"],
+            run_instructions_present=derived["run_instructions_present"],
+            security_coverage_state=security["coverage_state"],
+            security_high_alerts=security.get("dependabot_high") or 0,
+            security_critical_alerts=security.get("dependabot_critical") or 0,
+        )
+        derived["attention_state"] = attention_state
+        provenance_values = {
+            "declared": declared,
+            "derived": derived,
+            "risk": risk,
+        }
+        provenance: dict[str, dict[str, str]] = {}
+        for key in sorted(REQUIRED_PROJECT_PROVENANCE_KEYS):
+            section, field = key.split(".", 1)
+            value = provenance_values[section][field]
+            if key == "derived.context_files":
+                detail = str(len(value))
+            elif isinstance(value, bool):
+                detail = str(value).lower()
+            elif isinstance(value, list):
+                detail = ", ".join(str(item) for item in value)
+            else:
+                detail = str(value)
+            provenance[key] = {"source": "demo-fixture", "detail": detail}
+        provenance.update(
+            {
+                "declared.operating_path": {
+                    "source": "normalized",
+                    "detail": str(path_entry["operating_path_source"]),
+                },
+                "derived.path_override": {
+                    "source": "normalized",
+                    "detail": path_override,
+                },
+                "derived.path_confidence": {
+                    "source": "normalized",
+                    "detail": str(path_entry["path_confidence"]),
+                },
+                "derived.path_rationale": {
+                    "source": "normalized",
+                    "detail": str(path_entry["path_rationale"]),
+                },
+                "risk.risk_tier": {
+                    "source": "derived",
+                    "detail": str(risk["risk_tier"]),
+                },
+                "risk.doctor_gap": {
+                    "source": "derived",
+                    "detail": str(risk["doctor_gap"]).lower(),
+                },
+            }
+        )
 
         projects.append(
             {
@@ -725,56 +960,12 @@ def build_projects(
                     "section_label": _GROUP_LABELS[spec.group],
                     "default_branch": "main",
                 },
-                "declared": {
-                    "operating_path": operating_path,
-                    "category": spec.group,
-                    "tool_provenance": "codex" if index % 2 else "claude-code",
-                    "lifecycle_state": lifecycle_state,
-                    "purpose": _PURPOSES[spec.group],
-                    "owner": "demo-operator",
-                    "team": "",
-                    "criticality": "high" if spec.group == "flagship" else "medium",
-                    "review_cadence": "weekly"
-                    if spec.group == "flagship"
-                    else "monthly",
-                    "intended_disposition": "",
-                    "maturity_program": "maintain",
-                    "target_maturity": "operating",
-                    "notes": "",
-                    "doctor_standard": "",
-                    "automation_eligible": context_quality
-                    in {"minimum-viable", "boilerplate"},
-                },
-                "derived": {
-                    "context_quality": context_quality,
-                    "attention_state": spec.attention,
-                    "activity_status": spec.activity,
-                    "archived": spec.attention == "archived",
-                    "stack": list(spec.stack),
-                    "stack_present": True,
-                    "context_files": context_files,
-                    "context_file_count": len(context_files),
-                    "primary_context_file": "README.md",
-                    "project_summary_present": context_quality != "none",
-                    "current_state_present": context_quality in {"full", "standard"},
-                    "run_instructions_present": context_quality != "boilerplate",
-                    "known_risks_present": context_quality == "full",
-                    "next_recommended_move_present": context_quality
-                    in {"full", "standard"},
-                    "last_meaningful_activity_at": _iso(
-                        generated_at - timedelta(days=_ACTIVITY_AGE_DAYS[spec.activity])
-                    ),
-                    "has_tests": spec.has_tests,
-                    "has_ci": spec.has_ci,
-                    "has_license": spec.attention != "archived",
-                    "readme_char_count": 900 + index * 137,
-                    "release_count": 3 if spec.group == "flagship" else 0,
-                    "path_override": "",
-                    "path_confidence": "high" if spec.group == "flagship" else "medium",
-                    "path_rationale": f"Stable path is {operating_path} from explicit operating path.",
-                },
-                "risk": _risk(spec, security, context_quality),
+                "declared": declared,
+                "derived": derived,
+                "risk": risk,
                 "security": security,
+                "repository_state": repository_state,
+                "provenance": provenance,
                 "advisory": {
                     "notion_portfolio_call": "",
                     "notion_momentum": "",
@@ -790,114 +981,91 @@ def build_projects(
 
 
 
-def build_snapshot(generated_at: datetime, *, pressure: int = 0) -> dict[str, Any]:
+def build_snapshot(
+    generated_at: datetime,
+    *,
+    pressure: int = 0,
+    project_specs: tuple[DemoProject, ...] = DEMO_PROJECTS,
+) -> dict[str, Any]:
     """Build a complete portfolio-truth snapshot at the current schema."""
-    projects = build_projects(generated_at, pressure=pressure)
-
-    coverage_states = Counter(
-        resolved_coverage_state(project["security"]) for project in projects
+    projects = build_projects(
+        generated_at,
+        pressure=pressure,
+        project_specs=project_specs,
     )
-    risk_tiers = Counter(project["risk"]["risk_tier"] for project in projects)
-    attention = Counter(project["derived"]["attention_state"] for project in projects)
-    activity = Counter(project["derived"]["activity_status"] for project in projects)
-    context_quality = Counter(
-        project["derived"]["context_quality"] for project in projects
-    )
-
-    observed = [
-        project
-        for project in projects
-        if resolved_coverage_state(project["security"]) in {"complete", "partial"}
-    ]
-    total_open_high = sum(p["security"]["dependabot_high"] or 0 for p in observed)
-    total_open_critical = sum(
-        p["security"]["dependabot_critical"] or 0 for p in observed
+    projects.sort(
+        key=lambda item: (
+            item["identity"]["section_marker"].lower(),
+            item["identity"]["display_name"].lower(),
+        )
     )
 
-    return {
+    source_summary = build_source_summary(
+        workspace_root=DEMO_WORKSPACE_ROOT,
+        projects=projects,
+        catalog_errors=[],
+        catalog_warnings=[],
+        legacy_registry_rows=len(projects),
+        notion_context_rows=0,
+        notion_context_carried_forward=False,
+    )
+
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "derivation_policy_version": DERIVATION_POLICY_VERSION,
         "generated_at": _iso(generated_at),
         "workspace_root": DEMO_WORKSPACE_ROOT,
-        "producer": {
-            "repository": f"{DEMO_ORG}/portfolio-auditor",
-            "checkout_role": "demo-fixture",
-            "worktree_clean": True,
-            "dirty_path_count": 0,
-            "verified_at": _iso(generated_at),
-        },
-        "source_summary": {
-            "workspace_root": DEMO_WORKSPACE_ROOT,
-            "project_count": len(projects),
-            "catalog_errors": [],
-            "catalog_warnings": [],
-            "legacy_registry_rows": len(projects),
-            "notion_context_rows": 0,
-            "notion_context_carried_forward": 0,
-            "context_quality_counts": dict(context_quality),
-            "activity_status_counts": dict(activity),
-            "attention_state_counts": dict(attention),
-            "archived_count": attention.get("archived", 0),
-            "github_archived_count": 0,
-            "duplicate_display_names": [],
-            "unresolved_duplicate_display_names": [],
-        },
-        "precedence_matrix": {
-            "identity": ["demo fixture"],
-            "declared": ["demo fixture"],
-            "derived": ["demo fixture"],
-            "risk": ["demo fixture"],
-            "security": ["demo fixture receipt"],
-        },
-        "coverage": [
-            {
-                "source": "workspace",
-                "state": "observed",
-                "project_count": len(projects),
+        # Synthetic demo output is not emitted by an attested producer checkout.
+        # Canonical truth represents absent evidence as an empty object; partial
+        # invented evidence would fail the publication contract.
+        "producer": {},
+        "source_summary": source_summary,
+        "precedence_matrix": build_precedence_matrix(),
+        "coverage": build_coverage_envelope(
+            projects=projects,
+            notion_context_carried_forward=False,
+            notion_context_rows=0,
+        ),
+        "exclusions": build_exclusions({}),
+        "inputs": build_input_envelope(
+            workspace_root=DEMO_WORKSPACE_ROOT,
+            catalog_path=None,
+            now=generated_at,
+            include_notion=False,
+            notion_context_rows=0,
+            notion_context_carried_forward=False,
+            prior_notion_generated_at=None,
+            notion_source_mode="unavailable",
+            notion_observed_at=None,
+            security_coverage_metadata={
+                "source_id": "github-security-coverage-receipt",
+                "schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
+                "produced_at": _iso(generated_at),
+                "state": "fresh",
+                "age_hours": 0.0,
+                "producer_commit": DEMO_SECURITY_PRODUCER_COMMIT,
+                "cohort_policy": COHORT_POLICY,
+                "cohort_repository_count": sum(
+                    project["security"]["cohort_member"] for project in projects
+                ),
+                "path": "/demo-workspace/github-security-coverage.json",
+                "receipt_id": "sha256:" + "b" * 64,
+                "content_sha256": "b" * 64,
             },
-            {
-                "source": "github_security",
-                "state": "partial",
-                "project_count": len(projects),
-                "complete_repo_count": coverage_states.get("complete", 0),
-                "partial_repo_count": coverage_states.get("partial", 0),
-                "stale_count": coverage_states.get("stale", 0),
-                "unknown_count": coverage_states.get("unknown", 0),
-            },
-        ],
-        "exclusions": [],
-        "inputs": [],
-        "warnings": [],
+        ),
+        "warnings": build_warnings(
+            catalog_errors=[],
+            catalog_warnings=[],
+            unresolved_duplicates=[],
+        ),
         "projects": projects,
-        "rollups": {
-            "risk_tier_counts": {
-                tier: risk_tiers.get(tier, 0)
-                for tier in ("elevated", "moderate", "baseline", "deferred")
-            },
-            "security": {
-                "coverage_state": "partial",
-                "complete_repo_count": coverage_states.get("complete", 0),
-                "partial_repo_count": coverage_states.get("partial", 0),
-                "stale_count": coverage_states.get("stale", 0),
-                "unknown_count": coverage_states.get("unknown", 0),
-                "scanned_count": coverage_states.get("complete", 0),
-                "repos_with_open_high_critical": sum(
-                    1
-                    for p in observed
-                    if (p["security"]["open_high_critical"] or 0) > 0
-                ),
-                "total_open_high": total_open_high,
-                "total_open_critical": total_open_critical,
-            },
-            "decision": {
-                "decision_needed_count": attention.get("decision-needed", 0),
-                "default_attention_count": sum(
-                    attention.get(state, 0)
-                    for state in ("active-product", "active-infra", "decision-needed")
-                ),
-            },
-        },
     }
+    from src.portfolio_truth_validate import canonicalize_truth_snapshot_payload
+
+    return canonicalize_truth_snapshot_payload(
+        payload,
+        allow_synthetic_security_matrix=True,
+    )
 
 
 def history_snapshots(generated_at: datetime) -> list[tuple[str, dict[str, Any]]]:

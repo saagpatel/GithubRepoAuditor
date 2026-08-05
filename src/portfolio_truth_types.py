@@ -7,10 +7,15 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "0.11.0"
+CHECKOUT_COLLISION_SCHEMA_VERSION = "CheckoutCollisionV1"
+CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION = "CheckoutCollisionSummaryV1"
 # 0.11.0: provenance-bearing GitHub security receipts preserve per-provider
 # states and expose complete/partial/stale/unknown coverage denominators.
 # Additive 0.11.0 fields bind normalized provider reason codes, completed-zero
 # observations, and live remote default-branch/head evidence to the same receipt.
+# Workspace discovery v3 adds versioned CheckoutCollisionV1 evidence under the
+# generic source_summary and repository_state extension points; PCC 0.11 readers
+# continue to ignore those additive keys.
 # 0.10.0: canonical producer receipts bind the exact checkout; coverage and
 # repository/worktree observation envelopes fail closed on unavailable evidence.
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
@@ -460,7 +465,7 @@ class PortfolioTruthSnapshot:
     coverage: list[dict[str, Any]] = field(default_factory=list)
     exclusions: dict[str, Any] = field(
         default_factory=lambda: {
-            "policy_version": "workspace_discovery.v2",
+            "policy_version": "workspace_discovery.v3",
             "counts": {},
         }
     )

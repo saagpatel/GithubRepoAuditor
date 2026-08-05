@@ -14,6 +14,7 @@ def observe_repository_state(
     *,
     observed_at: datetime,
     remote_default_branch: dict[str, Any] | None = None,
+    workspace_root: Path | None = None,
 ) -> dict[str, Any]:
     """Read local Git/worktree state without changing refs or exposing file names."""
     remote = (
@@ -36,7 +37,7 @@ def observe_repository_state(
         }
 
     try:
-        worktrees = _observe_worktrees(path)
+        worktrees = _observe_worktrees(path, workspace_root=workspace_root)
         selection = _select_remote_default_worktree(worktrees, remote)
         topology = {
             "kind": repository_kind,
@@ -128,15 +129,29 @@ def _observe_working_tree(path: Path) -> dict[str, Any]:
     head = _git(path, "rev-parse", "HEAD")
     branch = _git(path, "branch", "--show-current") or None
     dirty = _git(path, "status", "--porcelain", "--untracked-files=all")
-    upstream = _git_optional(path, "rev-parse", "--abbrev-ref", "@{upstream}")
+    resolved_upstream = _git_optional(
+        path, "rev-parse", "--abbrev-ref", "@{upstream}"
+    )
+    upstream_remote, upstream_branch = _upstream_identity(
+        path, branch=branch, upstream=resolved_upstream
+    )
+    upstream = (
+        upstream_branch
+        if upstream_remote == "."
+        else (
+            f"{upstream_remote}/{upstream_branch}"
+            if upstream_remote is not None and upstream_branch is not None
+            else None
+        )
+    )
     ahead = behind = None
-    if upstream:
+    if resolved_upstream:
         counts = _git(
             path,
             "rev-list",
             "--left-right",
             "--count",
-            f"{upstream}...HEAD",
+            f"{resolved_upstream}...HEAD",
         )
         behind_text, ahead_text = counts.split()
         behind, ahead = int(behind_text), int(ahead_text)
@@ -147,12 +162,36 @@ def _observe_working_tree(path: Path) -> dict[str, Any]:
         "dirty": bool(dirty),
         "dirty_path_count": len(dirty.splitlines()) if dirty else 0,
         "upstream": upstream,
+        "upstream_branch": upstream_branch,
+        "upstream_remote": upstream_remote,
         "upstream_observation_source": (
             "local_tracking_ref" if upstream else "unavailable"
         ),
         "ahead": ahead,
         "behind": behind,
     }
+
+
+def _upstream_identity(
+    path: Path,
+    *,
+    branch: str | None,
+    upstream: str | None,
+) -> tuple[str | None, str | None]:
+    if upstream is None:
+        return None, None
+    if branch is None:
+        raise ValueError("detached worktree unexpectedly has an upstream")
+    merge_ref = _git_optional(path, "config", "--get", f"branch.{branch}.merge")
+    prefix = "refs/heads/"
+    if not merge_ref or not merge_ref.startswith(prefix) or merge_ref == prefix:
+        raise ValueError("tracked branch has no exact refs/heads merge target")
+    upstream_remote = _git_optional(
+        path, "config", "--get", f"branch.{branch}.remote"
+    )
+    if not upstream_remote:
+        raise ValueError("tracked branch has no exact configured remote")
+    return upstream_remote, merge_ref.removeprefix(prefix)
 
 
 def _observe_bare_coordinator(path: Path) -> dict[str, Any]:
@@ -166,10 +205,39 @@ def _observe_bare_coordinator(path: Path) -> dict[str, Any]:
     }
 
 
-def _observe_worktrees(path: Path) -> list[dict[str, Any]]:
+def _observe_worktrees(
+    path: Path, *, workspace_root: Path | None = None
+) -> list[dict[str, Any]]:
     observed: list[dict[str, Any]] = []
+    external_worktree_count = 0
     for item in _worktrees(path):
         worktree_path = Path(item["path"])
+        if workspace_root is not None and not _path_is_within(
+            worktree_path, workspace_root
+        ):
+            external_worktree_count += 1
+            opaque_path = (
+                "external-worktree"
+                if external_worktree_count == 1
+                else f"external-worktree-{external_worktree_count}"
+            )
+            observed.append(
+                {
+                    "state": "unknown",
+                    "reason_code": "external_worktree_outside_workspace",
+                    "reason": (
+                        "the linked worktree is outside the observed workspace"
+                    ),
+                    "path": opaque_path,
+                    "head": None,
+                    "branch": None,
+                    "detached": False,
+                    "bare": bool(item.get("bare")),
+                    "dirty": None,
+                    "dirty_path_count": None,
+                }
+            )
+            continue
         if item.get("bare"):
             observed.append(
                 {
@@ -211,6 +279,14 @@ def _observe_worktrees(path: Path) -> list[dict[str, Any]]:
             }
         )
     return observed
+
+
+def _path_is_within(candidate: Path, root: Path) -> bool:
+    try:
+        candidate.resolve().relative_to(root.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def _select_remote_default_worktree(
@@ -324,6 +400,8 @@ def _local_from_worktree(worktree: dict[str, Any]) -> dict[str, Any]:
         "dirty",
         "dirty_path_count",
         "upstream",
+        "upstream_branch",
+        "upstream_remote",
         "upstream_observation_source",
         "ahead",
         "behind",
@@ -333,10 +411,9 @@ def _local_from_worktree(worktree: dict[str, Any]) -> dict[str, Any]:
 
 def _tracks_nonmatching_branch(local: dict[str, Any]) -> bool:
     branch = str(local.get("branch") or "")
-    upstream = str(local.get("upstream") or "")
-    if not branch or "/" not in upstream:
+    upstream_branch = str(local.get("upstream_branch") or "")
+    if not branch or not upstream_branch:
         return False
-    _remote_name, upstream_branch = upstream.split("/", 1)
     return upstream_branch != branch
 
 
@@ -436,7 +513,11 @@ def _worktrees(path: Path) -> list[dict[str, Any]]:
         if key == "worktree":
             current["path"] = value
         elif key == "HEAD":
-            current["head"] = value
+            current["head"] = (
+                None
+                if len(value) in {40, 64} and value and set(value) == {"0"}
+                else value
+            )
         elif key == "branch":
             current["branch"] = value.removeprefix("refs/heads/")
         elif key == "detached":

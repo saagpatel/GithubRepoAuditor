@@ -139,6 +139,12 @@ def lint_operator_os_seams(
                 identity_since=identity_since,
             )
         )
+        if catalog_path is not None and not contract_shadow:
+            findings.extend(
+                _check_catalog_source_binding(
+                    truth, truth_path=truth_path, catalog_path=catalog_path
+                )
+            )
         if contract_shadow:
             findings.extend(
                 _check_contract_shadow(
@@ -300,6 +306,48 @@ def _load_truth_artifact(
         )
         return None
     return data
+
+
+def _check_catalog_source_binding(
+    truth: dict[str, Any], *, truth_path: Path, catalog_path: Path
+) -> list[SeamLintFinding]:
+    """Refuse an unqualified current result unless truth binds the live catalog."""
+    if not catalog_path.is_file():
+        return [
+            SeamLintFinding(
+                check="artifact_freshness",
+                artifact=str(truth_path),
+                violation="current catalog is unavailable",
+                detail=f"catalog={catalog_path}",
+                level="fail",
+            )
+        ]
+    inputs = truth.get("inputs")
+    catalog_input = inputs.get("catalog") if isinstance(inputs, dict) else None
+    declared_hash = (
+        catalog_input.get("sha256") if isinstance(catalog_input, dict) else None
+    )
+    if not isinstance(declared_hash, str) or not declared_hash:
+        return [
+            SeamLintFinding(
+                check="artifact_freshness",
+                artifact=str(truth_path),
+                violation="truth artifact is not source-bound to the current catalog",
+                detail="inputs.catalog.sha256 is absent; freshness is UNKNOWN",
+                level="fail",
+            )
+        ]
+    actual_hash = hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+    if declared_hash != actual_hash:
+        return [
+            SeamLintFinding(
+                check="artifact_freshness",
+                artifact=str(truth_path),
+                violation="truth artifact was produced from different catalog content",
+                detail=f"declared={declared_hash}; actual={actual_hash}",
+            )
+        ]
+    return []
 
 
 def _check_artifact_freshness(
