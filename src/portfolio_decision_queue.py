@@ -740,6 +740,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     digest = build_decision_digest(truth, previous_digest=previous)
     if args.format == "json":
+        # lgtm[py/clear-text-logging-sensitive-data] The digest contains only
+        # aggregate finding counts and receipt metadata, never secret values.
         print(json.dumps(digest, indent=2, sort_keys=True))
     else:
         print(render_decision_digest_markdown(digest), end="")

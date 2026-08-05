@@ -428,19 +428,18 @@ def test_cli_json_and_markdown_are_deterministic(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     truth_path = tmp_path / "portfolio-truth.json"
+    project = _project(
+        "MCPAudit",
+        attention_state="decision-needed",
+        security_risk=True,
+        secret_scanning_open=1,
+    )
+    inert_secret_marker = "INERT_SECRET_VALUE_MUST_NOT_REACH_DIGEST"
+    project["security"]["providers"]["secret_scanning"]["alerts"] = [
+        {"secret": inert_secret_marker}
+    ]
     truth_path.write_text(
-        json.dumps(
-            _truth(
-                [
-                    _project(
-                        "MCPAudit",
-                        attention_state="decision-needed",
-                        security_risk=True,
-                        dependabot_high=1,
-                    )
-                ]
-            )
-        ),
+        json.dumps(_truth([project])),
         encoding="utf-8",
     )
 
@@ -449,6 +448,8 @@ def test_cli_json_and_markdown_are_deterministic(
     assert main(["--truth", str(truth_path), "--format", "json"]) == 0
     second = capsys.readouterr().out
     assert first == second
+    assert inert_secret_marker not in first
+    assert '"secret_scanning_open": 1' in first
 
     previous = tmp_path / "previous.json"
     previous.write_text(first, encoding="utf-8")
