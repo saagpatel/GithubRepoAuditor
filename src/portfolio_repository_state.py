@@ -59,7 +59,12 @@ def observe_repository_state(
                 topology=topology,
             )
 
-        configured_local = _observe_working_tree(path)
+        # `_observe_worktrees` already captured the configured worktree. Re-reading
+        # it here creates two different snapshots when another owner is actively
+        # editing that checkout: `worktrees` can contain the first dirty count while
+        # `local` contains the second. Derive both views from the same observation so
+        # the envelope remains internally consistent without hiding the dirty state.
+        configured_local = _configured_local_from_worktrees(worktrees, path)
         if remote.get("state") == "observed":
             if selection["state"] != "selected":
                 return _unknown_result(
@@ -407,6 +412,21 @@ def _local_from_worktree(worktree: dict[str, Any]) -> dict[str, Any]:
         "behind",
     )
     return {key: worktree.get(key) for key in keys}
+
+
+def _configured_local_from_worktrees(
+    worktrees: list[dict[str, Any]], path: Path
+) -> dict[str, Any]:
+    configured_path = path.resolve()
+    matches = [
+        item
+        for item in worktrees
+        if item.get("state") == "observed"
+        and Path(str(item.get("path") or "")).resolve() == configured_path
+    ]
+    if len(matches) != 1:
+        raise ValueError("configured worktree is not uniquely observable")
+    return _local_from_worktree(matches[0])
 
 
 def _tracks_nonmatching_branch(local: dict[str, Any]) -> bool:
