@@ -971,6 +971,8 @@ repos:
     automation_eligible: false
     doctor_standard: basic
     notes: Lane is live end-to-end as of 2026-06-12; keep residual hardening, policy widening, and hook deployment under explicit operator review.
+    aliases:
+      - egress-guard-oss
   da-scaffold:
     owner: d
     lifecycle_state: archived
@@ -1266,12 +1268,6 @@ repos:
     tool_provenance: gpt
   # --- 2026-07-04 portfolio working-set reconciliation: finish contracts ---
   agent-session-replay:
-    owner: d
-    lifecycle_state: active
-    review_cadence: weekly
-    operating_path: finish
-    maturity_program: finish
-  egress-guard-oss:
     owner: d
     lifecycle_state: active
     review_cadence: weekly

@@ -255,6 +255,33 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     assert catalog["repos"]["gpt_rag"]["lifecycle_state"] == "dormant"
 
 
+def test_live_catalog_resolves_egress_alias_to_canonical_manual_only_entry() -> None:
+    catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
+    catalog = load_portfolio_catalog(catalog_path)
+
+    assert catalog["errors"] == []
+    assert catalog["warnings"] == []
+    assert catalog["repos"]["egress-guard-oss"]["catalog_key"] == (
+        "cross-provider-egress-guard"
+    )
+
+    entry = catalog_entry_for_repo(
+        {
+            "name": "egress-guard-oss",
+            "full_name": "saagpatel/cross-provider-egress-guard",
+            "path": "egress-guard-oss",
+        },
+        catalog,
+    )
+
+    assert entry["catalog_key"] == "cross-provider-egress-guard"
+    assert entry["matched_by"] == "path"
+    assert entry["lifecycle_state"] == "manual-only"
+    assert entry["operating_path"] == "maintain"
+    assert entry["category"] == "infrastructure"
+    assert entry["maturity_program"] == "maintain"
+
+
 def test_catalog_entry_matches_full_name_then_bare_name():
     catalog = {
         "repos": {

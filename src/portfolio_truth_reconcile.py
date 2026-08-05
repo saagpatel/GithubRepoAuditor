@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import logging
 import re
-import hashlib
-from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from src.github_security_coverage import (
+    DEFAULT_ATTENTION_STATES,
+    SecurityCoverageError,
+    derive_default_attention_cohort,
+)
 from src.portfolio_catalog import (
     catalog_entry_for_repo,
     group_entry_for_path,
@@ -17,11 +20,17 @@ from src.portfolio_catalog import (
 )
 from src.portfolio_context_contract import has_substantive_readme_support
 from src.portfolio_pathing import build_operating_path_entry
-from src.portfolio_risk import build_risk_entry
 from src.portfolio_repository_state import observe_repository_state
+from src.portfolio_truth_coverage import build_coverage_envelope
+from src.portfolio_truth_decisions import build_project_decision
+from src.portfolio_truth_metadata import (
+    build_exclusions,
+    build_input_envelope,
+    build_source_summary,
+    build_warnings,
+)
+from src.portfolio_truth_precedence import build_precedence_matrix
 from src.portfolio_truth_sources import (
-    WORKSPACE_DISCOVERY_POLICY_VERSION,
-    checkout_collision_summary,
     discover_workspace_projects,
     load_legacy_registry_rows,
     load_safe_notion_project_context,
@@ -43,47 +52,6 @@ from src.project_registry import DEFAULT_SUPPLEMENTARY
 from src.registry_parser import _normalize
 
 logger = logging.getLogger(__name__)
-
-PRECEDENCE_MATRIX: dict[str, list[str]] = {
-    "declared.owner": ["catalog_repo", "catalog_group"],
-    "declared.team": ["catalog_repo", "catalog_group"],
-    "declared.purpose": ["catalog_repo", "catalog_group"],
-    "declared.lifecycle_state": ["catalog_repo", "catalog_group"],
-    "declared.criticality": ["catalog_repo", "catalog_group"],
-    "declared.review_cadence": ["catalog_repo", "catalog_group"],
-    "declared.intended_disposition": ["catalog_repo", "catalog_group"],
-    "declared.maturity_program": ["catalog_repo", "catalog_group", "catalog_defaults"],
-    "declared.target_maturity": ["catalog_repo", "catalog_group", "catalog_defaults"],
-    "declared.operating_path": ["normalized"],
-    "declared.category": ["catalog_repo", "catalog_group", "legacy_registry"],
-    "declared.tool_provenance": [
-        "catalog_repo",
-        "catalog_group",
-        "inference",
-        "legacy_registry",
-    ],
-    "declared.notes": ["catalog_repo", "catalog_group", "legacy_registry"],
-    "derived.stack": ["workspace", "legacy_registry"],
-    "derived.context_quality": ["workspace", "catalog_repo", "catalog_group"],
-    "derived.context_files": ["workspace"],
-    "derived.primary_context_file": ["workspace"],
-    "derived.project_summary_present": ["workspace"],
-    "derived.current_state_present": ["workspace"],
-    "derived.stack_present": ["workspace"],
-    "derived.run_instructions_present": ["workspace"],
-    "derived.known_risks_present": ["workspace"],
-    "derived.next_recommended_move_present": ["workspace"],
-    "derived.last_meaningful_activity_at": ["git", "workspace"],
-    "derived.activity_status": ["derived"],
-    "derived.archived": ["derived"],
-    "derived.attention_state": ["derived"],
-    "derived.path_override": ["normalized"],
-    "derived.path_confidence": ["normalized"],
-    "derived.path_rationale": ["normalized"],
-    "derived.has_tests": ["workspace"],
-    "derived.has_ci": ["workspace"],
-    "derived.readme_char_count": ["workspace"],
-}
 
 # ── Strict signal constants (mirror src/analyzers/testing.py and cicd.py) ──
 _TEST_DIRS = frozenset(("test", "tests", "__tests__", "spec", "test_suite"))
@@ -225,6 +193,191 @@ class PortfolioTruthBuildResult:
     legacy_rows: dict[str, dict[str, str]]
 
 
+def _validate_security_receipt_cohort_identity(
+    *,
+    projects: list[PortfolioTruthProject],
+    security_alerts_by_name: dict[str, dict],
+    candidate_projects: list[PortfolioTruthProject] | None = None,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
+) -> None:
+    """Bind receipt membership to attention derived before the new receipt."""
+    if candidate_projects is None:
+        candidate_projects = projects
+    prior_security_alerts_by_name = prior_security_alerts_by_name or {}
+    receipt_repositories = tuple(sorted(security_alerts_by_name, key=str.lower))
+    try:
+        candidate_repositories = derive_default_attention_cohort(
+            {
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": project.identity.project_key,
+                            "repo_full_name": project.identity.repo_full_name,
+                        },
+                        "derived": {
+                            "attention_state": project.derived.attention_state,
+                        },
+                    }
+                    for project in candidate_projects
+                ]
+            },
+            expected_count=len(receipt_repositories),
+        )
+    except SecurityCoverageError as exc:
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt cohort cannot match freshly "
+            f"derived default attention: {exc}."
+        ) from exc
+
+    receipt_only = sorted(
+        set(receipt_repositories) - set(candidate_repositories),
+        key=str.lower,
+    )
+    derived_only = sorted(
+        set(candidate_repositories) - set(receipt_repositories),
+        key=str.lower,
+    )
+    if receipt_only or derived_only:
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt cohort differs from freshly "
+            "derived pre-security default attention: "
+            f"receipt_only={receipt_only}; derived_only={derived_only}."
+        )
+
+    final_repositories = _derive_project_security_cohort(projects)
+    final_only = sorted(
+        set(final_repositories) - set(receipt_repositories),
+        key=str.lower,
+    )
+    if final_only:
+        raise ValueError(
+            "PortfolioTruth post-receipt attention contains repositories outside "
+            f"the collected security cohort: {final_only}."
+        )
+
+    departed = sorted(
+        set(receipt_repositories) - set(final_repositories),
+        key=str.lower,
+    )
+
+    def final_project_is_archived(repository: str) -> bool:
+        matches = [
+            project
+            for project in projects
+            if project.identity.repo_full_name == repository
+        ]
+        return len(matches) == 1 and matches[0].derived.archived is True
+
+    unresolved_departures = [
+        repository
+        for repository in departed
+        if not _is_verified_security_cohort_departure(
+            prior_security_alerts_by_name.get(repository),
+            security_alerts_by_name.get(repository),
+            final_project_archived=final_project_is_archived(repository),
+        )
+    ]
+    if unresolved_departures:
+        raise ValueError(
+            "PortfolioTruth receipt members left default attention without fresh "
+            "observed Dependabot resolution or repository archive evidence: "
+            f"{unresolved_departures}."
+        )
+
+
+def _derive_project_security_cohort(
+    projects: list[PortfolioTruthProject],
+) -> tuple[str, ...]:
+    expected_count = sum(
+        project.derived.attention_state in DEFAULT_ATTENTION_STATES
+        and not project.identity.project_key.startswith("supp:")
+        for project in projects
+    )
+    try:
+        return derive_default_attention_cohort(
+            {
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": project.identity.project_key,
+                            "repo_full_name": project.identity.repo_full_name,
+                        },
+                        "derived": {
+                            "attention_state": project.derived.attention_state,
+                        },
+                    }
+                    for project in projects
+                ]
+            },
+            expected_count=expected_count,
+        )
+    except SecurityCoverageError as exc:
+        raise ValueError(
+            f"PortfolioTruth post-receipt security cohort is invalid: {exc}."
+        ) from exc
+
+
+def _is_verified_security_cohort_departure(
+    prior_entry: dict[str, Any] | None,
+    current_entry: dict[str, Any] | None,
+    *,
+    final_project_archived: bool,
+) -> bool:
+    prior = dict(prior_entry or {})
+    current = dict(current_entry or {})
+    prior_dependabot = dict((prior.get("providers") or {}).get("dependabot") or {})
+    current_dependabot = dict((current.get("providers") or {}).get("dependabot") or {})
+    current_repository = dict(current.get("repository") or {})
+    prior_counts = dict(prior_dependabot.get("counts") or {})
+    current_counts = dict(current_dependabot.get("counts") or {})
+    observed_resolution = (
+        prior_dependabot.get("state") == "observed"
+        and sum(
+            value
+            for value in (
+                prior_counts.get("high"),
+                prior_counts.get("critical"),
+            )
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        > 0
+        and current.get("receipt_state") == "fresh"
+        and current_dependabot.get("state") == "observed"
+        and current_counts.get("high") == 0
+        and current_counts.get("critical") == 0
+    )
+    observed_archive = (
+        final_project_archived
+        and current.get("receipt_state") == "fresh"
+        and current_repository.get("state") == "observed"
+        and current_repository.get("archived") is True
+    )
+    return observed_resolution or observed_archive
+
+
+def _candidate_prior_security_alerts(
+    prior_security_alerts_by_name: dict[str, dict],
+    prior_security_cohort_repositories: tuple[str, ...] | None,
+) -> dict[str, dict]:
+    """Keep prior final members from being removed by contradicted archive evidence."""
+    if prior_security_cohort_repositories is None:
+        return prior_security_alerts_by_name
+
+    prior_final_members = set(prior_security_cohort_repositories)
+    candidate_alerts: dict[str, dict] = {}
+    for repository, entry in prior_security_alerts_by_name.items():
+        candidate_entry = dict(entry)
+        remote_repository = dict(candidate_entry.get("repository") or {})
+        if (
+            repository in prior_final_members
+            and remote_repository.get("archived") is True
+        ):
+            remote_repository.pop("archived")
+            candidate_entry["repository"] = remote_repository
+        candidate_alerts[repository] = candidate_entry
+    return candidate_alerts
+
+
 def build_portfolio_truth_snapshot(
     *,
     workspace_root: Path,
@@ -236,6 +389,8 @@ def build_portfolio_truth_snapshot(
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, Any] | None = None,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
+    prior_security_cohort_repositories: tuple[str, ...] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
     producer: dict[str, Any] | None = None,
     prior_notion_generated_at: str | None = None,
@@ -279,20 +434,61 @@ def build_portfolio_truth_snapshot(
             now=now,
         ),
     )
-    projects = [
-        _build_truth_project(
-            raw_project,
-            catalog_data=catalog_data,
-            legacy_rows=legacy_rows,
-            notion_context=notion_context,
-            now=now,
-            workspace_root=workspace_root,
-            release_count_by_name=release_count_by_name,
-            security_alerts_by_name=security_alerts_by_name,
-            repo_status_by_name=repo_status_by_name,
+
+    def materialize_projects(
+        security_lookup: dict[str, dict] | None,
+        *,
+        repo_status_lookup: dict[str, dict] | None,
+    ) -> list[PortfolioTruthProject]:
+        return [
+            _build_truth_project(
+                raw_project,
+                catalog_data=catalog_data,
+                legacy_rows=legacy_rows,
+                notion_context=notion_context,
+                now=now,
+                workspace_root=workspace_root,
+                release_count_by_name=release_count_by_name,
+                security_alerts_by_name=security_lookup,
+                repo_status_by_name=repo_status_lookup,
+            )
+            for raw_project in workspace_projects
+        ]
+
+    prior_security_alerts = prior_security_alerts_by_name or {}
+    candidate_prior_security_alerts = _candidate_prior_security_alerts(
+        prior_security_alerts,
+        prior_security_cohort_repositories,
+    )
+    candidate_repo_status_by_name = {
+        name: status
+        for name, status in (repo_status_by_name or {}).items()
+        if status.get("source") == "github_api" and status.get("archived") is False
+    }
+    candidate_projects = (
+        materialize_projects(
+            candidate_prior_security_alerts,
+            # Current status may only expand candidate membership. A fresh GitHub
+            # unarchive therefore forces receipt coverage, while archive status is
+            # applied only to the final projects and must be corroborated by the
+            # receipt before it can authorize a departure.
+            repo_status_lookup=candidate_repo_status_by_name,
         )
-        for raw_project in workspace_projects
-    ]
+        if security_coverage_metadata is not None
+        and security_alerts_by_name is not None
+        else None
+    )
+    projects = materialize_projects(
+        security_alerts_by_name,
+        repo_status_lookup=repo_status_by_name,
+    )
+    if security_coverage_metadata is not None and security_alerts_by_name is not None:
+        _validate_security_receipt_cohort_identity(
+            projects=projects,
+            candidate_projects=candidate_projects,
+            security_alerts_by_name=security_alerts_by_name,
+            prior_security_alerts_by_name=prior_security_alerts,
+        )
     projects.sort(
         key=lambda item: (
             item.identity.section_marker.lower(),
@@ -300,69 +496,36 @@ def build_portfolio_truth_snapshot(
         )
     )
 
-    collision_summary = checkout_collision_summary(checkout_collisions)
-    source_summary = {
-        "workspace_root": workspace_root.as_posix(),
-        "project_count": len(projects),
-        "checkout_collisions": collision_summary,
-        "catalog_errors": list(catalog_data.get("errors") or []),
-        "catalog_warnings": list(catalog_data.get("warnings") or []),
-        "legacy_registry_rows": len(legacy_rows),
-        "notion_context_rows": len(notion_context),
-        "notion_context_carried_forward": notion_context_carried_forward,
-        "context_quality_counts": dict(
-            Counter(project.derived.context_quality for project in projects)
-        ),
-        "activity_status_counts": dict(
-            Counter(project.derived.activity_status for project in projects)
-        ),
-        "archived_count": sum(1 for project in projects if project.derived.archived),
-        "attention_state_counts": dict(
-            Counter(project.derived.attention_state for project in projects)
-        ),
-        "github_archived_count": sum(
-            1
-            for project in projects
-            if project.provenance.get("github.archived", {}).get("detail") == "true"
-        ),
-        "duplicate_display_names": _duplicate_display_names(projects),
-        "unresolved_duplicate_display_names": _unresolved_duplicate_display_names(
-            projects
-        ),
-    }
-    warnings = list(catalog_data.get("errors") or []) + list(
-        catalog_data.get("warnings") or []
+    source_summary = build_source_summary(
+        workspace_root=workspace_root.as_posix(),
+        projects=projects,
+        catalog_errors=list(catalog_data.get("errors") or []),
+        catalog_warnings=list(catalog_data.get("warnings") or []),
+        legacy_registry_rows=len(legacy_rows),
+        notion_context_rows=len(notion_context),
+        notion_context_carried_forward=notion_context_carried_forward,
+        checkout_collisions=checkout_collisions,
     )
-    duplicate_display_names = source_summary["unresolved_duplicate_display_names"]
-    if duplicate_display_names:
-        warnings.append(
-            "Duplicate project display names require path-qualified registry labels: "
-            + ", ".join(duplicate_display_names)
-        )
-    ambiguous_checkout_origins = [
-        str(group["origin"])
-        for group in collision_summary["groups"]
-        if group["selection"]["state"] == "unknown"
-    ]
-    if ambiguous_checkout_origins:
-        warnings.append(
-            "Checkout authority is UNKNOWN for same-origin checkout groups: "
-            + ", ".join(ambiguous_checkout_origins)
-        )
+    warnings = build_warnings(
+        catalog_errors=source_summary["catalog_errors"],
+        catalog_warnings=source_summary["catalog_warnings"],
+        unresolved_duplicates=source_summary["unresolved_duplicate_display_names"],
+        checkout_collisions=checkout_collisions,
+    )
 
     snapshot = PortfolioTruthSnapshot(
         schema_version=SCHEMA_VERSION,
         generated_at=now,
         workspace_root=workspace_root.as_posix(),
         source_summary=source_summary,
-        precedence_matrix=PRECEDENCE_MATRIX,
+        precedence_matrix=build_precedence_matrix(),
         warnings=warnings,
         projects=projects,
         derivation_policy_version=DERIVATION_POLICY_VERSION,
         producer=producer or {},
-        inputs=_build_input_envelope(
-            workspace_root=workspace_root,
-            catalog_data=catalog_data,
+        inputs=build_input_envelope(
+            workspace_root=workspace_root.as_posix(),
+            catalog_path=catalog_data.get("path"),
             now=now,
             include_notion=include_notion,
             notion_context_rows=len(notion_context),
@@ -372,15 +535,12 @@ def build_portfolio_truth_snapshot(
             notion_observed_at=notion_observed_at,
             security_coverage_metadata=security_coverage_metadata,
         ),
-        coverage=_build_coverage_envelope(
+        coverage=build_coverage_envelope(
             projects=projects,
             notion_context_carried_forward=notion_context_carried_forward,
             notion_context_rows=len(notion_context),
         ),
-        exclusions={
-            "policy_version": WORKSPACE_DISCOVERY_POLICY_VERSION,
-            "counts": dict(sorted(exclusion_counts.items())),
-        },
+        exclusions=build_exclusions(exclusion_counts),
     )
     return PortfolioTruthBuildResult(
         snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
@@ -486,190 +646,6 @@ def _merge_supplementary_discoveries(
     return merged
 
 
-def _build_coverage_envelope(
-    *,
-    projects: list[PortfolioTruthProject],
-    notion_context_carried_forward: bool,
-    notion_context_rows: int,
-) -> list[dict[str, Any]]:
-    workspace_projects = [
-        project
-        for project in projects
-        if not project.identity.project_key.startswith("supp:")
-    ]
-    workspace_project_count = len(workspace_projects)
-    supplementary_project_count = len(projects) - workspace_project_count
-    complete = sum(
-        project.security.coverage_state == "complete" for project in workspace_projects
-    )
-    partial = sum(
-        project.security.coverage_state == "partial" for project in workspace_projects
-    )
-    stale = sum(
-        project.security.coverage_state == "stale" for project in workspace_projects
-    )
-    unknown = workspace_project_count - complete - partial - stale
-    cohort_count = sum(project.security.cohort_member for project in workspace_projects)
-    cohort_complete = sum(
-        project.security.cohort_member and project.security.coverage_state == "complete"
-        for project in workspace_projects
-    )
-    cohort_partial = sum(
-        project.security.cohort_member and project.security.coverage_state == "partial"
-        for project in workspace_projects
-    )
-    cohort_stale = sum(
-        project.security.cohort_member and project.security.coverage_state == "stale"
-        for project in workspace_projects
-    )
-    cohort_unknown = cohort_count - cohort_complete - cohort_partial - cohort_stale
-    provider_counts = {
-        provider: sum(
-            project.security.provider_state(provider) == "observed"
-            for project in workspace_projects
-        )
-        for provider in ("dependabot", "code_scanning", "secret_scanning")
-    }
-    provider_zero_finding_counts = {
-        provider: sum(
-            (project.security.providers.get(provider) or {}).get("zero_findings")
-            is True
-            for project in workspace_projects
-        )
-        for provider in ("dependabot", "code_scanning", "secret_scanning")
-    }
-    remote_default_branch_counts = {
-        state: sum(
-            (project.repository_state.get("remote_default_branch") or {}).get("state")
-            == state
-            for project in workspace_projects
-        )
-        for state in (
-            "observed",
-            "partial",
-            "stale",
-            "credential_unavailable",
-            "forbidden",
-            "not_found",
-            "rate_limited",
-            "transient_error",
-            "malformed",
-            "not_requested",
-            "unknown",
-        )
-    }
-    git_observed = sum(
-        project.repository_state.get("state") == "observed"
-        for project in workspace_projects
-    )
-    coverage = [
-        {
-            "source": "workspace",
-            "state": "observed",
-            "project_count": workspace_project_count,
-        },
-        {
-            "source": "git",
-            "state": "observed" if git_observed else "unknown",
-            "observed_count": git_observed,
-            "project_count": workspace_project_count,
-        },
-        {
-            "source": "github_security",
-            "state": (
-                "known"
-                if complete == workspace_project_count
-                else "partial"
-                if complete or partial
-                else "unknown"
-            ),
-            "scanned_count": complete,
-            "complete_repo_count": complete,
-            "partial_repo_count": partial,
-            "stale_count": stale,
-            "unknown_count": unknown,
-            "cohort_repository_count": cohort_count,
-            "cohort_complete_count": cohort_complete,
-            "cohort_partial_count": cohort_partial,
-            "cohort_stale_count": cohort_stale,
-            "cohort_unknown_count": cohort_unknown,
-            "provider_observed_counts": provider_counts,
-            "provider_zero_finding_counts": provider_zero_finding_counts,
-            "remote_default_branch_counts": remote_default_branch_counts,
-            "project_count": workspace_project_count,
-        },
-        {
-            "source": "notion",
-            "state": "carried_forward"
-            if notion_context_carried_forward
-            else "observed"
-            if notion_context_rows
-            else "unknown",
-            "observed_count": notion_context_rows,
-        },
-    ]
-    if supplementary_project_count:
-        coverage.append(
-            {
-                "source": "supplementary_registry",
-                "state": "observed",
-                "project_count": supplementary_project_count,
-            }
-        )
-    return coverage
-
-
-def _build_input_envelope(
-    *,
-    workspace_root: Path,
-    catalog_data: dict[str, Any],
-    now: datetime,
-    include_notion: bool,
-    notion_context_rows: int,
-    notion_context_carried_forward: bool,
-    prior_notion_generated_at: str | None,
-    notion_source_mode: str,
-    notion_observed_at: str | None,
-    security_coverage_metadata: dict[str, Any] | None,
-) -> dict[str, Any]:
-    resolved_catalog = Path(str(catalog_data.get("path") or ""))
-    catalog_hash = (
-        hashlib.sha256(resolved_catalog.read_bytes()).hexdigest()
-        if resolved_catalog.is_file()
-        else None
-    )
-    if not include_notion or notion_context_rows == 0:
-        notion_mode = "unavailable"
-        notion_observed_at = None
-    elif notion_context_carried_forward:
-        notion_mode = "carried-forward" if prior_notion_generated_at else "unavailable"
-        notion_observed_at = prior_notion_generated_at
-    else:
-        notion_mode = notion_source_mode
-        notion_observed_at = notion_observed_at or now.isoformat()
-    inputs = {
-        "catalog": {
-            "source_id": "portfolio-catalog",
-            "sha256": catalog_hash,
-            "observed_at": now.isoformat(),
-        },
-        "workspace": {
-            "source_id": "projects-root",
-            "observed_at": now.isoformat(),
-        },
-        "notion": {
-            "mode": notion_mode,
-            "observed_at": notion_observed_at,
-            "carried_from_generated_at": (
-                prior_notion_generated_at if notion_context_carried_forward else None
-            ),
-        },
-    }
-    if security_coverage_metadata:
-        inputs["github_security"] = dict(security_coverage_metadata)
-    return inputs
-
-
 def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
     """Reconstruct a Notion project-context map from a previously published
     portfolio-truth artifact, keyed identically to live Notion context
@@ -708,40 +684,6 @@ def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
             "current_state": current_state,
         }
     return context
-
-
-def _duplicate_display_names(projects: list[PortfolioTruthProject]) -> list[str]:
-    return sorted(
-        name
-        for name, count in Counter(
-            project.identity.display_name for project in projects
-        ).items()
-        if count > 1
-    )
-
-
-def _unresolved_duplicate_display_names(
-    projects: list[PortfolioTruthProject],
-) -> list[str]:
-    grouped: dict[str, list[PortfolioTruthProject]] = {}
-    for project in projects:
-        grouped.setdefault(project.identity.display_name, []).append(project)
-    return sorted(
-        name
-        for name, members in grouped.items()
-        if len(members) > 1
-        and any(not _has_path_catalog_contract(project) for project in members)
-    )
-
-
-def _has_path_catalog_contract(project: PortfolioTruthProject) -> bool:
-    for source in project.provenance.values():
-        if (
-            source.get("source") == "catalog_repo"
-            and source.get("detail") == project.identity.path
-        ):
-            return True
-    return False
 
 
 def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
@@ -1054,42 +996,28 @@ def _build_truth_project(
     # Only Dependabot high/critical counts drive the risk tier today. Code-scanning
     # and secret-scanning counts are captured in SecurityFields for visibility but do
     # not yet feed the active-high-severity-alerts factor (Dependabot-only scope).
-    risk_entry = build_risk_entry(
+    risk_entry, attention_state = build_project_decision(
         display_name=raw_project["name"],
         operating_path=path_entry.get("operating_path", ""),
         path_override=path_entry.get("path_override", ""),
         context_quality=context_quality,
         activity_status=activity_status,
         archived=archived,
+        lifecycle_state=declared_values["lifecycle_state"],
+        category=declared_values["category"],
         criticality=declared_values["criticality"],
         doctor_standard=declared_values["doctor_standard"],
         known_risks_present=bool(raw_project["known_risks_present"]),
         run_instructions_present=bool(raw_project["run_instructions_present"]),
+        security_coverage_state=security.coverage_state,
         security_high_alerts=security.dependabot_high or 0,
         security_critical_alerts=security.dependabot_critical or 0,
     )
     if (
-        security.coverage_state != "complete"
-        and risk_entry.get("risk_summary") == "No elevated risk factors."
+        not security.receipt_schema_version
+        and attention_state in DEFAULT_ATTENTION_STATES
+        and not identity.project_key.startswith("supp:")
     ):
-        risk_entry["risk_summary"] = (
-            "No non-security risk factors detected; GitHub security coverage is "
-            f"{security.coverage_state}."
-        )
-    attention_state = _attention_state_for(
-        activity_status=activity_status,
-        archived=archived,
-        lifecycle_state=declared_values["lifecycle_state"],
-        operating_path=path_entry.get("operating_path", ""),
-        category=declared_values["category"],
-        path_override=path_entry.get("path_override", ""),
-        risk_entry=risk_entry,
-    )
-    if not security.receipt_schema_version and attention_state in {
-        "active-product",
-        "active-infra",
-        "decision-needed",
-    } and not identity.project_key.startswith("supp:"):
         security = replace(
             security,
             cohort_member=True,
@@ -1483,48 +1411,3 @@ def _activity_status_for(last_activity: datetime | None, *, now: datetime) -> st
     if delta_days <= 30:
         return "recent"
     return "stale"
-
-
-def _attention_state_for(
-    *,
-    activity_status: str,
-    archived: bool,
-    lifecycle_state: str,
-    operating_path: str,
-    category: str,
-    path_override: str,
-    risk_entry: dict[str, Any],
-) -> str:
-    if archived or operating_path == "archive":
-        return "archived"
-    if operating_path == "experiment" or lifecycle_state == "experimental":
-        return "experiment"
-    if risk_entry.get("security_risk"):
-        return "decision-needed"
-    if lifecycle_state == "manual-only":
-        return "manual-only"
-    if lifecycle_state == "dormant":
-        return "parked"
-    if lifecycle_state == "active" and operating_path == "maintain":
-        if category == "infrastructure":
-            return "active-infra"
-        if category == "commercial":
-            return "active-product"
-    if activity_status == "stale":
-        # A declared finish path is itself an unresolved operator decision. It can
-        # remain valid while the default branch is stale (for example, when work is
-        # on a release branch or waiting at a human/publication gate), so do not
-        # silently collapse it back into the parked pool.
-        return "decision-needed" if operating_path == "finish" else "parked"
-    if activity_status in {"active", "recent"} and operating_path in {
-        "maintain",
-        "finish",
-    }:
-        if category == "infrastructure":
-            return "active-infra"
-        if category == "commercial":
-            return "active-product"
-        return "manual-only"
-    if activity_status in {"active", "recent"}:
-        return "manual-only"
-    return "parked"
