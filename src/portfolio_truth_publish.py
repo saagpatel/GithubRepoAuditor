@@ -10,7 +10,7 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator
 
 from src.github_security_coverage import (
     DEFAULT_ATTENTION_STATES,
@@ -234,6 +234,7 @@ def _portfolio_truth_publication_lock(latest_path: Path) -> Iterator[None]:
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CONFIG_DIR = _REPO_ROOT / "config"
+_PUBLISH_JOURNAL_NAME = ".portfolio-truth-publish-journal.json"
 
 
 def _build_project_registry_json(snapshot, *, include_notion: bool) -> str:
@@ -402,6 +403,16 @@ def _publish_portfolio_truth_locked(
         else 24
     )
     latest_path = truth_latest_path(output_dir)
+    project_registry_path = output_dir / "project-registry.json"
+    _recover_interrupted_publication(
+        output_dir,
+        allowed_targets={
+            latest_path,
+            registry_output,
+            portfolio_report_output,
+            project_registry_path,
+        },
+    )
     notion_context_fallback = (
         load_prior_notion_context(latest_path) if allow_empty_notion else None
     )
@@ -455,7 +466,6 @@ def _publish_portfolio_truth_locked(
     )
     latest_name = latest_path.name
     snapshot_json = json.dumps(build_result.snapshot.to_dict(), indent=2) + "\n"
-    project_registry_path = output_dir / "project-registry.json"
     project_registry_json = _build_project_registry_json(
         build_result.snapshot, include_notion=include_notion
     )
@@ -488,8 +498,12 @@ def _publish_portfolio_truth_locked(
         project_registry_path: True,
     }
     temp_files = {path: _stage_text(path, content) for path, content in targets.items()}
-    originals = {path: (path.read_text() if path.exists() else None) for path in targets}
-    published: list[Path] = []
+    backups = {
+        path: (_stage_bytes(path, path.read_bytes()) if path.exists() else None)
+        for path in targets
+    }
+    journal_path = output_dir / _PUBLISH_JOURNAL_NAME
+    _write_publish_journal(journal_path, temp_files=temp_files, backups=backups)
 
     # This live guard is intentionally separate from the snapshot's shared
     # evaluation clock: it catches receipt replacement or expiry before writes.
@@ -513,25 +527,24 @@ def _publish_portfolio_truth_locked(
                 _verify_prior_security_evidence_current(prior_security_evidence)
             for path, staged in temp_files.items():
                 if path in {registry_output, portfolio_report_output} and not changed[path]:
-                    staged.unlink(missing_ok=True)
                     continue
                 staged.replace(path)
-                published.append(path)
-    except Exception as exc:
-        for path in reversed(published):
-            original = originals[path]
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_text(original)
-        for staged in temp_files.values():
-            staged.unlink(missing_ok=True)
+                _fsync_directory(path.parent)
+    except BaseException as exc:
+        _recover_interrupted_publication(
+            output_dir,
+            allowed_targets={
+                latest_path,
+                registry_output,
+                portfolio_report_output,
+                project_registry_path,
+            },
+        )
         if isinstance(exc, (SecurityCoverageError, ValueError)):
             raise PortfolioTruthPublishError(str(exc)) from exc
         raise
 
-    for staged in temp_files.values():
-        staged.unlink(missing_ok=True)
+    _cleanup_publish_transaction(journal_path, temp_files.values(), backups.values())
 
     collision_summary = build_result.snapshot.source_summary["checkout_collisions"]
     return PortfolioTruthPublishResult(
@@ -587,7 +600,151 @@ def _stage_text(target: Path, content: str) -> Path:
         "w", delete=False, dir=target.parent, suffix=f".{target.name}.tmp"
     ) as handle:
         handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
         return Path(handle.name)
+
+
+def _stage_bytes(target: Path, content: bytes) -> Path:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "wb", delete=False, dir=target.parent, suffix=f".{target.name}.bak"
+    ) as handle:
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
+        return Path(handle.name)
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _write_publish_journal(
+    journal_path: Path,
+    *,
+    temp_files: dict[Path, Path],
+    backups: dict[Path, Path | None],
+) -> None:
+    journal_targets: list[dict[str, object]] = []
+    for target in temp_files:
+        backup = backups[target]
+        journal_targets.append(
+            {
+                "target": str(target.resolve()),
+                "staged": str(temp_files[target].resolve()),
+                "backup": str(backup.resolve()) if backup is not None else None,
+                "existed": backup is not None,
+            }
+        )
+    payload = {
+        "schema": "PortfolioTruthPublishJournalV1",
+        "targets": journal_targets,
+    }
+    staged_journal = _stage_text(
+        journal_path, json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    )
+    staged_journal.replace(journal_path)
+    _fsync_directory(journal_path.parent)
+
+
+def _allowed_recovery_target(
+    target: Path, *, output_dir: Path, allowed_targets: set[Path]
+) -> bool:
+    resolved = target.resolve()
+    if resolved in {path.resolve() for path in allowed_targets}:
+        return True
+    return (
+        resolved.parent == output_dir.resolve()
+        and resolved.name.startswith("portfolio-truth-")
+        and resolved.name.endswith(".json")
+        and resolved.name != "portfolio-truth-latest.json"
+    )
+
+
+def _recover_interrupted_publication(
+    output_dir: Path, *, allowed_targets: set[Path]
+) -> None:
+    journal_path = output_dir / _PUBLISH_JOURNAL_NAME
+    if not journal_path.exists():
+        return
+    try:
+        payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PortfolioTruthPublishError(
+            f"Cannot recover interrupted publication: invalid journal {journal_path}"
+        ) from exc
+    if payload.get("schema") != "PortfolioTruthPublishJournalV1":
+        raise PortfolioTruthPublishError(
+            f"Cannot recover interrupted publication: unsupported journal {journal_path}"
+        )
+    rows = payload.get("targets")
+    if not isinstance(rows, list):
+        raise PortfolioTruthPublishError(
+            f"Cannot recover interrupted publication: malformed journal {journal_path}"
+        )
+
+    staged_paths: list[Path] = []
+    backup_paths: list[Path] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication: malformed journal {journal_path}"
+            )
+        target = Path(str(row.get("target", "")))
+        staged = Path(str(row.get("staged", "")))
+        backup_value = row.get("backup")
+        backup = Path(str(backup_value)) if backup_value else None
+        if not _allowed_recovery_target(
+            target, output_dir=output_dir, allowed_targets=allowed_targets
+        ):
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication target outside contract: {target}"
+            )
+        if staged.resolve().parent != target.resolve().parent:
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication: invalid staged path for {target}"
+            )
+        if backup is not None and backup.resolve().parent != target.resolve().parent:
+            raise PortfolioTruthPublishError(
+                f"Cannot recover interrupted publication: invalid backup path for {target}"
+            )
+        if backup is None:
+            target.unlink(missing_ok=True)
+        else:
+            if not backup.exists():
+                raise PortfolioTruthPublishError(
+                    f"Cannot recover interrupted publication: backup missing for {target}"
+                )
+            restored = _stage_bytes(target, backup.read_bytes())
+            restored.replace(target)
+            backup_paths.append(backup)
+        staged_paths.append(staged)
+        _fsync_directory(target.parent)
+
+    _cleanup_publish_transaction(journal_path, staged_paths, backup_paths)
+
+
+def _cleanup_publish_transaction(
+    journal_path: Path,
+    staged_paths: Iterable[Path],
+    backup_paths: Iterable[Path | None],
+) -> None:
+    # The journal is the recovery authority. Retire and fsync it before deleting
+    # backups so a process death during cleanup can leave only harmless orphans,
+    # never a live journal that points at already-deleted recovery material.
+    journal_path.unlink(missing_ok=True)
+    if journal_path.parent.exists():
+        _fsync_directory(journal_path.parent)
+    for path in staged_paths:
+        path.unlink(missing_ok=True)
+    for backup_path in backup_paths:
+        if backup_path is not None:
+            backup_path.unlink(missing_ok=True)
 
 
 def _content_changed(path: Path, content: str) -> bool:
