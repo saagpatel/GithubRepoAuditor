@@ -1,7 +1,7 @@
 {
   "username": "demo-operator",
-  "generated_at": "2026-08-01T22:50:13.825998+00:00",
-  "headline": "10 projects carry open high or critical alerts.",
+  "generated_at": "2026-08-04T20:46:39.243078+00:00",
+  "headline": "10 projects carry blocking GitHub security findings.",
   "decision": "Clear Aurora Ledger before starting lower-pressure cleanup.",
   "why_this_week": "Aurora Ledger holds the largest observed alert backlog and is the only flagship blocked on a security decision.",
   "next_step": "Open the burndown view, confirm the grouped fix, then record the decision.",
@@ -9,92 +9,189 @@
     "elevated_count": 10,
     "risk_tier_counts": {
       "elevated": 10,
-      "moderate": 12,
-      "baseline": 10,
-      "deferred": 8
+      "moderate": 6,
+      "baseline": 13,
+      "deferred": 11
     },
     "top_elevated": [
       {
         "repo": "flagship/aurora-ledger",
         "risk_tier": "elevated",
-        "risk_summary": "Open high or critical alerts need an operator decision."
-      },
-      {
-        "repo": "flagship/basalt-relay",
-        "risk_tier": "elevated",
-        "risk_summary": "Open high or critical alerts need an operator decision."
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings."
       },
       {
         "repo": "flagship/cinder-atlas",
         "risk_tier": "elevated",
-        "risk_summary": "Open high or critical alerts need an operator decision."
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings."
       },
       {
-        "repo": "platform/ember-conduit",
+        "repo": "lab/foxglove-mast",
         "risk_tier": "elevated",
-        "risk_summary": "Open high or critical alerts need an operator decision."
+        "risk_summary": "3 risk factor(s): weak context quality, investigate override active, run instructions missing."
       },
       {
-        "repo": "studio/glacier-quill",
+        "repo": "lab/pallas-runner",
         "risk_tier": "elevated",
-        "risk_summary": "Open high or critical alerts need an operator decision."
+        "risk_summary": "3 risk factor(s): weak context quality, investigate override active, run instructions missing."
+      },
+      {
+        "repo": "lab/tabard-anvil",
+        "risk_tier": "elevated",
+        "risk_summary": "3 risk factor(s): weak context quality, investigate override active, run instructions missing."
       }
     ]
   },
   "security_posture": {
     "scanned_count": 10,
     "repos_with_open_high_critical": 10,
-    "total_open_critical": 5,
-    "total_open_high": 20,
+    "repos_with_blocking_findings": 10,
+    "unadmitted_count": 8,
+    "admission_status_counts": {
+      "fail": 10,
+      "unknown": 4,
+      "pass": 4
+    },
+    "total_open_critical": 6,
+    "total_open_high": 24,
+    "total_open_secrets": 1,
     "top_alerts": [
       {
         "repo": "flagship/aurora-ledger",
         "risk_tier": "elevated",
         "dependabot_critical": 1,
-        "dependabot_high": 4
+        "dependabot_high": 4,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 2,
+        "secret_scanning_open": 0,
+        "total_open_critical": 1,
+        "total_open_high": 6,
+        "security_admission_status": "fail",
+        "security_admission_evidence_complete": true,
+        "security_admission_reason_codes": [
+          "SECURITY_ADMISSION_FINDINGS"
+        ]
       },
       {
         "repo": "flagship/cinder-atlas",
         "risk_tier": "elevated",
         "dependabot_critical": 2,
-        "dependabot_high": 3
+        "dependabot_high": 3,
+        "code_scanning_critical": 1,
+        "code_scanning_high": 0,
+        "secret_scanning_open": 1,
+        "total_open_critical": 3,
+        "total_open_high": 3,
+        "security_admission_status": "fail",
+        "security_admission_evidence_complete": true,
+        "security_admission_reason_codes": [
+          "SECURITY_ADMISSION_FINDINGS"
+        ]
       },
       {
         "repo": "studio/glacier-quill",
         "risk_tier": "elevated",
         "dependabot_critical": 1,
-        "dependabot_high": 2
+        "dependabot_high": 2,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 1,
+        "secret_scanning_open": 0,
+        "total_open_critical": 1,
+        "total_open_high": 3,
+        "security_admission_status": "fail",
+        "security_admission_evidence_complete": true,
+        "security_admission_reason_codes": [
+          "SECURITY_ADMISSION_FINDINGS"
+        ]
       },
       {
         "repo": "flagship/basalt-relay",
-        "risk_tier": "elevated",
+        "risk_tier": "moderate",
         "dependabot_critical": 0,
-        "dependabot_high": 2
+        "dependabot_high": 2,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 1,
+        "secret_scanning_open": 0,
+        "total_open_critical": 0,
+        "total_open_high": 3,
+        "security_admission_status": "fail",
+        "security_admission_evidence_complete": true,
+        "security_admission_reason_codes": [
+          "SECURITY_ADMISSION_FINDINGS"
+        ]
       },
       {
         "repo": "studio/kestrel-loom",
-        "risk_tier": "elevated",
+        "risk_tier": "moderate",
         "dependabot_critical": 0,
-        "dependabot_high": 3
+        "dependabot_high": 3,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 0,
+        "secret_scanning_open": 0,
+        "total_open_critical": 0,
+        "total_open_high": 3,
+        "security_admission_status": "fail",
+        "security_admission_evidence_complete": false,
+        "security_admission_reason_codes": [
+          "SECURITY_ADMISSION_FINDINGS",
+          "SECURITY_COVERAGE_PARTIAL",
+          "SECURITY_PROVIDER_CODE_SCANNING_NOT_OBSERVED",
+          "SECURITY_PROVIDER_SECRET_SCANNING_NOT_OBSERVED"
+        ]
       }
     ]
   },
   "path_attention": [
     {
+      "repo": "flagship/aurora-ledger",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
+      "activity_status": "active",
+      "context_quality": "full"
+    },
+    {
+      "repo": "flagship/basalt-relay",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
+      "activity_status": "active",
+      "context_quality": "standard"
+    },
+    {
       "repo": "flagship/cinder-atlas",
-      "headline": "Open high or critical alerts need an operator decision.",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
       "activity_status": "active",
       "context_quality": "minimum-viable"
     },
     {
+      "repo": "flagship/meridian-vault",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
+      "activity_status": "active",
+      "context_quality": "full"
+    },
+    {
+      "repo": "platform/ember-conduit",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
+      "activity_status": "active",
+      "context_quality": "full"
+    },
+    {
+      "repo": "platform/ivory-sextant",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
+      "activity_status": "recent",
+      "context_quality": "full"
+    },
+    {
+      "repo": "platform/lumen-ferry",
+      "headline": "4 risk factor(s): weak context quality, investigate override active, run instructions missing, blocking GitHub security findings.",
+      "activity_status": "recent",
+      "context_quality": "boilerplate"
+    },
+    {
       "repo": "studio/glacier-quill",
-      "headline": "Open high or critical alerts need an operator decision.",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
       "activity_status": "active",
       "context_quality": "minimum-viable"
     },
     {
       "repo": "studio/kestrel-loom",
-      "headline": "Open high or critical alerts need an operator decision.",
+      "headline": "1 risk factor(s): blocking GitHub security findings.",
       "activity_status": "recent",
       "context_quality": "minimum-viable"
     }

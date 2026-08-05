@@ -326,28 +326,58 @@ def test_build_weekly_command_center_digest_blocks_stale_queue_when_truth_is_new
     assert "StaleRepo" not in rendered_md
 
 
-def _sec(available: bool, critical: int = 0, high: int = 0) -> dict:
+def _security_provider(counts: dict[str, int], *, available: bool) -> dict:
     return {
+        "state": "observed" if available else "not_requested",
+        "reason_code": "observed" if available else "not_requested",
+        "observed_at": "2026-04-14T11:57:00+00:00" if available else None,
+        "pagination_complete": available,
+        "completed": available,
+        "zero_findings": sum(counts.values()) == 0 if available else None,
+        "counts": counts if available else None,
+    }
+
+
+def _sec(
+    available: bool,
+    critical: int = 0,
+    high: int = 0,
+    *,
+    code_critical: int = 0,
+    code_high: int = 0,
+    secrets: int = 0,
+) -> dict:
+    return {
+        "cohort_member": True,
         "alerts_available": available,
-        "coverage_state": "complete" if available else "unavailable",
+        "coverage_state": "complete" if available else "unknown",
         "receipt_state": "fresh" if available else "unknown",
         "source_produced_at": "2026-04-14T11:58:00+00:00" if available else None,
         "providers": {
-            "dependabot": {
-                "state": "observed" if available else "unavailable",
-                "observed_at": "2026-04-14T11:57:00+00:00" if available else None,
-                "pagination_complete": available,
-                "completed": available,
-                "counts": {"critical": critical, "high": high},
-            }
+            "dependabot": _security_provider(
+                {"critical": critical, "high": high, "medium": 0, "low": 0},
+                available=available,
+            ),
+            "code_scanning": _security_provider(
+                {
+                    "critical": code_critical,
+                    "high": code_high,
+                    "warning": 0,
+                    "note": 0,
+                },
+                available=available,
+            ),
+            "secret_scanning": _security_provider(
+                {"open": secrets}, available=available
+            ),
         },
         "dependabot_critical": critical,
         "dependabot_high": high,
         "dependabot_medium": 0,
         "dependabot_low": 0,
-        "code_scanning_critical": 0,
-        "code_scanning_high": 0,
-        "secret_scanning_open": 0,
+        "code_scanning_critical": code_critical,
+        "code_scanning_high": code_high,
+        "secret_scanning_open": secrets,
     }
 
 
@@ -377,7 +407,11 @@ def _security_project(
             "context_risk": False,
             "path_risk": False,
             "security_risk": bool(
-                security.get("dependabot_high") or security.get("dependabot_critical")
+                security.get("dependabot_high")
+                or security.get("dependabot_critical")
+                or security.get("code_scanning_high")
+                or security.get("code_scanning_critical")
+                or security.get("secret_scanning_open")
             ),
         },
         "security": security,
@@ -446,7 +480,7 @@ def test_security_posture_surfaces_open_alerts_critical_first() -> None:
     digest = _digest_for(portfolio_truth)
     posture = digest["security_posture"]
 
-    # Only repos with alerts_available are scanned; UnscannedRepo is excluded.
+    # Only complete canonical admissions count as scanned.
     assert posture["scanned_count"] == 3
     assert posture["repos_with_open_high_critical"] == 2
     assert posture["total_open_critical"] == 2
@@ -464,7 +498,7 @@ def test_security_posture_surfaces_open_alerts_critical_first() -> None:
     rendered = render_weekly_command_center_markdown(digest)
     assert "## Security Posture" in rendered
     assert "CriticalRepo" in rendered
-    assert "2 critical, 1 high" in rendered
+    assert "2 critical, 1 high, 0 open secrets" in rendered
 
 
 def test_security_posture_reports_clean_when_scanned_and_no_open_alerts() -> None:
@@ -479,7 +513,59 @@ def test_security_posture_reports_clean_when_scanned_and_no_open_alerts() -> Non
     assert digest["security_posture"]["top_alerts"] == []
 
     rendered = render_weekly_command_center_markdown(digest)
-    assert "All 2 scanned repos are clear" in rendered
+    assert "All 2 admitted repos are clear" in rendered
+
+
+def test_security_posture_ignores_projects_outside_security_cohort() -> None:
+    out_of_cohort = _sec(False)
+    out_of_cohort["cohort_member"] = False
+    portfolio_truth = {
+        "projects": [
+            _security_project("CleanCohort", "baseline", _sec(True)),
+            _security_project("OutsideCohort", "baseline", out_of_cohort),
+        ]
+    }
+
+    digest = _digest_for(portfolio_truth)
+    posture = digest["security_posture"]
+
+    assert posture["scanned_count"] == 1
+    assert posture["unadmitted_count"] == 0
+    assert posture["admission_status_counts"] == {"pass": 1}
+    assert posture["top_alerts"] == []
+
+
+def test_security_posture_uses_code_scanning_and_secret_findings() -> None:
+    portfolio_truth = {
+        "projects": [
+            _security_project(
+                "CodeFinding",
+                "moderate",
+                _sec(True, code_high=2),
+                ["active-high-severity-alerts"],
+            ),
+            _security_project(
+                "SecretFinding",
+                "elevated",
+                _sec(True, secrets=1),
+                ["active-high-severity-alerts"],
+            ),
+        ]
+    }
+
+    digest = _digest_for(portfolio_truth)
+    posture = digest["security_posture"]
+
+    assert posture["repos_with_blocking_findings"] == 2
+    assert posture["total_open_high"] == 2
+    assert posture["total_open_secrets"] == 1
+    assert {item["repo"] for item in posture["top_alerts"]} == {
+        "CodeFinding",
+        "SecretFinding",
+    }
+    rendered = render_weekly_command_center_markdown(digest)
+    assert "2 high" in rendered
+    assert "1 open secrets" in rendered
 
 
 def test_security_posture_reports_not_run_when_no_overlay() -> None:

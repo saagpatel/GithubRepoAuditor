@@ -25,12 +25,20 @@
         "derived": { "attention_state": "decision-needed" },
         "risk": { "security_risk": true },
         "security": {
+          "alerts_available": true,
           "coverage_state": "complete",
           "receipt_state": "fresh",
           "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
           "dependabot_critical": 0,
           "dependabot_high": 1,
-          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+          "code_scanning_critical": 0,
+          "code_scanning_high": 0,
+          "secret_scanning_open": 0,
+          "providers": {
+            "dependabot": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": false, "counts": { "critical": 0, "high": 1, "medium": 0, "low": 0 } },
+            "code_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "critical": 0, "high": 0, "warning": 0, "note": 0 } },
+            "secret_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "open": 0 } }
+          }
         }
       },
       {
@@ -39,12 +47,20 @@
         "derived": { "attention_state": "decision-needed" },
         "risk": { "security_risk": true },
         "security": {
+          "alerts_available": true,
           "coverage_state": "complete",
           "receipt_state": "fresh",
           "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
           "dependabot_critical": 0,
           "dependabot_high": 4,
-          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+          "code_scanning_critical": 0,
+          "code_scanning_high": 0,
+          "secret_scanning_open": 0,
+          "providers": {
+            "dependabot": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": false, "counts": { "critical": 0, "high": 4, "medium": 0, "low": 0 } },
+            "code_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "critical": 0, "high": 0, "warning": 0, "note": 0 } },
+            "secret_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "open": 0 } }
+          }
         }
       },
       {
@@ -53,12 +69,20 @@
         "derived": { "attention_state": "decision-needed" },
         "risk": { "security_risk": true },
         "security": {
+          "alerts_available": true,
           "coverage_state": "complete",
           "receipt_state": "fresh",
           "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
           "dependabot_critical": 0,
           "dependabot_high": 2,
-          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+          "code_scanning_critical": 0,
+          "code_scanning_high": 0,
+          "secret_scanning_open": 0,
+          "providers": {
+            "dependabot": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": false, "counts": { "critical": 0, "high": 2, "medium": 0, "low": 0 } },
+            "code_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "critical": 0, "high": 0, "warning": 0, "note": 0 } },
+            "secret_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "open": 0 } }
+          }
         }
       },
       {
@@ -67,12 +91,20 @@
         "derived": { "attention_state": "decision-needed" },
         "risk": { "security_risk": true },
         "security": {
+          "alerts_available": true,
           "coverage_state": "complete",
           "receipt_state": "fresh",
           "source_produced_at": "2026-08-05T05:00:16.563112+00:00",
           "dependabot_critical": 0,
           "dependabot_high": 1,
-          "providers": { "dependabot": { "state": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true } }
+          "code_scanning_critical": 0,
+          "code_scanning_high": 0,
+          "secret_scanning_open": 0,
+          "providers": {
+            "dependabot": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": false, "counts": { "critical": 0, "high": 1, "medium": 0, "low": 0 } },
+            "code_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "critical": 0, "high": 0, "warning": 0, "note": 0 } },
+            "secret_scanning": { "state": "observed", "reason_code": "observed", "observed_at": "2026-08-05T05:00:01.822262+00:00", "pagination_complete": true, "completed": true, "zero_findings": true, "counts": { "open": 0 } }
+          }
         }
       },
       {
@@ -92,19 +124,19 @@
   "expected_security_decisions": {
     "payments-api": {
       "decision_key": "sha256:fddaff8be63ec131629eb8b3eb2f2232b999f3730748fcfc407f467a915a23cd",
-      "decision_fingerprint": "sha256:71bf4b0914e8d34be50369d084e45407ccf733a021b5cb97bad6097e04b305e0"
+      "decision_fingerprint": "sha256:569284e465a9b29993e8b7cf34fc562731054ec53b968f28b367335aa8387c8d"
     },
     "audit-engine": {
       "decision_key": "sha256:595399eab7f31296ce96f7277673d955ad7fd0d540e37da54b5ce12f4cc5eb6e",
-      "decision_fingerprint": "sha256:e16817a5216a197802f71c11931391ec77e310435781b9c599da3c24d1293d99"
+      "decision_fingerprint": "sha256:df7441a6ba99aafb25eb9d8d877cdb634983194bda4b3ee2b6bcf37d55b1a810"
     },
     "trust-store": {
       "decision_key": "sha256:98e4e3ebbadc0a4479704f33e0ca9d991fdb87defa6eb7ce8eb7654d821066f8",
-      "decision_fingerprint": "sha256:f7a589059d617bc5759b03ff418a1a4ffb61ac8e1bab92b858ed7a61101c026c"
+      "decision_fingerprint": "sha256:786c1dbd1709ebd6051ad5d359948b80055bc5798c2205955741183b688066cc"
     },
     "security-console": {
       "decision_key": "sha256:2fec2aef256380d1957c3cbf6cf332bf04d04050e62bf5d8cf5413e3ae2fe89f",
-      "decision_fingerprint": "sha256:ff5107001f3e30f062e01816ea6b4240533de7a7eafd21ae5784a816f2c2057e"
+      "decision_fingerprint": "sha256:c646394805520758fb2616a00071b72524f0deaa4227ac111c481126d9fdeaed"
     }
   },
   "expected_withheld": {

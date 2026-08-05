@@ -66,6 +66,7 @@ from src.portfolio_truth_types import (
 )
 from src.producer_preflight import ProducerEvidence
 from src.registry_parser import _normalize, parse_registry
+from src.security_admission import derive_security_admission
 
 
 def validate_truth_snapshot(
@@ -253,6 +254,7 @@ def validate_truth_snapshot(
             snapshot.generated_at,
             security_max_age_hours,
         )
+        security_admission = derive_security_admission(project.security.to_dict())
         expected_risk, expected_attention = build_project_decision(
             display_name=project.identity.display_name,
             operating_path=project.declared.operating_path,
@@ -266,9 +268,12 @@ def validate_truth_snapshot(
             doctor_standard=project.declared.doctor_standard,
             known_risks_present=project.derived.known_risks_present,
             run_instructions_present=project.derived.run_instructions_present,
-            security_coverage_state=project.security.coverage_state,
-            security_high_alerts=project.security.dependabot_high or 0,
-            security_critical_alerts=project.security.dependabot_critical or 0,
+            security_coverage_state=security_admission.effective_coverage_state,
+            security_high_alerts=security_admission.total_open_high,
+            security_critical_alerts=(
+                security_admission.total_open_critical
+                + security_admission.total_open_secrets
+            ),
         )
         if project.risk.to_dict() != expected_risk:
             raise ValueError(
@@ -466,7 +471,9 @@ def _runtime_value_matches(value: object, annotation: object) -> bool:
         return True
     origin = get_origin(annotation)
     if origin in {Union, UnionType}:
-        return any(_runtime_value_matches(value, option) for option in get_args(annotation))
+        return any(
+            _runtime_value_matches(value, option) for option in get_args(annotation)
+        )
     if origin is list:
         return type(value) is list
     if origin is dict:
@@ -555,11 +562,15 @@ def _validate_snapshot_inputs(
 ) -> None:
     inputs = snapshot.inputs
     allowed_input_keys = {"catalog", "workspace", "notion", "github_security"}
-    if not isinstance(inputs, dict) or not {
-        "catalog",
-        "workspace",
-        "notion",
-    }.issubset(inputs) or not set(inputs).issubset(allowed_input_keys):
+    if (
+        not isinstance(inputs, dict)
+        or not {
+            "catalog",
+            "workspace",
+            "notion",
+        }.issubset(inputs)
+        or not set(inputs).issubset(allowed_input_keys)
+    ):
         raise ValueError("PortfolioTruth input envelope fields are invalid.")
     generated_at = snapshot.generated_at.isoformat()
     catalog = inputs.get("catalog")
@@ -579,11 +590,10 @@ def _validate_snapshot_inputs(
         )
     ):
         raise ValueError("PortfolioTruth catalog input is invalid.")
-    if (
-        not isinstance(workspace, dict)
-        or workspace
-        != {"source_id": "projects-root", "observed_at": generated_at}
-    ):
+    if not isinstance(workspace, dict) or workspace != {
+        "source_id": "projects-root",
+        "observed_at": generated_at,
+    }:
         raise ValueError("PortfolioTruth workspace input is invalid.")
     if not isinstance(notion, dict) or set(notion) != {
         "mode",
@@ -609,9 +619,7 @@ def _validate_snapshot_inputs(
             and carried_from == observed_at
         )
         unknown_origin = (
-            mode == "unavailable"
-            and observed_at is None
-            and carried_from is None
+            mode == "unavailable" and observed_at is None and carried_from is None
         )
         if not known_origin and not unknown_origin:
             raise ValueError("PortfolioTruth carried Notion input is inconsistent.")
@@ -627,7 +635,10 @@ def _validate_snapshot_inputs(
             or carried_from is not None
         ):
             raise ValueError("PortfolioTruth observed Notion input is inconsistent.")
-        if _parse_datetime(observed_at, "inputs.notion.observed_at") > snapshot.generated_at:
+        if (
+            _parse_datetime(observed_at, "inputs.notion.observed_at")
+            > snapshot.generated_at
+        ):
             raise ValueError("PortfolioTruth Notion input is future-dated.")
     github_security = inputs.get("github_security")
     has_receipt_rows = any(
@@ -681,7 +692,9 @@ def _validate_github_security_input(
         "cohort_policy",
         "path",
     }
-    if any(field in value and not _nonempty_text(value[field]) for field in text_fields):
+    if any(
+        field in value and not _nonempty_text(value[field]) for field in text_fields
+    ):
         raise ValueError("PortfolioTruth GitHub security input text is invalid.")
     if value.get("source_id", "github-security-coverage-receipt") != (
         "github-security-coverage-receipt"
@@ -766,7 +779,9 @@ def _validate_github_security_input(
         if allow_synthetic_security_matrix
         else receipt_states != {value["state"]}
     ):
-        raise ValueError("PortfolioTruth GitHub security receipt state is inconsistent.")
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt state is inconsistent."
+        )
 
 
 def _validate_snapshot_exclusions(exclusions: Any) -> None:
@@ -1131,8 +1146,7 @@ def _validate_repository_state_shape(
     if state == "not_a_repository":
         _require_repository_keys(
             repository_state,
-            {"state", "observed_at", "remote_default_branch"}
-            | checkout_authority_key,
+            {"state", "observed_at", "remote_default_branch"} | checkout_authority_key,
             project_key,
             "repository state",
         )
@@ -1665,9 +1679,7 @@ def validate_truth_snapshot_payload(
         == {
             "deterministic": True,
             "producer_evidence": "absent",
-            "security_evidence_semantics": (
-                "synthetic-cross-receipt-state-matrix"
-            ),
+            "security_evidence_semantics": ("synthetic-cross-receipt-state-matrix"),
         }
         and payload.get("producer") == {}
     )
@@ -1752,9 +1764,7 @@ def _validate_portable_repository_paths(
 def _contains_private_identity(value: Any) -> bool:
     if isinstance(value, str):
         return (
-            re.search(
-                r"(?:^|[/\\])(?:users|home|root)[/\\]", value, re.IGNORECASE
-            )
+            re.search(r"(?:^|[/\\])(?:users|home|root)[/\\]", value, re.IGNORECASE)
             is not None
             or re.search(
                 r"(?:^|[/\\])private[/\\]var[/\\]folders(?:[/\\]|$)",
@@ -1777,9 +1787,7 @@ def _contains_private_identity(value: Any) -> bool:
         )
     if isinstance(value, Mapping):
         return any(
-            _contains_private_identity(item)
-            for pair in value.items()
-            for item in pair
+            _contains_private_identity(item) for pair in value.items() for item in pair
         )
     if isinstance(value, list):
         return any(_contains_private_identity(item) for item in value)
@@ -1990,9 +1998,10 @@ def _validate_contract_envelope(payload: Mapping[str, Any]) -> None:
                 "Canonical producer evidence must declare zero dirty paths."
             )
         receipt_id = producer.get("receipt_id")
-        if not isinstance(receipt_id, str) or re.fullmatch(
-            r"sha256:[0-9a-f]{64}", receipt_id
-        ) is None:
+        if (
+            not isinstance(receipt_id, str)
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", receipt_id) is None
+        ):
             raise ValueError("Producer receipt_id must be a SHA-256 identity.")
         verified_at = _parse_datetime(
             producer.get("verified_at"), "producer.verified_at"

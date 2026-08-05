@@ -50,6 +50,7 @@ from src.portfolio_truth_types import (
 )
 from src.project_registry import DEFAULT_SUPPLEMENTARY
 from src.registry_parser import _normalize
+from src.security_admission import derive_security_admission
 
 logger = logging.getLogger(__name__)
 
@@ -399,9 +400,7 @@ def build_portfolio_truth_snapshot(
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
     notion_context = load_safe_notion_project_context() if include_notion else {}
-    notion_source_mode = str(
-        getattr(notion_context, "source_mode", "live") or "live"
-    )
+    notion_source_mode = str(getattr(notion_context, "source_mode", "live") or "live")
     notion_observed_at = getattr(notion_context, "observed_at", None)
     notion_context_carried_forward = False
     if include_notion and not notion_context and notion_context_fallback:
@@ -571,13 +570,14 @@ def _cataloged_supplementary_projects(
                 "path": canonical_key,
                 "top_level_dir": "supplementary",
                 "group_entry": {
-                    "group_key": str(supplementary.get("group_key") or "operator_infra"),
+                    "group_key": str(
+                        supplementary.get("group_key") or "operator_infra"
+                    ),
                     "group_label": str(
                         supplementary.get("group_label") or "Operator Infrastructure"
                     ),
                     "section_marker": str(
-                        supplementary.get("section_marker")
-                        or "Supplementary Projects"
+                        supplementary.get("section_marker") or "Supplementary Projects"
                     ),
                     "section_label": str(
                         supplementary.get("section_label") or "Operator OS"
@@ -614,8 +614,7 @@ def _merge_supplementary_discoveries(
 ) -> list[dict[str, Any]]:
     """Keep one canonical identity while retaining local checkout observations."""
     supplementary_by_name = {
-        _normalize(str(project.get("name") or "")): project
-        for project in supplementary
+        _normalize(str(project.get("name") or "")): project for project in supplementary
     }
     used: set[str] = set()
     merged: list[dict[str, Any]] = []
@@ -928,10 +927,10 @@ def _build_truth_project(
     live_status_available = bool(
         status_entry and status_entry.get("source") == "github_api"
     )
-    remote_status_available = (
-        remote_repository.get("state") in {"observed", "partial"}
-        and isinstance(remote_repository.get("archived"), bool)
-    )
+    remote_status_available = remote_repository.get("state") in {
+        "observed",
+        "partial",
+    } and isinstance(remote_repository.get("archived"), bool)
     if live_status_available:
         github_archived = status_entry.get("archived") is True
         provenance["github.archived"] = {
@@ -992,10 +991,8 @@ def _build_truth_project(
     }
 
     security = _build_security_fields(security_entry)
+    security_admission = derive_security_admission(security.to_dict())
 
-    # Only Dependabot high/critical counts drive the risk tier today. Code-scanning
-    # and secret-scanning counts are captured in SecurityFields for visibility but do
-    # not yet feed the active-high-severity-alerts factor (Dependabot-only scope).
     risk_entry, attention_state = build_project_decision(
         display_name=raw_project["name"],
         operating_path=path_entry.get("operating_path", ""),
@@ -1009,9 +1006,12 @@ def _build_truth_project(
         doctor_standard=declared_values["doctor_standard"],
         known_risks_present=bool(raw_project["known_risks_present"]),
         run_instructions_present=bool(raw_project["run_instructions_present"]),
-        security_coverage_state=security.coverage_state,
-        security_high_alerts=security.dependabot_high or 0,
-        security_critical_alerts=security.dependabot_critical or 0,
+        security_coverage_state=security_admission.effective_coverage_state,
+        security_high_alerts=security_admission.total_open_high,
+        security_critical_alerts=(
+            security_admission.total_open_critical
+            + security_admission.total_open_secrets
+        ),
     )
     if (
         not security.receipt_schema_version

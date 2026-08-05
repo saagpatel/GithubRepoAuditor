@@ -27,6 +27,18 @@ CONTENT_SHA256 = "c" * 64
 PRODUCER_COMMIT = "d" * 40
 
 
+def _provider(counts: dict[str, int], observed_at: str = OBSERVED_AT) -> dict:
+    return {
+        "state": "observed",
+        "reason_code": "observed",
+        "observed_at": observed_at,
+        "pagination_complete": True,
+        "completed": True,
+        "zero_findings": sum(counts.values()) == 0,
+        "counts": counts,
+    }
+
+
 def _project(
     name: str,
     *,
@@ -34,6 +46,9 @@ def _project(
     security_risk: bool = False,
     dependabot_critical: int = 0,
     dependabot_high: int = 0,
+    code_scanning_critical: int = 0,
+    code_scanning_high: int = 0,
+    secret_scanning_open: int = 0,
     owner: str = "d",
 ) -> dict:
     return {
@@ -54,22 +69,33 @@ def _project(
             "security_risk": security_risk,
         },
         "security": {
+            "alerts_available": True,
             "coverage_state": "complete",
             "receipt_state": "fresh",
             "source_produced_at": PRODUCED_AT,
             "dependabot_critical": dependabot_critical,
             "dependabot_high": dependabot_high,
+            "code_scanning_critical": code_scanning_critical,
+            "code_scanning_high": code_scanning_high,
+            "secret_scanning_open": secret_scanning_open,
             "providers": {
-                "dependabot": {
-                    "state": "observed",
-                    "observed_at": OBSERVED_AT,
-                    "pagination_complete": True,
-                    "completed": True,
-                    "counts": {
+                "dependabot": _provider(
+                    {
                         "critical": dependabot_critical,
                         "high": dependabot_high,
-                    },
-                }
+                        "medium": 0,
+                        "low": 0,
+                    }
+                ),
+                "code_scanning": _provider(
+                    {
+                        "critical": code_scanning_critical,
+                        "high": code_scanning_high,
+                        "warning": 0,
+                        "note": 0,
+                    }
+                ),
+                "secret_scanning": _provider({"open": secret_scanning_open}),
             },
         },
     }
@@ -114,9 +140,8 @@ def _next_truth(
     source["receipt_id"] = "sha256:" + "f" * 64
     source["content_sha256"] = "1" * 64
     project["security"]["source_produced_at"] = produced_at
-    project["security"]["providers"]["dependabot"]["observed_at"] = (
-        "2026-08-06T01:03:15+00:00"
-    )
+    for provider in project["security"]["providers"].values():
+        provider["observed_at"] = "2026-08-06T01:03:15+00:00"
     value["projects"] = [project]
     return value
 
@@ -188,6 +213,33 @@ def test_security_decision_has_complete_stable_contract_and_dual_clocks() -> Non
     assert first["readback_contract"]["requires_newer_receipt"] is True
     assert first["readback_contract"]["supporting_evidence_only"] == ["bridge-shipped"]
     assert SECURITY_DECISION_VALIDITY_HOURS == 36
+
+
+@pytest.mark.parametrize(
+    ("security_changes", "reference_field"),
+    [
+        ({"code_scanning_high": 1}, "code_scanning_high"),
+        ({"secret_scanning_open": 1}, "secret_scanning_open"),
+    ],
+)
+def test_non_dependabot_findings_enter_the_same_decision_contract(
+    security_changes: dict[str, int], reference_field: str
+) -> None:
+    project = _project(
+        "ProviderFinding",
+        attention_state="active-infra",
+        security_risk=False,
+        **security_changes,
+    )
+
+    [decision] = build_decision_queue(_truth([project]))
+
+    assert decision["evidence_reference"]["security_admission_schema"] == (
+        "SecurityAdmissionV1"
+    )
+    assert decision["evidence_reference"][reference_field] == 1
+    assert decision["evidence_reference"]["provider"] == ("github_security_combined")
+    assert decision["readback_contract"]["success_condition"][reference_field] == 0
 
 
 def test_current_security_fixture_freezes_ids_fingerprints_and_withheld_items() -> None:
@@ -376,19 +428,18 @@ def test_cli_json_and_markdown_are_deterministic(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     truth_path = tmp_path / "portfolio-truth.json"
+    project = _project(
+        "MCPAudit",
+        attention_state="decision-needed",
+        security_risk=True,
+        secret_scanning_open=1,
+    )
+    inert_secret_marker = "INERT_SECRET_VALUE_MUST_NOT_REACH_DIGEST"
+    project["security"]["providers"]["secret_scanning"]["alerts"] = [
+        {"secret": inert_secret_marker}
+    ]
     truth_path.write_text(
-        json.dumps(
-            _truth(
-                [
-                    _project(
-                        "MCPAudit",
-                        attention_state="decision-needed",
-                        security_risk=True,
-                        dependabot_high=1,
-                    )
-                ]
-            )
-        ),
+        json.dumps(_truth([project])),
         encoding="utf-8",
     )
 
@@ -397,6 +448,8 @@ def test_cli_json_and_markdown_are_deterministic(
     assert main(["--truth", str(truth_path), "--format", "json"]) == 0
     second = capsys.readouterr().out
     assert first == second
+    assert inert_secret_marker not in first
+    assert '"secret_scanning_open": 1' in first
 
     previous = tmp_path / "previous.json"
     previous.write_text(first, encoding="utf-8")

@@ -1492,7 +1492,7 @@
         "risk_factors": [
           "active-high-severity-alerts"
         ],
-        "risk_summary": "1 risk factor(s): open high/critical security alerts.",
+        "risk_summary": "1 risk factor(s): blocking GitHub security findings.",
         "risk_tier": "moderate",
         "security_risk": true
       },
@@ -1609,9 +1609,11 @@
       "scanned_count": 1,
       "secret_scanning_observed_count": 1,
       "secret_scanning_zero_finding_count": 1,
+      "security_admission_schema_version": "SecurityAdmissionV1",
       "stale_count": 1,
       "total_open_critical": 0,
       "total_open_high": 3,
+      "total_open_secrets": 0,
       "unavailable_count": 3,
       "unknown_count": 1
     }
