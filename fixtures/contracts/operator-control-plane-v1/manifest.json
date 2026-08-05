@@ -1,0 +1,70 @@
+{
+  "acceptance": {
+    "coverage_cases": [
+      {
+        "case_id": "valid-current-schema",
+        "expected": "accept",
+        "source": "artifact"
+      },
+      {
+        "case_id": "additive-canary",
+        "expected": "accept-ignore-addition",
+        "pointer": "/projects/0/additive_contract_canary",
+        "source": "artifact"
+      },
+      {
+        "case_id": "missing-schema-version",
+        "expected": "reject",
+        "mutation": {
+          "op": "remove",
+          "path": "/schema_version"
+        },
+        "source": "artifact"
+      },
+      {
+        "case_id": "malformed-root",
+        "expected": "reject",
+        "source": "literal",
+        "value": []
+      },
+      {
+        "case_id": "contradictory-contract-envelope",
+        "expected": "reject",
+        "mutation": {
+          "op": "add",
+          "path": "/contract",
+          "value": {
+            "compatibility": "additive",
+            "id": "ghra.portfolio_truth",
+            "version": "0.12.0"
+          }
+        },
+        "source": "artifact"
+      }
+    ],
+    "fail_closed_behavior": "incompatible-artifact-yields-unavailable-health"
+  },
+  "consumer_profile": {
+    "compatibility_policy": "additive-0.x",
+    "id": "operator-control-plane-v1"
+  },
+  "contract_version": "ghra-portfolio-truth-portable.v1",
+  "fixture": {
+    "additive_canary_paths": [
+      "contract_fixture",
+      "projects[0].additive_contract_canary"
+    ],
+    "evaluation_time": "2026-08-01T06:00:00+00:00",
+    "generated_at": "2026-08-01T00:00:00+00:00",
+    "producer_evidence": "absent",
+    "project_count": 4
+  },
+  "portfolio_truth_schema_version": "0.11.0",
+  "producer": {
+    "artifact_path": "fixtures/contracts/portable-consumers-v1/portfolio-truth.json",
+    "artifact_sha256": "8af46309e1b7a891edf7489dcbfa5971cc3453fe983b9a824098d87dc42105d3",
+    "generator": "src.portfolio_truth_contract_fixture:build_portable_contract_fixture",
+    "manifest_path": "fixtures/contracts/operator-control-plane-v1/manifest.json",
+    "repository": "saagpatel/GithubRepoAuditor"
+  }
+}
