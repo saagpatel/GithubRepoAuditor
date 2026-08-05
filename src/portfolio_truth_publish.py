@@ -79,6 +79,20 @@ def _parse_bound_datetime(value: object, *, field: str) -> datetime:
     return parsed
 
 
+def _is_same_bound_security_receipt(
+    prior_metadata: dict[str, object],
+    current_metadata: dict[str, object],
+) -> bool:
+    """Return true only when both payloads identify the same immutable receipt."""
+    binding_fields = ("receipt_id", "content_sha256", "producer_commit")
+    return all(
+        isinstance(prior_metadata.get(field), str)
+        and bool(str(prior_metadata[field]).strip())
+        and prior_metadata[field] == current_metadata.get(field)
+        for field in binding_fields
+    )
+
+
 def _load_prior_security_alerts(
     latest_path: Path,
     *,
@@ -145,6 +159,9 @@ def _load_prior_security_alerts(
                 "Prior PortfolioTruth security evidence is not immutably bound."
             )
 
+    prior_security_metadata = (canonical.get("inputs") or {}).get(
+        "github_security"
+    ) or {}
     prior_generated_at = _parse_bound_datetime(
         canonical.get("generated_at"),
         field="Prior PortfolioTruth generated_at",
@@ -153,7 +170,10 @@ def _load_prior_security_alerts(
         current_security_metadata.get("produced_at"),
         field="Current security receipt produced_at",
     )
-    if prior_generated_at > current_produced_at:
+    if prior_generated_at > current_produced_at and not _is_same_bound_security_receipt(
+        prior_security_metadata,
+        current_security_metadata,
+    ):
         raise PortfolioTruthPublishError(
             "Prior PortfolioTruth was generated after the current security receipt."
         )
