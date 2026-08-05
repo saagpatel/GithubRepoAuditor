@@ -319,7 +319,7 @@ def _check_catalog_source_binding(
                 artifact=str(truth_path),
                 violation="current catalog is unavailable",
                 detail=f"catalog={catalog_path}",
-                level="unknown",
+                level="fail",
             )
         ]
     inputs = truth.get("inputs")
@@ -334,7 +334,7 @@ def _check_catalog_source_binding(
                 artifact=str(truth_path),
                 violation="truth artifact is not source-bound to the current catalog",
                 detail="inputs.catalog.sha256 is absent; freshness is UNKNOWN",
-                level="unknown",
+                level="fail",
             )
         ]
     actual_hash = hashlib.sha256(catalog_path.read_bytes()).hexdigest()

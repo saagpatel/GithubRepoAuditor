@@ -115,7 +115,11 @@ def _lookup_project_mapping(name: str, mapping: dict[str, dict]) -> dict | None:
         for mapped_name, mapped_project in mapping.items()
         if _normalize(mapped_name) == normalized
     ]
-    if len(candidates) == 1:
+    destination_ids = {
+        str(candidate.get("localProjectId") or "").strip()
+        for candidate in candidates
+    }
+    if candidates and len(destination_ids) == 1 and "" not in destination_ids:
         return candidates[0]
     return None
 
