@@ -742,7 +742,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.format == "json":
         # The digest contains aggregate finding counts and receipt metadata,
         # never secret values; the regression test exercises that boundary.
-        # codeql[py/clear-text-logging-sensitive-data]
         print(json.dumps(digest, indent=2, sort_keys=True))
     else:
         print(render_decision_digest_markdown(digest), end="")
