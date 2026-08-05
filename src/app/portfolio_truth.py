@@ -160,6 +160,12 @@ def run_portfolio_truth_mode(args: Any) -> None:
         f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
         f"report {'updated' if result.report_changed else 'unchanged'})"
     )
+    print_info(
+        "Checkout authority: "
+        f"{getattr(result, 'checkout_collision_group_count', 0)} same-origin groups, "
+        f"{getattr(result, 'checkout_authority_unknown_count', 0)} UNKNOWN, "
+        f"{getattr(result, 'discarded_checkout_count', 0)} discarded checkouts"
+    )
 
 
 def run_portfolio_context_recovery_mode(args: Any) -> None:

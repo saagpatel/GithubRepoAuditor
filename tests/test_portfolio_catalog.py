@@ -66,6 +66,46 @@ groups:
     assert catalog["repos"]["repob"]["doctor_standard"] == ""
 
 
+def test_load_portfolio_catalog_rejects_non_utf8(tmp_path: Path) -> None:
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_bytes(b"repos:\n  bad: \xff\n")
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["repos"] == {}
+    assert "UTF-8" in catalog["errors"][0]
+    assert "offset" in catalog["errors"][0]
+
+
+def test_load_portfolio_catalog_rejects_duplicate_repo_key(tmp_path: Path) -> None:
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        "repos:\n  RepoA:\n    owner: first\n  RepoA:\n    owner: second\n",
+        encoding="utf-8",
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["repos"] == {}
+    assert "duplicate mapping key 'RepoA'" in catalog["errors"][0]
+
+
+def test_load_portfolio_catalog_rejects_invalid_group_order(tmp_path: Path) -> None:
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        "groups:\n"
+        "  active:\n"
+        "    path_prefixes: [active]\n"
+        "    order: first\n",
+        encoding="utf-8",
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["groups"] == {}
+    assert "order must be an integer" in catalog["errors"][0]
+
+
 def test_load_portfolio_catalog_indexes_repo_aliases(tmp_path: Path):
     path = tmp_path / "portfolio-catalog.yaml"
     path.write_text(
@@ -253,6 +293,33 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     for repo_name in manual_only:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
     assert catalog["repos"]["gpt_rag"]["lifecycle_state"] == "dormant"
+
+
+def test_live_catalog_resolves_egress_alias_to_canonical_manual_only_entry() -> None:
+    catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
+    catalog = load_portfolio_catalog(catalog_path)
+
+    assert catalog["errors"] == []
+    assert catalog["warnings"] == []
+    assert catalog["repos"]["egress-guard-oss"]["catalog_key"] == (
+        "cross-provider-egress-guard"
+    )
+
+    entry = catalog_entry_for_repo(
+        {
+            "name": "egress-guard-oss",
+            "full_name": "saagpatel/cross-provider-egress-guard",
+            "path": "egress-guard-oss",
+        },
+        catalog,
+    )
+
+    assert entry["catalog_key"] == "cross-provider-egress-guard"
+    assert entry["matched_by"] == "path"
+    assert entry["lifecycle_state"] == "manual-only"
+    assert entry["operating_path"] == "maintain"
+    assert entry["category"] == "infrastructure"
+    assert entry["maturity_program"] == "maintain"
 
 
 def test_catalog_entry_matches_full_name_then_bare_name():

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import timezone
+from typing import Any
 
 from src.portfolio_truth_types import (
     PortfolioTruthProject,
@@ -132,6 +133,7 @@ def render_portfolio_report_markdown(
     )
     risk_tier_counts = Counter(project.risk.risk_tier for project in snapshot.projects)
     security_overview = _security_overview(snapshot.projects)
+    checkout_collisions = snapshot.source_summary.get("checkout_collisions", {})
     lines = [
         GENERATED_MARKDOWN_PROVENANCE_MARKER,
         "",
@@ -145,13 +147,14 @@ def render_portfolio_report_markdown(
         "## Table of Contents",
         "",
         "1. [Portfolio truth summary](#portfolio-truth-summary)",
-        "2. [Audit Methodology](#audit-methodology)",
-        "3. [Canonical Portfolio Truth Table](#canonical-portfolio-truth-table)",
-        "4. [Coverage Summary](#coverage-summary)",
-        "5. [Breakdown by Portfolio Signals](#breakdown-by-portfolio-signals)",
-        "6. [Security Posture](#security-posture)",
-        "7. [Accuracy Findings](#accuracy-findings)",
-        "8. [Recommended Next Sync Steps](#recommended-next-sync-steps)",
+        "2. [Checkout Authority](#checkout-authority)",
+        "3. [Audit Methodology](#audit-methodology)",
+        "4. [Canonical Portfolio Truth Table](#canonical-portfolio-truth-table)",
+        "5. [Coverage Summary](#coverage-summary)",
+        "6. [Breakdown by Portfolio Signals](#breakdown-by-portfolio-signals)",
+        "7. [Security Posture](#security-posture)",
+        "8. [Accuracy Findings](#accuracy-findings)",
+        "9. [Recommended Next Sync Steps](#recommended-next-sync-steps)",
         "",
         "---",
         "",
@@ -162,6 +165,8 @@ def render_portfolio_report_markdown(
         f"- Projects discovered: `{len(snapshot.projects)}`",
         f"- Grouped sections represented: `{len(grouped)}`",
         f"- Canonical source path: `{latest_json_path}`",
+        "",
+        *_render_checkout_authority_section(checkout_collisions),
         "",
         "## Audit Methodology",
         "",
@@ -291,6 +296,67 @@ def render_portfolio_report_markdown(
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def _render_checkout_authority_section(summary: dict[str, Any]) -> list[str]:
+    group_count = summary.get("group_count", 0)
+    ambiguous_count = summary.get("ambiguous_group_count", 0)
+    discarded_count = summary.get("discarded_checkout_count", 0)
+    lines = [
+        "## Checkout Authority",
+        "",
+        f"- Same-origin checkout groups: `{group_count}`",
+        f"- Authority state UNKNOWN: `{ambiguous_count}`",
+        f"- Discarded checkout records retained: `{discarded_count}`",
+        "- Selection policy: preserve one compatibility representative per origin; "
+        + "independent full-clone conflicts remain UNKNOWN.",
+    ]
+    groups = summary.get("groups", [])
+    if not groups:
+        lines.append("- No same-origin checkout collisions were observed.")
+        return lines
+
+    lines.extend(
+        [
+            "",
+            "| Origin | Authority | Representative | Selected checkout | Discarded | Reason |",
+            "|--------|-----------|----------------|-------------------|-----------|--------|",
+        ]
+    )
+    for group in groups:
+        selection = group["selection"]
+        selected = selection.get("selected_path") or "UNKNOWN"
+        lines.append(
+            f"| `{group['origin']}` | {selection['state']} | "
+            f"`{selection['representative_path']}` | `{selected}` | "
+            f"{len(group['discarded_checkouts'])} | "
+            f"`{selection['reason_code']}` |"
+        )
+
+    lines.extend(["", "### Discarded Checkout Evidence", ""])
+    for group in groups:
+        selection = group["selection"]
+        lines.append(f"- `{group['origin']}` selection: {selection['reason']}")
+        for checkout in group["discarded_checkouts"]:
+            head = checkout.get("head") or "UNKNOWN"
+            branch = checkout.get("branch") or "detached-or-UNKNOWN"
+            if checkout.get("dirty") is True:
+                dirty = f"dirty ({checkout['dirty_path_count']} paths)"
+            elif checkout.get("dirty") is False:
+                dirty = "clean"
+            else:
+                dirty = "dirty state UNKNOWN"
+            lines.append(
+                f"  - `{checkout['path']}`: `{checkout['relation']}`, "
+                f"head `{head}`, branch `{branch}`, {dirty}."
+            )
+        if group.get("declared_checkout_paths"):
+            paths = "`, `".join(group["declared_checkout_paths"])
+            lines.append(f"  - Declared checkout paths resolve to: `{paths}`.")
+        if group.get("unresolved_declared_paths"):
+            paths = "`, `".join(group["unresolved_declared_paths"])
+            lines.append(f"  - Unresolved declared checkout paths: `{paths}`.")
+    return lines
 
 
 def _group_projects(

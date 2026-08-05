@@ -971,6 +971,8 @@ repos:
     automation_eligible: false
     doctor_standard: basic
     notes: Lane is live end-to-end as of 2026-06-12; keep residual hardening, policy widening, and hook deployment under explicit operator review.
+    aliases:
+      - egress-guard-oss
   da-scaffold:
     owner: d
     lifecycle_state: archived
@@ -1271,12 +1273,6 @@ repos:
     review_cadence: weekly
     operating_path: finish
     maturity_program: finish
-  egress-guard-oss:
-    owner: d
-    lifecycle_state: active
-    review_cadence: weekly
-    operating_path: finish
-    maturity_program: finish
   proof-pr:
     owner: d
     lifecycle_state: active
@@ -1374,10 +1370,11 @@ repos:
     category: infrastructure
     tool_provenance: codex
     notes: Drill-verified (dated passing drill) at 2026-07-17 tribunal judgment; tribunal
-      KEEP maps to this manual-only standing-tooling contract.
+      KEEP maps to this manual-only standing-tooling contract. The 2026-07-11
+      disposable real-repository recovery drill also passed, including broken-main
+      rejection, timeout handling, and force-tracked .env blocking.
     maturity_program: maintain
     target_maturity: operating
-    notes: Session 2026-07-11 disposable real-repository recovery drill passed, including broken-main rejection, timeout handling, and force-tracked .env blocking.
   sovereign-intelligence:
     owner: d
     purpose: local evidence-receipt intelligence workspace for repeated scenario comparison and decision support
