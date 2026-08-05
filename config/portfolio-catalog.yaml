@@ -1370,10 +1370,11 @@ repos:
     category: infrastructure
     tool_provenance: codex
     notes: Drill-verified (dated passing drill) at 2026-07-17 tribunal judgment; tribunal
-      KEEP maps to this manual-only standing-tooling contract.
+      KEEP maps to this manual-only standing-tooling contract. The 2026-07-11
+      disposable real-repository recovery drill also passed, including broken-main
+      rejection, timeout handling, and force-tracked .env blocking.
     maturity_program: maintain
     target_maturity: operating
-    notes: Session 2026-07-11 disposable real-repository recovery drill passed, including broken-main rejection, timeout handling, and force-tracked .env blocking.
   sovereign-intelligence:
     owner: d
     purpose: local evidence-receipt intelligence workspace for repeated scenario comparison and decision support

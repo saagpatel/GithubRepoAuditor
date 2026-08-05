@@ -110,9 +110,13 @@ def _lookup_project_mapping(name: str, mapping: dict[str, dict]) -> dict | None:
     normalized = _normalize(name)
     if not normalized:
         return None
-    for mapped_name, mapped_project in mapping.items():
-        if _normalize(mapped_name) == normalized:
-            return mapped_project
+    candidates = [
+        mapped_project
+        for mapped_name, mapped_project in mapping.items()
+        if _normalize(mapped_name) == normalized
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
     return None
 
 

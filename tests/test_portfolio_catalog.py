@@ -66,6 +66,46 @@ groups:
     assert catalog["repos"]["repob"]["doctor_standard"] == ""
 
 
+def test_load_portfolio_catalog_rejects_non_utf8(tmp_path: Path) -> None:
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_bytes(b"repos:\n  bad: \xff\n")
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["repos"] == {}
+    assert "UTF-8" in catalog["errors"][0]
+    assert "offset" in catalog["errors"][0]
+
+
+def test_load_portfolio_catalog_rejects_duplicate_repo_key(tmp_path: Path) -> None:
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        "repos:\n  RepoA:\n    owner: first\n  RepoA:\n    owner: second\n",
+        encoding="utf-8",
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["repos"] == {}
+    assert "duplicate mapping key 'RepoA'" in catalog["errors"][0]
+
+
+def test_load_portfolio_catalog_rejects_invalid_group_order(tmp_path: Path) -> None:
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        "groups:\n"
+        "  active:\n"
+        "    path_prefixes: [active]\n"
+        "    order: first\n",
+        encoding="utf-8",
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["groups"] == {}
+    assert "order must be an integer" in catalog["errors"][0]
+
+
 def test_load_portfolio_catalog_indexes_repo_aliases(tmp_path: Path):
     path = tmp_path / "portfolio-catalog.yaml"
     path.write_text(
