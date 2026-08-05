@@ -17,6 +17,7 @@ from src.demo_portfolio import DEMO_PROJECTS, DemoProject, build_snapshot
 from src.portfolio_truth_types import SCHEMA_VERSION
 
 CONTRACT_VERSION = "ghra-pcc-portfolio-truth.v1"
+PORTABLE_CONTRACT_VERSION = "ghra-portfolio-truth-portable.v1"
 PRODUCER_REPOSITORY = "saagpatel/GithubRepoAuditor"
 CONSUMER_REPOSITORY = "saagpatel/PortfolioCommandCenter"
 FIXTURE_RELATIVE_PATH = (
@@ -25,6 +26,17 @@ FIXTURE_RELATIVE_PATH = (
 MANIFEST_RELATIVE_PATH = (
     "fixtures/contracts/portfolio-command-center-v1/manifest.json"
 )
+PORTABLE_FIXTURE_RELATIVE_PATH = (
+    "fixtures/contracts/portable-consumers-v1/portfolio-truth.json"
+)
+CONSUMER_PROFILE_MANIFEST_PATHS = {
+    "operator-control-plane-v1": (
+        "fixtures/contracts/operator-control-plane-v1/manifest.json"
+    ),
+    "public-site-projection-v1": (
+        "fixtures/contracts/public-site-projection-v1/manifest.json"
+    ),
+}
 
 # Fixed-clock values make the bytes durable. Consumers evaluate freshness
 # against EVALUATED_AT rather than wall time; runtime freshness behavior remains
@@ -48,8 +60,7 @@ def _contract_project_specs() -> tuple[DemoProject, ...]:
     return tuple(by_codename[name] for name in _PROJECT_CODENAMES)
 
 
-def build_contract_fixture() -> dict[str, Any]:
-    """Return the fixed-clock public-safe PortfolioTruth compatibility fixture."""
+def _build_fixture(contract_version: str) -> dict[str, Any]:
     fixture = build_snapshot(
         GENERATED_AT,
         project_specs=_contract_project_specs(),
@@ -59,7 +70,7 @@ def build_contract_fixture() -> dict[str, Any]:
     # evidence; partial synthetic evidence would be invalid and misleading.
     fixture["producer"] = {}
     fixture["contract_fixture"] = {
-        "contract_version": CONTRACT_VERSION,
+        "contract_version": contract_version,
         "deterministic": True,
         "producer_evidence": "absent",
         "security_evidence_semantics": "synthetic-cross-receipt-state-matrix",
@@ -68,6 +79,16 @@ def build_contract_fixture() -> dict[str, Any]:
         "consumer_behavior": "ignore-compatible-addition"
     }
     return fixture
+
+
+def build_contract_fixture() -> dict[str, Any]:
+    """Return the byte-stable legacy PortfolioCommandCenter fixture."""
+    return _build_fixture(CONTRACT_VERSION)
+
+
+def build_portable_contract_fixture() -> dict[str, Any]:
+    """Return the shared public-safe fixture for additive consumer profiles."""
+    return _build_fixture(PORTABLE_CONTRACT_VERSION)
 
 
 def canonical_json_bytes(payload: dict[str, Any]) -> bytes:
@@ -82,6 +103,14 @@ def fixture_bytes() -> bytes:
 
 def fixture_sha256() -> str:
     return hashlib.sha256(fixture_bytes()).hexdigest()
+
+
+def portable_fixture_bytes() -> bytes:
+    return canonical_json_bytes(build_portable_contract_fixture())
+
+
+def portable_fixture_sha256() -> str:
+    return hashlib.sha256(portable_fixture_bytes()).hexdigest()
 
 
 def build_contract_manifest() -> dict[str, Any]:
@@ -126,3 +155,128 @@ def build_contract_manifest() -> dict[str, Any]:
 
 def manifest_bytes() -> bytes:
     return canonical_json_bytes(build_contract_manifest())
+
+
+def _profile_acceptance(profile_id: str) -> dict[str, Any]:
+    common_cases = [
+        {
+            "case_id": "valid-current-schema",
+            "source": "artifact",
+            "expected": "accept",
+        },
+        {
+            "case_id": "additive-canary",
+            "source": "artifact",
+            "pointer": "/projects/0/additive_contract_canary",
+            "expected": "accept-ignore-addition",
+        },
+        {
+            "case_id": "missing-schema-version",
+            "source": "artifact",
+            "mutation": {"op": "remove", "path": "/schema_version"},
+            "expected": "reject",
+        },
+        {
+            "case_id": "malformed-root",
+            "source": "literal",
+            "value": [],
+            "expected": "reject",
+        },
+    ]
+    if profile_id == "operator-control-plane-v1":
+        return {
+            "coverage_cases": [
+                *common_cases,
+                {
+                    "case_id": "contradictory-contract-envelope",
+                    "source": "artifact",
+                    "mutation": {
+                        "op": "add",
+                        "path": "/contract",
+                        "value": {
+                            "id": "ghra.portfolio_truth",
+                            "version": "0.12.0",
+                            "compatibility": "additive",
+                        },
+                    },
+                    "expected": "reject",
+                },
+            ],
+            "fail_closed_behavior": "incompatible-artifact-yields-unavailable-health",
+        }
+    if profile_id == "public-site-projection-v1":
+        return {
+            "coverage_cases": [
+                *common_cases,
+                {
+                    "case_id": "non-allowlisted-project",
+                    "source": "artifact",
+                    "expected": "aggregate-only",
+                },
+                {
+                    "case_id": "missing-projects",
+                    "source": "artifact",
+                    "mutation": {"op": "remove", "path": "/projects"},
+                    "expected": "reject",
+                },
+                {
+                    "case_id": "malformed-projects",
+                    "source": "artifact",
+                    "mutation": {
+                        "op": "replace",
+                        "path": "/projects",
+                        "value": "invalid",
+                    },
+                    "expected": "reject",
+                },
+            ],
+            "public_projection": {
+                "allowlisted_repo_slugs": ["dovetail-forge", "kestrel-loom"],
+                "expected_curated_repo_slugs": [
+                    "dovetail-forge",
+                    "kestrel-loom",
+                ],
+            },
+            "fail_closed_behavior": "unknown-project-identities-remain-anonymous",
+        }
+    raise ValueError(f"Unknown PortfolioTruth consumer profile: {profile_id}")
+
+
+def build_consumer_profile_manifest(profile_id: str) -> dict[str, Any]:
+    """Describe one consumer profile without exposing a private repository name."""
+    manifest_path = CONSUMER_PROFILE_MANIFEST_PATHS.get(profile_id)
+    if manifest_path is None:
+        raise ValueError(f"Unknown PortfolioTruth consumer profile: {profile_id}")
+    return {
+        "contract_version": PORTABLE_CONTRACT_VERSION,
+        "producer": {
+            "repository": PRODUCER_REPOSITORY,
+            "generator": (
+                "src.portfolio_truth_contract_fixture:"
+                "build_portable_contract_fixture"
+            ),
+            "manifest_path": manifest_path,
+            "artifact_path": PORTABLE_FIXTURE_RELATIVE_PATH,
+            "artifact_sha256": portable_fixture_sha256(),
+        },
+        "consumer_profile": {
+            "id": profile_id,
+            "compatibility_policy": "additive-0.x",
+        },
+        "portfolio_truth_schema_version": SCHEMA_VERSION,
+        "fixture": {
+            "generated_at": GENERATED_AT.isoformat(),
+            "evaluation_time": EVALUATED_AT.isoformat(),
+            "project_count": len(_PROJECT_CODENAMES),
+            "producer_evidence": "absent",
+            "additive_canary_paths": [
+                "contract_fixture",
+                "projects[0].additive_contract_canary",
+            ],
+        },
+        "acceptance": _profile_acceptance(profile_id),
+    }
+
+
+def consumer_profile_manifest_bytes(profile_id: str) -> bytes:
+    return canonical_json_bytes(build_consumer_profile_manifest(profile_id))

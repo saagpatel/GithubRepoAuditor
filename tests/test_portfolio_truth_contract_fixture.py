@@ -18,16 +18,23 @@ from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
 from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
 from src.portfolio_truth_contract_fixture import (
+    CONSUMER_PROFILE_MANIFEST_PATHS,
     CONTRACT_VERSION,
     EVALUATED_AT,
     FIXTURE_RELATIVE_PATH,
     GENERATED_AT,
     MANIFEST_RELATIVE_PATH,
+    PORTABLE_CONTRACT_VERSION,
+    PORTABLE_FIXTURE_RELATIVE_PATH,
     PRODUCER_REPOSITORY,
     build_contract_fixture,
     build_contract_manifest,
+    build_consumer_profile_manifest,
+    build_portable_contract_fixture,
+    consumer_profile_manifest_bytes,
     fixture_bytes,
     manifest_bytes,
+    portable_fixture_bytes,
 )
 from src.portfolio_truth_reconcile import _build_security_fields
 from src.portfolio_truth_sources import WORKSPACE_DISCOVERY_POLICY_VERSION
@@ -47,6 +54,78 @@ from src.producer_preflight import (
 def test_committed_contract_artifacts_match_the_deterministic_generator() -> None:
     assert Path(FIXTURE_RELATIVE_PATH).read_bytes() == fixture_bytes()
     assert Path(MANIFEST_RELATIVE_PATH).read_bytes() == manifest_bytes()
+
+
+def test_portable_profile_artifacts_match_the_deterministic_generator() -> None:
+    assert (
+        Path(PORTABLE_FIXTURE_RELATIVE_PATH).read_bytes()
+        == portable_fixture_bytes()
+    )
+    for profile_id, manifest_path in CONSUMER_PROFILE_MANIFEST_PATHS.items():
+        assert Path(manifest_path).read_bytes() == consumer_profile_manifest_bytes(
+            profile_id
+        )
+
+
+def test_portable_profiles_share_one_public_safe_artifact() -> None:
+    fixture = build_portable_contract_fixture()
+    manifests = [
+        build_consumer_profile_manifest(profile_id)
+        for profile_id in sorted(CONSUMER_PROFILE_MANIFEST_PATHS)
+    ]
+
+    validate_truth_snapshot_payload(fixture)
+    assert fixture["contract_fixture"]["contract_version"] == (
+        PORTABLE_CONTRACT_VERSION
+    )
+    assert {
+        manifest["producer"]["artifact_path"] for manifest in manifests
+    } == {PORTABLE_FIXTURE_RELATIVE_PATH}
+    assert len(
+        {manifest["producer"]["artifact_sha256"] for manifest in manifests}
+    ) == 1
+
+    rendered = json.dumps(manifests, sort_keys=True).lower()
+    assert "personal-ops" not in rendered
+    assert "portfolio-index" not in rendered
+    assert "/users/" not in rendered
+
+
+def test_portable_profiles_bind_fixed_clock_additions_and_fail_closed_cases() -> None:
+    operator = build_consumer_profile_manifest("operator-control-plane-v1")
+    public_site = build_consumer_profile_manifest("public-site-projection-v1")
+
+    for manifest in (operator, public_site):
+        assert manifest["fixture"]["generated_at"] == GENERATED_AT.isoformat()
+        assert manifest["fixture"]["evaluation_time"] == EVALUATED_AT.isoformat()
+        assert manifest["fixture"]["additive_canary_paths"]
+        cases = {
+            case["case_id"]: case for case in manifest["acceptance"]["coverage_cases"]
+        }
+        assert cases["valid-current-schema"]["expected"] == "accept"
+        assert cases["additive-canary"]["expected"] == (
+            "accept-ignore-addition"
+        )
+        assert cases["missing-schema-version"]["expected"] == "reject"
+        assert cases["malformed-root"]["expected"] == "reject"
+        assert manifest["acceptance"]["fail_closed_behavior"]
+
+    projection = public_site["acceptance"]["public_projection"]
+    assert projection["allowlisted_repo_slugs"] == [
+        "dovetail-forge",
+        "kestrel-loom",
+    ]
+    assert projection["expected_curated_repo_slugs"] == (
+        projection["allowlisted_repo_slugs"]
+    )
+
+
+def test_undocumented_portable_matrix_marker_cannot_enable_synthetic_rows() -> None:
+    fixture = build_portable_contract_fixture()
+    fixture["contract_fixture"]["contract_version"] = "unrecognized-contract.v1"
+
+    with pytest.raises(ValueError, match="source time is inconsistent"):
+        validate_truth_snapshot_payload(fixture)
 
 
 def test_manifest_binds_schema_generator_and_fixture_digest() -> None:
