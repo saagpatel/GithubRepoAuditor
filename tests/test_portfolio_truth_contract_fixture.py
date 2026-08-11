@@ -1391,7 +1391,7 @@ def _delete_nested_repository_value(
 
 
 def _replace_all_repository_paths(repository_state: dict[str, object]) -> None:
-    private_path = "/Users/d/private-repository"
+    private_path = "/Users/example/private-repository"
     repository_state["local"]["path"] = private_path
     repository_state["worktrees"][0]["path"] = private_path
     repository_state["topology"]["configured_path"] = private_path
@@ -1444,13 +1444,13 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
-                state, ("local", "path"), "/Users/d/private-local"
+                state, ("local", "path"), "/Users/example/private-local"
             ),
             "[Rr]epository",
         ),
         (
             lambda state: _set_nested_repository_value(
-                state, ("worktrees", 0, "path"), "/Users/d/private-worktree"
+                state, ("worktrees", 0, "path"), "/Users/example/private-worktree"
             ),
             "[Rr]epository",
         ),
@@ -1458,13 +1458,13 @@ def _replace_all_repository_paths_with_other_demo_path(
             lambda state: _set_nested_repository_value(
                 state,
                 ("topology", "selection", "path"),
-                "/Users/d/private-selection",
+                "/Users/example/private-selection",
             ),
             "[Rr]epository",
         ),
         (
             lambda state: _set_nested_repository_value(
-                state, ("topology", "configured_path"), "/Users/d/private-topology"
+                state, ("topology", "configured_path"), "/Users/example/private-topology"
             ),
             "[Rr]epository",
         ),
@@ -1582,7 +1582,7 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
-                state, ("local", "upstream"), "/Users/d/private"
+                state, ("local", "upstream"), "/Users/example/private"
             ),
             "upstream",
         ),
@@ -1717,7 +1717,7 @@ def test_portable_repository_state_rejects_private_observation_failure_reason() 
         "state": "unknown",
         "observed_at": GENERATED_AT.isoformat(),
         "reason_code": "repository_observation_failed",
-        "reason": "/Users/d/private-repository",
+        "reason": "/Users/example/private-repository",
         "remote_default_branch": repository_state["remote_default_branch"],
     }
 
@@ -1744,7 +1744,7 @@ def test_portable_repository_state_rejects_private_observation_failure_reason() 
         (("declared", "notes"), "owner@example.com"),
         (("declared", "notes"), "owner@localhost"),
         (("declared", "notes"), "/root/private-note"),
-        (("warnings",), ["/Users/d/private-warning"]),
+        (("warnings",), ["/Users/example/private-warning"]),
     ),
 )
 def test_portable_payload_rejects_private_identity_patterns(

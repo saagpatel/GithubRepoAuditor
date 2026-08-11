@@ -81,5 +81,5 @@ doc-truth-up batch · 80 repo(s) · tier=2 · model=sonnet · concurrency=8 · E
 [80/80] mcpforge → ran
 
 Done. {'skipped': 31, 'already_done': 6, 'ran': 43}
-Results: /Users/d/Projects/GithubRepoAuditor/output/doc-truth-up-run-2026-05-30.json
+Results: ~/Projects/GithubRepoAuditor/output/doc-truth-up-run-2026-05-30.json
 Review each repo's docs/truth-up-* branch, then merge or delete. Nothing was pushed.

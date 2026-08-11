@@ -293,9 +293,9 @@ def build_restart_packet(
             for repo in active_set
         ],
         "next_commands": [
-            "python -m src.codex_restart_packet --workspace-root /Users/d/Projects",
-            "git -C /Users/d/.local/share/personal-ops status --short --branch",
-            "git -C /Users/d/.codex/codexkit status --short --branch",
+            "python -m src.codex_restart_packet --workspace-root ~/Projects",
+            "git -C ~/.local/share/personal-ops status --short --branch",
+            "git -C ~/.codex/codexkit status --short --branch",
             "audit report saagpatel --portfolio-truth --portfolio-truth-include-security",
         ],
     }

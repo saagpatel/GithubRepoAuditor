@@ -117,7 +117,7 @@ DEFAULT_SUPPLEMENTARY: list[dict] = [
         "section_label": "Operator OS",
         "lifecycle_state": "active",
         "note": (
-            "4-layer knowledge vault at /Users/d/Documents/SecondBrain "
+            "4-layer knowledge vault at ~/Documents/SecondBrain "
             "(engraph-indexed). Not a git repo; absent from auditor."
         ),
     },
@@ -147,7 +147,7 @@ DEFAULT_NOTION_PROJECTION_ONLY_ROWS: dict[str, str] = {
     "app": "local runtime/app shell placeholder; not a portfolio-truth repo",
     "claude-code-harness": "local agent harness projection; outside repo-root truth",
     "Sandbox Local Portfolio Project": "actuation sandbox fixture row",
-    "SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo",
+    "SecondBrain": "knowledge vault under ~/Documents; not a ~/Projects repo",
     "RAG Knowledge Base": "notion planning row; not a portfolio-truth repo",
 }
 
