@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_topline_payload import build_resolution_trend_topline_payload
+from github_repo_auditor.operator_trend_topline_payload import build_resolution_trend_topline_payload
 
 
 def test_build_resolution_trend_topline_payload_packages_core_summary() -> None:

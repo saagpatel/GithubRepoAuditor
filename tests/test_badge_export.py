@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from urllib.parse import parse_qs, urlparse
 
-from src.badge_export import (
+from github_repo_auditor.badge_export import (
     _endpoint_badge_url,
     _load_gist_id,
     _make_shield_json,

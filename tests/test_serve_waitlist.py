@@ -1,10 +1,10 @@
-"""Tests for src/serve/waitlist.py — email capture store + validation."""
+"""Tests for src/github_repo_auditor/serve/waitlist.py — email capture store + validation."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.serve.waitlist import (
+from github_repo_auditor.serve.waitlist import (
     SqliteWaitlistStore,
     build_waitlist_store,
     is_valid_email,

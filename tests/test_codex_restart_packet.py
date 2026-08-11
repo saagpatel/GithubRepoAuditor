@@ -4,12 +4,12 @@ import json
 import subprocess
 from pathlib import Path
 
-from src.codex_restart_packet import (
+from github_repo_auditor.codex_restart_packet import (
     build_restart_packet,
     discover_git_repos,
     render_markdown,
 )
-from src.portfolio_truth_types import TRUTH_LATEST_FILENAME
+from github_repo_auditor.portfolio_truth_types import TRUTH_LATEST_FILENAME
 
 
 def _run(args: list[str], cwd: Path) -> None:

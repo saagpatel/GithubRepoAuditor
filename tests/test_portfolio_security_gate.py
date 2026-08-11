@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.cli import _run_security_gate_mode, build_subcommand_parser
-from src.portfolio_security_gate import (
+from github_repo_auditor.cli import _run_security_gate_mode, build_subcommand_parser
+from github_repo_auditor.portfolio_security_gate import (
     build_security_gate_report,
     render_security_gate_markdown,
 )

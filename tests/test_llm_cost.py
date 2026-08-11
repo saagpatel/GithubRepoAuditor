@@ -1,4 +1,4 @@
-"""Tests for src/llm_cost.py — CostTracker, BudgetExceededError, and provider wiring."""
+"""Tests for src/github_repo_auditor/llm_cost.py — CostTracker, BudgetExceededError, and provider wiring."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.llm_cost import (
+from github_repo_auditor.llm_cost import (
     BudgetExceededError,
     CostTracker,
 )
@@ -217,7 +217,7 @@ def test_write_telemetry_appends(tmp_path: Path):
 
 
 def test_anthropic_provider_records_cost():
-    from src.narrative import AnthropicProvider
+    from github_repo_auditor.narrative import AnthropicProvider
 
     tracker = CostTracker()
 
@@ -258,7 +258,7 @@ def test_anthropic_provider_records_cost():
 
 
 def test_github_models_provider_records_cost():
-    from src.narrative import GitHubModelsProvider
+    from github_repo_auditor.narrative import GitHubModelsProvider
 
     tracker = CostTracker()
 
@@ -291,7 +291,7 @@ def test_github_models_provider_records_cost():
 
 
 def test_briefing_call_chain_records_feature():
-    from src.briefing import _build_suggestions
+    from github_repo_auditor.briefing import _build_suggestions
 
     tracker = CostTracker()
 
@@ -303,7 +303,7 @@ def test_briefing_call_chain_records_feature():
     }
     mock_response.raise_for_status.return_value = None
 
-    from src.narrative import GitHubModelsProvider
+    from github_repo_auditor.narrative import GitHubModelsProvider
 
     provider = GitHubModelsProvider(github_token="test-token")
 

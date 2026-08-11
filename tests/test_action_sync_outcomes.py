@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.action_sync_outcomes import build_action_sync_outcomes_bundle
+from github_repo_auditor.action_sync_outcomes import build_action_sync_outcomes_bundle
 
 
 def _run_snapshot(

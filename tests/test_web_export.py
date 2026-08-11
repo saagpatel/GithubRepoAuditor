@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 
-from src.report_enrichment import (
+from github_repo_auditor.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
     build_weekly_review_pack,
     no_baseline_summary,
     no_linked_artifact_summary,
 )
-from src.web_export import _render_html, _risk_posture_section, export_html_dashboard
+from github_repo_auditor.web_export import _render_html, _risk_posture_section, export_html_dashboard
 
 
 def _make_report(**overrides) -> dict:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_class_transitions import (
+from github_repo_auditor.operator_trend_class_transitions import (
     build_class_reweight_events,
     build_class_transition_events,
     consecutive_transition_runs,

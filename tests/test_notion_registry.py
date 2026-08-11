@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.notion_registry import (
+from github_repo_auditor.notion_registry import (
     _extract_first_select,
     _extract_select,
     _extract_title,

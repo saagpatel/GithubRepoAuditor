@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.implementation_hotspots import build_implementation_hotspots
-from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+from github_repo_auditor.implementation_hotspots import build_implementation_hotspots
+from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
 
 
 def _metadata() -> RepoMetadata:

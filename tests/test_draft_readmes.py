@@ -1,4 +1,4 @@
-"""Tests for src/draft_readmes.py — Arc G Sprint 5.1-5.3."""
+"""Tests for src/github_repo_auditor/draft_readmes.py — Arc G Sprint 5.1-5.3."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.draft_readmes import (
+from github_repo_auditor.draft_readmes import (
     DraftReadmePacket,
     build_context,
     generate_draft,
@@ -21,7 +21,7 @@ from src.draft_readmes import (
     record_draft_apply_failure,
     write_packets_to_ledger,
 )
-from src.llm_cost import BudgetExceededError
+from github_repo_auditor.llm_cost import BudgetExceededError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -264,7 +264,7 @@ class TestGenerateDraft:
 class TestWritePacketsToLedger:
     def test_produces_readable_records(self) -> None:
         """Packets written to ledger can be read back by load_approval_records."""
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -320,9 +320,9 @@ class TestCLIFlagDispatch:
         ]
         with (
             patch("sys.argv", test_argv),
-            patch("src.cli._run_draft_readmes_mode") as mock_dispatch,
+            patch("github_repo_auditor.cli._run_draft_readmes_mode") as mock_dispatch,
         ):
-            from src.cli import main
+            from github_repo_auditor.cli import main
 
             try:
                 main()
@@ -336,7 +336,7 @@ class TestCLIFlagDispatch:
 
     def test_parser_accepts_draft_readmes_repo_flag(self) -> None:
         """build_parser() accepts --draft-readmes and --draft-readmes-repo flags."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(
@@ -354,7 +354,7 @@ class TestCLIFlagDispatch:
 
     def test_legacy_form_accepts_draft_readmes_flags(self) -> None:
         """Legacy flat invocation accepts --draft-readmes flags."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(
@@ -382,11 +382,11 @@ class TestCLIFlagDispatch:
             "/tmp/test-output",
         ]
         with patch("sys.argv", ["audit"] + argv):
-            with patch("src.cli._run_draft_readmes_mode") as mock_fn:
+            with patch("github_repo_auditor.cli._run_draft_readmes_mode") as mock_fn:
                 with warnings.catch_warnings(record=True) as caught:
                     warnings.simplefilter("always")
                     try:
-                        from src.cli import main
+                        from github_repo_auditor.cli import main
 
                         main()
                     except SystemExit:
@@ -405,7 +405,7 @@ class TestCLIFlagDispatch:
 
     def test_infer_subcommand_maps_draft_readmes_to_report(self) -> None:
         """_infer_subcommand_from_flags returns 'report' when draft_readmes=True."""
-        from src.cli import _infer_subcommand_from_flags, build_parser
+        from github_repo_auditor.cli import _infer_subcommand_from_flags, build_parser
 
         parser = build_parser()
         args = parser.parse_args(
@@ -427,8 +427,8 @@ class TestCLIFlagDispatch:
 class TestSuppressionCheck:
     def test_suppressed_repo_skipped_in_dispatch(self) -> None:
         """When operator prefs mark a repo as suppressed, generate_draft is not called."""
-        with patch("src.draft_readmes.generate_draft") as mock_gen:
-            from src.operator_prefs import is_suppressed
+        with patch("github_repo_auditor.draft_readmes.generate_draft") as mock_gen:
+            from github_repo_auditor.operator_prefs import is_suppressed
 
             prefs = {
                 "suppressions": [
@@ -459,7 +459,7 @@ class TestCostGuard:
     def test_budget_exceeded_aborts_batch_partial_packets_persisted(self) -> None:
         """With --max-llm-spend=0.0001 and a budget-busting provider, run aborts
         after the first failure; packets generated before the abort are persisted."""
-        from src.llm_cost import CostTracker
+        from github_repo_auditor.llm_cost import CostTracker
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -502,7 +502,7 @@ class TestCostGuard:
             # Persist whatever was generated before abort
             write_packets_to_ledger(packets_written, output_dir, reviewer="tester")
 
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "tester")
             draft_records = [r for r in records if r.get("approval_subject_type") == "draft-readme"]
@@ -670,10 +670,10 @@ class TestApplyImprovementsModeWithLedger:
 
             mock_apply = MagicMock(return_value=[{"repo": "target-repo", "ok": True}])
             with (
-                patch("src.repo_improver.apply_readme_updates", mock_apply),
-                patch("src.cli.apply_readme_updates", mock_apply, create=True),
+                patch("github_repo_auditor.repo_improver.apply_readme_updates", mock_apply),
+                patch("github_repo_auditor.cli.apply_readme_updates", mock_apply, create=True),
             ):
-                from src.cli import _run_apply_improvements_mode
+                from github_repo_auditor.cli import _run_apply_improvements_mode
 
                 args = self._make_args(str(output_dir), apply_readmes=True, dry_run=False)
                 parser = MagicMock()
@@ -727,8 +727,8 @@ class TestApplyImprovementsModeWithLedger:
                     {"repo": "ledger-repo", "ok": True},
                 ]
             )
-            with patch("src.repo_improver.apply_readme_updates", mock_apply):
-                from src.cli import _run_apply_improvements_mode
+            with patch("github_repo_auditor.repo_improver.apply_readme_updates", mock_apply):
+                from github_repo_auditor.cli import _run_apply_improvements_mode
 
                 args = self._make_args(
                     str(output_dir),
@@ -775,10 +775,10 @@ class TestApplyImprovementsModeWithLedger:
             mock_apply = MagicMock(return_value=[{"repo": "dry-repo", "dry_run": True}])
             mock_mark_applied = MagicMock()
             with (
-                patch("src.repo_improver.apply_readme_updates", mock_apply),
-                patch("src.draft_readmes.mark_draft_applied", mock_mark_applied),
+                patch("github_repo_auditor.repo_improver.apply_readme_updates", mock_apply),
+                patch("github_repo_auditor.draft_readmes.mark_draft_applied", mock_mark_applied),
             ):
-                from src.cli import _run_apply_improvements_mode
+                from github_repo_auditor.cli import _run_apply_improvements_mode
 
                 args = self._make_args(str(output_dir), apply_readmes=True, dry_run=True)
                 parser = MagicMock()

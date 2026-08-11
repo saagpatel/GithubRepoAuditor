@@ -103,7 +103,7 @@ These are intent-log only — they do not call `--writeback-apply`.
 ## Subprocess safety
 
 All flags accepted through the `/runs/new` form are validated against a strict allowlist
-(`SAFE_FLAG_NAMES` in `src/serve/runner.py`). Any flag name not in the allowlist is
+(`SAFE_FLAG_NAMES` in `src/github_repo_auditor/serve/runner.py`). Any flag name not in the allowlist is
 rejected before the subprocess is spawned.
 
 Flag values are additionally checked against a shell-metacharacter blocklist. The

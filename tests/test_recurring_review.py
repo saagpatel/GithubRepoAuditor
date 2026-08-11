@@ -3,14 +3,14 @@ from __future__ import annotations
 from argparse import Namespace
 from datetime import datetime, timedelta, timezone
 
-from src.baseline_context import build_baseline_context
-from src.models import AuditReport, RepoAudit, RepoMetadata
-from src.recurring_review import (
+from github_repo_auditor.baseline_context import build_baseline_context
+from github_repo_auditor.models import AuditReport, RepoAudit, RepoMetadata
+from github_repo_auditor.recurring_review import (
     MATERIALITY_THRESHOLDS,
     choose_watch_plan,
     evaluate_material_changes,
 )
-from src.warehouse import write_warehouse_snapshot
+from github_repo_auditor.warehouse import write_warehouse_snapshot
 
 
 def _make_args(tmp_path, **overrides) -> Namespace:

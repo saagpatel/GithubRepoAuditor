@@ -6,13 +6,13 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.operator_os_seam_linter import (
+from github_repo_auditor.operator_os_seam_linter import (
     build_worklist_payload,
     lint_operator_os_seams,
     main,
 )
-from src.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
-from src.portfolio_truth_types import SCHEMA_VERSION
+from github_repo_auditor.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
+from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
 
 
 NOW = datetime(2026, 7, 3, 12, 0, tzinfo=UTC)

@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from src.automation_executor import AutomationExecutionError, CommandResult
-from src.automation_proposals import (
+from github_repo_auditor.automation_executor import AutomationExecutionError, CommandResult
+from github_repo_auditor.automation_proposals import (
     ACTION_CATALOG_SEED,
     ACTION_CONTEXT_PR,
     STATUS_APPROVED,
@@ -30,13 +30,13 @@ from src.automation_proposals import (
     load_proposals,
     save_proposals,
 )
-from src.automation_workflow import (
+from github_repo_auditor.automation_workflow import (
     build_catalog_seeds_for,
     build_context_pr_plan,
     execute_approved_proposals,
 )
-from src.portfolio_context_contract import MANAGED_CONTEXT_START
-from src.portfolio_truth_types import (
+from github_repo_auditor.portfolio_context_contract import MANAGED_CONTEXT_START
+from github_repo_auditor.portfolio_truth_types import (
     DeclaredFields,
     DerivedFields,
     IdentityFields,

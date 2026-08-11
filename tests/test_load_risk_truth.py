@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.excel_export_truth_helpers import load_risk_truth
+from github_repo_auditor.excel_export_truth_helpers import load_risk_truth
 
 
 def test_load_risk_truth_keys_by_slug_and_display_name(tmp_path: Path) -> None:

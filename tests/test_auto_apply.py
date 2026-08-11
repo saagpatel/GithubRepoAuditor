@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.auto_apply import (
+from github_repo_auditor.auto_apply import (
     SAFE_MUTATION_TARGETS,
     build_trust_bar_index,
     filter_safe_actions,

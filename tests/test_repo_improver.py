@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 
-from src.repo_improver import (
+from github_repo_auditor.repo_improver import (
     apply_file_updates,
     apply_metadata_updates,
     apply_readme_updates,

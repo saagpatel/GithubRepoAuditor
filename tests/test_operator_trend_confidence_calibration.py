@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_confidence_calibration import build_confidence_calibration
+from github_repo_auditor.operator_trend_confidence_calibration import build_confidence_calibration
 
 
 def _queue_identity(item: dict) -> str:

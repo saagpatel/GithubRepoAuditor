@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.analyzers.cicd import CicdAnalyzer, _has_build_scripts
+from github_repo_auditor.analyzers.cicd import CicdAnalyzer, _has_build_scripts
 
 
 class TestCicdAnalyzerAltCi:

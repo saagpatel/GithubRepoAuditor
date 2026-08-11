@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src import operator_control_center_artifacts as artifacts
+from github_repo_auditor import operator_control_center_artifacts as artifacts
 
 
 def _stub_artifact_dependencies(tmp_path, monkeypatch, *, weekly_digest=None):

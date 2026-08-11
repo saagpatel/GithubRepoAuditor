@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_trust_policy_history import (
+from github_repo_auditor.operator_trend_trust_policy_history import (
     build_trust_policy_events,
     false_positive_exception_hotspots,
     policy_flip_count,

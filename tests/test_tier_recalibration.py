@@ -1,6 +1,6 @@
 # tests/test_tier_recalibration.py
 """Tests for the tier distribution report (Arc H A4)."""
-from src.tier_recalibration import tier_distribution_report
+from github_repo_auditor.tier_recalibration import tier_distribution_report
 
 
 def _make_repo(tier: int) -> dict:
@@ -8,7 +8,7 @@ def _make_repo(tier: int) -> dict:
 
 
 def test_report_counts_tiers_correctly(monkeypatch):
-    from src import tier_recalibration
+    from github_repo_auditor import tier_recalibration
 
     monkeypatch.setattr(tier_recalibration, "compute_tier", lambda r: r["_mock_tier"])
 
@@ -28,7 +28,7 @@ def test_report_counts_tiers_correctly(monkeypatch):
 
 
 def test_report_computes_percentages(monkeypatch):
-    from src import tier_recalibration
+    from github_repo_auditor import tier_recalibration
 
     monkeypatch.setattr(tier_recalibration, "compute_tier", lambda r: r["_mock_tier"])
 
@@ -46,7 +46,7 @@ def test_report_empty_repos():
 
 
 def test_report_flags_bunching_when_bronze_over_60_percent(monkeypatch):
-    from src import tier_recalibration
+    from github_repo_auditor import tier_recalibration
 
     monkeypatch.setattr(tier_recalibration, "compute_tier", lambda r: r["_mock_tier"])
 
@@ -56,7 +56,7 @@ def test_report_flags_bunching_when_bronze_over_60_percent(monkeypatch):
 
 
 def test_report_no_bunching_when_distributed(monkeypatch):
-    from src import tier_recalibration
+    from github_repo_auditor import tier_recalibration
 
     monkeypatch.setattr(tier_recalibration, "compute_tier", lambda r: r["_mock_tier"])
 

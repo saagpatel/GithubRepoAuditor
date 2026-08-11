@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.similarity import classify_similarity, compute_file_hashes, find_similar_repos
+from github_repo_auditor.similarity import classify_similarity, compute_file_hashes, find_similar_repos
 
 
 class TestComputeFileHashes:

@@ -23,8 +23,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.app.portfolio_analysis import _print_tier_gaps_markdown, _run_tier_gaps_export_mode
-from src.cli import build_subcommand_parser
+from github_repo_auditor.app.portfolio_analysis import _print_tier_gaps_markdown, _run_tier_gaps_export_mode
+from github_repo_auditor.cli import build_subcommand_parser
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -157,7 +157,7 @@ class TestTierFiltering:
         tier_map = {"bronze-repo": 1, "tier4-repo": 4, "no-git-repo": 0}
 
         with patch(
-            "src.maturity_tiers.compute_tier",
+            "github_repo_auditor.maturity_tiers.compute_tier",
             side_effect=lambda p: tier_map.get(
                 (p.get("identity") or {}).get("display_name", ""), 1
             ),
@@ -176,7 +176,7 @@ class TestTierFiltering:
 class TestTargetOverride:
     def test_target_override_3_applied(self, tmp_path, capsys):
         """--tier-gaps-target 3 → all gaps have target_tier 3."""
-        from src.maturity_tiers import compute_tier
+        from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("repo-a")
         if compute_tier(bronze) in (0, 4):
@@ -200,7 +200,7 @@ class TestTargetOverride:
         _write_truth(tmp_path, [project])
 
         # Mock compute_tier to return 2 (Silver) so target_override==current==2
-        with patch("src.maturity_tiers.compute_tier", return_value=2):
+        with patch("github_repo_auditor.maturity_tiers.compute_tier", return_value=2):
             args = _make_args(str(tmp_path), tier_gaps_target=2, fmt="json")
             _run_tier_gaps_export_mode(args)
 
@@ -238,7 +238,7 @@ class TestInvalidTargetOverride:
 class TestMarkdownFormat:
     def test_markdown_output_has_table_header(self, tmp_path, capsys):
         """--format markdown → stdout contains markdown table header."""
-        from src.maturity_tiers import compute_tier
+        from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("md-repo")
         if compute_tier(bronze) in (0, 4):
@@ -274,7 +274,7 @@ class TestJsonFormat:
 
     def test_json_gap_fields_present(self, tmp_path, capsys):
         """Each gap entry has all required fields."""
-        from src.maturity_tiers import compute_tier
+        from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("field-check")
         if compute_tier(bronze) in (0, 4):
@@ -299,7 +299,7 @@ class TestJsonFormat:
 class TestRequirementSources:
     def test_requirement_sources_parallel_to_missing(self, tmp_path, capsys):
         """missing_requirements and requirement_sources have same length."""
-        from src.maturity_tiers import compute_tier
+        from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("src-check")
         if compute_tier(bronze) in (0, 4):
@@ -341,7 +341,7 @@ class TestEmptyDisplayName:
 class TestDefaultTarget:
     def test_default_target_is_current_plus_one(self, tmp_path, capsys):
         """Without --tier-gaps-target, each repo's target = current + 1."""
-        from src.maturity_tiers import compute_tier
+        from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("default-target")
         current = compute_tier(bronze)

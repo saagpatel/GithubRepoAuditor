@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_exception_recovery import (
+from github_repo_auditor.operator_trend_exception_recovery import (
     exception_pattern_summary,
     recovery_pattern_reason,
     trust_recovery_for_target,

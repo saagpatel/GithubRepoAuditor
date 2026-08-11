@@ -4,9 +4,9 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.models import AnalyzerResult, RepoMetadata
-from src.app.run_audit import _load_scoring_profile
-from src.scorer import WEIGHTS, score_repo
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.app.run_audit import _load_scoring_profile
+from github_repo_auditor.scorer import WEIGHTS, score_repo
 
 
 def _make_results(scores: dict[str, float]) -> list[AnalyzerResult]:

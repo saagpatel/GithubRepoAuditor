@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.action_sync_automation import build_action_sync_automation_bundle
+from github_repo_auditor.action_sync_automation import build_action_sync_automation_bundle
 
 
 def _readiness_record(campaign_type: str, readiness_stage: str, *, action_count: int = 2) -> dict:

@@ -12,14 +12,14 @@ from pathlib import Path
 
 import pytest
 
-from src.automation_executor import (
+from github_repo_auditor.automation_executor import (
     AutomationExecutionError,
     CommandResult,
     ExecutionPlan,
     execute_catalog_seed,
     execute_context_pr,
 )
-from src.automation_proposals import (
+from github_repo_auditor.automation_proposals import (
     ACTION_CATALOG_SEED,
     ACTION_CONTEXT_PR,
     STATUS_APPROVED,

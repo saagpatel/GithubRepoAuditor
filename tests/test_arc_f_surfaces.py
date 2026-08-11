@@ -13,11 +13,11 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from src.excel_all_repos_helpers import ALL_REPOS_HEADERS, build_all_repo_rows
-from src.excel_export import _build_all_repos, _build_security
-from src.excel_repo_data_helpers import _arc_f_detail_cols, repo_detail_rows
-from src.excel_security_sheet_helpers import SECURITY_HEADERS, build_security_sheet_rows
-from src.operator_control_center import build_operator_snapshot
+from github_repo_auditor.excel_all_repos_helpers import ALL_REPOS_HEADERS, build_all_repo_rows
+from github_repo_auditor.excel_export import _build_all_repos, _build_security
+from github_repo_auditor.excel_repo_data_helpers import _arc_f_detail_cols, repo_detail_rows
+from github_repo_auditor.excel_security_sheet_helpers import SECURITY_HEADERS, build_security_sheet_rows
+from github_repo_auditor.operator_control_center import build_operator_snapshot
 
 # ─────────────────────────────────────────────────────────────
 # Shared fixture helpers

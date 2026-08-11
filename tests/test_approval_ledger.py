@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.approval_ledger import (
+from github_repo_auditor.approval_ledger import (
     build_approval_followup_record,
     build_approval_record,
     load_approval_ledger_bundle,
 )
-from src.warehouse import (
+from github_repo_auditor.warehouse import (
     load_approval_followup_events,
     load_approval_records,
     save_approval_followup_event,

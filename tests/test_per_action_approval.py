@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from src.plan_campaign import (
+from github_repo_auditor.plan_campaign import (
     CampaignAction,
     CampaignPlanPacket,
     approve_action,
@@ -58,7 +58,7 @@ def _make_packet(
 
 def _seed_approved_manual(output_dir: Path, goal: str = "add CI to all repos") -> str:
     """Write a packet with status='approved-manual' and return the record_id."""
-    from src.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
 
     packet = _make_packet(goal)
     record_id = write_packet_to_ledger(packet, output_dir=output_dir, reviewer="tester")
@@ -79,7 +79,7 @@ def _seed_approved_manual(output_dir: Path, goal: str = "add CI to all repos") -
 
 class TestApproveAction:
     def test_sets_state_approved_and_persists(self) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -93,7 +93,7 @@ class TestApproveAction:
             assert rec["actions"][0]["decided_at"] is not None
 
     def test_sets_decided_at_iso_timestamp(self) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -130,7 +130,7 @@ class TestApproveAction:
 
     def test_clears_rejected_reason_on_re_approve(self) -> None:
         """Re-approving a previously rejected action clears rejected_reason."""
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -152,7 +152,7 @@ class TestApproveAction:
 
 class TestRejectAction:
     def test_sets_state_rejected_with_reason(self) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -167,7 +167,7 @@ class TestRejectAction:
             assert rec["actions"][0]["decided_at"] is not None
 
     def test_sets_state_rejected_empty_reason(self) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -195,7 +195,7 @@ class TestRejectAction:
 
     def test_re_approve_flips_rejected_back_to_approved(self) -> None:
         """Idempotency: approve after reject → state becomes approved."""
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -217,7 +217,7 @@ class TestRejectAction:
 class TestBackwardCompat:
     def test_load_approved_campaign_plans_defaults_missing_state_to_pending(self) -> None:
         """Pre-7B records without 'state' key → CampaignAction.state == 'pending'."""
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -263,7 +263,7 @@ class TestBackwardCompat:
 
     def test_load_approved_campaign_plans_preserves_existing_state(self) -> None:
         """Records with 'state' set are hydrated correctly."""
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -324,8 +324,8 @@ class TestApplyPathGate:
         actions: list[CampaignAction],
         goal: str = "apply gate test",
     ) -> CampaignPlanPacket:
-        from src.plan_campaign import _goal_subject_key, _packet_record_id
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.plan_campaign import _goal_subject_key, _packet_record_id
+        from github_repo_auditor.warehouse import save_approval_record
 
         generated_at = _recent_generated_at()
         packet = CampaignPlanPacket(
@@ -395,7 +395,7 @@ class TestApplyPathGate:
             ]
             self._make_approved_manual_packet(output_dir, actions)
 
-            with patch("src.plan_campaign.dispatch_action") as mock_dispatch:
+            with patch("github_repo_auditor.plan_campaign.dispatch_action") as mock_dispatch:
                 packets = load_approved_campaign_plans(output_dir)
                 assert len(packets) == 1
                 # Only approved actions should be dispatched — pending ones skip
@@ -496,12 +496,12 @@ pytest.importorskip("jinja2", reason="[serve] extra not installed")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from src.serve.app import create_app  # noqa: E402
+from github_repo_auditor.serve.app import create_app  # noqa: E402
 
 
 def _seed_cp_record_for_routes(output_dir: Path) -> str:
     """Seed a campaign-plan record with 2 pending actions; return record_id."""
-    from src.warehouse import save_approval_record
+    from github_repo_auditor.warehouse import save_approval_record
 
     record_id = "cp-7b-route-test-0001"
     save_approval_record(
@@ -571,7 +571,7 @@ class TestPerActionRoutes:
         assert "approved" in resp.text.lower() or "&#10003;" in resp.text
 
     def test_approve_action_persists_state(self, tmp_path: Path) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         output_dir = self._make_output_dir(tmp_path)
         record_id = _seed_cp_record_for_routes(output_dir)

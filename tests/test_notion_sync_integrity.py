@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from src import notion_sync
+from github_repo_auditor import notion_sync
 
 
 @dataclass

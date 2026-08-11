@@ -14,7 +14,7 @@ pytest.importorskip("jinja2", reason="[serve] extra not installed")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from src.serve.app import create_app  # noqa: E402
+from github_repo_auditor.serve.app import create_app  # noqa: E402
 
 # ── Repo fixture helpers (mirror test_initiatives_routes.py) ────────────────
 
@@ -92,7 +92,7 @@ class TestInitiativesSuggestionsGet:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """GET with valid portfolio-truth → 200 with suggestion cards rendered."""
-        from src.suggest_initiatives import InitiativeSuggestion
+        from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
         truth = _make_portfolio_truth([_bronze_repo("MyRepo"), _bronze_repo("OtherRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -109,7 +109,7 @@ class TestInitiativesSuggestionsGet:
         ]
 
         with patch(
-            "src.suggest_initiatives.generate_suggestions",
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
             return_value=(fake_suggestions, 0.0042),
         ):
             resp = client.get("/initiatives/suggestions")
@@ -126,7 +126,7 @@ class TestInitiativesSuggestionsGet:
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
 
         with patch(
-            "src.suggest_initiatives.generate_suggestions",
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
             return_value=([], 0.0),
         ):
             resp = client.get("/initiatives/suggestions")
@@ -138,7 +138,7 @@ class TestInitiativesSuggestionsGet:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """GET ?target=3 passes target_tier=3 to generate_suggestions."""
-        from src.suggest_initiatives import InitiativeSuggestion
+        from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
         truth = _make_portfolio_truth([_silver_repo("Repo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -155,7 +155,7 @@ class TestInitiativesSuggestionsGet:
         ]
 
         with patch(
-            "src.suggest_initiatives.generate_suggestions",
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
             return_value=(fake_suggestions, 0.005),
         ) as mock_gen:
             resp = client.get("/initiatives/suggestions?target=3")
@@ -183,7 +183,7 @@ class TestInitiativesAcceptPost:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """Valid form data → 200 HTML fragment containing '✓ Accepted'."""
-        from src.initiatives import Initiative
+        from github_repo_auditor.initiatives import Initiative
 
         truth = _make_portfolio_truth([_bronze_repo("TargetRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -196,7 +196,7 @@ class TestInitiativesAcceptPost:
             set_by="web",
         )
 
-        with patch("src.suggest_initiatives.accept_suggestion", return_value=fake_initiative):
+        with patch("github_repo_auditor.suggest_initiatives.accept_suggestion", return_value=fake_initiative):
             resp = client.post(
                 "/initiatives/accept",
                 data={
@@ -378,7 +378,7 @@ class TestRequirementSourcesHints:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """initiative_gap.html renders (approx.) for proxy-sourced requirements."""
-        from src.maturity_tiers import TierGap
+        from github_repo_auditor.maturity_tiers import TierGap
 
         truth = _make_portfolio_truth([_bronze_repo("ProxyRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -391,7 +391,7 @@ class TestRequirementSourcesHints:
             requirement_sources=["proxy"],
         )
 
-        with patch("src.maturity_tiers.tier_gap", return_value=fake_gap):
+        with patch("github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap):
             resp = client.get("/initiatives/ProxyRepo/gap?target=2")
 
         assert resp.status_code == 200
@@ -402,7 +402,7 @@ class TestRequirementSourcesHints:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """initiative_gap.html does NOT render (approx.) for strict-sourced requirements."""
-        from src.maturity_tiers import TierGap
+        from github_repo_auditor.maturity_tiers import TierGap
 
         truth = _make_portfolio_truth([_bronze_repo("StrictRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -415,7 +415,7 @@ class TestRequirementSourcesHints:
             requirement_sources=["strict"],
         )
 
-        with patch("src.maturity_tiers.tier_gap", return_value=fake_gap):
+        with patch("github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap):
             resp = client.get("/initiatives/StrictRepo/gap?target=2")
 
         assert resp.status_code == 200
@@ -430,7 +430,7 @@ class TestRequirementSourcesHints:
         # they load via the HTMX /gap partial. We test the partial directly.
         # This test verifies the gap partial renders correctly (covers the
         # requirement_sources field being passed through the route).
-        from src.maturity_tiers import TierGap
+        from github_repo_auditor.maturity_tiers import TierGap
 
         truth = _make_portfolio_truth([_bronze_repo("HintRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -443,7 +443,7 @@ class TestRequirementSourcesHints:
             requirement_sources=["proxy", "strict"],
         )
 
-        with patch("src.maturity_tiers.tier_gap", return_value=fake_gap):
+        with patch("github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap):
             resp = client.get("/initiatives/HintRepo/gap?target=2")
 
         assert resp.status_code == 200
@@ -471,7 +471,7 @@ class TestInitiativesSuggestionsRouteCache:
         We verify the key format rather than cache hit behaviour — the cache
         semantics are covered in TestSuggestionCache.
         """
-        from src.suggest_initiatives import InitiativeSuggestion
+        from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
         truth = _make_portfolio_truth([_bronze_repo("WiredRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -493,7 +493,7 @@ class TestInitiativesSuggestionsRouteCache:
             received_keys.append(cache_key)
             return fake_suggestions, 0.001
 
-        with patch("src.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
+        with patch("github_repo_auditor.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
             resp = client.get("/initiatives/suggestions")
 
         assert resp.status_code == 200
@@ -509,7 +509,7 @@ class TestInitiativesSuggestionsRouteCache:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """Different portfolio-truth generated_at values produce different cache keys."""
-        from src.suggest_initiatives import InitiativeSuggestion
+        from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
         fake_suggestion = InitiativeSuggestion(
             repo_name="DiffRepo",
@@ -529,7 +529,7 @@ class TestInitiativesSuggestionsRouteCache:
         truth_v1 = {"generated_at": "2026-01-01T00:00:00", "projects": [_bronze_repo("DiffRepo")]}
         truth_v2 = {"generated_at": "2026-02-01T00:00:00", "projects": [_bronze_repo("DiffRepo")]}
 
-        with patch("src.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
+        with patch("github_repo_auditor.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
             (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth_v1))
             resp1 = client.get("/initiatives/suggestions")
 
@@ -584,7 +584,7 @@ class TestDismissSuggestionRoute:
         self, output_dir: Path, client: TestClient
     ) -> None:
         """After dismissing a repo, GET /initiatives/suggestions excludes it."""
-        from src.suggest_initiatives import InitiativeSuggestion
+        from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
         truth = _make_portfolio_truth([_bronze_repo("DismissedRepo"), _bronze_repo("KeptRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -608,7 +608,7 @@ class TestDismissSuggestionRoute:
 
         # Patch generate_suggestions to call the real narrow_candidates so dismissal is applied
         with patch(
-            "src.suggest_initiatives.generate_suggestions",
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
             return_value=([fake_kept], 0.001),
         ):
             resp_get = client.get("/initiatives/suggestions")

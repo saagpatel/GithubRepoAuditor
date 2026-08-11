@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from src.notion_export import (
+from github_repo_auditor.notion_export import (
     _build_event_key,
     _find_biggest_drag,
     _lookup_project_mapping,

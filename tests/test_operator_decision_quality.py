@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_decision_quality import (
+from github_repo_auditor.operator_decision_quality import (
     build_decision_quality_v1,
     decision_quality_from_summary,
 )

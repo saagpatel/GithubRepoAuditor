@@ -1,7 +1,7 @@
 // scripts/run-instructions-audit.workflow.js
 // External audit of the snapshot's run_instructions_present claim.
 // Stage 2 (verifier fan-out, Haiku) + Stage 3 (deterministic tally) + Stage 4 (Sonnet synthesis).
-// args = output of `python -m src.run_instructions_audit` ({ generated_at, workspace_root, records, errors }).
+// args = output of `python -m github_repo_auditor.run_instructions_audit` ({ generated_at, workspace_root, records, errors }).
 export const meta = {
 	name: "run-instructions-audit",
 	description:
@@ -56,7 +56,7 @@ function verifierPrompt(rec) {
 	].join("\n");
 }
 
-// --- Stage 3 tally logic (mirror of src/run_instructions_audit.py) ---
+// --- Stage 3 tally logic (mirror of src/github_repo_auditor/run_instructions_audit.py) ---
 function assignBucket(toolToday, verdict, inPrimary) {
 	if (toolToday === verdict) return verdict ? "agree_present" : "agree_absent";
 	if (verdict && !toolToday)

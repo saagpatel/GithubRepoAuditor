@@ -12,7 +12,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.portfolio_truth_sources import (
+from github_repo_auditor.portfolio_truth_sources import (
     WORKSPACE_EXCLUSION_REASONS,
     _dedupe_checkouts_by_origin,
     _is_ignored_project_dir,

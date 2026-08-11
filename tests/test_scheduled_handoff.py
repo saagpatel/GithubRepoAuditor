@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from src.scheduled_handoff import build_scheduled_handoff
+from github_repo_auditor.scheduled_handoff import build_scheduled_handoff
 
 
 def _control_center_payload(*, urgency: str = "urgent") -> dict:

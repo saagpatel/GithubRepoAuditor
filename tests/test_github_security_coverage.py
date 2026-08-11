@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from src.github_security_coverage import (
+from github_repo_auditor.github_security_coverage import (
     DEFAULT_BASE_REQUEST_LIMIT,
     DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     GITHUB_SECURITY_RECEIPT_FILENAME,
@@ -30,8 +30,8 @@ from src.github_security_coverage import (
     verified_security_coverage_receipt_binding,
     write_security_coverage_receipt,
 )
-from src.portfolio_truth_reconcile import _select_security_entry
-from src.portfolio_truth_status import load_security_coverage_by_full_name
+from github_repo_auditor.portfolio_truth_reconcile import _select_security_entry
+from github_repo_auditor.portfolio_truth_status import load_security_coverage_by_full_name
 
 NOW = datetime(2026, 7, 16, 12, tzinfo=timezone.utc)
 OUTCOME_FIXTURES = json.loads(
@@ -656,7 +656,7 @@ def _assert_binding_revalidation_fails_in_child(
 import json
 import sys
 
-from src.github_security_coverage import (
+from github_repo_auditor.github_security_coverage import (
     SecurityCoverageError,
     SecurityCoverageReceiptBinding,
     verified_security_coverage_receipt_binding,
@@ -1499,7 +1499,7 @@ def test_collector_cli_holds_writer_intent_before_truth_read_and_replacement(
         api_base_url="https://api.example.test",
     )
     observed: dict[str, object] = {}
-    from src import github_security_coverage as coverage_module
+    from github_repo_auditor import github_security_coverage as coverage_module
 
     original_load_json_object = coverage_module._load_json_object
 
@@ -1527,11 +1527,11 @@ def test_collector_cli_holds_writer_intent_before_truth_read_and_replacement(
         return second
 
     monkeypatch.setattr(
-        "src.github_security_coverage._load_json_object",
+        "github_repo_auditor.github_security_coverage._load_json_object",
         load_json_with_truth_read_probe,
     )
     monkeypatch.setattr(
-        "src.github_security_coverage.collect_security_coverage",
+        "github_repo_auditor.github_security_coverage.collect_security_coverage",
         fake_collect_security_coverage,
     )
     monkeypatch.setattr(

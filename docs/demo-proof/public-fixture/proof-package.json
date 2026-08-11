@@ -170,7 +170,7 @@
     {
       "id": "demo-portfolio-source",
       "kind": "source",
-      "path": "../../../src/demo_portfolio.py",
+      "path": "../../../src/github_repo_auditor/demo_portfolio.py",
       "description": "Closed-pool synthetic portfolio definition backing the demo truth artifacts.",
       "required": true
     },

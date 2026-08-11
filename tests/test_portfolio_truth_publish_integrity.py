@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import src.portfolio_truth_publish as publish_mod
+import github_repo_auditor.portfolio_truth_publish as publish_mod
 
 
 @pytest.mark.parametrize("replaced_count", [1, 2, 3, 4, 5])

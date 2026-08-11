@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from src.portfolio_truth_reconcile import (
+from github_repo_auditor.portfolio_truth_reconcile import (
     _derive_has_ci,
     _derive_has_license,
     _derive_has_tests,
@@ -207,7 +207,7 @@ def _make_audit_json(tmp_path: Path, username: str, repo_name: str, release_coun
 
 def test_release_count_loaded_from_audit_json(tmp_path: Path) -> None:
     """--portfolio-truth-include-release-count with valid audit JSON → release_count == 3."""
-    from src.portfolio_truth_status import load_release_count_by_name
+    from github_repo_auditor.portfolio_truth_status import load_release_count_by_name
 
     _make_audit_json(tmp_path, username="saagpatel", repo_name="MyRepo", release_count=3)
     result = load_release_count_by_name(output_dir=tmp_path, username="saagpatel")
@@ -219,7 +219,7 @@ def test_release_count_no_audit_json_returns_none(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """--portfolio-truth-include-release-count with no audit JSON → None returned, warning logged."""
-    from src.portfolio_truth_status import load_release_count_by_name
+    from github_repo_auditor.portfolio_truth_status import load_release_count_by_name
 
     with caplog.at_level(logging.WARNING):
         result = load_release_count_by_name(output_dir=tmp_path, username="saagpatel")
@@ -230,7 +230,7 @@ def test_release_count_no_audit_json_returns_none(
 
 def test_release_count_absent_for_missing_project(tmp_path: Path) -> None:
     """Project not in the audit report → release_count key absent from returned dict."""
-    from src.portfolio_truth_status import load_release_count_by_name
+    from github_repo_auditor.portfolio_truth_status import load_release_count_by_name
 
     _make_audit_json(tmp_path, username="saagpatel", repo_name="KnownRepo", release_count=5)
     result = load_release_count_by_name(output_dir=tmp_path, username="saagpatel")
@@ -248,7 +248,7 @@ def _make_ghas_json(tmp_path: Path, *, username: str, entries: dict) -> Path:
 
 def test_security_alerts_loaded_from_ghas_json(tmp_path: Path) -> None:
     """--portfolio-truth-include-security with a valid GHAS JSON → name-keyed dict."""
-    from src.portfolio_truth_status import load_security_alerts_by_name
+    from github_repo_auditor.portfolio_truth_status import load_security_alerts_by_name
 
     _make_ghas_json(
         tmp_path,
@@ -270,7 +270,7 @@ def test_security_alerts_no_ghas_json_returns_none(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """--portfolio-truth-include-security with no GHAS JSON → None, warning logged."""
-    from src.portfolio_truth_status import load_security_alerts_by_name
+    from github_repo_auditor.portfolio_truth_status import load_security_alerts_by_name
 
     with caplog.at_level(logging.WARNING):
         result = load_security_alerts_by_name(output_dir=tmp_path, username="saagpatel")
@@ -281,7 +281,7 @@ def test_security_alerts_no_ghas_json_returns_none(
 
 def test_security_alerts_picks_latest_by_mtime(tmp_path: Path) -> None:
     """When multiple GHAS files exist, the most recently modified one wins."""
-    from src.portfolio_truth_status import load_security_alerts_by_name
+    from github_repo_auditor.portfolio_truth_status import load_security_alerts_by_name
 
     older = tmp_path / "ghas-alerts-saagpatel-2026-05-01.json"
     older.write_text(json.dumps({"MyRepo": {"dependabot": {"high": 9, "available": True}}}))

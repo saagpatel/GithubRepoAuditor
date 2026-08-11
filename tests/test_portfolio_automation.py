@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from src.portfolio_automation import (
+from github_repo_auditor.portfolio_automation import (
     AutomationCandidate,
     AutomationEligibility,
     evaluate_automation_eligibility,
     select_automation_candidates,
 )
-from src.weekly_command_center import (
+from github_repo_auditor.weekly_command_center import (
     build_weekly_command_center_digest,
     render_weekly_command_center_markdown,
 )

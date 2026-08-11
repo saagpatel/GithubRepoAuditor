@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 
-APP_ROOT = Path(__file__).parent.parent / "src" / "app"
+APP_ROOT = Path(__file__).parent.parent / "src" / "github_repo_auditor" / "app"
 
 
 def _cli_imports(path: Path) -> list[str]:
@@ -14,12 +14,14 @@ def _cli_imports(path: Path) -> list[str]:
     violations: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            violations.extend(alias.name for alias in node.names if alias.name == "src.cli")
+            violations.extend(alias.name for alias in node.names if alias.name == "github_repo_auditor.cli")
         elif isinstance(node, ast.ImportFrom):
-            if node.module == "src.cli":
-                violations.append("from src.cli")
-            elif node.module == "src" and any(alias.name == "cli" for alias in node.names):
-                violations.append("from src import cli")
+            if node.module == "github_repo_auditor.cli":
+                violations.append("from github_repo_auditor.cli")
+            elif node.module == "github_repo_auditor" and any(
+                alias.name == "cli" for alias in node.names
+            ):
+                violations.append("from github_repo_auditor import cli")
     return violations
 
 

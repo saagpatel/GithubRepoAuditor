@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from src.notion_dashboard import _bullet_block, _divider_block, _heading_block, _paragraph_block
-from src.notion_registry import _extract_rich_text
-from src.notion_sync import _render_audit_highlights, check_recommendation_followup
+from github_repo_auditor.notion_dashboard import _bullet_block, _divider_block, _heading_block, _paragraph_block
+from github_repo_auditor.notion_registry import _extract_rich_text
+from github_repo_auditor.notion_sync import _render_audit_highlights, check_recommendation_followup
 
 
 class TestExtractRichText:
