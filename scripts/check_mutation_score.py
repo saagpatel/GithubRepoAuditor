@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-KILLED_EXIT_CODES = {1, 3, 37}
+KILLED_EXIT_CODES = {1, 37}
 SURVIVED_EXIT_CODES = {0}
 TIMEOUT_EXIT_CODES = {-24, 24, 36, 152, 255}
 

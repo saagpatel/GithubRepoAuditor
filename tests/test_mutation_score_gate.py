@@ -28,6 +28,16 @@ def test_main_fails_closed_on_unchecked_results(tmp_path: Path) -> None:
     assert main(["--mutants-dir", str(tmp_path), "--minimum", "0.5"]) == 1
 
 
+def test_main_fails_closed_on_pytest_internal_error(tmp_path: Path) -> None:
+    _write_meta(tmp_path, [1] * 9 + [0, 3])
+
+    counts = classify_exit_codes([3])
+
+    assert counts["invalid"] == 1
+    assert counts["killed"] == 0
+    assert main(["--mutants-dir", str(tmp_path), "--minimum", "0.85"]) == 1
+
+
 def test_main_fails_when_no_results_exist(tmp_path: Path) -> None:
     assert main(["--mutants-dir", str(tmp_path)]) == 2
 
