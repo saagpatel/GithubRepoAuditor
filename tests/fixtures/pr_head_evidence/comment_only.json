@@ -1,0 +1,70 @@
+{
+  "schema_version": "PRHeadEvidenceV1",
+  "pull_request": {
+    "repository": "octo/example",
+    "number": 42,
+    "author": "author",
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base_sha": "cccccccccccccccccccccccccccccccccccccccc"
+  },
+  "latest_reviewable_push": {
+    "pushed_at": "2026-07-28T10:00:00Z",
+    "actor": "bob"
+  },
+  "reviews": [
+    {
+      "id": 1,
+      "actor": {
+        "login": "alice",
+        "can_count": true
+      },
+      "state": "COMMENTED",
+      "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "submitted_at": "2026-07-28T10:05:00Z",
+      "dismissal": {
+        "dismissed": false,
+        "dismissed_at": null,
+        "prior_state": null
+      }
+    }
+  ],
+  "checks": [],
+  "rules": {
+    "source": "branch_protection",
+    "availability": "available",
+    "items": [
+      {
+        "type": "pull_request",
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews": true,
+        "require_last_push_approval": false,
+        "require_code_owner_reviews": false
+      }
+    ]
+  },
+  "coverage": {
+    "reviews": {
+      "permission": "granted",
+      "complete": true,
+      "truncated": false,
+      "pages_fetched": 1
+    },
+    "checks": {
+      "permission": "granted",
+      "complete": true,
+      "truncated": false,
+      "pages_fetched": 0
+    },
+    "rules": {
+      "permission": "granted",
+      "complete": true,
+      "truncated": false,
+      "pages_fetched": 1
+    }
+  },
+  "provenance": {
+    "source": "synthetic_fixture",
+    "captured_at": "2026-07-28T10:10:00Z",
+    "freshness": "current"
+  }
+}

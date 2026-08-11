@@ -1,0 +1,372 @@
+{
+  "fixture_schema_version": "PRHeadEvidenceSemanticTripletsV1",
+  "base_snapshot": {
+    "schema_version": "PRHeadEvidenceV1",
+    "pull_request": {
+      "repository": "octo/example",
+      "number": 42,
+      "author": "author",
+      "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "base_sha": "cccccccccccccccccccccccccccccccccccccccc"
+    },
+    "latest_reviewable_push": {
+      "pushed_at": "2026-07-28T10:00:00Z",
+      "actor": "bob"
+    },
+    "reviews": [
+      {
+        "id": 1,
+        "actor": {
+          "login": "alice",
+          "can_count": true
+        },
+        "state": "APPROVED",
+        "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "submitted_at": "2026-07-28T10:05:00Z",
+        "dismissal": {
+          "dismissed": false,
+          "dismissed_at": null,
+          "prior_state": null
+        }
+      }
+    ],
+    "checks": [
+      {
+        "id": 10,
+        "kind": "check_run",
+        "name": "ci/test",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "success",
+        "integration_id": 99
+      }
+    ],
+    "rules": {
+      "source": "branch_protection",
+      "availability": "available",
+      "items": [
+        {
+          "type": "pull_request",
+          "required_approving_review_count": 1,
+          "dismiss_stale_reviews": true,
+          "require_last_push_approval": false,
+          "require_code_owner_reviews": false
+        },
+        {
+          "type": "required_status_checks",
+          "strict_required_status_checks_policy": false,
+          "checks": [
+            {
+              "context": "ci/test",
+              "integration_id": 99
+            }
+          ]
+        }
+      ]
+    },
+    "coverage": {
+      "reviews": {
+        "permission": "granted",
+        "complete": true,
+        "truncated": false,
+        "pages_fetched": 1
+      },
+      "checks": {
+        "permission": "granted",
+        "complete": true,
+        "truncated": false,
+        "pages_fetched": 1
+      },
+      "rules": {
+        "permission": "granted",
+        "complete": true,
+        "truncated": false,
+        "pages_fetched": 1
+      }
+    },
+    "provenance": {
+      "source": "synthetic_fixture",
+      "captured_at": "2026-07-28T10:10:00Z",
+      "freshness": "current"
+    }
+  },
+  "triplets": [
+    {
+      "name": "stale_review_sha",
+      "before_patch": {},
+      "after_patch": {
+        "pull_request": {
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "latest_reviewable_push": {
+          "pushed_at": "2026-07-28T11:00:00Z"
+        },
+        "checks": [
+          {
+            "id": 10,
+            "kind": "check_run",
+            "name": "ci/test",
+            "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "completed",
+            "conclusion": "success",
+            "integration_id": 99
+          }
+        ]
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "stale",
+        "after_reasons": [
+          "required_approval_only_on_older_sha"
+        ]
+      }
+    },
+    {
+      "name": "old_check_sha",
+      "before_patch": {},
+      "after_patch": {
+        "pull_request": {
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "latest_reviewable_push": {
+          "pushed_at": "2026-07-28T11:00:00Z"
+        },
+        "reviews": [
+          {
+            "id": 2,
+            "actor": {
+              "login": "alice",
+              "can_count": true
+            },
+            "state": "APPROVED",
+            "commit_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "submitted_at": "2026-07-28T11:05:00Z",
+            "dismissal": {
+              "dismissed": false,
+              "dismissed_at": null,
+              "prior_state": null
+            }
+          }
+        ]
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "stale",
+        "after_reasons": [
+          "required_check_only_on_older_sha"
+        ]
+      }
+    },
+    {
+      "name": "dismissed_approval",
+      "before_patch": {},
+      "after_patch": {
+        "reviews": [
+          {
+            "id": 1,
+            "actor": {
+              "login": "alice",
+              "can_count": true
+            },
+            "state": "DISMISSED",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "submitted_at": "2026-07-28T10:05:00Z",
+            "dismissal": {
+              "dismissed": true,
+              "dismissed_at": "2026-07-28T10:06:00Z",
+              "prior_state": "APPROVED"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "missing",
+        "after_reasons": [
+          "required_approval_missing"
+        ]
+      }
+    },
+    {
+      "name": "comment_vs_approval",
+      "before_patch": {
+        "reviews": [
+          {
+            "id": 1,
+            "actor": {
+              "login": "alice",
+              "can_count": true
+            },
+            "state": "COMMENTED",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "submitted_at": "2026-07-28T10:05:00Z",
+            "dismissal": {
+              "dismissed": false,
+              "dismissed_at": null,
+              "prior_state": null
+            }
+          }
+        ]
+      },
+      "after_patch": {},
+      "expected": {
+        "before_state": "missing",
+        "after_state": "current"
+      }
+    },
+    {
+      "name": "latest_push_changes",
+      "before_patch": {},
+      "after_patch": {
+        "latest_reviewable_push": {
+          "actor": "alice"
+        },
+        "rules": {
+          "items": [
+            {
+              "type": "pull_request",
+              "required_approving_review_count": 1,
+              "dismiss_stale_reviews": true,
+              "require_last_push_approval": true,
+              "require_code_owner_reviews": false
+            },
+            {
+              "type": "required_status_checks",
+              "strict_required_status_checks_policy": false,
+              "checks": [
+                {
+                  "context": "ci/test",
+                  "integration_id": 99
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "missing",
+        "after_reasons": [
+          "latest_push_approval_missing"
+        ]
+      }
+    },
+    {
+      "name": "missing_rules",
+      "before_patch": {},
+      "after_patch": {
+        "rules": {
+          "availability": "missing",
+          "items": []
+        },
+        "coverage": {
+          "rules": {
+            "complete": false,
+            "pages_fetched": 0
+          }
+        }
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "unknown",
+        "after_reasons": [
+          "rules_missing"
+        ]
+      }
+    },
+    {
+      "name": "incomplete_pagination",
+      "before_patch": {},
+      "after_patch": {
+        "coverage": {
+          "reviews": {
+            "complete": false,
+            "truncated": true
+          }
+        }
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "unknown",
+        "after_reasons": [
+          "reviews_pagination_truncated"
+        ]
+      }
+    },
+    {
+      "name": "valid_approval_check_sets",
+      "before_patch": {},
+      "after_patch": {
+        "reviews": [
+          {
+            "id": 1,
+            "actor": {
+              "login": "alice",
+              "can_count": true
+            },
+            "state": "APPROVED",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "submitted_at": "2026-07-28T10:05:00Z",
+            "dismissal": {
+              "dismissed": false,
+              "dismissed_at": null,
+              "prior_state": null
+            }
+          },
+          {
+            "id": 2,
+            "actor": {
+              "login": "carol",
+              "can_count": true
+            },
+            "state": "COMMENTED",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "submitted_at": "2026-07-28T10:06:00Z",
+            "dismissal": {
+              "dismissed": false,
+              "dismissed_at": null,
+              "prior_state": null
+            }
+          }
+        ],
+        "checks": [
+          {
+            "id": 10,
+            "kind": "check_run",
+            "name": "ci/test",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success",
+            "integration_id": 99
+          },
+          {
+            "id": 11,
+            "kind": "check_suite",
+            "name": "ci-suite",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success",
+            "integration_id": 99
+          }
+        ]
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "current"
+      }
+    },
+    {
+      "name": "benign_head_stable_refresh",
+      "before_patch": {},
+      "after_patch": {
+        "provenance": {
+          "captured_at": "2026-07-28T10:20:00Z"
+        }
+      },
+      "expected": {
+        "before_state": "current",
+        "after_state": "current"
+      }
+    }
+  ]
+}

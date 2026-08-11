@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/saagpatel/GithubRepoAuditor/config/portfolio-decision-digest-v2.schema.json",
+  "title": "PortfolioDecisionDigestV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "source",
+    "decision_queue",
+    "withheld_decisions",
+    "superseded_decisions",
+    "summary"
+  ],
+  "properties": {
+    "contract_version": { "const": "portfolio_decision_digest_v2" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "generated_at",
+        "portfolio_truth_sha256",
+        "portfolio_truth_receipt_id",
+        "github_security_receipt_id",
+        "github_security_produced_at"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "minLength": 1 },
+        "generated_at": { "type": "string", "minLength": 1 },
+        "portfolio_truth_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "portfolio_truth_receipt_id": { "type": ["string", "null"] },
+        "github_security_receipt_id": { "type": ["string", "null"] },
+        "github_security_produced_at": { "type": ["string", "null"] }
+      }
+    },
+    "decision_queue": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/actionableDecision" }
+    },
+    "withheld_decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/withheldDecision" }
+    },
+    "superseded_decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/supersededDecision" }
+    },
+    "summary": { "type": "object" }
+  },
+  "$defs": {
+    "sha256Identity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "actionableDecision": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "decision_key",
+        "decision_fingerprint",
+        "decision_question",
+        "owner",
+        "allowed_outcomes",
+        "approval_boundary",
+        "authoritative_source",
+        "evidence_reference",
+        "evaluated_at",
+        "evidence_observed_at",
+        "valid_until",
+        "source_generation",
+        "supersedes",
+        "readback_contract",
+        "actionability",
+        "withheld_reason_code"
+      ],
+      "properties": {
+        "schema_version": { "const": "portfolio_decision_item_v2" },
+        "decision_key": { "$ref": "#/$defs/sha256Identity" },
+        "decision_fingerprint": { "$ref": "#/$defs/sha256Identity" },
+        "decision_question": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "allowed_outcomes": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "object" }
+        },
+        "approval_boundary": { "type": "object" },
+        "authoritative_source": { "const": "github-security-coverage-receipt" },
+        "evidence_reference": { "type": "object" },
+        "evaluated_at": { "type": "string", "minLength": 1 },
+        "evidence_observed_at": { "type": "string", "minLength": 1 },
+        "valid_until": { "type": "string", "minLength": 1 },
+        "source_generation": { "type": "object" },
+        "supersedes": { "type": ["object", "null"] },
+        "readback_contract": { "type": "object" },
+        "actionability": { "const": "actionable" },
+        "withheld_reason_code": { "type": "null" }
+      }
+    },
+    "withheldDecision": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "decision_key",
+        "decision_fingerprint",
+        "actionability",
+        "withheld_reason_code",
+        "source_generation"
+      ],
+      "properties": {
+        "schema_version": { "const": "portfolio_decision_withheld_v2" },
+        "decision_key": { "$ref": "#/$defs/sha256Identity" },
+        "decision_fingerprint": { "$ref": "#/$defs/sha256Identity" },
+        "actionability": { "const": "withheld" },
+        "withheld_reason_code": { "type": "string", "minLength": 1 },
+        "source_generation": { "type": "object" }
+      }
+    },
+    "supersededDecision": {
+      "type": "object",
+      "required": [
+        "decision_key",
+        "decision_fingerprint",
+        "source_generation",
+        "superseding_generation",
+        "superseding_fingerprint",
+        "readback_state",
+        "reason_code",
+        "closure_eligible"
+      ],
+      "properties": {
+        "decision_key": { "$ref": "#/$defs/sha256Identity" },
+        "decision_fingerprint": { "$ref": "#/$defs/sha256Identity" },
+        "source_generation": { "type": "object" },
+        "superseding_generation": { "type": "object" },
+        "superseding_fingerprint": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256Identity" },
+            { "type": "null" }
+          ]
+        },
+        "readback_state": { "type": "string", "minLength": 1 },
+        "reason_code": { "type": "string", "minLength": 1 },
+        "closure_eligible": { "type": "boolean" }
+      }
+    }
+  }
+}

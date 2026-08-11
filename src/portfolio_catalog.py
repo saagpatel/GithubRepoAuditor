@@ -84,8 +84,43 @@ def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
             "repos": {},
         }
 
+    class UniqueKeyLoader(yaml.SafeLoader):
+        pass
+
+    def construct_unique_mapping(loader: Any, node: Any, deep: bool = False) -> dict[Any, Any]:
+        mapping: dict[Any, Any] = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    f"duplicate mapping key {key!r}",
+                    key_node.start_mark,
+                )
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+    UniqueKeyLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_unique_mapping
+    )
+
     try:
-        loaded = yaml.safe_load(catalog_path.read_text()) or {}
+        raw = catalog_path.read_text(encoding="utf-8")
+        loaded = yaml.load(raw, Loader=UniqueKeyLoader) or {}
+    except UnicodeDecodeError as exc:
+        return {
+            "path": str(catalog_path),
+            "exists": True,
+            "errors": [
+                "Failed to read portfolio catalog as UTF-8: "
+                f"invalid byte at offset {exc.start}."
+            ],
+            "warnings": [],
+            "defaults": {},
+            "groups": {},
+            "repos": {},
+        }
     except yaml.YAMLError as exc:
         return {
             "path": str(catalog_path),
@@ -246,6 +281,18 @@ def _normalize_group_entries(
             raw_value, label=f"Portfolio catalog group '{key}'", warnings=warnings
         )
 
+        raw_order = raw_value.get("order", order)
+        if isinstance(raw_order, bool):
+            errors.append(f"Portfolio catalog group '{key}' order must be an integer.")
+            continue
+        try:
+            normalized_order = int(raw_order)
+        except (TypeError, ValueError):
+            errors.append(
+                f"Portfolio catalog group '{key}' order must be an integer, got {raw_order!r}."
+            )
+            continue
+
         normalized = {
             "group_key": key,
             "label": _safe_text(raw_value.get("label")) or key,
@@ -254,7 +301,7 @@ def _normalize_group_entries(
             or _safe_text(raw_value.get("label"))
             or key,
             "section_note": _safe_text(raw_value.get("section_note")),
-            "order": int(raw_value.get("order", order)),
+            "order": normalized_order,
             "path_prefixes": prefixes,
             "owner": _safe_text(raw_value.get("owner")),
             "team": _safe_text(raw_value.get("team")),

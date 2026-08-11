@@ -113,6 +113,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Public-safe recording plan: [DEMO-PLAN.md](DEMO-PLAN.md)
 - Product brief: [docs/product/operator-os-product-brief.md](docs/product/operator-os-product-brief.md)
 - Public fixture proof package: [docs/demo-proof/public-fixture/README.md](docs/demo-proof/public-fixture/README.md)
+- Portable PCC contract: [fixtures/contracts/portfolio-command-center-v1/manifest.json](fixtures/contracts/portfolio-command-center-v1/manifest.json)
 - proof-pr dogfood: [docs/proof-pr-dogfood.md](docs/proof-pr-dogfood.md)
 - Product modes: [docs/modes.md](docs/modes.md)
 - Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
@@ -126,6 +127,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Project history: [docs/project-history.md](docs/project-history.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security policy: [SECURITY.md](SECURITY.md)
+- PR evidence-to-head binding: [docs/pr-head-evidence.md](docs/pr-head-evidence.md)
 
 ## Features
 
@@ -226,6 +228,19 @@ audit serve --output-dir output/demo
 To record the Portfolio Command Center wedge from the same fixture, follow
 [DEMO-PLAN.md](DEMO-PLAN.md) and point the desktop app at `output/demo/`.
 
+The smaller PCC compatibility fixture is fixed-clock and deterministic. GHRA
+owns its manifest, schema identity, generator, and digest; PCC pins the exact
+producer commit separately so the artifact never needs a self-referential Git
+hash. Because the synthetic fixture is not emitted by an attested producer
+checkout, its canonical `producer` evidence is intentionally empty; partial or
+invented producer evidence fails the same validation gate used for publication.
+Regenerate or verify it with:
+
+```bash
+python scripts/generate_portfolio_truth_contract_fixture.py
+python scripts/generate_portfolio_truth_contract_fixture.py --check
+```
+
 ### Quick start (subcommand form)
 
 ```bash
@@ -272,6 +287,9 @@ audit run <github-username> --repos <repo-name> --html
 
 # Action Sync — managed campaign preview / writeback
 audit report <github-username> --campaign security-review --writeback-target github
+
+# Local PR evidence binding — no token, network request, or output file
+audit pr-evidence tests/fixtures/pr_head_evidence/current.json
 ```
 
 Normal runs perform a lightweight automatic preflight before fetching repos. By default
@@ -287,6 +305,15 @@ and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json`
 groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and
 `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval
 capture stays separate from writeback apply.
+
+`audit pr-evidence <snapshot.json>` is a separate local-only evidence check. It
+validates a versioned `PRHeadEvidenceV1` snapshot and emits deterministic
+`PRHeadEvidenceVerdictV1` JSON showing whether evidence required by the
+supplied rules is current for the supplied PR head, while classifying every
+supplied review and check. It does not read GitHub credentials, call GitHub,
+write files, affect portfolio scoring, or regenerate portfolio truth. See
+[docs/pr-head-evidence.md](docs/pr-head-evidence.md) for the input contract,
+coverage requirements, exit codes, and claim ceiling.
 
 Watch mode supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the
 default and uses the stored baseline contract plus the scheduled full-refresh interval to

@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from src.security_admission import derive_security_admission
+
 
 @dataclass(frozen=True)
 class SecurityGateItem:
@@ -20,6 +22,8 @@ class SecurityGateItem:
     high: int
     risk_tier: str
     secret_scanning_open: int = 0
+    evidence_complete: bool = True
+    reason_codes: tuple[str, ...] = ()
 
     @property
     def total(self) -> int:
@@ -32,6 +36,8 @@ class SecurityGateItem:
             "high": self.high,
             "secret_scanning_open": self.secret_scanning_open,
             "risk_tier": self.risk_tier,
+            "evidence_complete": self.evidence_complete,
+            "reason_codes": list(self.reason_codes),
         }
 
 
@@ -51,6 +57,7 @@ class SecurityGateReport:
     max_age_hours: int | None = None
     source_age_hours: float | None = None
     freshness_error: str | None = None
+    unadmitted_repos: tuple[SecurityGateItem, ...] = ()
 
     @property
     def repos_with_open_high_critical(self) -> int:
@@ -113,6 +120,7 @@ class SecurityGateReport:
             "source_age_hours": self.source_age_hours,
             "freshness_error": self.freshness_error,
             "flagged_repos": [item.to_dict() for item in self.flagged_repos],
+            "unadmitted_repos": [item.to_dict() for item in self.unadmitted_repos],
         }
 
 
@@ -131,7 +139,9 @@ def _int(value: Any) -> int:
         return 0
 
 
-def _source_age_hours(generated_at: str, now: datetime) -> tuple[float | None, str | None]:
+def _source_age_hours(
+    generated_at: str, now: datetime
+) -> tuple[float | None, str | None]:
     if not generated_at or generated_at == "unknown":
         return None, "missing generated_at"
     try:
@@ -140,7 +150,9 @@ def _source_age_hours(generated_at: str, now: datetime) -> tuple[float | None, s
         return None, f"invalid generated_at: {generated_at}"
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    age_hours = (now.astimezone(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
+    age_hours = (
+        now.astimezone(timezone.utc) - parsed.astimezone(timezone.utc)
+    ).total_seconds()
     return round(age_hours / 3600, 3), None
 
 
@@ -161,6 +173,7 @@ def build_security_gate_report(
     total_high = 0
     total_secrets = 0
     flagged: list[SecurityGateItem] = []
+    unadmitted: list[SecurityGateItem] = []
     generated_at = _text(portfolio_truth.get("generated_at")) or "unknown"
     source_age_hours = freshness_error = None
     if max_age_hours is not None:
@@ -176,8 +189,9 @@ def build_security_gate_report(
         if not security.get("cohort_member"):
             continue
         required_cohort_count += 1
-        coverage_state = _text(security.get("coverage_state")) or "unknown"
-        if coverage_state == "complete" and security.get("alerts_available"):
+        admission = derive_security_admission(security)
+        coverage_state = admission.coverage_state
+        if admission.evidence_complete:
             complete_count += 1
             scanned_count += 1
         elif coverage_state == "partial":
@@ -186,57 +200,35 @@ def build_security_gate_report(
             stale_count += 1
         else:
             unknown_count += 1
-        providers = _mapping(security.get("providers"))
-        dependabot = _mapping(providers.get("dependabot"))
-        code_scanning = _mapping(providers.get("code_scanning"))
-        secret_scanning = _mapping(providers.get("secret_scanning"))
-        critical = (
-            _int(security.get("dependabot_critical"))
-            if dependabot.get("state") == "observed"
-            else 0
-        ) + (
-            _int(security.get("code_scanning_critical"))
-            if code_scanning.get("state") == "observed"
-            else 0
-        )
-        high = (
-            _int(security.get("dependabot_high"))
-            if dependabot.get("state") == "observed"
-            else 0
-        ) + (
-            _int(security.get("code_scanning_high"))
-            if code_scanning.get("state") == "observed"
-            else 0
-        )
-        secrets = (
-            _int(security.get("secret_scanning_open"))
-            if secret_scanning.get("state") == "observed"
-            else 0
-        )
+        critical = admission.total_open_critical
+        high = admission.total_open_high
+        secrets = admission.total_open_secrets
         total_critical += critical
         total_high += high
         total_secrets += secrets
-        if critical <= 0 and high <= 0 and secrets <= 0:
-            continue
-
         identity = _mapping(project.get("identity"))
         risk = _mapping(project.get("risk"))
-        flagged.append(
-            SecurityGateItem(
-                repo=(
-                    _text(identity.get("display_name"))
-                    or _text(identity.get("repo_full_name"))
-                    or _text(identity.get("path"))
-                    or "Repo"
-                ),
-                critical=critical,
-                high=high,
-                risk_tier=_text(risk.get("risk_tier")) or "baseline",
-                secret_scanning_open=secrets,
-            )
+        item = SecurityGateItem(
+            repo=(
+                _text(identity.get("display_name"))
+                or _text(identity.get("repo_full_name"))
+                or _text(identity.get("path"))
+                or "Repo"
+            ),
+            critical=critical,
+            high=high,
+            risk_tier=_text(risk.get("risk_tier")) or "baseline",
+            secret_scanning_open=secrets,
+            evidence_complete=admission.evidence_complete,
+            reason_codes=admission.reason_codes,
         )
+        if admission.has_findings:
+            flagged.append(item)
+        if not admission.evidence_complete:
+            unadmitted.append(item)
 
     flagged.sort(key=lambda item: (-item.critical, -item.high, item.repo.lower()))
+    unadmitted.sort(key=lambda item: item.repo.lower())
     return SecurityGateReport(
         generated_at=generated_at,
         scanned_count=scanned_count,
@@ -252,6 +244,7 @@ def build_security_gate_report(
         max_age_hours=max_age_hours,
         source_age_hours=source_age_hours,
         freshness_error=freshness_error,
+        unadmitted_repos=tuple(unadmitted),
     )
 
 
@@ -277,9 +270,13 @@ def render_security_gate_markdown(report: SecurityGateReport) -> str:
             f"stale {report.stale_count}, unknown {report.unknown_count}). "
             "Do not treat the cohort as clear."
         )
+        for item in report.unadmitted_repos:
+            lines.append(f"- {item.repo}: {', '.join(item.reason_codes)}")
     elif report.status == "stale":
         if report.freshness_error:
-            lines.append(f"Portfolio truth freshness could not be verified: {report.freshness_error}.")
+            lines.append(
+                f"Portfolio truth freshness could not be verified: {report.freshness_error}."
+            )
         else:
             lines.append(
                 f"Portfolio truth is {report.source_age_hours:.1f}h old, beyond the "

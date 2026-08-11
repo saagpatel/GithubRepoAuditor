@@ -68,7 +68,7 @@ def _query_existing_event_keys(
     token: str,
     version: str,
 ) -> set[str]:
-    """Query existing audit event keys for deduplication."""
+    """Query every existing audit event key or fail closed."""
     keys: set[str] = set()
     start_cursor = None
 
@@ -85,9 +85,17 @@ def _query_existing_event_keys(
 
         resp = _notion_request("POST", f"/databases/{events_db_id}/query", token, version, body)
         if not resp or resp.status_code != 200:
-            break
+            status = getattr(resp, "status_code", "no-response")
+            raise RuntimeError(
+                f"existing-event enumeration failed before completion: status={status}"
+            )
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except (ValueError, TypeError) as exc:
+            raise RuntimeError("existing-event enumeration returned invalid JSON") from exc
+        if not isinstance(data, dict) or not isinstance(data.get("results", []), list):
+            raise RuntimeError("existing-event enumeration returned an invalid page")
         for page in data.get("results", []):
             props = page.get("properties", {})
             ek = props.get("Event Key", {})
@@ -98,6 +106,10 @@ def _query_existing_event_keys(
         if not data.get("has_more"):
             break
         start_cursor = data.get("next_cursor")
+        if not isinstance(start_cursor, str) or not start_cursor:
+            raise RuntimeError(
+                "existing-event enumeration was partial: has_more without next_cursor"
+            )
         time.sleep(REQUEST_DELAY)
 
     return keys
@@ -201,7 +213,18 @@ def sync_notion_events(
 
     # Query existing event keys for dedup
     print("  Querying existing audit events...", file=sys.stderr)
-    existing_keys = _query_existing_event_keys(events_db_id, token, version)
+    try:
+        existing_keys = _query_existing_event_keys(events_db_id, token, version)
+    except RuntimeError as exc:
+        print(f"  Refusing Notion creates: {exc}", file=sys.stderr)
+        return {
+            "created": 0,
+            "deduped": 0,
+            "updated_projects": 0,
+            "errors": 1,
+            "skipped": True,
+            "reason": "incomplete existing-event enumeration",
+        }
     print(f"  Found {len(existing_keys)} existing audit events.", file=sys.stderr)
 
     created = 0

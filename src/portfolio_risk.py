@@ -27,7 +27,7 @@ _FACTOR_LABELS: dict[str, str] = {
     "missing-doctor-standard": "doctor standard not declared",
     "no-run-instructions": "run instructions missing",
     "undocumented-risks": "known risks not documented",
-    "active-high-severity-alerts": "open high/critical security alerts",
+    "active-high-severity-alerts": "blocking GitHub security findings",
 }
 
 _DEFERRED_ARCHIVED = {
@@ -96,22 +96,18 @@ def build_risk_entry(
         factors.append("undocumented-risks")
 
     # A currently active repo, or a stale repo intentionally kept on the maintain
-    # path, carrying open high- or critical-severity Dependabot alerts.
+    # path, carrying admitted high/critical alerts or an open secret finding.
     # High alerts contribute one normal factor toward the 3+ elevation threshold;
     # an open critical alert force-elevates on its own (see is_elevated below) — a
     # lone unpatched critical CVE cannot hide in an otherwise-clean repo.
     security_relevant = (
         activity_status in ACTIVE_STATUSES or operating_path == "maintain"
     )
-    if security_relevant and (
-        security_high_alerts > 0 or security_critical_alerts > 0
-    ):
+    if security_relevant and (security_high_alerts > 0 or security_critical_alerts > 0):
         factors.append("active-high-severity-alerts")
 
     # Derive tier
-    security_forces_elevated = (
-        security_relevant and security_critical_alerts > 0
-    )
+    security_forces_elevated = security_relevant and security_critical_alerts > 0
     is_elevated = (
         len(factors) >= 3
         or ("weak-context-active" in factors and "investigate-override" in factors)

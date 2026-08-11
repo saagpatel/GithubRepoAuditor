@@ -26,8 +26,8 @@
         "Aurora Ledger",
         "Basalt Relay",
         "Cinder Atlas",
-        "Ember Conduit",
-        "Glacier Quill"
+        "Meridian Vault",
+        "Onyx Placard"
       ],
       "affected_repo_count": 5
     },
@@ -39,9 +39,9 @@
       "first_patched_version": "0.9.2",
       "affected_repos": [
         "Cinder Atlas",
-        "Ember Conduit",
-        "Glacier Quill",
-        "Ivory Sextant"
+        "Meridian Vault",
+        "Onyx Placard",
+        "Ember Conduit"
       ],
       "affected_repo_count": 4
     }

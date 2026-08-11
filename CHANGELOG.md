@@ -13,7 +13,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+### Added
+- Added the local-only `audit pr-evidence <snapshot.json>` operator path with
+  strict `PRHeadEvidenceV1` input validation and deterministic
+  `PRHeadEvidenceVerdictV1` output. Reviews retain actor, state, dismissal, and
+  `commit_id`; checks and suites retain status, conclusion, and `head_sha`;
+  required approvals/checks come only from supplied rules; latest-push
+  approval, stale head evidence, non-success conclusions, missing permissions,
+  incomplete pagination, missing rules, and malformed input remain explicit.
+  The fixture-first evaluator does not consult credentials or GitHub, write
+  files, alter portfolio scoring, or regenerate portfolio truth.
+
 ### Changed
+- Converged the strict security gate, risk/attention derivation, portfolio
+  rollups, registry/report rendering, decision digest, and weekly command-center
+  posture on one
+  fail-closed `SecurityAdmissionV1` interpretation of fresh Dependabot, CodeQL,
+  and secret-scanning evidence. Missing or contradictory evidence now carries
+  explicit reason codes; non-Dependabot blocking findings can no longer vanish
+  from risk or decision surfaces. PortfolioTruth remains schema `0.11.0` and
+  retains its legacy compatibility fields for existing consumers.
 - Kept PortfolioTruth `0.11.0` and
   `GitHubSecurityCoverageReceiptV1` read-compatible while adding normalized
   provider reason codes, explicit completed-zero semantics, producer-commit
