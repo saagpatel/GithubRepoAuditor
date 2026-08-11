@@ -57,7 +57,7 @@ are exactly what an LLM reading the prose catches and a regex never will.
 
 - `schema_version`: `0.4.0`
 - `generated_at`: `2026-05-17T05:01:39Z` (**12 days stale as of this spec — drift is real, see §8**)
-- `workspace_root`: `/Users/d/Projects`
+- `workspace_root`: `~/Projects`
 - `projects`: 132 (a list; key on `identity.project_key`, **not** `display_name` — dupes exist:
   `IncidentWorkbench`, `OrbitForge`, `StatusPage`)
 - `context_quality_counts`: `none: 3, boilerplate: 17, minimum-viable: 66, standard: 27, full: 19`
@@ -168,7 +168,7 @@ Main session writes the report to `output/run-instructions-audit-2026-05-29.md`.
 {
   "project_key": "Fun:GamePrjs/BattleGrid",
   "display_name": "BattleGrid",
-  "abs_path": "/Users/d/Projects/Fun:GamePrjs/BattleGrid",
+  "abs_path": "~/Projects/Fun:GamePrjs/BattleGrid",
   "primary_file_name": "AGENTS.md",
   "snapshot_claim": false,
   "tool_today": false,

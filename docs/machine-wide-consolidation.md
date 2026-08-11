@@ -1,21 +1,21 @@
 # Machine-Wide Consolidation
 
 This is the operating plan for reducing portfolio-scale attention drag across
-`/Users/d/Projects` and adjacent Codex operating repos.
+`~/Projects` and adjacent Codex operating repos.
 
 ## Current Packet
 
 Run this first in new Codex sessions:
 
 ```sh
-cd /Users/d/Projects/GithubRepoAuditor
-python -m src.codex_restart_packet --workspace-root /Users/d/Projects
+cd ~/Projects/GithubRepoAuditor
+python -m src.codex_restart_packet --workspace-root ~/Projects
 ```
 
 The packet combines:
 
 - latest `output/portfolio-truth-latest.json`
-- live git state for `/Users/d/Projects`
+- live git state for `~/Projects`
 - live git state for adjacent operating repos such as `personal-ops` and
   `.codex/codexkit`
 - archive/dependency/temp exclusions so old cleanup waves do not reappear as
@@ -37,14 +37,14 @@ jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_stat
    forensics or fixture maintenance.
 3. Resolve dirty operating repos before lower-signal product drift. The usual
    operating set is:
-   - `/Users/d/.local/share/personal-ops`
-   - `/Users/d/.codex/codexkit`
-   - `/Users/d/Projects/GithubRepoAuditor`
-   - `/Users/d/Projects/PortfolioCommandCenter`
-   - `/Users/d/Projects/Notion`
-   - `/Users/d/Projects/bridge-db`
-   - `/Users/d/Projects/notification-hub`
-   - `/Users/d/Projects/mcpforge`
+   - `~/.local/share/personal-ops`
+   - `~/.codex/codexkit`
+   - `~/Projects/GithubRepoAuditor`
+   - `~/Projects/PortfolioCommandCenter`
+   - `~/Projects/Notion`
+   - `~/Projects/bridge-db`
+   - `~/Projects/notification-hub`
+   - `~/Projects/mcpforge`
 4. Convert broad repo drift into decisions:
    - active now
    - verify and land

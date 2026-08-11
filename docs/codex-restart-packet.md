@@ -8,13 +8,13 @@ should not pull operator attention during normal restarts.
 ## Command
 
 ```sh
-python -m src.codex_restart_packet --workspace-root /Users/d/Projects
+python -m src.codex_restart_packet --workspace-root ~/Projects
 ```
 
 Use JSON when another tool should consume the result:
 
 ```sh
-python -m src.codex_restart_packet --workspace-root /Users/d/Projects --json
+python -m src.codex_restart_packet --workspace-root ~/Projects --json
 ```
 
 For the current generated portfolio truth counts, query the canonical snapshot directly:

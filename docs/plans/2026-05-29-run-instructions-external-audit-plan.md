@@ -291,9 +291,9 @@ def test_build_record_resolves_path_and_primary():
             "run_instructions_present": False,
         },
     }
-    record = build_record(project, "/Users/d/Projects")
+    record = build_record(project, "~/Projects")
 
-    assert record["abs_path"] == "/Users/d/Projects/Fun:GamePrjs/BattleGrid"
+    assert record["abs_path"] == "~/Projects/Fun:GamePrjs/BattleGrid"
     assert record["primary_file_name"] == "AGENTS.md"   # no CLAUDE.md → AGENTS.md
     assert record["snapshot_claim"] is False
     assert record["context_files"] == ["AGENTS.md", "README.md"]
