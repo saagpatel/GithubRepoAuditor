@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.portfolio_readme import export_portfolio_readme
+from github_repo_auditor.portfolio_readme import export_portfolio_readme
 
 
 def _make_report(**overrides) -> dict:

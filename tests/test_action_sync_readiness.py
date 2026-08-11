@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.action_sync_readiness import build_action_sync_readiness_bundle
-from src.ops_writeback import build_campaign_bundle
+from github_repo_auditor.action_sync_readiness import build_action_sync_readiness_bundle
+from github_repo_auditor.ops_writeback import build_campaign_bundle
 
 
 def _report_data(**overrides) -> dict:

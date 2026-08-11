@@ -14,7 +14,7 @@ pytest.importorskip("jinja2", reason="[serve] extra not installed")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from src.serve.app import create_app  # noqa: E402
+from github_repo_auditor.serve.app import create_app  # noqa: E402
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 

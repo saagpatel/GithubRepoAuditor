@@ -6,7 +6,7 @@ This package establishes the safe public data path for the Operator OS /
 Portfolio Command Center demo:
 
 - fixture input: `fixtures/demo/sample-report.json` for the audit-report lane,
-  and the closed-pool synthetic portfolio in `src/demo_portfolio.py` for the
+  and the closed-pool synthetic portfolio in `src/github_repo_auditor/demo_portfolio.py` for the
   PortfolioCommandCenter lane;
 - generated artifacts: `output/demo/`, including a 40-project PortfolioCommandCenter
   `projects` payload at the producer's current truth schema with receipt-backed

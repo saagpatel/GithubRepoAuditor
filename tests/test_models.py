@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
 
 
 class TestRepoMetadata:

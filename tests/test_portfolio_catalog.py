@@ -5,7 +5,7 @@ import tempfile
 
 from pathlib import Path
 
-from src.portfolio_catalog import (
+from github_repo_auditor.portfolio_catalog import (
     build_catalog_line,
     build_intent_alignment_summary,
     build_portfolio_catalog_summary,
@@ -14,7 +14,7 @@ from src.portfolio_catalog import (
     group_entry_for_path,
     load_portfolio_catalog,
 )
-from src.portfolio_pathing import resolve_declared_operating_path
+from github_repo_auditor.portfolio_pathing import resolve_declared_operating_path
 
 
 def test_load_portfolio_catalog_accepts_defaults_and_repo_entries(tmp_path: Path):

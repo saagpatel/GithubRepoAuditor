@@ -12,8 +12,8 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.automation_proposals import VALID_ACTION_TYPES, VALID_STATUSES
-from src.demo_portfolio import (
+from github_repo_auditor.automation_proposals import VALID_ACTION_TYPES, VALID_STATUSES
+from github_repo_auditor.demo_portfolio import (
     DEMO_PROJECTS,
     FRESH_OFFSET_HOURS,
     HISTORY_POINTS,
@@ -27,18 +27,18 @@ from src.demo_portfolio import (
     history_snapshots,
     resolved_coverage_state,
 )
-from src.github_security_coverage import (
+from github_repo_auditor.github_security_coverage import (
     GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
     PROVIDER_NAMES,
     _provider_result,
 )
-from src.portfolio_pathing import build_operating_path_entry
-from src.portfolio_truth_sources import (
+from github_repo_auditor.portfolio_pathing import build_operating_path_entry
+from github_repo_auditor.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
     checkout_collision_summary,
 )
-from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
-from src.portfolio_truth_types import (
+from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_types import (
     SCHEMA_VERSION,
     TRUTH_LATEST_FILENAME,
     VALID_ACTIVITY_STATUS,
@@ -46,8 +46,8 @@ from src.portfolio_truth_types import (
     VALID_CATEGORY_TAGS,
     VALID_CONTEXT_QUALITY,
 )
-from src.portfolio_truth_reconcile import _build_security_fields
-from src.portfolio_truth_validate import validate_truth_snapshot_payload
+from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
+from github_repo_auditor.portfolio_truth_validate import validate_truth_snapshot_payload
 
 # Portfolio Command Center reads anything older than this as no longer fresh.
 CONSUMER_FRESH_WINDOW_HOURS = 48
@@ -414,7 +414,7 @@ def test_proposals_present_a_mixed_state_triage_queue() -> None:
 
 
 def test_weekly_digest_and_burndown_agree_with_the_snapshot() -> None:
-    from src.security_admission import derive_security_admission
+    from github_repo_auditor.security_admission import derive_security_admission
 
     snapshot = _snapshot()
     digest = build_weekly_digest(snapshot)

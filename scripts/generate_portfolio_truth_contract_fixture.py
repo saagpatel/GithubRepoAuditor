@@ -8,10 +8,11 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+SOURCE_ROOT = REPO_ROOT / "src"
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
-from src.portfolio_truth_contract_fixture import (  # noqa: E402
+from github_repo_auditor.portfolio_truth_contract_fixture import (  # noqa: E402
     CONSUMER_PROFILE_MANIFEST_PATHS,
     FIXTURE_RELATIVE_PATH,
     MANIFEST_RELATIVE_PATH,
@@ -23,7 +24,7 @@ from src.portfolio_truth_contract_fixture import (  # noqa: E402
     manifest_bytes,
     portable_fixture_bytes,
 )
-from src.portfolio_truth_validate import validate_truth_snapshot_payload  # noqa: E402
+from github_repo_auditor.portfolio_truth_validate import validate_truth_snapshot_payload  # noqa: E402
 
 
 def _expected_artifacts() -> tuple[tuple[Path, bytes], ...]:

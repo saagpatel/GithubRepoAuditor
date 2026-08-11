@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from src.automation_proposals import (
+from github_repo_auditor.automation_proposals import (
     ACTION_CATALOG_SEED,
     ACTION_CONTEXT_PR,
     STATUS_APPROVED,
@@ -32,7 +32,7 @@ from src.automation_proposals import (
     require_approved,
     save_proposals,
 )
-from src.portfolio_automation import AutomationCandidate
+from github_repo_auditor.portfolio_automation import AutomationCandidate
 
 NOW = "2026-04-14T12:00:00+00:00"
 LATER = "2026-04-15T09:00:00+00:00"

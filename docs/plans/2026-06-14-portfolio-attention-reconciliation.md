@@ -20,7 +20,7 @@ This note records the narrow truth update from the 2026-06-14 portfolio attentio
 The normal publish command should be used when Notion context is available:
 
 ```sh
-uv run python -m src.cli report saagpatel --portfolio-truth
+uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth
 ```
 
 Then confirm:
@@ -38,7 +38,7 @@ Expected state:
 
 ## 2026-06-14 Verification Result
 
-- `uv run python -m src.cli report saagpatel --portfolio-truth` was attempted but refused to publish because `NOTION_TOKEN` was not present and the current `output/portfolio-truth-latest.json` has 137 Notion context rows. The canonical latest snapshot was not replaced.
+- `uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth` was attempted but refused to publish because `NOTION_TOKEN` was not present and the current `output/portfolio-truth-latest.json` has 137 Notion context rows. The canonical latest snapshot was not replaced.
 - A non-publishing build with `include_notion=False` validated the catalog logic: `bridge-db`, `notification-hub`, and `AIGCCore` all resolved to `category=infrastructure` and `attention_state=active-infra`; snapshot validation reported no warnings.
 - `uv run pytest -q tests/test_portfolio_truth.py tests/test_catalog_validator.py`: 56 passed, 1 deprecation warning from a legacy CLI invocation test.
 - `uv run ruff check .`: passed.
@@ -46,7 +46,7 @@ Expected state:
 
 ## 2026-06-19 Publish Result
 
-- `uv run python -m src.cli report saagpatel --portfolio-truth` was rerun after Notion context became available.
+- `uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth` was rerun after Notion context became available.
 - The regenerated latest snapshot preserved `source_summary.notion_context_rows=137`, reported `warnings=[]`, and was generated at `2026-06-19T04:36:19.383106+00:00`.
 - `bridge-db`: `category=infrastructure`, `attention_state=active-infra`, `notion_current_state=Shipped`.
 - `notification-hub`: `category=infrastructure`, `attention_state=active-infra`, `notion_current_state=Shipped`.

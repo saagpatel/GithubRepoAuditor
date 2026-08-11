@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from src.workbook_gate import format_gate_result, record_manual_signoff, run_workbook_gate
+from github_repo_auditor.workbook_gate import format_gate_result, record_manual_signoff, run_workbook_gate
 
 
 def test_workbook_gate_generates_artifacts_and_validates(tmp_path):

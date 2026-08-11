@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.cli as cli_module
-from src.app.pr_head_evidence import run_pr_head_evidence_mode
+import github_repo_auditor.cli as cli_module
+from github_repo_auditor.app.pr_head_evidence import run_pr_head_evidence_mode
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pr_head_evidence"
 

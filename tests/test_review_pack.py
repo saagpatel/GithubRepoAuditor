@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.review_pack import export_review_pack
+from github_repo_auditor.review_pack import export_review_pack
 
 
 def _make_report() -> dict:

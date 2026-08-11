@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_transition_closure import (
+from github_repo_auditor.operator_trend_transition_closure import (
     apply_transition_closure_control,
     transition_closure_confidence_for_target,
 )

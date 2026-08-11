@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.github_projects import (
+from github_repo_auditor.github_projects import (
     build_project_field_values,
     build_project_preview_summary,
     load_github_projects_config,

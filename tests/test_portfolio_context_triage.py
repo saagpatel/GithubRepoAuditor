@@ -3,7 +3,7 @@
 
 import json
 
-from src.portfolio_context_triage import (
+from github_repo_auditor.portfolio_context_triage import (
     FailureMode,
     TriageEntry,
     assess_repo_failure_modes,

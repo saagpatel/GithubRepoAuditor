@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from src.cli import main
-from src.github_security_coverage import (
+from github_repo_auditor.cli import main
+from github_repo_auditor.github_security_coverage import (
     GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
     SecurityCoverageReceiptBinding,
     _provider_result,
@@ -24,41 +24,41 @@ from src.github_security_coverage import (
     load_security_coverage_receipt,
     write_security_coverage_receipt,
 )
-from src.portfolio_decision_queue import build_decision_queue
-from src.portfolio_context_recovery import (
+from github_repo_auditor.portfolio_decision_queue import build_decision_queue
+from github_repo_auditor.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
 )
-from src.portfolio_checkout_authority import (
+from github_repo_auditor.portfolio_checkout_authority import (
     checkout_authority_blocker,
     checkout_authority_path,
     validate_checkout_authority_envelope,
 )
-from src.portfolio_truth_publish import (
+from github_repo_auditor.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
 )
-from src.producer_preflight import ProducerEvidence, producer_evidence_receipt_id
-from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
-from src.portfolio_truth_render import (
+from github_repo_auditor.producer_preflight import ProducerEvidence, producer_evidence_receipt_id
+from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+from github_repo_auditor.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
-from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
-from src.portfolio_truth_sources import (
+from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
     _git_read,
     _git_remote_full_name,
     load_safe_notion_project_context,
 )
-from src.portfolio_truth_validate import (
+from github_repo_auditor.portfolio_truth_validate import (
     canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
     validate_truth_snapshot,
 )
-from src.project_registry import build_project_registry
-from src.registry_parser import parse_registry
+from github_repo_auditor.project_registry import build_project_registry
+from github_repo_auditor.registry_parser import parse_registry
 
 
 def _write(path: Path, content: str) -> None:
@@ -136,7 +136,7 @@ def _security_test_project(
     tier: str = "elevated",
 ):
     """Minimal PortfolioTruthProject for exercising security render helpers directly."""
-    from src.portfolio_truth_types import (
+    from github_repo_auditor.portfolio_truth_types import (
         DeclaredFields,
         DerivedFields,
         IdentityFields,
@@ -356,7 +356,7 @@ def test_notion_context_uses_configured_title_aliases(
     )
 
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: {
             "Notion Operating System": {
                 "portfolio_call": "Build Now",
@@ -401,7 +401,7 @@ def test_notion_context_uses_fresh_verified_snapshot_when_live_api_unavailable(
         )
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
 
@@ -436,7 +436,7 @@ def test_notion_context_rejects_snapshot_without_verified_live_receipt(
         )
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
 
@@ -454,7 +454,7 @@ def test_notion_context_rejects_non_object_snapshot_json(
     snapshot_path = tmp_path / "project-snapshot.json"
     snapshot_path.write_text("[]")
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
 
@@ -682,7 +682,7 @@ def test_prior_security_loader_accepts_bounded_legacy_truth(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import src.portfolio_truth_publish as publish_mod
+    import github_repo_auditor.portfolio_truth_publish as publish_mod
 
     payload, metadata, _ = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -713,7 +713,7 @@ def test_prior_security_loader_allows_same_receipt_truth_generated_after_receipt
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import src.portfolio_truth_publish as publish_mod
+    import github_repo_auditor.portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -750,7 +750,7 @@ def test_prior_security_loader_refuses_future_truth_from_different_receipt(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import src.portfolio_truth_publish as publish_mod
+    import github_repo_auditor.portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -868,7 +868,7 @@ def test_collision_warning_uses_canonical_summary_order(
         return []
 
     monkeypatch.setattr(
-        "src.portfolio_truth_reconcile.discover_workspace_projects",
+        "github_repo_auditor.portfolio_truth_reconcile.discover_workspace_projects",
         discover_with_unsorted_collisions,
     )
     result = build_portfolio_truth_snapshot(
@@ -1220,7 +1220,7 @@ def test_failed_singleton_observation_with_declaration_is_valid_unknown(
         return _git_read(project_path, *args)
 
     monkeypatch.setattr(
-        "src.portfolio_truth_sources._git_read",
+        "github_repo_auditor.portfolio_truth_sources._git_read",
         _timeout_status,
     )
 
@@ -1377,7 +1377,7 @@ def test_worktree_enumeration_failure_is_explicit_unknown_summary(
         raise subprocess.TimeoutExpired(["git", "worktree", "list"], timeout=5)
 
     monkeypatch.setattr(
-        "src.portfolio_truth_sources._git_worktree_paths",
+        "github_repo_auditor.portfolio_truth_sources._git_worktree_paths",
         _timeout_worktree_enumeration,
     )
 
@@ -1709,7 +1709,7 @@ repos:
 """
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_reconcile.load_safe_notion_project_context",
+        "github_repo_auditor.portfolio_truth_reconcile.load_safe_notion_project_context",
         lambda: {
             "repo": {
                 "portfolio_call": "Maintain",
@@ -2250,8 +2250,8 @@ repos:
 def test_finish_attention_flips_exactly_at_31_day_activity_boundary() -> None:
     from zoneinfo import ZoneInfo
 
-    from src.portfolio_truth_decisions import derive_attention_state
-    from src.portfolio_truth_reconcile import _activity_status_for
+    from github_repo_auditor.portfolio_truth_decisions import derive_attention_state
+    from github_repo_auditor.portfolio_truth_reconcile import _activity_status_for
 
     last_activity = datetime(2026, 7, 4, 7, 44, 49, tzinfo=timezone.utc)
     before_boundary = last_activity + timedelta(days=31) - timedelta(microseconds=1)
@@ -2285,8 +2285,8 @@ def test_finish_attention_flips_exactly_at_31_day_activity_boundary() -> None:
 def test_attention_state_classifier_separates_activity_from_operator_attention() -> (
     None
 ):
-    from src.portfolio_truth_decisions import derive_attention_state
-    from src.portfolio_truth_types import VALID_LIFECYCLE_STATES
+    from github_repo_auditor.portfolio_truth_decisions import derive_attention_state
+    from github_repo_auditor.portfolio_truth_types import VALID_LIFECYCLE_STATES
 
     assert "manual-only" in VALID_LIFECYCLE_STATES
 
@@ -2485,8 +2485,8 @@ def test_attention_state_uses_resolved_catalog_operating_path(
     intended_disposition: str,
     expected_attention: str,
 ) -> None:
-    from src.portfolio_pathing import build_operating_path_entry
-    from src.portfolio_truth_decisions import derive_attention_state
+    from github_repo_auditor.portfolio_pathing import build_operating_path_entry
+    from github_repo_auditor.portfolio_truth_decisions import derive_attention_state
 
     catalog_entry = build_operating_path_entry(
         {
@@ -2552,7 +2552,7 @@ def test_github_archived_status_reconciles_to_archived_attention(
     assert alpha.derived.activity_status == "active"
     assert alpha.derived.archived is True
     assert alpha.derived.attention_state == "archived"
-    from src.portfolio_truth_types import display_activity_status
+    from github_repo_auditor.portfolio_truth_types import display_activity_status
 
     assert (
         display_activity_status(
@@ -2677,7 +2677,7 @@ def test_receipt_archived_state_is_fallback_when_live_status_is_unavailable(
 
 
 def test_build_security_fields_maps_ghas_entry() -> None:
-    from src.portfolio_truth_reconcile import _build_security_fields
+    from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
 
     fields = _build_security_fields(
         {
@@ -2704,7 +2704,7 @@ def test_build_security_fields_maps_ghas_entry() -> None:
 
 
 def test_build_security_fields_none_is_unscanned() -> None:
-    from src.portfolio_truth_reconcile import _build_security_fields
+    from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
 
     fields = _build_security_fields(None)
     assert fields.alerts_available is False
@@ -2713,7 +2713,7 @@ def test_build_security_fields_none_is_unscanned() -> None:
 
 
 def test_build_security_fields_unavailable_dependabot_is_not_available() -> None:
-    from src.portfolio_truth_reconcile import _build_security_fields
+    from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
 
     fields = _build_security_fields(
         {
@@ -2728,7 +2728,7 @@ def test_build_security_fields_unavailable_dependabot_is_not_available() -> None
 def test_dependabot_only_clean_is_partial_not_combined_security_coverage() -> None:
     # A clean Dependabot observation must not stand in for combined GitHub
     # security coverage when code and secret scanning were not observed.
-    from src.portfolio_truth_reconcile import _build_security_fields
+    from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
 
     fields = _build_security_fields({"dependabot": {"available": True}})
     assert fields.alerts_available is False
@@ -3195,7 +3195,7 @@ repos:
 def test_security_cohort_identity_skips_repo_less_supplementary() -> None:
     from types import SimpleNamespace
 
-    from src.portfolio_truth_reconcile import (
+    from github_repo_auditor.portfolio_truth_reconcile import (
         _validate_security_receipt_cohort_identity,
     )
 
@@ -3225,7 +3225,7 @@ def test_security_cohort_identity_skips_repo_less_supplementary() -> None:
 def test_security_cohort_identity_rejects_repo_backed_supplementary() -> None:
     from types import SimpleNamespace
 
-    from src.portfolio_truth_reconcile import (
+    from github_repo_auditor.portfolio_truth_reconcile import (
         _validate_security_receipt_cohort_identity,
     )
 
@@ -3375,7 +3375,7 @@ repos:
 def test_security_cohort_identity_rejects_case_only_drift() -> None:
     from types import SimpleNamespace
 
-    from src.portfolio_truth_reconcile import (
+    from github_repo_auditor.portfolio_truth_reconcile import (
         _validate_security_receipt_cohort_identity,
     )
 
@@ -3408,7 +3408,7 @@ def test_security_cohort_identity_rejects_expansion_and_contraction(
 ) -> None:
     from types import SimpleNamespace
 
-    from src.portfolio_truth_reconcile import (
+    from github_repo_auditor.portfolio_truth_reconcile import (
         _validate_security_receipt_cohort_identity,
     )
 
@@ -3435,7 +3435,7 @@ def test_security_cohort_identity_rejects_expansion_and_contraction(
 def test_security_cohort_identity_rejects_missing_repository_name() -> None:
     from types import SimpleNamespace
 
-    from src.portfolio_truth_reconcile import (
+    from github_repo_auditor.portfolio_truth_reconcile import (
         _validate_security_receipt_cohort_identity,
     )
 
@@ -4045,7 +4045,7 @@ repos:
     second_at = first_at + timedelta(hours=1)
     write_catalog("manual-only")
     from contextlib import contextmanager
-    from src import portfolio_truth_publish as publish_module
+    from github_repo_auditor import portfolio_truth_publish as publish_module
 
     original_lock = publish_module._portfolio_truth_publication_lock
     original_verify = publish_module._verify_prior_security_evidence_current
@@ -4277,7 +4277,7 @@ def test_security_input_rejects_clock_skew_beyond_tolerance(
 
 def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None:
     # GHAS is keyed by repo name ("signal-noise"); the local dir is "Signal & Noise".
-    from src.portfolio_truth_reconcile import _select_security_entry
+    from github_repo_auditor.portfolio_truth_reconcile import _select_security_entry
 
     entry = {"dependabot": {"high": 9, "available": True}}
     lookup = {"signal-noise": entry}
@@ -4288,7 +4288,7 @@ def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None
 
 
 def test_select_security_entry_falls_back_to_display_name() -> None:
-    from src.portfolio_truth_reconcile import _select_security_entry
+    from github_repo_auditor.portfolio_truth_reconcile import _select_security_entry
 
     entry = {"dependabot": {"high": 1, "available": True}}
     # No repo_full_name (local-only repo) → must fall back to display_name.
@@ -4296,7 +4296,7 @@ def test_select_security_entry_falls_back_to_display_name() -> None:
 
 
 def test_select_security_entry_prefers_repo_name_over_display() -> None:
-    from src.portfolio_truth_reconcile import _select_security_entry
+    from github_repo_auditor.portfolio_truth_reconcile import _select_security_entry
 
     by_repo = {"dependabot": {"high": 2, "available": True}}
     by_display = {"dependabot": {"high": 5, "available": True}}
@@ -4305,7 +4305,7 @@ def test_select_security_entry_prefers_repo_name_over_display() -> None:
 
 
 def test_select_security_entry_returns_none_when_unmatched() -> None:
-    from src.portfolio_truth_reconcile import _select_security_entry
+    from github_repo_auditor.portfolio_truth_reconcile import _select_security_entry
 
     assert _select_security_entry({"other": {}}, "owner/missing", "AlsoMissing") is None
 
@@ -4348,7 +4348,7 @@ repos:
         return {"has_git": False, "last_commit_at": None, "repo_full_name": ""}
 
     monkeypatch.setattr(
-        "src.portfolio_truth_sources._gather_git_facts", _fake_git_facts
+        "github_repo_auditor.portfolio_truth_sources._gather_git_facts", _fake_git_facts
     )
 
     result = build_portfolio_truth_snapshot(
@@ -4803,7 +4803,7 @@ def test_portfolio_report_security_posture_scanned_clear(
 
 
 def test_security_attention_items_caps_at_five_and_sorts_critical_first() -> None:
-    from src.portfolio_truth_render import (
+    from github_repo_auditor.portfolio_truth_render import (
         MAX_SECURITY_ATTENTION_ITEMS,
         _security_attention_items,
     )
@@ -4987,7 +4987,7 @@ def test_publish_uses_bound_security_max_age_for_remote_evidence(
     from contextlib import nullcontext
 
     monkeypatch.setattr(
-        "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
+        "github_repo_auditor.portfolio_truth_publish.verified_security_coverage_receipt_binding",
         lambda _binding: nullcontext(),
     )
     now = datetime.now(timezone.utc)
@@ -5344,7 +5344,7 @@ def test_publish_failure_leaves_live_files_untouched(
         raise RuntimeError("renderer exploded")
 
     monkeypatch.setattr(
-        "src.portfolio_truth_publish.render_portfolio_report_markdown", _boom
+        "github_repo_auditor.portfolio_truth_publish.render_portfolio_report_markdown", _boom
     )
 
     with pytest.raises(RuntimeError):
@@ -5427,7 +5427,7 @@ def test_publish_refuses_receipt_pointer_replacement_after_load(
     registry_output.write_text("sentinel-registry\n")
     report_output.write_text("sentinel-report\n")
 
-    from src import portfolio_truth_publish as publish_module
+    from github_repo_auditor import portfolio_truth_publish as publish_module
 
     original_stage = publish_module._stage_text
     replaced = False
@@ -5548,7 +5548,7 @@ def test_publish_refuses_prior_truth_pointer_replacement_after_load(
         "path": "/evidence/github-security-coverage-latest.json",
     }
 
-    from src import portfolio_truth_publish as publish_module
+    from github_repo_auditor import portfolio_truth_publish as publish_module
 
     original_stage = publish_module._stage_text
     replaced = False
@@ -5756,11 +5756,11 @@ def test_publish_refuses_nested_evidence_that_expires_after_snapshot(
             events.append("guard-exit")
 
     monkeypatch.setattr(
-        "src.portfolio_truth_publish.verify_evidence_still_current",
+        "github_repo_auditor.portfolio_truth_publish.verify_evidence_still_current",
         advance_during_final_producer_verification,
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_publish.verified_security_coverage_receipt_binding",
+        "github_repo_auditor.portfolio_truth_publish.verified_security_coverage_receipt_binding",
         reloaded_guard,
     )
 
@@ -5880,11 +5880,11 @@ def test_publish_refuses_to_drop_existing_notion_context(
     report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
 
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_publish._notion_project_context_configured",
+        "github_repo_auditor.portfolio_truth_publish._notion_project_context_configured",
         lambda: True,
     )
 
@@ -5906,8 +5906,8 @@ def test_publish_refuses_to_drop_existing_notion_context(
 
 
 def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> None:
-    from src.portfolio_truth_reconcile import load_prior_notion_context
-    from src.registry_parser import _normalize
+    from github_repo_auditor.portfolio_truth_reconcile import load_prior_notion_context
+    from github_repo_auditor.registry_parser import _normalize
 
     latest_path = tmp_path / "portfolio-truth-latest.json"
     latest_path.write_text(
@@ -5951,7 +5951,7 @@ def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> Non
 def test_load_prior_notion_context_missing_or_malformed_returns_empty(
     tmp_path: Path,
 ) -> None:
-    from src.portfolio_truth_reconcile import load_prior_notion_context
+    from github_repo_auditor.portfolio_truth_reconcile import load_prior_notion_context
 
     assert load_prior_notion_context(tmp_path / "absent.json") == {}
     malformed = tmp_path / "malformed.json"
@@ -5962,7 +5962,7 @@ def test_load_prior_notion_context_missing_or_malformed_returns_empty(
 def test_notion_origin_resolution_preserves_oldest_carried_observation(
     tmp_path: Path,
 ) -> None:
-    from src.portfolio_truth_lineage import resolve_notion_origin
+    from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
 
     oldest = "2026-07-10T09:00:10+00:00"
     predecessor_generated = "2026-07-11T03:17:38+00:00"
@@ -6001,7 +6001,7 @@ def test_notion_origin_resolution_preserves_oldest_carried_observation(
 
 
 def test_notion_origin_resolution_uses_legacy_generation_time(tmp_path: Path) -> None:
-    from src.portfolio_truth_lineage import resolve_notion_origin
+    from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
 
     artifact = tmp_path / "portfolio-truth-latest.json"
     artifact.write_text(json.dumps({"generated_at": "2026-07-10T09:00:10+00:00"}))
@@ -6023,11 +6023,11 @@ def test_publish_allow_empty_notion_carries_forward_prior_context(
 
     # Live Notion unavailable (token lost) - the exact condition that breaks the nightly job.
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_publish._notion_project_context_configured",
+        "github_repo_auditor.portfolio_truth_publish._notion_project_context_configured",
         lambda: True,
     )
 
@@ -6099,11 +6099,11 @@ def test_publish_without_allow_empty_notion_still_guards(
         json.dumps({"source_summary": {"notion_context_rows": 137}}) + "\n"
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_publish._notion_project_context_configured",
+        "github_repo_auditor.portfolio_truth_publish._notion_project_context_configured",
         lambda: True,
     )
 
@@ -6123,7 +6123,7 @@ def test_publish_without_allow_empty_notion_still_guards(
 def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
     # The nightly job runs `audit report <user> --portfolio-truth`; the new flag
     # must be accepted on that exact path and default to opt-in off.
-    from src.cli import build_subcommand_parser
+    from github_repo_auditor.cli import build_subcommand_parser
 
     parser = build_subcommand_parser()
     enabled = parser.parse_args(
@@ -6140,8 +6140,8 @@ def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
 
 
 def test_report_subcommand_parses_security_cohort_count() -> None:
-    from src.cli import build_subcommand_parser
-    from src.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    from github_repo_auditor.cli import build_subcommand_parser
+    from github_repo_auditor.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
 
     parser = build_subcommand_parser()
     explicit = parser.parse_args(
@@ -6169,7 +6169,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
 ) -> None:
     from types import SimpleNamespace
 
-    from src.app.portfolio_truth import run_portfolio_truth_mode
+    from github_repo_auditor.app.portfolio_truth import run_portfolio_truth_mode
 
     captured: dict[str, object] = {}
 
@@ -6194,12 +6194,12 @@ def test_portfolio_truth_app_threads_security_cohort_count(
         )
 
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_security_coverage_by_full_name",
+        "github_repo_auditor.app.portfolio_truth.load_security_coverage_by_full_name",
         fake_security_loader,
     )
-    monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_live_repo_status_by_name",
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
         lambda **kwargs: (
             captured.setdefault("repo_status_cache", kwargs["cache"]) or {}
         ),
@@ -6238,8 +6238,8 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
 ) -> None:
     from types import SimpleNamespace
 
-    from src.app.portfolio_truth import run_portfolio_truth_mode
-    from src.github_security_coverage import SecurityCoverageReceiptBinding
+    from github_repo_auditor.app.portfolio_truth import run_portfolio_truth_mode
+    from github_repo_auditor.github_security_coverage import SecurityCoverageReceiptBinding
 
     receipt_path = tmp_path / "github-security-coverage-latest.json"
     binding = SecurityCoverageReceiptBinding(
@@ -6268,11 +6268,11 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_security_coverage_by_full_name",
+        "github_repo_auditor.app.portfolio_truth.load_security_coverage_by_full_name",
         lambda **_kwargs: loaded,
     )
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
     )
 
     def fake_publish(**kwargs):
@@ -6287,7 +6287,7 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
             report_changed=False,
         )
 
-    monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     args = SimpleNamespace(
         output_dir=str(tmp_path / "output"),
@@ -6321,8 +6321,8 @@ def test_canonical_portfolio_truth_refuses_legacy_security_receipt_identity(
 ) -> None:
     from types import SimpleNamespace
 
-    from src.app.portfolio_truth import run_portfolio_truth_mode
-    from src.github_security_coverage import SecurityCoverageError
+    from github_repo_auditor.app.portfolio_truth import run_portfolio_truth_mode
+    from github_repo_auditor.github_security_coverage import SecurityCoverageError
 
     def missing_binding():
         raise SecurityCoverageError(
@@ -6331,7 +6331,7 @@ def test_canonical_portfolio_truth_refuses_legacy_security_receipt_identity(
 
     loaded = SimpleNamespace(binding=missing_binding)
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_security_coverage_by_full_name",
+        "github_repo_auditor.app.portfolio_truth.load_security_coverage_by_full_name",
         lambda **_kwargs: loaded,
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
@@ -6363,8 +6363,8 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
 ) -> None:
     from types import SimpleNamespace
 
-    from src.app.portfolio_truth import run_portfolio_truth_mode
-    from src.producer_preflight import (
+    from github_repo_auditor.app.portfolio_truth import run_portfolio_truth_mode
+    from github_repo_auditor.producer_preflight import (
         PREFLIGHT_PASS_CHECKS,
         PREFLIGHT_SCHEMA_VERSION,
         producer_evidence_receipt_id,
@@ -6414,9 +6414,9 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
             report_changed=False,
         )
 
-    monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
     monkeypatch.setenv("GHRA_PRODUCER_EVIDENCE", str(receipt))
@@ -6483,11 +6483,11 @@ def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
         + "\n"
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_publish._notion_project_context_configured",
+        "github_repo_auditor.portfolio_truth_publish._notion_project_context_configured",
         lambda: True,
     )
     argv = [
@@ -6531,11 +6531,11 @@ def test_publish_allow_empty_notion_without_prior_context_publishes_zero(
         + "\n"
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_sources.load_notion_project_context",
+        "github_repo_auditor.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
     monkeypatch.setattr(
-        "src.portfolio_truth_publish._notion_project_context_configured",
+        "github_repo_auditor.portfolio_truth_publish._notion_project_context_configured",
         lambda: True,
     )
 
@@ -7295,7 +7295,7 @@ def test_context_recovery_emits_drift_note_when_correcting(
 
 
 def test_git_default_branch_reads_local_origin_head(tmp_path: Path) -> None:
-    from src.portfolio_truth_sources import _git_default_branch
+    from github_repo_auditor.portfolio_truth_sources import _git_default_branch
 
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -7317,7 +7317,7 @@ def test_git_default_branch_reads_local_origin_head(tmp_path: Path) -> None:
 
 
 def test_git_default_branch_keeps_multi_segment_branch(tmp_path: Path) -> None:
-    from src.portfolio_truth_sources import _git_default_branch
+    from github_repo_auditor.portfolio_truth_sources import _git_default_branch
 
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -7339,7 +7339,7 @@ def test_git_default_branch_keeps_multi_segment_branch(tmp_path: Path) -> None:
 
 
 def test_git_default_branch_empty_when_origin_head_unset(tmp_path: Path) -> None:
-    from src.portfolio_truth_sources import _git_default_branch
+    from github_repo_auditor.portfolio_truth_sources import _git_default_branch
 
     repo = tmp_path / "repo"
     repo.mkdir()

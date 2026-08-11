@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from src.demo_portfolio import resolved_coverage_state
-from src.portfolio_truth_coverage import build_coverage_envelope
-from src.portfolio_truth_metadata import build_source_summary, build_warnings
-from src.portfolio_pathing import build_operating_path_entry
-from src.portfolio_truth_precedence import PRECEDENCE_MATRIX
-from src.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
-from src.portfolio_truth_contract_fixture import (
+from github_repo_auditor.demo_portfolio import resolved_coverage_state
+from github_repo_auditor.portfolio_truth_coverage import build_coverage_envelope
+from github_repo_auditor.portfolio_truth_metadata import build_source_summary, build_warnings
+from github_repo_auditor.portfolio_pathing import build_operating_path_entry
+from github_repo_auditor.portfolio_truth_precedence import PRECEDENCE_MATRIX
+from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_contract_fixture import (
     CONSUMER_PROFILE_MANIFEST_PATHS,
     CONTRACT_VERSION,
     EVALUATED_AT,
@@ -36,16 +36,16 @@ from src.portfolio_truth_contract_fixture import (
     manifest_bytes,
     portable_fixture_bytes,
 )
-from src.portfolio_truth_reconcile import _build_security_fields
-from src.portfolio_truth_sources import WORKSPACE_DISCOVERY_POLICY_VERSION
-from src.portfolio_truth_types import SCHEMA_VERSION
-from src.portfolio_truth_validate import (
+from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
+from github_repo_auditor.portfolio_truth_sources import WORKSPACE_DISCOVERY_POLICY_VERSION
+from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
+from github_repo_auditor.portfolio_truth_validate import (
     _snapshot_from_payload,
     _validate_security_fields,
     validate_truth_snapshot,
     validate_truth_snapshot_payload,
 )
-from src.producer_preflight import (
+from github_repo_auditor.producer_preflight import (
     ProducerEvidence,
     producer_evidence_receipt_id,
 )

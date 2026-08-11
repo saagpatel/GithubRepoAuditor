@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.narrative import (
+from github_repo_auditor.narrative import (
     AnthropicProvider,
     GitHubModelsProvider,
     _build_prompt,
@@ -226,7 +226,7 @@ class TestCLIProviderIntegration:
 
     def test_cli_parser_accepts_narrative_provider_flag(self):
         """Parser correctly maps --narrative-provider and --narrative-model."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(
@@ -238,7 +238,7 @@ class TestCLIProviderIntegration:
 
     def test_cli_parser_narrative_provider_defaults_to_none(self):
         """narrative_provider is None by default (auto-detect)."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["someuser"])

@@ -7,7 +7,7 @@ from collections import OrderedDict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from src.suggest_initiatives import (
+from github_repo_auditor.suggest_initiatives import (
     _CACHE_TTL_DAYS,
     InitiativeSuggestion,
     load_suggestion_cache,
@@ -66,7 +66,7 @@ class TestV1LegacyMigration:
             ),
             encoding="utf-8",
         )
-        with caplog.at_level(logging.INFO, logger="src.suggest_initiatives"):
+        with caplog.at_level(logging.INFO, logger="github_repo_auditor.suggest_initiatives"):
             result = load_suggestion_cache(path)
 
         assert result == OrderedDict()
@@ -80,7 +80,7 @@ class TestV1LegacyMigration:
             json.dumps({"version": 1, "entries": []}),
             encoding="utf-8",
         )
-        with caplog.at_level(logging.INFO, logger="src.suggest_initiatives"):
+        with caplog.at_level(logging.INFO, logger="github_repo_auditor.suggest_initiatives"):
             load_suggestion_cache(path)
 
         assert any("v1" in r.message and "dropping" in r.message for r in caplog.records)

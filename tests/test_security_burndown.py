@@ -10,9 +10,9 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from src.cli import _run_security_burndown_mode
-from src.ghas_alert_details import fetch_dependabot_details
-from src.security_burndown import (
+from github_repo_auditor.cli import _run_security_burndown_mode
+from github_repo_auditor.ghas_alert_details import fetch_dependabot_details
+from github_repo_auditor.security_burndown import (
     BurndownEntry,
     BurndownReport,
     build_security_burndown,
@@ -198,7 +198,7 @@ class TestFetchDependabotDetails:
         """Verify the module source has no format args in the except-handler log calls."""
         import inspect
 
-        from src import ghas_alert_details
+        from github_repo_auditor import ghas_alert_details
 
         source = inspect.getsource(ghas_alert_details)
         # Find the except blocks — they should only contain logger calls with

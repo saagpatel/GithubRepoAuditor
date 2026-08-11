@@ -81,7 +81,7 @@ Symptoms:
 - template-mode preflight failure
 
 Fix:
-- restore `assets/excel/analyst-template.xlsx`
+- restore `src/github_repo_auditor/assets/excel/analyst-template.xlsx`
 - or run with `--excel-mode standard`
 
 `standard` mode is the default and recommended workbook path.

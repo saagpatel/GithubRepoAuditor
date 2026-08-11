@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from src.notion_client import query_notion_collection, query_page_by_title
-from src.notion_sync import (
+from github_repo_auditor.notion_client import query_notion_collection, query_page_by_title
+from github_repo_auditor.notion_sync import (
     ELIGIBLE_TIERS,
     FLAG_TO_ACTION,
     _build_weekly_review_section_blocks,
@@ -151,7 +151,7 @@ class TestWeeklyReviewManagedSection:
         append_resp.status_code = 200
 
         with patch(
-            "src.notion_sync._notion_request",
+            "github_repo_auditor.notion_sync._notion_request",
             side_effect=[query_resp, children_resp, archive_resp, archive_resp, archive_resp, append_resp],
         ) as notion_request:
             result = patch_weekly_review(
@@ -237,7 +237,7 @@ class TestExtractAuditData:
 
 class TestCampaignActionSync:
     def test_fails_soft_without_token(self, monkeypatch):
-        monkeypatch.setattr("src.notion_sync.get_notion_token", lambda: "")
+        monkeypatch.setattr("github_repo_auditor.notion_sync.get_notion_token", lambda: "")
         results, refs, drift = sync_campaign_actions([], {"campaign_type": "security-review"}, apply=True)
         assert results[0]["status"] == "skipped"
         assert refs == {}
@@ -260,7 +260,7 @@ class TestCheckRecommendationFollowup:
         assert result == {"checked": 0}
 
     def test_returns_zero_when_api_fails(self):
-        with patch("src.notion_sync._notion_request", return_value=None):
+        with patch("github_repo_auditor.notion_sync._notion_request", return_value=None):
             result = check_recommendation_followup(
                 self._report(["RepoA"], [0.5]),
                 "token",
@@ -273,7 +273,7 @@ class TestCheckRecommendationFollowup:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": []}
 
-        with patch("src.notion_sync._notion_request", return_value=mock_resp):
+        with patch("github_repo_auditor.notion_sync._notion_request", return_value=mock_resp):
             result = check_recommendation_followup(
                 self._report(["RepoA"], [0.5]),
                 "token",
@@ -300,7 +300,7 @@ class TestCheckRecommendationFollowup:
             ]
         }
 
-        with patch("src.notion_sync._notion_request", side_effect=[query_resp, blocks_resp]):
+        with patch("github_repo_auditor.notion_sync._notion_request", side_effect=[query_resp, blocks_resp]):
             result = check_recommendation_followup(
                 self._report(["RepoA", "RepoB", "RepoC"], [0.6, 0.4, 0.0]),
                 "token",
@@ -318,7 +318,7 @@ class TestCheckRecommendationFollowup:
         query_resp.status_code = 200
         query_resp.json.return_value = {"results": [{"id": "page-abc"}]}
 
-        with patch("src.notion_sync._notion_request", side_effect=[query_resp, None]):
+        with patch("github_repo_auditor.notion_sync._notion_request", side_effect=[query_resp, None]):
             result = check_recommendation_followup(
                 self._report(["RepoA"], [0.5]),
                 "token",
@@ -333,7 +333,7 @@ class TestQueryPageByTitle:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": [{"id": "page-xyz"}]}
 
-        with patch("src.notion_client.notion_request", return_value=mock_resp):
+        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp):
             result = query_page_by_title("db123", "My Project", "token")
 
         assert result == "page-xyz"
@@ -343,13 +343,13 @@ class TestQueryPageByTitle:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": []}
 
-        with patch("src.notion_client.notion_request", return_value=mock_resp):
+        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp):
             result = query_page_by_title("db123", "Nonexistent", "token")
 
         assert result is None
 
     def test_returns_none_when_api_fails(self):
-        with patch("src.notion_client.notion_request", return_value=None):
+        with patch("github_repo_auditor.notion_client.notion_request", return_value=None):
             result = query_page_by_title("db123", "Any Title", "token")
 
         assert result is None
@@ -358,7 +358,7 @@ class TestQueryPageByTitle:
         mock_resp = MagicMock()
         mock_resp.status_code = 404
 
-        with patch("src.notion_client.notion_request", return_value=mock_resp):
+        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp):
             result = query_page_by_title("db123", "Any Title", "token")
 
         assert result is None
@@ -368,7 +368,7 @@ class TestQueryPageByTitle:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": [{"id": "page-abc"}]}
 
-        with patch("src.notion_client.notion_request", return_value=mock_resp) as mock_req:
+        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp) as mock_req:
             query_page_by_title("db123", "My Title", "token", title_property="Title")
             call_body = mock_req.call_args[0][4]  # body is 5th positional arg
             assert call_body["filter"]["property"] == "Title"
@@ -379,7 +379,7 @@ class TestQueryNotionCollection:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
 
-        with patch("src.notion_client.notion_request", return_value=mock_resp) as mock_req:
+        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp) as mock_req:
             result = query_notion_collection("collection-123", "token", body={"page_size": 1})
 
         assert result is mock_resp
@@ -392,7 +392,7 @@ class TestQueryNotionCollection:
         legacy_resp.status_code = 200
 
         with patch(
-            "src.notion_client.notion_request",
+            "github_repo_auditor.notion_client.notion_request",
             side_effect=[missing_resp, legacy_resp],
         ) as mock_req:
             result = query_notion_collection("database-123", "token")

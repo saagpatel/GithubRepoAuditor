@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from src.cache import ResponseCache
+from github_repo_auditor.cache import ResponseCache
 
 
 class TestResponseCache:

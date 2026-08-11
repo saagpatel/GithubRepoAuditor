@@ -1,0 +1,233 @@
+from __future__ import annotations
+
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from github_repo_auditor.cli_output import print_info
+from github_repo_auditor.github_security_coverage import (
+    DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    SecurityCoverageError,
+    SecurityCoverageReceiptBinding,
+)
+from github_repo_auditor.portfolio_context_recovery import (
+    apply_context_recovery_plan,
+    build_context_recovery_plan,
+    write_context_recovery_plan_artifacts,
+)
+from github_repo_auditor.portfolio_truth_publish import PortfolioTruthPublishError, publish_portfolio_truth
+from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+from github_repo_auditor.portfolio_truth_status import (
+    load_live_repo_status_by_name,
+    load_release_count_by_name,
+    load_repo_status_from_audit_by_name,
+    load_security_coverage_by_full_name,
+)
+from github_repo_auditor.producer_preflight import load_producer_evidence
+
+
+def run_portfolio_truth_mode(args: Any) -> None:
+    evaluation_at: datetime | None = None
+    output_dir = Path(args.output_dir)
+    workspace_root = Path(args.workspace_root)
+    registry_output = (
+        Path(args.registry_output)
+        if args.registry_output
+        else workspace_root / "project-registry.md"
+    )
+    portfolio_report_output = (
+        Path(args.portfolio_report_output)
+        if args.portfolio_report_output
+        else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
+    )
+    legacy_registry_path = Path(args.registry) if args.registry else registry_output
+    producer_evidence_path = os.environ.get("GHRA_PRODUCER_EVIDENCE")
+    producer_evidence = (
+        load_producer_evidence(Path(producer_evidence_path))
+        if producer_evidence_path
+        else None
+    )
+    producer_repo_root_value = os.environ.get("GHRA_PRODUCER_REPO_ROOT")
+    producer_repo_root = (
+        Path(producer_repo_root_value) if producer_repo_root_value else None
+    )
+    require_producer_evidence = bool(
+        os.environ.get("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1") == "1"
+    )
+    release_count_by_name: dict[str, int] | None = None
+    if getattr(args, "portfolio_truth_include_release_count", False):
+        release_count_by_name = load_release_count_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
+    security_alerts_by_name: dict[str, dict] | None = None
+    security_coverage_metadata: dict[str, object] | None = None
+    security_receipt_binding: SecurityCoverageReceiptBinding | None = None
+    if getattr(args, "portfolio_truth_include_security", False):
+        evaluation_at = datetime.now(timezone.utc)
+        receipt_path_value = getattr(args, "portfolio_truth_security_receipt", None)
+        loaded_security = load_security_coverage_by_full_name(
+            output_dir=output_dir,
+            receipt_path=Path(receipt_path_value) if receipt_path_value else None,
+            max_age_hours=getattr(
+                args, "portfolio_truth_security_max_age_hours", 24
+            ),
+            expected_cohort_count=getattr(
+                args,
+                "portfolio_truth_security_cohort_count",
+                DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+            ),
+            expected_producer_commit=(
+                producer_evidence.commit if producer_evidence is not None else None
+            ),
+            now=evaluation_at,
+        )
+        if loaded_security is not None:
+            try:
+                security_receipt_binding = loaded_security.binding()
+            except SecurityCoverageError as exc:
+                if require_producer_evidence:
+                    raise SystemExit(
+                        f"Canonical PortfolioTruth security publication refused: {exc}"
+                    ) from exc
+            security_alerts_by_name = loaded_security.entries_by_full_name
+            security_coverage_metadata = {
+                "source_id": "github-security-coverage-receipt",
+                "schema_version": loaded_security.schema_version,
+                "produced_at": loaded_security.produced_at,
+                "state": loaded_security.receipt_state,
+                "age_hours": loaded_security.age_hours,
+                "producer_commit": loaded_security.producer_commit,
+                "cohort_policy": loaded_security.cohort_policy,
+                "cohort_repository_count": len(
+                    loaded_security.cohort_repositories
+                ),
+                "path": loaded_security.source_path,
+            }
+            if loaded_security.receipt_id is not None:
+                security_coverage_metadata["receipt_id"] = loaded_security.receipt_id
+            if loaded_security.content_sha256 is not None:
+                security_coverage_metadata["content_sha256"] = (
+                    loaded_security.content_sha256
+                )
+        elif require_producer_evidence:
+            raise SystemExit(
+                "Canonical PortfolioTruth security publication requires a valid "
+                "identity-bound GitHub security receipt."
+            )
+    repo_status_by_name = load_live_repo_status_by_name(
+        username=args.username,
+        token=getattr(args, "token", None),
+        # Lifecycle state is reconciled against the fresh security receipt.
+        # Do not let the general API response cache masquerade as a newer
+        # repository-status observation.
+        cache=None,
+    )
+    if repo_status_by_name is None:
+        repo_status_by_name = load_repo_status_from_audit_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
+    try:
+        result = publish_portfolio_truth(
+            workspace_root=workspace_root,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=portfolio_report_output,
+            catalog_path=Path(args.catalog) if args.catalog else None,
+            legacy_registry_path=legacy_registry_path,
+            include_notion=True,
+            allow_empty_notion=getattr(args, "portfolio_truth_allow_empty_notion", False),
+            release_count_by_name=release_count_by_name,
+            security_alerts_by_name=security_alerts_by_name,
+            security_coverage_metadata=security_coverage_metadata,
+            security_receipt_binding=security_receipt_binding,
+            repo_status_by_name=repo_status_by_name,
+            producer_evidence=producer_evidence,
+            producer_repo_root=producer_repo_root,
+            require_producer_evidence=require_producer_evidence,
+            now=evaluation_at,
+        )
+    except (PortfolioTruthPublishError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    print_info(f"Portfolio truth snapshot: {result.latest_path}")
+    print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
+    print_info(f"Project registry compatibility output: {result.registry_output}")
+    print_info(f"Portfolio audit compatibility output: {result.portfolio_report_output}")
+    print_info(
+        f"Portfolio truth generated for {result.project_count} projects "
+        f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
+        f"report {'updated' if result.report_changed else 'unchanged'})"
+    )
+    print_info(
+        "Checkout authority: "
+        f"{getattr(result, 'checkout_collision_group_count', 0)} same-origin groups, "
+        f"{getattr(result, 'checkout_authority_unknown_count', 0)} UNKNOWN, "
+        f"{getattr(result, 'discarded_checkout_count', 0)} discarded checkouts"
+    )
+
+
+def run_portfolio_context_recovery_mode(args: Any) -> None:
+    output_dir = Path(args.output_dir)
+    workspace_root = Path(args.workspace_root)
+    registry_output = (
+        Path(args.registry_output)
+        if args.registry_output
+        else workspace_root / "project-registry.md"
+    )
+    portfolio_report_output = (
+        Path(args.portfolio_report_output)
+        if args.portfolio_report_output
+        else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
+    )
+    legacy_registry_path = Path(args.registry) if args.registry else registry_output
+    catalog_path = Path(args.catalog) if args.catalog else None
+    build_result = build_portfolio_truth_snapshot(
+        workspace_root=workspace_root,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=True,
+    )
+    plan = build_context_recovery_plan(
+        build_result.snapshot,
+        workspace_root=workspace_root,
+        allow_dirty=bool(getattr(args, "allow_dirty_worktree", False)),
+    )
+    plan_json, plan_markdown = write_context_recovery_plan_artifacts(plan, output_dir=output_dir)
+    print_info(f"Context recovery plan JSON: {plan_json}")
+    print_info(f"Context recovery plan Markdown: {plan_markdown}")
+    eligible_count = sum(project.status == "eligible" for project in plan.projects)
+    skipped_count = sum(project.status == "skipped" for project in plan.projects)
+    excluded_count = sum(project.status == "excluded" for project in plan.projects)
+    print_info(
+        f"Frozen context-recovery cohort: {plan.target_project_count} targets "
+        f"({eligible_count} eligible, {skipped_count} skipped, {excluded_count} excluded)"
+    )
+    if not args.apply_context_recovery:
+        return
+    apply_result = apply_context_recovery_plan(
+        build_result.snapshot,
+        plan,
+        workspace_root=workspace_root,
+        catalog_path=catalog_path,
+        limit=args.context_recovery_limit,
+    )
+    if apply_result.failed_projects:
+        raise SystemExit("Context recovery failed for: " + ", ".join(apply_result.failed_projects))
+    truth_result = publish_portfolio_truth(
+        workspace_root=workspace_root,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=portfolio_report_output,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=True,
+    )
+    print_info(
+        f"Applied context recovery to {len(apply_result.updated_projects)} projects "
+        f"(skipped/excluded {len(apply_result.skipped_projects)})."
+    )
+    print_info(f"Portfolio truth snapshot: {truth_result.latest_path}")
+    print_info(f"Project registry compatibility output: {truth_result.registry_output}")
+    print_info(f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}")

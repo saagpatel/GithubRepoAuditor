@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from src.automation_proposals import (
+from github_repo_auditor.automation_proposals import (
     ACTION_CONTEXT_PR,
     STATUS_APPROVED,
     STATUS_PENDING,
@@ -47,7 +47,7 @@ def _seed(output_dir: Path, status: str = STATUS_PENDING) -> Path:
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *flags: str) -> None:
-    from src.cli import main
+    from github_repo_auditor.cli import main
 
     monkeypatch.setattr(sys, "argv", ["audit", "--output-dir", str(tmp_path), "user", *flags])
     main()

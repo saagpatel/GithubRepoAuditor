@@ -35,7 +35,7 @@ The machine-readable shape is
 from the same PortfolioTruth generation:
 
 ```bash
-python -m src.portfolio_decision_queue \
+python -m github_repo_auditor.portfolio_decision_queue \
   --truth output/portfolio-truth-latest.json \
   --previous-digest output/portfolio-decision-digest-latest.json \
   --format json

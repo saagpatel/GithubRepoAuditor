@@ -7,12 +7,12 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from src.excel_initiative_tracker_helpers import (
+from github_repo_auditor.excel_initiative_tracker_helpers import (
     _format_missing_requirements,
     build_initiative_tracker_sheet,
 )
-from src.initiatives import Initiative, save_initiatives
-from src.maturity_tiers import TierGap
+from github_repo_auditor.initiatives import Initiative, save_initiatives
+from github_repo_auditor.maturity_tiers import TierGap
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ def _build_sheet(
     # Save initiatives to tmp path
     output_dir = tmp_path or Path("/tmp/test_initiative_tracker")
     output_dir.mkdir(parents=True, exist_ok=True)
-    from src.initiatives import initiatives_path
+    from github_repo_auditor.initiatives import initiatives_path
 
     save_initiatives(initiatives_path(output_dir), initiatives)
 

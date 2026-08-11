@@ -5,15 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from src.analyzers import load_custom_analyzers
-from src.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.analyzers import load_custom_analyzers
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 
 def _make_analyzer_source(name: str = "custom_test", weight: float = 0.5) -> str:
     return f"""\
 from pathlib import Path
-from src.analyzers.base import BaseAnalyzer
-from src.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.analyzers.base import BaseAnalyzer
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 class CustomTestAnalyzer(BaseAnalyzer):
     name = "{name}"

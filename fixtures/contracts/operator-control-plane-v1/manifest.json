@@ -63,7 +63,7 @@
   "producer": {
     "artifact_path": "fixtures/contracts/portable-consumers-v1/portfolio-truth.json",
     "artifact_sha256": "e79ca6b203ff58b8b6ffbb01e778305887dfba4e4caf66334defea6ccc1713df",
-    "generator": "src.portfolio_truth_contract_fixture:build_portable_contract_fixture",
+    "generator": "github_repo_auditor.portfolio_truth_contract_fixture:build_portable_contract_fixture",
     "manifest_path": "fixtures/contracts/operator-control-plane-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"
   }

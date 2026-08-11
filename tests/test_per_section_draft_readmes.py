@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.draft_readmes import (
+from github_repo_auditor.draft_readmes import (
     DraftReadmePacket,
     approve_section,
     assemble_readme_from_approved_sections,
@@ -48,7 +48,7 @@ def _seed_sections(output_dir: Path, packet: DraftReadmePacket | None = None) ->
     if packet is None:
         packet = _make_packet()
     write_section_packets_to_ledger([packet], output_dir, reviewer="tester")
-    from src.warehouse import load_approval_records
+    from github_repo_auditor.warehouse import load_approval_records
 
     records = load_approval_records(output_dir, "", limit=500)
     return [
@@ -125,7 +125,7 @@ class TestWriteSectionPackets:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             write_section_packets_to_ledger([packet], output_dir, reviewer="t")
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             section_records = [
@@ -138,7 +138,7 @@ class TestWriteSectionPackets:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             write_section_packets_to_ledger([packet], output_dir, reviewer="t")
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             section_records = [
@@ -154,7 +154,7 @@ class TestWriteSectionPackets:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             write_section_packets_to_ledger([packet], output_dir, reviewer="t")
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             section_records = [
@@ -179,7 +179,7 @@ class TestWriteSectionPackets:
             # Re-run with the SAME sections (same approval_id derived from heading)
             write_section_packets_to_ledger([packet], output_dir, reviewer="t")
 
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             rec = next(
@@ -197,7 +197,7 @@ class TestApproveSection:
             output_dir = Path(tmp)
             record_ids = _seed_sections(output_dir)
             approve_section(record_ids[0], output_dir)
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             rec = next(r for r in records if r.get("approval_id") == record_ids[0])
@@ -216,7 +216,7 @@ class TestRejectSection:
             output_dir = Path(tmp)
             record_ids = _seed_sections(output_dir)
             reject_section(record_ids[0], output_dir, reason="too verbose")
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             rec = next(r for r in records if r.get("approval_id") == record_ids[0])
@@ -233,8 +233,8 @@ class TestRejectSection:
 class TestLegacyDraftReadmeRecords:
     def test_legacy_records_load_via_load_approved_drafts(self) -> None:
         """Pre-Sprint-8 draft-readme records continue to flow through load_approved_drafts."""
-        from src.draft_readmes import load_approved_drafts
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.draft_readmes import load_approved_drafts
+        from github_repo_auditor.warehouse import save_approval_record
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -323,7 +323,7 @@ class TestMarkSectionPacketApplied:
             output_dir = Path(tmp)
             _seed_sections(output_dir, packet)
             # Get shared packet_id
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             pid = next(
@@ -405,7 +405,7 @@ class TestCounterMath:
             reject_section(record_ids[1], output_dir)
             # record_ids[2] stays pending
 
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             sections = [
@@ -428,7 +428,7 @@ class TestDraftSectionsRoutes:
     def _client(self, output_dir: Path):
         from fastapi.testclient import TestClient  # noqa: E402
 
-        from src.serve.app import create_app  # noqa: E402
+        from github_repo_auditor.serve.app import create_app  # noqa: E402
 
         return TestClient(create_app(output_dir=output_dir), raise_server_exceptions=True)
 
@@ -437,7 +437,7 @@ class TestDraftSectionsRoutes:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             _seed_sections(output_dir, packet)
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             pid = next(
@@ -497,7 +497,7 @@ class TestDraftSectionsRoutes:
                 f"/approvals/sections/{record_ids[0]}/reject",
                 data={"reason": "needs work"},
             )
-            from src.warehouse import load_approval_records
+            from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "", limit=500)
             rec = next(r for r in records if r.get("approval_id") == record_ids[0])

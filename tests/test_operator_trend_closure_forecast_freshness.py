@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_freshness_controls import (
+from github_repo_auditor.operator_trend_closure_forecast_freshness_controls import (
     apply_closure_forecast_decay_control,
     closure_forecast_freshness_for_target,
     closure_forecast_freshness_hotspots,

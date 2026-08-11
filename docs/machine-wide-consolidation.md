@@ -9,7 +9,7 @@ Run this first in new Codex sessions:
 
 ```sh
 cd ~/Projects/GithubRepoAuditor
-python -m src.codex_restart_packet --workspace-root ~/Projects
+python -m github_repo_auditor.codex_restart_packet --workspace-root "$HOME/Projects"
 ```
 
 The packet combines:
