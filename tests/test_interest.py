@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.analyzers.interest import (
+from github_repo_auditor.analyzers.interest import (
     InterestAnalyzer,
     _burst_coefficient,
     _count_assets,
@@ -13,7 +13,7 @@ from src.analyzers.interest import (
     _score_readme_storytelling,
     _score_recency,
 )
-from src.models import RepoMetadata
+from github_repo_auditor.models import RepoMetadata
 
 
 def _meta(**overrides) -> RepoMetadata:

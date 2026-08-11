@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from src.evidence_freshness_conformance import (
+from github_repo_auditor.evidence_freshness_conformance import (
     AGING_AFTER_MS,
     CANONICAL_REASONS,
     CANONICAL_STATES,

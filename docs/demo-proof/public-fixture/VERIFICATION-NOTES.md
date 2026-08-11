@@ -5,10 +5,10 @@ Date: 2026-08-02 (frames recaptured; supersedes the 2026-06-27 capture)
 ## Fixture Truth
 
 - Fixture input: `fixtures/demo/sample-report.json` (audit-report lane) and
-  `src/demo_portfolio.py` (PortfolioCommandCenter lane).
+  `src/github_repo_auditor/demo_portfolio.py` (PortfolioCommandCenter lane).
 - Generated output directory: `output/demo`.
 - Portfolio truth schema: sourced from the producer constant
-  `src.portfolio_truth_types.SCHEMA_VERSION`, never restated in the generator.
+  `github_repo_auditor.portfolio_truth_types.SCHEMA_VERSION`, never restated in the generator.
 - Visible project names: closed synthetic codename pool (`Aurora Ledger`,
   `Basalt Relay`, ... `Nocturne Spar`); no real repository is named.
 - Visible workspace root: `/demo-workspace`.

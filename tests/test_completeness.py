@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.analyzers.completeness import (
+from github_repo_auditor.analyzers.completeness import (
     BuildReadinessAnalyzer,
     DocumentationAnalyzer,
     _sample_comment_density,

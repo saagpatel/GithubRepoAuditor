@@ -11,9 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from src.analyzers.activity import ActivityAnalyzer
-from src.analyzers.readme import ReadmeAnalyzer, _compute_readme_staleness
-from src.models import RepoMetadata
+from github_repo_auditor.analyzers.activity import ActivityAnalyzer
+from github_repo_auditor.analyzers.readme import ReadmeAnalyzer, _compute_readme_staleness
+from github_repo_auditor.models import RepoMetadata
 
 # ---------------------------------------------------------------------------
 # Helpers

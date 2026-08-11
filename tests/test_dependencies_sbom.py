@@ -13,9 +13,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.analyzers.dependencies import DependenciesAnalyzer
-from src.github_client import GitHubClient
-from src.models import RepoMetadata
+from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer
+from github_repo_auditor.github_client import GitHubClient
+from github_repo_auditor.models import RepoMetadata
 
 # ---------------------------------------------------------------------------
 # Fixtures

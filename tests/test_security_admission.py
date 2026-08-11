@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from src.security_admission import derive_security_admission
+from github_repo_auditor.security_admission import derive_security_admission
 
 
 OBSERVED_AT = "2026-08-05T05:47:30+00:00"

@@ -1,4 +1,4 @@
-"""Tests for src/ossf_scorecard.py — OSSF Scorecard integration."""
+"""Tests for src/github_repo_auditor/ossf_scorecard.py — OSSF Scorecard integration."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from src.cache import ResponseCache
-from src.ossf_scorecard import (
+from github_repo_auditor.cache import ResponseCache
+from github_repo_auditor.ossf_scorecard import (
     _OSSF_CACHE_PARAMS,
     OSSF_SCORECARD_BASE_URL,
     _fetch_one,

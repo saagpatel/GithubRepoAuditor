@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.analyzers.community_profile import CommunityProfileAnalyzer
-from src.models import RepoMetadata
+from github_repo_auditor.analyzers.community_profile import CommunityProfileAnalyzer
+from github_repo_auditor.models import RepoMetadata
 
 
 class _CommunityProfileClient:

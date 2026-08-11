@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 
-from src.run_instructions_audit import (
+from github_repo_auditor.run_instructions_audit import (
     CLAIM_FIELDS,
     assign_bucket,
     assign_drift_bucket,

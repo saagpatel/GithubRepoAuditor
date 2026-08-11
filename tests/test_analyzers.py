@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from src.analyzers.cicd import CicdAnalyzer
-from src.analyzers.code_quality import CodeQualityAnalyzer
-from src.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
-from src.analyzers.dependencies import DependenciesAnalyzer
-from src.analyzers.readme import ReadmeAnalyzer
-from src.analyzers.structure import StructureAnalyzer
-from src.analyzers.testing import TestingAnalyzer
-from src.models import RepoMetadata
+from github_repo_auditor.analyzers.cicd import CicdAnalyzer
+from github_repo_auditor.analyzers.code_quality import CodeQualityAnalyzer
+from github_repo_auditor.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
+from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer
+from github_repo_auditor.analyzers.readme import ReadmeAnalyzer
+from github_repo_auditor.analyzers.structure import StructureAnalyzer
+from github_repo_auditor.analyzers.testing import TestingAnalyzer
+from github_repo_auditor.models import RepoMetadata
 
 
 class TestReadmeAnalyzer:
@@ -176,7 +176,7 @@ class TestCloneWorkspace:
         """clone_workspace must use TemporaryDirectory, not a hardcoded path."""
         import inspect
 
-        from src.cloner import clone_workspace
+        from github_repo_auditor.cloner import clone_workspace
         src = inspect.getsource(clone_workspace)
         assert "TemporaryDirectory" in src
         assert "/tmp/audit-repos" not in src

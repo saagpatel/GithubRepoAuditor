@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from src.project_registry import (
+from github_repo_auditor.project_registry import (
     build_index,
     build_project_registry,
     normalize,

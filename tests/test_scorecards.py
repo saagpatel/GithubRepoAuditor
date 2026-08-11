@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.scorecards import (
+from github_repo_auditor.scorecards import (
     build_scorecards_summary,
     evaluate_repo_scorecard,
     evaluate_scorecards_for_report,

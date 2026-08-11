@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.models import AnalyzerResult, RepoMetadata
-from src.security_intelligence import build_security_posture
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.security_intelligence import build_security_posture
 
 
 def _make_metadata(**overrides) -> RepoMetadata:

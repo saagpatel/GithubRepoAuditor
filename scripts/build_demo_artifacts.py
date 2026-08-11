@@ -11,17 +11,17 @@ ROOT = ensure_project_root()
 
 
 def _load_demo_tools() -> tuple[object, object, object, object, object, object, object]:
-    from src.excel_export import export_excel
-    from src.operator_control_center import (
+    from github_repo_auditor.excel_export import export_excel
+    from github_repo_auditor.operator_control_center import (
         control_center_artifact_payload,
         render_control_center_markdown,
     )
-    from src.report_enrichment import (
+    from github_repo_auditor.report_enrichment import (
         build_run_change_counts,
         build_run_change_summary,
         build_score_explanation,
     )
-    from src.web_export import export_html_dashboard
+    from github_repo_auditor.web_export import export_html_dashboard
 
     return (
         control_center_artifact_payload,
@@ -195,7 +195,7 @@ def _write_demo_command_center_artifacts() -> None:
     consumer needs portfolio-scale breadth and a current, receipt-backed security
     contract, neither of which a three-repo report can demonstrate.
     """
-    from src.demo_portfolio import (
+    from github_repo_auditor.demo_portfolio import (
         build_proposals,
         build_security_burndown,
         build_snapshot,
@@ -203,7 +203,7 @@ def _write_demo_command_center_artifacts() -> None:
         fixture_generated_at,
         history_snapshots,
     )
-    from src.portfolio_truth_types import TRUTH_LATEST_FILENAME
+    from github_repo_auditor.portfolio_truth_types import TRUTH_LATEST_FILENAME
 
     # Prefix-discovered artifacts from an earlier generation would still be
     # picked up by the consumer, so clear them before writing the new set.
@@ -224,8 +224,8 @@ def _write_demo_command_center_artifacts() -> None:
 
 
 def _write_demo_warehouse(report_data: dict[str, Any], report_path) -> None:
-    from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
-    from src.warehouse import WAREHOUSE_FILENAME, write_warehouse_snapshot
+    from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+    from github_repo_auditor.warehouse import WAREHOUSE_FILENAME, write_warehouse_snapshot
 
     generated_at = _parse_generated_at(report_data.get("generated_at"))
     warehouse_path = OUTPUT_DIR / WAREHOUSE_FILENAME

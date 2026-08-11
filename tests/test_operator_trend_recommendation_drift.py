@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_recommendation_drift import (
+from github_repo_auditor.operator_trend_recommendation_drift import (
     recommendation_drift_status,
     recommendation_drift_summary,
 )

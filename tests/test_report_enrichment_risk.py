@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.report_enrichment import build_risk_lookup, build_weekly_review_pack
+from github_repo_auditor.report_enrichment import build_risk_lookup, build_weekly_review_pack
 
 
 def _make_report() -> dict:

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.analyzers.code_quality import (
+from github_repo_auditor.analyzers.code_quality import (
     CodeQualityAnalyzer,
     _classify_commits,
     _count_todos,
@@ -18,7 +18,7 @@ from src.analyzers.code_quality import (
     _radon_analysis,
     _score_commit_messages,
 )
-from src.models import RepoMetadata
+from github_repo_auditor.models import RepoMetadata
 
 
 def _meta(**overrides) -> RepoMetadata:

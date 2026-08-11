@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.portfolio_context_contract import (
+from github_repo_auditor.portfolio_context_contract import (
     analyze_project_context,
     has_substantive_readme_support,
 )

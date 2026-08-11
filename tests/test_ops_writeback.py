@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.ops_writeback import (
+from github_repo_auditor.ops_writeback import (
     apply_github_writeback,
     build_action_runs,
     build_campaign_bundle,

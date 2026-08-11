@@ -4,9 +4,9 @@ import importlib
 import inspect
 import pkgutil
 
-from src.analyzers import ALL_ANALYZERS
-from src.analyzers.base import BaseAnalyzer
-from src.scorer import WEIGHTS
+from github_repo_auditor.analyzers import ALL_ANALYZERS
+from github_repo_auditor.analyzers.base import BaseAnalyzer
+from github_repo_auditor.scorer import WEIGHTS
 
 
 def test_scoring_weights_sum_to_one() -> None:
@@ -32,7 +32,7 @@ def test_scoring_weights_cover_exactly_the_composed_dimensions() -> None:
 
 
 def test_analyzer_classes_do_not_declare_dead_weight_attributes() -> None:
-    import src.analyzers as analyzers_package
+    import github_repo_auditor.analyzers as analyzers_package
 
     analyzer_classes = [BaseAnalyzer]
     for module_info in pkgutil.iter_modules(analyzers_package.__path__):

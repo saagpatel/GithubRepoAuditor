@@ -7,7 +7,7 @@ import zipfile
 import pytest
 from openpyxl import Workbook
 
-from src.excel_export import (
+from github_repo_auditor.excel_export import (
     RADAR_DIMS,
     RADAR_LABELS,
     _build_action_items,
@@ -43,12 +43,12 @@ from src.excel_export import (
     _build_writeback_audit,
     export_excel,
 )
-from src.excel_template import (
+from github_repo_auditor.excel_template import (
     DEFAULT_TEMPLATE_PATH,
     TEMPLATE_INFO_SHEET,
     load_workbook_allowing_native_sparklines,
 )
-from src.report_enrichment import (
+from github_repo_auditor.report_enrichment import (
     build_trust_actionability_summary,
     build_weekly_review_pack,
     no_baseline_summary,
@@ -1933,7 +1933,7 @@ class TestAnalystWorkbookSheets:
         assert wb["Trends"].freeze_panes == "B4"
 
     def test_creates_security_phase_sheets(self):
-        from src.excel_export import (
+        from github_repo_auditor.excel_export import (
             _build_security_controls,
             _build_security_debt,
             _build_supply_chain,

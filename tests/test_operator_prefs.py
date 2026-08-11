@@ -1,11 +1,11 @@
-"""Tests for src/operator_prefs.py — suppression hint detection and persistence."""
+"""Tests for src/github_repo_auditor/operator_prefs.py — suppression hint detection and persistence."""
 
 from __future__ import annotations
 
 import json
 import tempfile
 
-from src.operator_prefs import (
+from github_repo_auditor.operator_prefs import (
     SuppressionHint,
     detect_suppressions,
     is_suppressed,
@@ -266,7 +266,7 @@ def test_cli_reset_prefs_clears_file(tmp_path):
 
     import sys
 
-    from src.cli import main  # noqa: PLC0415
+    from github_repo_auditor.cli import main  # noqa: PLC0415
 
     sys.argv = [
         "audit",
@@ -316,7 +316,7 @@ def test_post_process_approval_session_updates_prefs(tmp_path):
 
 def test_briefing_skips_suppressed_action():
     """build_briefing with prefs containing a suppression should skip that action."""
-    from src.briefing import build_briefing
+    from github_repo_auditor.briefing import build_briefing
 
     prefs = {
         "version": 1,

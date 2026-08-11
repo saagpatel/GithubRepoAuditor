@@ -141,7 +141,7 @@ operator decision before truth scope expands.
 
 ## Canonical Remote Repair
 
-Implemented in `src/portfolio_truth_sources.py`:
+Implemented in `src/github_repo_auditor/portfolio_truth_sources.py`:
 
 - Portfolio truth now inspects all configured GitHub fetch remotes instead of
   only `origin`.
@@ -160,7 +160,7 @@ Focused regression tests were added in `tests/test_portfolio_truth.py` for:
 
 Verification:
 
-- `uv run ruff check src/portfolio_truth_sources.py tests/test_portfolio_truth.py tests/test_portfolio_truth_sources.py`
+- `uv run ruff check src/github_repo_auditor/portfolio_truth_sources.py tests/test_portfolio_truth.py tests/test_portfolio_truth_sources.py`
 - `PYTHONDONTWRITEBYTECODE=1 uv run pytest tests/test_portfolio_truth.py::test_git_remote_full_name_prefers_canonical_remote tests/test_portfolio_truth.py::test_git_remote_full_name_prefers_matching_public_remote_for_archive_origin tests/test_portfolio_truth.py::test_git_remote_full_name_keeps_normal_origin tests/test_portfolio_truth.py::test_extract_github_full_name_uses_exact_github_host tests/test_portfolio_truth.py::test_git_default_branch_reads_local_origin_head tests/test_portfolio_truth.py::test_git_default_branch_keeps_multi_segment_branch tests/test_portfolio_truth.py::test_git_default_branch_empty_when_origin_head_unset -q`
 - `PYTHONDONTWRITEBYTECODE=1 uv run pytest tests/test_portfolio_truth.py tests/test_portfolio_truth_sources.py -q`
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify.py --run --id cross-system-smoke:contract-conformance --agent codex`

@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from src import cli
-from src.app import auto_apply, run_audit
-from src.baseline_context import build_baseline_context
-from src.models import AnalyzerResult, AuditReport, RepoAudit
-from src.report_scorecards import apply_scorecards
-from src.report_state import audit_from_dict, report_from_dict
-from src.scorer import WEIGHTS
+from github_repo_auditor import cli
+from github_repo_auditor.app import auto_apply, run_audit
+from github_repo_auditor.baseline_context import build_baseline_context
+from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit
+from github_repo_auditor.report_scorecards import apply_scorecards
+from github_repo_auditor.report_state import audit_from_dict, report_from_dict
+from github_repo_auditor.scorer import WEIGHTS
 
 
 def _make_args(**overrides) -> Namespace:
@@ -404,8 +404,8 @@ def test_main_watch_uses_chosen_watch_plan(monkeypatch, sample_metadata, tmp_pat
     )
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr("src.recurring_review.choose_watch_plan", lambda *_a, **_k: watch_plan)
-    monkeypatch.setattr("src.watch.run_watch_loop", lambda audit_fn, interval=0: audit_fn())
+    monkeypatch.setattr("github_repo_auditor.recurring_review.choose_watch_plan", lambda *_a, **_k: watch_plan)
+    monkeypatch.setattr("github_repo_auditor.watch.run_watch_loop", lambda audit_fn, interval=0: audit_fn())
     monkeypatch.setattr(run_audit, "_load_scoring_profile", lambda name: (None, "default"))
     monkeypatch.setattr(run_audit, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
     monkeypatch.setattr(run_audit, "_run_incremental_audit", lambda *a, **k: captured.update(k))
@@ -589,7 +589,7 @@ programs:
         "operator_queue": [dict(report.operator_queue[0])],
     }
 
-    from src.control_center_snapshot import enrich_control_center_snapshot_from_report
+    from github_repo_auditor.control_center_snapshot import enrich_control_center_snapshot_from_report
 
     updated = enrich_control_center_snapshot_from_report(
         report.to_dict(),
@@ -648,7 +648,7 @@ repos:
     ]
     snapshot = {"operator_summary": {}, "operator_queue": [dict(report.operator_queue[0])]}
 
-    from src.control_center_snapshot import enrich_control_center_snapshot_from_report
+    from github_repo_auditor.control_center_snapshot import enrich_control_center_snapshot_from_report
 
     updated = enrich_control_center_snapshot_from_report(
         report.to_dict(),
@@ -671,9 +671,9 @@ def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path, ca
         blocking_errors = 0
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr("src.diagnostics.run_diagnostics", lambda *a, **k: _Result())
-    monkeypatch.setattr("src.diagnostics.format_diagnostics_report", lambda result: "doctor ok")
-    monkeypatch.setattr("src.diagnostics.write_diagnostics_report", lambda result, output_dir, username: artifact_path)
+    monkeypatch.setattr("github_repo_auditor.diagnostics.run_diagnostics", lambda *a, **k: _Result())
+    monkeypatch.setattr("github_repo_auditor.diagnostics.format_diagnostics_report", lambda result: "doctor ok")
+    monkeypatch.setattr("github_repo_auditor.diagnostics.write_diagnostics_report", lambda result, output_dir, username: artifact_path)
 
     cli.main()
     captured = capsys.readouterr()
@@ -703,11 +703,11 @@ def test_main_approval_center_writes_artifacts_without_apply(monkeypatch, tmp_pa
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        "src.app.approval_center.refresh_latest_report_state",
+        "github_repo_auditor.app.approval_center.refresh_latest_report_state",
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
     monkeypatch.setattr(
-        "src.app.approval_center.write_approval_center_artifacts",
+        "github_repo_auditor.app.approval_center.write_approval_center_artifacts",
         _write_approval_center_artifacts,
     )
 
@@ -729,10 +729,10 @@ def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_pat
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        "src.app.control_center.load_latest_report",
+        "github_repo_auditor.app.control_center.load_latest_report",
         lambda _output_dir: (report_path, report_data),
     )
-    monkeypatch.setattr("src.app.control_center.find_previous", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("github_repo_auditor.app.control_center.find_previous", lambda *_args, **_kwargs: None)
 
     cli.main()
 
@@ -768,10 +768,10 @@ def test_main_control_center_suppresses_queue_when_portfolio_truth_is_newer(
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        "src.app.control_center.load_latest_report",
+        "github_repo_auditor.app.control_center.load_latest_report",
         lambda _output_dir: (report_path, report_data),
     )
-    monkeypatch.setattr("src.app.control_center.find_previous", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("github_repo_auditor.app.control_center.find_previous", lambda *_args, **_kwargs: None)
 
     cli.main()
 
@@ -783,7 +783,7 @@ def test_main_control_center_suppresses_queue_when_portfolio_truth_is_newer(
 
 
 def test_control_center_default_print_hides_experiment_items() -> None:
-    from src.operator_control_center_artifacts import should_print_control_center_item
+    from github_repo_auditor.operator_control_center_artifacts import should_print_control_center_item
 
     assert should_print_control_center_item(
         {
@@ -806,7 +806,7 @@ def test_control_center_default_print_hides_experiment_items() -> None:
 
 
 def test_control_center_default_view_hides_archive_items() -> None:
-    from src.operator_control_center_artifacts import should_print_control_center_item
+    from github_repo_auditor.operator_control_center_artifacts import should_print_control_center_item
 
     assert not should_print_control_center_item(
         {
@@ -842,7 +842,7 @@ def test_control_center_artifact_filter_drops_archive_queue_items() -> None:
         ],
     }
 
-    from src.operator_control_center_artifacts import filter_snapshot_for_default_view
+    from github_repo_auditor.operator_control_center_artifacts import filter_snapshot_for_default_view
 
     filter_snapshot_for_default_view(snapshot)
 
@@ -853,7 +853,7 @@ def test_main_control_center_requires_latest_report(monkeypatch):
     args = _make_args(control_center=True)
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr("src.app.control_center.load_latest_report", lambda _output_dir: (None, None))
+    monkeypatch.setattr("github_repo_auditor.app.control_center.load_latest_report", lambda _output_dir: (None, None))
 
     with pytest.raises(SystemExit) as exc:
         cli.main()
@@ -904,7 +904,7 @@ def test_auto_apply_dry_run_prints_automation_trust_bar(
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
     monkeypatch.setattr(
-        "src.approval_ledger.load_approval_ledger_bundle",
+        "github_repo_auditor.approval_ledger.load_approval_ledger_bundle",
         lambda *_args, **_kwargs: {"approval_ledger": []},
     )
 
@@ -966,7 +966,7 @@ def test_auto_apply_dry_run_does_not_call_github_writeback(
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
     monkeypatch.setattr(
-        "src.approval_ledger.load_approval_ledger_bundle",
+        "github_repo_auditor.approval_ledger.load_approval_ledger_bundle",
         lambda *_args, **_kwargs: {
             "approval_ledger": [
                 {
@@ -980,7 +980,7 @@ def test_auto_apply_dry_run_does_not_call_github_writeback(
         },
     )
     monkeypatch.setattr(
-        "src.ops_writeback.build_campaign_bundle",
+        "github_repo_auditor.ops_writeback.build_campaign_bundle",
         lambda *_args, **_kwargs: (
             {"campaign_type": "promotion-push"},
             [
@@ -1002,7 +1002,7 @@ def test_auto_apply_dry_run_does_not_call_github_writeback(
     def _apply_github_writeback(*_args, **_kwargs):
         raise AssertionError("dry-run must not call apply_github_writeback")
 
-    monkeypatch.setattr("src.ops_writeback.apply_github_writeback", _apply_github_writeback)
+    monkeypatch.setattr("github_repo_auditor.ops_writeback.apply_github_writeback", _apply_github_writeback)
 
     auto_apply.run_auto_apply_approved_mode(args, tmp_path)
 
@@ -1068,18 +1068,18 @@ def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, 
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        "src.app.approval_center._utcnow",
+        "github_repo_auditor.app.approval_center._utcnow",
         lambda: datetime(2026, 4, 17, tzinfo=timezone.utc),
     )
     monkeypatch.setattr(
-        "src.app.approval_center.refresh_latest_report_state",
+        "github_repo_auditor.app.approval_center.refresh_latest_report_state",
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
-    monkeypatch.setattr("src.app.approval_center.refresh_shared_artifacts_from_report", lambda *_a, **_k: {})
-    monkeypatch.setattr("src.app.approval_center.write_approval_center_artifacts", _write_approval_center_artifacts)
-    monkeypatch.setattr("src.app.approval_center.load_approval_ledger_bundle", _load_approval_ledger_bundle)
+    monkeypatch.setattr("github_repo_auditor.app.approval_center.refresh_shared_artifacts_from_report", lambda *_a, **_k: {})
+    monkeypatch.setattr("github_repo_auditor.app.approval_center.write_approval_center_artifacts", _write_approval_center_artifacts)
+    monkeypatch.setattr("github_repo_auditor.app.approval_center.load_approval_ledger_bundle", _load_approval_ledger_bundle)
     monkeypatch.setattr(
-        "src.app.approval_center.build_approval_record",
+        "github_repo_auditor.app.approval_center.build_approval_record",
         lambda ledger_record, *, reviewer, note="": {
             "approval_id": ledger_record["approval_id"],
             "approval_subject_type": ledger_record["approval_subject_type"],
@@ -1091,7 +1091,7 @@ def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, 
             "approval_note": note,
         },
     )
-    monkeypatch.setattr("src.app.approval_center.save_approval_record", _save_approval_record)
+    monkeypatch.setattr("github_repo_auditor.app.approval_center.save_approval_record", _save_approval_record)
 
     cli.main()
 
@@ -1117,11 +1117,11 @@ def test_main_generate_manifest_writes_artifact(monkeypatch, tmp_path, sample_me
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        "src.app.report_only.load_latest_report",
+        "github_repo_auditor.app.report_only.load_latest_report",
         lambda _output_dir: (report_path, report_data),
     )
     monkeypatch.setattr(
-        "src.app.report_only.generate_manifest",
+        "github_repo_auditor.app.report_only.generate_manifest",
         lambda data: [{"repo": "testuser/test-repo"}],
     )
 
@@ -1131,7 +1131,7 @@ def test_main_generate_manifest_writes_artifact(monkeypatch, tmp_path, sample_me
         manifest_path.write_text("[]")
         return manifest_path
 
-    monkeypatch.setattr("src.app.report_only.write_manifest", _write_manifest)
+    monkeypatch.setattr("github_repo_auditor.app.report_only.write_manifest", _write_manifest)
 
     cli.main()
 
@@ -1153,7 +1153,7 @@ def test_main_apply_improvements_writes_execution_report(monkeypatch, tmp_path, 
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        "src.repo_improver.load_improvements",
+        "github_repo_auditor.repo_improver.load_improvements",
         lambda path: {
             "testuser/test-repo": {
                 "repo": "testuser/test-repo",
@@ -1180,9 +1180,9 @@ def test_main_apply_improvements_writes_execution_report(monkeypatch, tmp_path, 
         readme_calls["dry_run"] = dry_run
         return [{"repo": "test-repo", "dry_run": True}]
 
-    monkeypatch.setattr("src.repo_improver.apply_metadata_updates", _apply_metadata_updates)
-    monkeypatch.setattr("src.repo_improver.apply_readme_updates", _apply_readme_updates)
-    monkeypatch.setattr("src.repo_improver.generate_execution_report", lambda results, output_dir: execution_report)
+    monkeypatch.setattr("github_repo_auditor.repo_improver.apply_metadata_updates", _apply_metadata_updates)
+    monkeypatch.setattr("github_repo_auditor.repo_improver.apply_readme_updates", _apply_readme_updates)
+    monkeypatch.setattr("github_repo_auditor.repo_improver.generate_execution_report", lambda results, output_dir: execution_report)
 
     cli.main()
 
@@ -1212,7 +1212,7 @@ def test_main_strict_preflight_blocks_on_warnings(monkeypatch):
     args = _make_args(preflight_mode="strict", token=None)
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr("src.diagnostics._resolve_github_token", lambda token: ("", ""))
+    monkeypatch.setattr("github_repo_auditor.diagnostics._resolve_github_token", lambda token: ("", ""))
 
     with pytest.raises(SystemExit) as exc:
         cli.main()
@@ -1327,7 +1327,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
 
     monkeypatch.setattr(run_audit, "_load_latest_report", lambda _output_dir: (report_path, report_data))
     monkeypatch.setattr(
-        "src.history.load_fingerprints",
+        "github_repo_auditor.history.load_fingerprints",
         lambda *_args, **_kwargs: {sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()}},
     )
 
@@ -1449,7 +1449,7 @@ def test_incremental_audit_delegates_changed_repos_to_targeted_path(monkeypatch,
 
     monkeypatch.setattr(run_audit, "_load_latest_report", lambda _output_dir: (report_path, report_data))
     monkeypatch.setattr(
-        "src.history.load_fingerprints",
+        "github_repo_auditor.history.load_fingerprints",
         lambda *_args, **_kwargs: {
             changed_repo.name: {"pushed_at": "2026-03-19T00:00:00+00:00"},
             sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()},
@@ -1665,19 +1665,19 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
     monkeypatch.setattr(run_audit, "write_markdown_report", lambda *a, **k: tmp_path / "audit.md")
     monkeypatch.setattr(run_audit, "write_pcc_export", lambda *a, **k: tmp_path / "audit-pcc.json")
     monkeypatch.setattr(run_audit, "write_raw_metadata", lambda *a, **k: tmp_path / "raw.json")
-    monkeypatch.setattr("src.history.load_trend_data", lambda: [])
-    monkeypatch.setattr("src.history.load_repo_score_history", lambda: {})
-    monkeypatch.setattr("src.history.find_previous", lambda *_: None)
-    monkeypatch.setattr("src.history.save_fingerprints", lambda *_: None)
-    monkeypatch.setattr("src.history.archive_report", lambda *_: None)
-    monkeypatch.setattr("src.warehouse.write_warehouse_snapshot", lambda *a, **k: tmp_path / "warehouse.db")
+    monkeypatch.setattr("github_repo_auditor.history.load_trend_data", lambda: [])
+    monkeypatch.setattr("github_repo_auditor.history.load_repo_score_history", lambda: {})
+    monkeypatch.setattr("github_repo_auditor.history.find_previous", lambda *_: None)
+    monkeypatch.setattr("github_repo_auditor.history.save_fingerprints", lambda *_: None)
+    monkeypatch.setattr("github_repo_auditor.history.archive_report", lambda *_: None)
+    monkeypatch.setattr("github_repo_auditor.warehouse.write_warehouse_snapshot", lambda *a, **k: tmp_path / "warehouse.db")
     excel_calls: dict[str, object] = {}
 
     def _record_excel(*_args, **kwargs):
         excel_calls.update(kwargs)
         return tmp_path / "audit.xlsx"
 
-    monkeypatch.setattr("src.excel_export.export_excel", _record_excel)
+    monkeypatch.setattr("github_repo_auditor.excel_export.export_excel", _record_excel)
 
     html_calls: dict[str, object] = {}
     review_pack_calls: dict[str, object] = {}
@@ -1690,8 +1690,8 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
         review_pack_calls.update(kwargs)
         return {"review_pack_path": tmp_path / "review-pack.md"}
 
-    monkeypatch.setattr("src.web_export.export_html_dashboard", _record_html)
-    monkeypatch.setattr("src.review_pack.export_review_pack", _record_review_pack)
+    monkeypatch.setattr("github_repo_auditor.web_export.export_html_dashboard", _record_html)
+    monkeypatch.setattr("github_repo_auditor.review_pack.export_review_pack", _record_review_pack)
 
     outputs = run_audit._write_report_outputs(report, args, tmp_path)
 

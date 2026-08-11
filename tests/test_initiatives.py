@@ -1,4 +1,4 @@
-"""Tests for src/initiatives.py and CLI wiring — Arc G Sprint 7A.2/7A.3."""
+"""Tests for src/github_repo_auditor/initiatives.py and CLI wiring — Arc G Sprint 7A.2/7A.3."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.initiatives import (
+from github_repo_auditor.initiatives import (
     Initiative,
     close_initiative,
     derive_status,
@@ -355,7 +355,7 @@ def _build_portfolio_truth(tmp_path: Path, repo_name: str = "Wavelength", tier: 
 
 def _run_cli(argv: list[str]) -> int:
     """Run the CLI and return exit code (0 = success)."""
-    from src.cli import main
+    from github_repo_auditor.cli import main
 
     with patch.object(sys, "argv", ["audit"] + argv):
         try:

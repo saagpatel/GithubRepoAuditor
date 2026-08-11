@@ -2,8 +2,23 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from src.models import AnalyzerResult, RepoMetadata
-from src.scorer import WEIGHTS, score_repo
+import pytest
+
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.scorer import WEIGHTS, score_repo
+
+
+@pytest.fixture(autouse=True)
+def _block_scorecard_network(monkeypatch):
+    def unexpected_scorecard_request(metadata):
+        raise AssertionError(
+            f"score_repo unexpectedly enabled live scorecard lookup for {metadata.full_name}"
+        )
+
+    monkeypatch.setattr(
+        "github_repo_auditor.security_intelligence.load_scorecard_security",
+        unexpected_scorecard_request,
+    )
 
 
 def _make_results(scores: dict[str, float]) -> list[AnalyzerResult]:
@@ -258,37 +273,37 @@ class TestWeightsKeys:
 
 class TestLetterGradeBoundaries:
     def test_exactly_0_80_is_A(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.80) == "A"
 
     def test_exactly_0_70_is_B(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.70) == "B"
 
     def test_exactly_0_55_is_C(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.55) == "C"
 
     def test_exactly_0_35_is_D(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.35) == "D"
 
     def test_exactly_0_0_is_F(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.0) == "F"
 
     def test_just_below_0_80_is_B(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.799) == "B"
 
     def test_above_1_is_A(self):
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(1.0) == "A"
 
@@ -300,7 +315,7 @@ class TestLetterGradeBoundaries:
 
 class TestCompletenessTiers:
     def test_shipped_threshold(self):
-        from src.scorer import COMPLETENESS_TIERS
+        from github_repo_auditor.scorer import COMPLETENESS_TIERS
 
         tier_map = dict(COMPLETENESS_TIERS)
         assert tier_map["shipped"] == 0.75
@@ -336,7 +351,7 @@ class TestCompletenessTiers:
 
 class TestInterestTiers:
     def test_flagship_tier(self):
-        from src.scorer import INTEREST_TIERS
+        from github_repo_auditor.scorer import INTEREST_TIERS
 
         tier_map = dict(INTEREST_TIERS)
         assert tier_map["flagship"] == 0.70
@@ -408,7 +423,7 @@ class TestInterestTiers:
 
 class TestStaleness:
     def test_stale_threshold_days_exact(self):
-        from src.scorer import STALE_THRESHOLD_DAYS
+        from github_repo_auditor.scorer import STALE_THRESHOLD_DAYS
 
         # Must be exactly 730 (not 731)
         assert STALE_THRESHOLD_DAYS == 730
@@ -434,13 +449,30 @@ class TestStaleness:
 
 
 class TestScoreRepoDefaults:
-    def test_scorecard_enabled_default_is_false(self):
-        # Kills scorecard_enabled: bool = True mutation
+    def test_scorecard_enabled_default_is_false(self, monkeypatch):
+        observed: dict[str, bool] = {}
+
+        def build_security_posture(
+            metadata,
+            results,
+            github_client,
+            *,
+            scorecard_enabled,
+            security_offline,
+        ):
+            observed["scorecard_enabled"] = scorecard_enabled
+            return {}
+
+        monkeypatch.setattr(
+            "github_repo_auditor.security_intelligence.build_security_posture",
+            build_security_posture,
+        )
         results = _make_results({dim: 0.5 for dim in WEIGHTS})
         meta = _make_metadata()
-        audit = score_repo(meta, results)
-        # If scorecard_enabled were True, it would attempt live scorecard fetch → error
-        assert audit is not None
+
+        score_repo(meta, results)
+
+        assert observed == {"scorecard_enabled": False}
 
     def test_score_explanation_populated(self):
         # Kills audit.score_explanation = None mutation
@@ -455,7 +487,7 @@ class TestScoreRepoDefaults:
 
 
 class TestComputePortfolioGrade:
-    from src.scorer import compute_portfolio_grade
+    from github_repo_auditor.scorer import compute_portfolio_grade
 
     def _audit(self, score: float, tier: str, language: str = "Python", badges: int = 0):
         results = _make_results({dim: score for dim in WEIGHTS})
@@ -468,14 +500,14 @@ class TestComputePortfolioGrade:
         return audit
 
     def test_empty_audits_returns_F(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         grade, score = compute_portfolio_grade([])
         assert grade == "F"
         assert score == 0.0
 
     def test_single_perfect_audit(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audit = self._audit(1.0, "shipped")
         grade, score = compute_portfolio_grade([audit])
@@ -484,7 +516,7 @@ class TestComputePortfolioGrade:
 
     def test_avg_score_used(self):
         # Kills * → / mutation: avg = sum * len instead of sum / len
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         a1 = self._audit(0.6, "functional")
         a2 = self._audit(0.4, "wip")
@@ -493,7 +525,7 @@ class TestComputePortfolioGrade:
         assert 0.4 <= score <= 0.8  # would be huge if * was used
 
     def test_diversity_bonus_applies_with_many_languages(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 5 languages → bonus = min(0.10, max(0, (5-3)) * 0.05) = 0.10
         audits = [
@@ -505,7 +537,7 @@ class TestComputePortfolioGrade:
         assert score >= 0.5
 
     def test_diversity_bonus_zero_with_few_languages(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 2 languages → bonus = min(0.10, max(0, (2-3)) * 0.05) = 0
         audits = [
@@ -523,7 +555,7 @@ class TestComputePortfolioGrade:
 
     def test_diversity_bonus_max_10_pct(self):
         # Kills min(0.10 → 1.10) mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [
             self._audit(0.5, "functional", lang)
@@ -535,7 +567,7 @@ class TestComputePortfolioGrade:
 
     def test_diversity_bonus_three_languages_is_zero(self):
         # Kills (len - 3) → (len + 3) mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go"]]
         _, score3 = compute_portfolio_grade(audits)
@@ -547,7 +579,7 @@ class TestComputePortfolioGrade:
 
     def test_diversity_bonus_four_languages_is_nonzero(self):
         # Kills (len - 4) → (len - 3) off-by-one mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_3 = [self._audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go"]]
         audits_4 = [self._audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go", "Swift"]]
@@ -557,7 +589,7 @@ class TestComputePortfolioGrade:
         assert score4 > score3
 
     def test_shipped_ratio_above_50_pct_gives_10_pct_bonus(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 2/3 shipped → ratio = 0.67 > 0.5 → bonus = 0.10
         audits = [
@@ -573,7 +605,7 @@ class TestComputePortfolioGrade:
     def test_shipped_bonus_threshold_30_pct(self):
         # 1/4 shipped = 0.25, not > 0.3, so bonus = 0
         # 2/4 shipped = 0.50, not > 0.5, so bonus = 0.05
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_25 = [self._audit(0.5, "shipped")] + [self._audit(0.5, "wip")] * 3
         audits_50 = [self._audit(0.5, "shipped")] * 2 + [self._audit(0.5, "wip")] * 2
@@ -582,7 +614,7 @@ class TestComputePortfolioGrade:
         assert score_50 > score_25
 
     def test_abandonment_penalty_above_60_pct(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 4/5 abandoned → ratio = 0.80 > 0.6 → penalty = -0.10
         audits = [self._audit(0.5, "abandoned")] * 4 + [self._audit(0.5, "wip")]
@@ -593,7 +625,7 @@ class TestComputePortfolioGrade:
 
     def test_abandonment_penalty_above_40_pct_but_below_60(self):
         # 3/6 = 0.50 > 0.40 but not > 0.60 → penalty = -0.05
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_50 = [self._audit(0.5, "abandoned")] * 3 + [self._audit(0.5, "wip")] * 3
         audits_none = [self._audit(0.5, "wip")] * 6
@@ -603,7 +635,7 @@ class TestComputePortfolioGrade:
 
     def test_abandonment_counts_skeleton_tier(self):
         # Kills "XXskeletonXX" mutation — skeleton must be counted as abandoned-like
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._audit(0.5, "skeleton")] * 5
         audits_wip = [self._audit(0.5, "wip")] * 5
@@ -613,7 +645,7 @@ class TestComputePortfolioGrade:
 
     def test_badge_bonus_above_3_avg(self):
         # Kills avg_badges = None mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_many = [self._audit(0.5, "wip", badges=4)] * 3
         audits_few = [self._audit(0.5, "wip", badges=0)] * 3
@@ -622,7 +654,7 @@ class TestComputePortfolioGrade:
         assert score_many > score_few
 
     def test_health_score_clamped_to_0_1(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # extreme inputs should still produce 0..1 score
         audits = [self._audit(1.0, "shipped", badges=10)] * 10
@@ -631,7 +663,7 @@ class TestComputePortfolioGrade:
 
     def test_health_score_not_none(self):
         # Kills health_score = None mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._audit(0.7, "shipped")]
         grade, score = compute_portfolio_grade(audits)
@@ -639,7 +671,7 @@ class TestComputePortfolioGrade:
         assert score > 0.0
 
     def test_returns_letter_grade(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._audit(0.85, "shipped")]
         grade, score = compute_portfolio_grade(audits)
@@ -647,7 +679,7 @@ class TestComputePortfolioGrade:
 
     def test_grade_uses_rounded_score(self):
         # Kills round(health_score, 3) side-effects
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._audit(0.5, "wip")]
         _, score = compute_portfolio_grade(audits)
@@ -672,7 +704,7 @@ class TestCountMeaningfulFiles:
                 details={"config_files": ["pyproject.toml"], "source_dirs": ["src"]},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 1
 
@@ -686,7 +718,7 @@ class TestCountMeaningfulFiles:
                 details={"entry_point": "main.py", "total_loc": 0},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 1
 
@@ -701,7 +733,7 @@ class TestCountMeaningfulFiles:
                 details={"total_loc": 100},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 1
 
@@ -717,7 +749,7 @@ class TestCountMeaningfulFiles:
                 details={"total_loc": 0},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 0
 
@@ -726,7 +758,7 @@ class TestCountMeaningfulFiles:
         results = [
             AnalyzerResult(dimension="readme", score=0.5, max_score=1.0, findings=[], details={})
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 0
 
@@ -741,7 +773,7 @@ class TestCountMeaningfulFiles:
                 details={"config_files": ["pyproject.toml"]},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 1
 
@@ -775,7 +807,7 @@ class TestCountMeaningfulFiles:
                 details={"source_dirs": ["src"]},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 1
 
@@ -790,7 +822,7 @@ class TestCountMeaningfulFiles:
                 details={"total_loc": 1},
             )
         ]
-        from src.scorer import _count_meaningful_files
+        from github_repo_auditor.scorer import _count_meaningful_files
 
         assert _count_meaningful_files(results) == 1
 
@@ -912,7 +944,7 @@ class TestScoreRepoAdditional:
     def test_grade_F_returned_when_no_threshold_matches(self):
         # Kills return "XXFXX" mutation for letter_grade fallback
         # Score -1.0 would fall below all thresholds if letter_grade fallback changed
-        from src.scorer import letter_grade
+        from github_repo_auditor.scorer import letter_grade
 
         assert letter_grade(0.0) == "F"
         assert letter_grade(-0.1) == "F"
@@ -921,7 +953,7 @@ class TestScoreRepoAdditional:
         # The literal "F" at the last GRADE_THRESHOLDS entry (0.0) means the fallback
         # `return "F"` at the end of letter_grade is actually unreachable for valid scores.
         # The test verifies that changing its value still works correctly via the threshold path.
-        from src.scorer import GRADE_THRESHOLDS
+        from github_repo_auditor.scorer import GRADE_THRESHOLDS
 
         # The last threshold is (0.0, "F") — anything >= 0.0 returns "F" from the loop
         assert GRADE_THRESHOLDS[-1] == (0.0, "F")
@@ -1035,7 +1067,7 @@ class TestComputePortfolioGradeAdditional:
         return audit
 
     def test_grade_F_for_empty(self):
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         grade, score = compute_portfolio_grade([])
         assert grade == "F"
@@ -1043,7 +1075,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_shipped_ratio_exactly_50_pct(self):
         # Kills shipped_ratio > 0.5 → >= 0.5 mutation: exactly 50% should NOT give 10% bonus
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_50 = [self._simple_audit(0.5, "shipped"), self._simple_audit(0.5, "wip")]
         audits_66 = [
@@ -1058,7 +1090,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_shipped_ratio_exactly_50_pct_gets_mid_bonus(self):
         # With ratio=0.5 (> 0.5 is False, but > 0.3 is True) → gets 0.05 bonus, not 0.10
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_exactly_50 = [self._simple_audit(0.5, "shipped"), self._simple_audit(0.5, "wip")]
         audits_all_wip = [self._simple_audit(0.5, "wip"), self._simple_audit(0.5, "wip")]
@@ -1069,7 +1101,7 @@ class TestComputePortfolioGradeAdditional:
     def test_shipped_bonus_sum_1_not_2(self):
         # Kills sum(1 for ...) → sum(2 for ...) mutation: 2 shipped out of 4 = 0.5 ratio
         # With sum(1): ratio = 2/4 = 0.5; with sum(2): ratio = 4/4 = 1.0 → different bonus tier
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_2of4 = [self._simple_audit(0.5, "shipped")] * 2 + [
             self._simple_audit(0.5, "wip")
@@ -1085,7 +1117,7 @@ class TestComputePortfolioGradeAdditional:
     def test_abandon_ratio_sum_1_not_2(self):
         # Kills sum(1 for ...) → sum(2 for ...) mutation: 2 abandoned out of 4 = 0.5
         # With sum(2): 4/4 = 1.0 → high penalty; with sum(1): 0.5 → mid penalty
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_2of4 = [self._simple_audit(0.5, "abandoned")] * 2 + [
             self._simple_audit(0.5, "wip")
@@ -1097,7 +1129,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_abandon_ratio_div_not_mul(self):
         # Kills ) / len(audits) → ) * len(audits) mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 1 abandoned out of 5: / → 0.2; * → 1.0 (then penalty would be -0.10 not -0.05)
         audits = [self._simple_audit(0.5, "abandoned")] + [self._simple_audit(0.5, "wip")] * 4
@@ -1110,7 +1142,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_abandon_penalty_high_threshold_0_6(self):
         # Kills > 0.6 → >= 0.6 and > 1.6 mutations
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # Exactly 60% abandoned → should get -0.05 (mid penalty), not -0.10 (high penalty)
         audits_60 = [self._simple_audit(0.5, "abandoned")] * 3 + [
@@ -1124,7 +1156,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_abandon_penalty_mid_threshold_0_4(self):
         # Kills > 0.4 → >= 0.4 mutation for mid-penalty threshold
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # Exactly 40% abandoned → should NOT get -0.05 penalty (threshold is > 0.4, not >=)
         audits_40 = [self._simple_audit(0.5, "abandoned")] * 2 + [
@@ -1138,7 +1170,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_badge_bonus_avg_3_not_triggered(self):
         # Kills > 3 → >= 3 mutation: avg_badges = 3 should NOT get bonus
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_3badges = [self._simple_audit(0.5, "wip", badges=3)]
         audits_4badges = [self._simple_audit(0.5, "wip", badges=4)]
@@ -1149,7 +1181,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_avg_badges_div_not_mul(self):
         # Kills / len(audits) → * len(audits) mutation for avg_badges
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 1 badge across 2 audits: / → 0.5 (no bonus); * → 2 (would trigger bonus)
         audits = [
@@ -1167,7 +1199,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_diversity_bonus_uses_multiply_0_05(self):
         # Kills * 0.05 → / 0.05 and * 1.05 mutations
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # 4 langs: bonus = min(0.10, max(0, 1) * 0.05) = 0.05
         # If / 0.05: bonus = min(0.10, max(0, 1) / 0.05) = min(0.10, 20) = 0.10
@@ -1188,7 +1220,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_shipped_bonus_uses_0_10_not_1_1(self):
         # Kills 0.10 → 1.1 for high shipped ratio
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         # All shipped: ratio = 1.0 > 0.5 → bonus = 0.10
         # If 1.1: health_score could exceed 1.0 before clamping
@@ -1198,7 +1230,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_abandon_penalty_uses_negative_0_10_not_negative_1_1(self):
         # Kills -0.10 → -1.10 for high abandonment penalty
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._simple_audit(0.5, "abandoned")] * 4 + [self._simple_audit(0.5, "wip")]
         _, score = compute_portfolio_grade(audits)
@@ -1206,7 +1238,7 @@ class TestComputePortfolioGradeAdditional:
 
     def test_rounded_to_3_decimal_places(self):
         # Kills round(health_score, 4) mutation
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._simple_audit(0.5123456789, "wip")]
         _, score = compute_portfolio_grade(audits)
@@ -1219,7 +1251,7 @@ class TestComputePortfolioGradeAdditional:
         # Kills 0.10 → 1.1 mutation: verify exact bonus value (not just clamped max)
         # avg_score=0.3, ratio=1.0 → health = 0.3 + 0.10 = 0.40 (unclamped)
         # With 1.1: 0.3 + 1.1 = 1.0 (clamped) → diff detectable
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._simple_audit(0.3, "shipped")] * 3
         _, score = compute_portfolio_grade(audits)
@@ -1228,7 +1260,7 @@ class TestComputePortfolioGradeAdditional:
     def test_shipped_bonus_mid_tier_exact_0_05(self):
         # Kills shipped_bonus 0.05 → other mutations at mid-ratio tier
         # avg_score=0.3, ratio=0.4 (1 shipped, 2 not) → health = 0.3 + 0.05 = 0.35
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits_mid = [
             self._simple_audit(0.3, "shipped"),
@@ -1242,7 +1274,7 @@ class TestComputePortfolioGradeAdditional:
         # Kills -0.10 → -1.1 mutation: verify exact penalty value (not just clamped min)
         # avg_score=0.5, abandon_ratio=0.8 > 0.6 → health = 0.5 - 0.10 = 0.40
         # With -1.1: 0.5 - 1.1 = max(0, -0.6) = 0.0 → diff detectable
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._simple_audit(0.5, "abandoned")] * 4 + [self._simple_audit(0.5, "wip")]
         _, score = compute_portfolio_grade(audits)
@@ -1252,7 +1284,7 @@ class TestComputePortfolioGradeAdditional:
         # Kills 0.05 → 1.05 mutation: verify exact bonus when clamping would differ
         # avg_score=0.3, avg_badges=4 > 3 → health = 0.3 + 0.05 = 0.35
         # With 1.05: 0.3 + 1.05 = 1.0 (clamped) → detectable
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [self._simple_audit(0.3, "wip", badges=4)]
         _, score = compute_portfolio_grade(audits)
@@ -1261,7 +1293,7 @@ class TestComputePortfolioGradeAdditional:
     def test_avg_badges_div_not_mul_two_audits(self):
         # Kills / len(audits) → * len(audits) mutation with 2 audits
         # 2 audits each with 2 badges: sum=4, / 2 = 2.0 (< 3, no bonus), * 2 = 8 (bonus)
-        from src.scorer import compute_portfolio_grade
+        from github_repo_auditor.scorer import compute_portfolio_grade
 
         audits = [
             self._simple_audit(0.3, "wip", badges=2),
@@ -1280,7 +1312,7 @@ class TestComputePortfolioGradeAdditional:
         # Kills / weight_sum → * weight_sum when weight_sum != 1.0
         # Pass only 2 dims (readme=0.12, structure=0.10, total=0.22) with score 1.0
         # / 0.22 = 1.0; * 0.22 = 0.22 → detectably different
-        from src.models import AnalyzerResult
+        from github_repo_auditor.models import AnalyzerResult
 
         partial = [
             AnalyzerResult(
@@ -1311,7 +1343,7 @@ class TestComputePortfolioGradeAdditional:
         # correct: activity impact = 0.05; mutant: same (weights["activity"]=0.05 either way)
         # But other weights differ: correct other_total sums differently
         # Use a uniform score across dims so impact shows via activity contribution
-        from src.scorer import WEIGHTS
+        from github_repo_auditor.scorer import WEIGHTS
 
         # activity weight is explicitly set to FORK_ACTIVITY_WEIGHT regardless of -/+;
         # the difference only manifests via redistribution to other keys.

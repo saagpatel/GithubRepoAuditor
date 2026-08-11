@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.models import RepoAudit, RepoMetadata
-from src.registry_parser import _normalize, parse_registry, reconcile
+from github_repo_auditor.models import RepoAudit, RepoMetadata
+from github_repo_auditor.registry_parser import _normalize, parse_registry, reconcile
 
 
 def _make_audit(name: str, tier: str = "functional", score: float = 0.6) -> RepoAudit:

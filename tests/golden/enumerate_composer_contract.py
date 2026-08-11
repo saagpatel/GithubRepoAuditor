@@ -58,7 +58,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import src.operator_trend_closure_forecast_reset_controls as m
+import github_repo_auditor.operator_trend_closure_forecast_reset_controls as m
 
 REPO = Path(__file__).resolve().parents[2]
 GOLDEN_PATH = REPO / "tests" / "golden" / "composer_contract.golden.json"

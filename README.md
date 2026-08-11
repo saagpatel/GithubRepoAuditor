@@ -378,7 +378,7 @@ The portfolio truth layer now has its own dedicated generation path. `--portfoli
 After regenerating portfolio truth, verify the canonical snapshot instead of copying numbers into handoff or demo docs:
 
 ```bash
-uv run python -m src.cli report saagpatel --portfolio-truth
+PYTHONPATH=src uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth
 jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
 uv run operator-os-seam-linter --truth output/portfolio-truth-latest.json --json
 ```
@@ -410,7 +410,7 @@ Watch mode now uses that same baseline contract in live execution. Each cycle re
 The workbook now supports two modes:
 
 - `--excel-mode standard` — stable operational workbook path, the CLI default, and the recommended mode for automation and Mac Excel compatibility
-- `--excel-mode template` — template-backed workbook path using `assets/excel/analyst-template.xlsx` for controlled template work
+- `--excel-mode template` — template-backed workbook path using `src/github_repo_auditor/assets/excel/analyst-template.xlsx` for controlled template work
 
 Both modes read from the same report + warehouse facts. Python owns the hidden `Data_*` sheets, stable table names, and workbook facts. The template-backed workbook still owns the template shell, named-range bindings, native sparkline placement, and print layout, but the standard workbook path is now the safest default for automated generation and Excel compatibility.
 
@@ -488,7 +488,7 @@ Common fixes:
 - Missing GitHub token: set `GITHUB_TOKEN` or pass `--token` for private-repo access, GitHub writeback, metadata apply flows, and other authenticated actions.
 - Missing or broken Notion config: create or fix `config/notion-config.json` before using `--notion-sync`, `--notion-registry`, or Notion writeback.
 - Starting from scratch: copy `config/examples/audit-config.example.yaml` to `audit-config.yaml` and `config/examples/notion-config.example.json` to `config/notion-config.json`.
-- Missing Excel template: restore `assets/excel/analyst-template.xlsx` or use `--excel-mode standard`.
+- Missing Excel template: restore `src/github_repo_auditor/assets/excel/analyst-template.xlsx` or use `--excel-mode standard`.
 - Missing baseline report: run a full audit before using `--repos`, `--incremental`, or other baseline-dependent workflows.
 - Config/profile errors: fix `audit-config.yaml` syntax or choose an existing scoring profile under `config/scoring-profiles/`.
 

@@ -1,4 +1,4 @@
-"""Tests for the per-(repo, sha, analyzer) cache in src/analyzer_cache.py."""
+"""Tests for the per-(repo, sha, analyzer) cache in src/github_repo_auditor/analyzer_cache.py."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.analyzer_cache import _deep_equal, _diff_summary, invalidate_repo, lookup, reconcile, stats, store
-from src.analyzers import ALL_ANALYZERS, run_all_analyzers, run_with_cache
-from src.analyzers.dependencies import DependenciesAnalyzer
-from src.analyzers.readme import ReadmeAnalyzer
-from src.analyzers.structure import StructureAnalyzer
-from src.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.analyzer_cache import _deep_equal, _diff_summary, invalidate_repo, lookup, reconcile, stats, store
+from github_repo_auditor.analyzers import ALL_ANALYZERS, run_all_analyzers, run_with_cache
+from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer
+from github_repo_auditor.analyzers.readme import ReadmeAnalyzer
+from github_repo_auditor.analyzers.structure import StructureAnalyzer
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ from src.models import AnalyzerResult, RepoMetadata
 def _fresh_db() -> sqlite3.Connection:
     """In-memory SQLite connection with the analyzer_cache table."""
     conn = sqlite3.connect(":memory:")
-    from src.warehouse import _ensure_schema
+    from github_repo_auditor.warehouse import _ensure_schema
 
     _ensure_schema(conn)
     return conn
@@ -240,7 +240,7 @@ class TestReconcileEdges:
         def _fresh(path, metadata, conn=None):
             return [result]
 
-        monkeypatch.setattr("src.analyzers.ALL_ANALYZERS", [analyzer])
+        monkeypatch.setattr("github_repo_auditor.analyzers.ALL_ANALYZERS", [analyzer])
         report = reconcile({"repo": repo}, {"repo": meta}, conn, _fresh)
 
         assert report["checked"] == 1
@@ -282,7 +282,7 @@ class TestReconcileEdges:
                 raise RuntimeError("boom")
             return [result]
 
-        monkeypatch.setattr("src.analyzers.ALL_ANALYZERS", [analyzer])
+        monkeypatch.setattr("github_repo_auditor.analyzers.ALL_ANALYZERS", [analyzer])
         report = reconcile(
             {"bad": bad_repo, "good": good_repo},
             {"bad": bad_meta, "good": good_meta},
@@ -307,7 +307,7 @@ class TestReconcileEdges:
         def _fresh(path, metadata, conn=None):
             return [AnalyzerResult("edge", 0.5, 1.0, ["fresh"], {})]
 
-        monkeypatch.setattr("src.analyzers.ALL_ANALYZERS", [analyzer])
+        monkeypatch.setattr("github_repo_auditor.analyzers.ALL_ANALYZERS", [analyzer])
         report = reconcile(
             {"repo": repo},
             {"repo": meta},
@@ -384,7 +384,7 @@ class TestSchemaMigration:
         db_path = tmp_path / "fresh.db"
         conn = sqlite3.connect(str(db_path))
         # _ensure_schema should create analyzer_cache even on a blank DB.
-        from src.warehouse import _ensure_schema
+        from github_repo_auditor.warehouse import _ensure_schema
 
         _ensure_schema(conn)
         # Confirm the table exists by querying it.

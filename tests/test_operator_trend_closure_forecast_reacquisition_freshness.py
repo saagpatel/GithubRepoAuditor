@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_reacquisition_controls import (
+from github_repo_auditor.operator_trend_closure_forecast_reacquisition_controls import (
     apply_reacquisition_freshness_reset_control,
     closure_forecast_persistence_reset_summary,
     closure_forecast_reacquisition_freshness_for_target,

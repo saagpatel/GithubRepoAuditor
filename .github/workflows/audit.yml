@@ -95,7 +95,7 @@ jobs:
 
       - name: Build scheduled handoff artifact
         run: |
-          python3 -m src.scheduled_handoff \
+          python3 -m github_repo_auditor.scheduled_handoff \
             --output-dir output \
             --issue-state "${{ steps.issue-state.outputs.issue_state }}" \
             --issue-number "${{ steps.issue-state.outputs.issue_number }}" \

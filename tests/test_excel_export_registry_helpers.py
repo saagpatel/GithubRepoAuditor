@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.excel_export_registry_helpers import build_excel_workbook_runtime
-from src.excel_workbook_helpers import (
+from github_repo_auditor.excel_export_registry_helpers import build_excel_workbook_runtime
+from github_repo_auditor.excel_workbook_helpers import (
     CORE_VISIBLE_SHEETS,
     DEFAULT_PREFERRED_SHEET_ORDER,
     finalize_workbook_structure,

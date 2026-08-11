@@ -10,9 +10,9 @@ GitHub Repo Auditor is now a workbook-first portfolio operating system, not just
 
 The same weekly story is rendered across workbook, Markdown, HTML, review-pack, and scheduled handoff. The workbook remains the flagship surface, while the other artifacts mirror the same compressed interpretation so operators do not have to relearn the product by surface.
 
-The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, finalized through `src/weekly_packaging.py` and exposed by `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story. The current release also adds a bounded approval-aware weekly overlay in `src/weekly_scheduling_overlay.py`, but that overlay still lives inside the same weekly contract instead of creating a second recommendation engine.
+The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, finalized through `src/github_repo_auditor/weekly_packaging.py` and exposed by `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story. The current release also adds a bounded approval-aware weekly overlay in `src/github_repo_auditor/weekly_scheduling_overlay.py`, but that overlay still lives inside the same weekly contract instead of creating a second recommendation engine.
 
-Phase 107 adds one more bounded read model on top of that same weekly seam: `weekly_command_center_digest_v1` in `src/weekly_command_center.py`. The digest is derived from `weekly_story_v1`, the latest operator summary, and the current portfolio-truth snapshot. It is explicitly report-only and workbook-first. Its job is to give a future weekly loop one canonical digest artifact without creating a second weekly authority or widening automation power.
+Phase 107 adds one more bounded read model on top of that same weekly seam: `weekly_command_center_digest_v1` in `src/github_repo_auditor/weekly_command_center.py`. The digest is derived from `weekly_story_v1`, the latest operator summary, and the current portfolio-truth snapshot. It is explicitly report-only and workbook-first. Its job is to give a future weekly loop one canonical digest artifact without creating a second weekly authority or widening automation power.
 
 The portfolio layer now has its own explicit truth contract too. `--portfolio-truth` builds a versioned machine-readable snapshot for the configured local projects workspace and treats the legacy markdown registry/report files as derived compatibility surfaces rather than as canonical inputs.
 
@@ -36,7 +36,7 @@ That means the architecture is intentionally split between raw state assembly an
 
 ### `audit`
 
-`src/cli.py` remains the single entrypoint. It keeps one flag-based command surface and packages the product around four guidance modes:
+`src/github_repo_auditor/cli.py` remains the single entrypoint. It keeps one flag-based command surface and packages the product around four guidance modes:
 
 - `First Run`
 - `Weekly Review`
@@ -67,57 +67,57 @@ Phase 107 extends that same read-only path. A control-center refresh now also wr
 
 The current module boundaries are documented enough to guide work, but they still carry known concentration risk:
 
-- `src/operator_control_center.py`
+- `src/github_repo_auditor/operator_control_center.py`
   Public façade and orchestration layer for control-center snapshot building.
-- `src/operator_snapshot_packaging.py`
+- `src/github_repo_auditor/operator_snapshot_packaging.py`
   Operator summary assembly, handoff packaging, and control-center artifact payload shaping.
-- `src/operator_decision_quality.py`
+- `src/github_repo_auditor/operator_decision_quality.py`
   Versioned `decision_quality_v1` contract assembly, historical downgrade rules, and the single ownership seam for decision-quality derivation.
-- `src/operator_follow_through.py`
+- `src/github_repo_auditor/operator_follow_through.py`
   Follow-through enrichment, projection, and follow-through summary families.
-- `src/operator_resolution_trend.py`
+- `src/github_repo_auditor/operator_resolution_trend.py`
   Resolution-trend, trust, closure-forecast, calibration, and queue-history reasoning.
-- `src/operator_control_center_rendering.py`
+- `src/github_repo_auditor/operator_control_center_rendering.py`
   Markdown rendering for the control-center artifact.
-- `src/weekly_command_center.py`
+- `src/github_repo_auditor/weekly_command_center.py`
   Report-only weekly digest contract and artifact rendering for the bounded command-center loop.
-- `src/report_enrichment.py`
+- `src/github_repo_auditor/report_enrichment.py`
   Raw `weekly_pack` assembly plus the compatibility façade that hands off to the extracted weekly packaging seam.
-- `src/weekly_packaging.py`
+- `src/github_repo_auditor/weekly_packaging.py`
   Shared weekly contract finalization, compact explainability, and parity layer for workbook, Markdown, HTML, review-pack, and scheduled handoff.
-- `src/action_sync_readiness.py`
+- `src/github_repo_auditor/action_sync_readiness.py`
   Readiness-stage logic for deciding whether a campaign should stay local, preview next, apply next, or stop for drift/blockers.
-- `src/action_sync_packets.py`
+- `src/github_repo_auditor/action_sync_packets.py`
   Execution handoff logic that turns a campaign into an `Apply Packet` with blockers, rollback posture, and command hints.
-- `src/action_sync_outcomes.py`
+- `src/github_repo_auditor/action_sync_outcomes.py`
   Post-apply monitoring logic that judges whether a recent sync is holding, drifting back, reopening, or still needs monitoring.
-- `src/action_sync_tuning.py`
+- `src/github_repo_auditor/action_sync_tuning.py`
   Bounded tie-break layer that uses post-apply history to rank tied campaigns without changing stage precedence.
-- `src/approval_ledger.py`
+- `src/github_repo_auditor/approval_ledger.py`
   Local approval workflow synthesis, fingerprinting, approval receipts, and approval-center packaging.
-- `src/intervention_ledger.py`
+- `src/github_repo_auditor/intervention_ledger.py`
   Cross-run repo intelligence synthesis that connects intervention history, recurring pressure, hotspot persistence, scorecard direction, and campaign aftermath.
-- `src/implementation_hotspots.py`
+- `src/github_repo_auditor/implementation_hotspots.py`
   Repo-level implementation pressure and “where to start” guidance.
-- `src/warehouse.py`
+- `src/github_repo_auditor/warehouse.py`
   Persistence, history loading, and compatibility handling for regenerated reports and historical trend work.
-- `src/portfolio_truth_types.py`
+- `src/github_repo_auditor/portfolio_truth_types.py`
   Versioned public truth contract for workspace projects.
-- `src/portfolio_truth_sources.py`
+- `src/github_repo_auditor/portfolio_truth_sources.py`
   Safe local workspace, legacy-registry, and optional Notion source adapters for portfolio truth generation.
-- `src/portfolio_truth_reconcile.py`
+- `src/github_repo_auditor/portfolio_truth_reconcile.py`
   Field-by-field precedence, derived status mapping, and truth snapshot assembly.
-- `src/portfolio_truth_validate.py`
+- `src/github_repo_auditor/portfolio_truth_validate.py`
   Truth contract, compatibility, and external-path safety validation.
-- `src/portfolio_truth_render.py`
+- `src/github_repo_auditor/portfolio_truth_render.py`
   Compatibility rendering for `project-registry.md` and `PORTFOLIO-AUDIT-REPORT.md`.
-- `src/portfolio_truth_publish.py`
+- `src/github_repo_auditor/portfolio_truth_publish.py`
   Publish orchestration with temp-file staging, validation, and replace-on-success semantics.
-- `src/portfolio_context_contract.py`
+- `src/github_repo_auditor/portfolio_context_contract.py`
   Semantic contract for minimum-viable context, accepted heading aliases, managed context blocks, and context-band classification.
-- `src/portfolio_context_recovery.py`
+- `src/github_repo_auditor/portfolio_context_recovery.py`
   Frozen-cohort planning, dirty/temp skip rules, managed context block application, and bounded catalog seed handling for workspace recovery.
-- `src/portfolio_pathing.py`
+- `src/github_repo_auditor/portfolio_pathing.py`
   Single owner for normalized operating-path derivation, confidence, override, and rationale assembly.
 
 This separation is deliberate, but it is not “finished architecture”:
@@ -142,7 +142,7 @@ The architecture rule is now:
 - declared portfolio metadata stays in the catalog
 - scorecards still own maturity evaluation
 - tactical collections remain derived views
-- `src/portfolio_pathing.py` normalizes stable path, temporary override, confidence, and rationale
+- `src/github_repo_auditor/portfolio_pathing.py` normalizes stable path, temporary override, confidence, and rationale
 - the truth snapshot is the one machine-facing surface that other renderers consume
 
 The normalized path contract is intentionally strict:
@@ -157,7 +157,7 @@ This keeps path semantics advisory and portable without reopening queue, approva
 
 ## Portfolio Risk Overlay
 
-Phase 108 adds a structured risk overlay on top of the shipped truth, context, path, and trust layers. `src/portfolio_risk.py` is the single owner of risk tier derivation. Risk tiers are `elevated`, `moderate`, `baseline`, and `deferred`. The overlay is advisory-only and derives from already-present truth fields — no new data collection.
+Phase 108 adds a structured risk overlay on top of the shipped truth, context, path, and trust layers. `src/github_repo_auditor/portfolio_risk.py` is the single owner of risk tier derivation. Risk tiers are `elevated`, `moderate`, `baseline`, and `deferred`. The overlay is advisory-only and derives from already-present truth fields — no new data collection.
 
 Risk factors are accumulated during reconciliation and written into `RiskFields` on each `PortfolioTruthProject`. Compound factor thresholds keep signal gradation useful: `elevated` requires three or more factors, or the specific compound pair `weak-context-active + investigate-override`. Most repos land at `moderate` or `baseline`. Archived and stale-non-maintain repos are short-circuited to `deferred`.
 
@@ -171,7 +171,7 @@ Phase 108 standardizes a minimal doctor/release-check contract for strategic rep
 
 The active roadmap already treats two cleanup tracks as real dependencies for later feature work:
 
-- Phase 99 extracted the weekly packaging seam into `src/weekly_packaging.py`, but `src/report_enrichment.py` still remains a broad raw-assembly module that should not absorb new weekly feature growth casually
+- Phase 99 extracted the weekly packaging seam into `src/github_repo_auditor/weekly_packaging.py`, but `src/github_repo_auditor/report_enrichment.py` still remains a broad raw-assembly module that should not absorb new weekly feature growth casually
 - Phase 100 extracted the highest-risk operator subsystems into dedicated modules, but later approval work should still land on those bounded seams instead of rebuilding concentration inside the façade
 
 ## Shared Artifact Model
@@ -200,13 +200,13 @@ The shared-weekly rule is now explicit:
 
 The operator system has two architectural layers:
 
-- raw operator state orchestration in `src/operator_control_center.py`
+- raw operator state orchestration in `src/github_repo_auditor/operator_control_center.py`
 - extracted operator subsystem logic in:
-  - `src/operator_resolution_trend.py`
-  - `src/operator_follow_through.py`
-  - `src/operator_snapshot_packaging.py`
-  - `src/operator_control_center_rendering.py`
-- compressed weekly packaging in `src/weekly_packaging.py`
+  - `src/github_repo_auditor/operator_resolution_trend.py`
+  - `src/github_repo_auditor/operator_follow_through.py`
+  - `src/github_repo_auditor/operator_snapshot_packaging.py`
+  - `src/github_repo_auditor/operator_control_center_rendering.py`
+- compressed weekly packaging in `src/github_repo_auditor/weekly_packaging.py`
 
 The operator façade keeps:
 
@@ -256,7 +256,7 @@ These are warehouse-backed descriptive summaries. They inform the weekly read bu
 
 Phase 105 adds a bounded trust-contract layer on top of the existing effectiveness and calibration evidence. The goal is not to invent a second recommendation engine. The goal is to make the existing trust posture explicit, reusable, and historically comparable.
 
-The new contract is `decision_quality_v1`. It is assembled in `src/operator_decision_quality.py`, stored inside `operator_summary`, and also persisted as a compact warehouse-backed summary so later runs do not have to scrape prose to compare recommendation quality.
+The new contract is `decision_quality_v1`. It is assembled in `src/github_repo_auditor/operator_decision_quality.py`, stored inside `operator_summary`, and also persisted as a compact warehouse-backed summary so later runs do not have to scrape prose to compare recommendation quality.
 
 `decision_quality_v1` is intentionally narrow:
 
@@ -268,7 +268,7 @@ The new contract is `decision_quality_v1`. It is assembled in `src/operator_deci
 The architecture rule for this layer is strict:
 
 - raw evidence may come from operator history, calibration history, trend history, and current operator state
-- `src/operator_decision_quality.py` is the only owner that turns that evidence into a decision-quality contract
+- `src/github_repo_auditor/operator_decision_quality.py` is the only owner that turns that evidence into a decision-quality contract
 - workbook, Markdown, HTML, review-pack, scheduled handoff, and control-center surfaces consume the same contract through packaged summary fields instead of recomputing trust locally
 - older warehouse runs that predate the contract are explicitly downgraded to `insufficient-data` rather than guessed into compatibility
 
@@ -359,10 +359,10 @@ Instead it explains whether a repo currently looks:
 
 Architecturally, this keeps the split clean:
 
-- `src/portfolio_intelligence.py` remains the current-state portfolio layer
-- `src/intervention_ledger.py` owns cross-run historical synthesis
-- `src/operator_control_center.py` carries those results into `operator_summary` and queue items
-- `src/report_enrichment.py` packages the same historical story across workbook, Markdown, HTML, review-pack, and scheduled handoff
+- `src/github_repo_auditor/portfolio_intelligence.py` remains the current-state portfolio layer
+- `src/github_repo_auditor/intervention_ledger.py` owns cross-run historical synthesis
+- `src/github_repo_auditor/operator_control_center.py` carries those results into `operator_summary` and queue items
+- `src/github_repo_auditor/report_enrichment.py` packages the same historical story across workbook, Markdown, HTML, review-pack, and scheduled handoff
 
 ## Weekly Story Contract
 
@@ -417,11 +417,11 @@ That layer does not widen write authority. It exists to answer:
 
 Architecturally:
 
-- `src/approval_ledger.py` owns approval synthesis and fingerprinting
-- `src/approval_ledger.py` now also derives approval freshness from the latest tracked follow-up review event or the original approval timestamp fallback
-- `src/operator_control_center.py` carries approval state into the operator summary and queue items
-- `src/report_enrichment.py` passes the approval story through the shared weekly/report contracts, and `src/weekly_packaging.py` now carries the final weekly approval packaging across workbook, Markdown, HTML, review-pack, and scheduled handoff artifacts
-- `src/warehouse.py` persists approval ledger snapshots, initial approval records, and append-only approval follow-up events while keeping legacy governance approvals readable
+- `src/github_repo_auditor/approval_ledger.py` owns approval synthesis and fingerprinting
+- `src/github_repo_auditor/approval_ledger.py` now also derives approval freshness from the latest tracked follow-up review event or the original approval timestamp fallback
+- `src/github_repo_auditor/operator_control_center.py` carries approval state into the operator summary and queue items
+- `src/github_repo_auditor/report_enrichment.py` passes the approval story through the shared weekly/report contracts, and `src/github_repo_auditor/weekly_packaging.py` now carries the final weekly approval packaging across workbook, Markdown, HTML, review-pack, and scheduled handoff artifacts
+- `src/github_repo_auditor/warehouse.py` persists approval ledger snapshots, initial approval records, and append-only approval follow-up events while keeping legacy governance approvals readable
 
 Approval stays local-authoritative:
 
@@ -506,7 +506,7 @@ template-stamped control modules, and lazy-import cycles.
 
 1. **No new callable-threaded extractions.** When logic is extracted from a large module,
    the shared primitives it needs move to a leaf support module (for the operator layer,
-   `src/operator_trend_support.py`) and are imported by the extracted module. Threading the
+   `src/github_repo_auditor/operator_trend_support.py`) and are imported by the extracted module. Threading the
    parent's helpers back in as `Callable` parameters is no longer an accepted way to avoid a
    circular import — fix the dependency direction instead.
 2. **No new stamped control modules.** A new closure-forecast or trend control may not be
@@ -514,8 +514,8 @@ template-stamped control modules, and lazy-import cycles.
    `*_recovery_for_target` / `apply_*_control` / `*_hotspots` / `*_summary` / `*_reason`)
    into a new module. New controls wait for (or drive) the parametrized control core; until
    that core exists, adding one requires an explicit maintainer decision recorded here.
-3. **No new function-level internal imports outside the CLI dispatch layer.** `src/cli.py`
-   may defer imports for startup latency. Everywhere else, a deferred `from src...` import
+3. **No new function-level internal imports outside the CLI dispatch layer.** `src/github_repo_auditor/cli.py`
+   may defer imports for startup latency. Everywhere else, a deferred `from github_repo_auditor...` import
    inside a function body marks a layering bug; fix the direction rather than hiding the
    import.
 4. **Overlays merge or die.** An advisory overlay that survives two further phases is either
@@ -534,9 +534,9 @@ Its job is narrow:
 
 Architecturally:
 
-- `src/action_sync_automation.py` owns the posture classification and safe-command packaging
-- `src/operator_control_center.py` carries the posture into `operator_summary` and queue items
-- `src/report_enrichment.py` packages the same wording across workbook, Markdown, HTML, review-pack, and scheduled handoff
+- `src/github_repo_auditor/action_sync_automation.py` owns the posture classification and safe-command packaging
+- `src/github_repo_auditor/operator_control_center.py` carries the posture into `operator_summary` and queue items
+- `src/github_repo_auditor/report_enrichment.py` packages the same wording across workbook, Markdown, HTML, review-pack, and scheduled handoff
 
 This layer does not widen write authority:
 

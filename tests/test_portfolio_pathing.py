@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.portfolio_pathing import (
+from github_repo_auditor.portfolio_pathing import (
     INVESTIGATE_OVERRIDE,
     build_operating_path_entry,
     build_operating_path_line,

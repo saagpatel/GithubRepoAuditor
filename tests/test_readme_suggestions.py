@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.readme_suggestions import generate_readme_suggestions
+from github_repo_auditor.readme_suggestions import generate_readme_suggestions
 
 
 def _make_report(**overrides) -> dict:

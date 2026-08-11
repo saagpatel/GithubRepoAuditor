@@ -20,11 +20,11 @@ import re
 from pathlib import Path
 from types import ModuleType
 
-import src.operator_resolution_trend as m_resolution
-import src.operator_snapshot_packaging as m_pkg
-import src.operator_trend_closure_forecast_reacquisition_controls as m_reacq
-import src.operator_trend_closure_forecast_reset_controls as m_reset
-import src.operator_trend_support as m_support  # scanned since 2026-07-10: classifiers moved here by the callable-threading unwind
+import github_repo_auditor.operator_resolution_trend as m_resolution
+import github_repo_auditor.operator_snapshot_packaging as m_pkg
+import github_repo_auditor.operator_trend_closure_forecast_reacquisition_controls as m_reacq
+import github_repo_auditor.operator_trend_closure_forecast_reset_controls as m_reset
+import github_repo_auditor.operator_trend_support as m_support  # scanned since 2026-07-10: classifiers moved here by the callable-threading unwind
 
 REPO = Path(__file__).resolve().parents[2]
 GOLDEN_PATH = REPO / "tests" / "golden" / "recovery_state_contract.golden.json"

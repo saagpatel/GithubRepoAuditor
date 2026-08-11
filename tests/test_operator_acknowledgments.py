@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from src.operator_acknowledgments import (
+from github_repo_auditor.operator_acknowledgments import (
     acknowledgments_path,
     build_acknowledgment_record,
     directional_signature,

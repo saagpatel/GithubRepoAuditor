@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_apply_chain import run_resolution_trend_apply_chain
+from github_repo_auditor.operator_trend_apply_chain import run_resolution_trend_apply_chain
 
 
 def test_run_resolution_trend_apply_chain_returns_named_results() -> None:

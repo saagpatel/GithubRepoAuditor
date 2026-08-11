@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from src.operator_trend_pending_text import (
+from github_repo_auditor.operator_trend_pending_text import (
     class_pending_debt_summary,
     pending_debt_freshness_summary,
     transition_closure_confidence_summary,
 )
-from src.operator_trend_support import (
+from github_repo_auditor.operator_trend_support import (
     is_generic_baseline_guidance,
     is_generic_monitor_guidance,
     is_generic_recommendation,
