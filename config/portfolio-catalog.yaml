@@ -1571,3 +1571,159 @@ repos:
     review_cadence: weekly
     operating_path: experiment
     category: infrastructure
+  portfolio-tribunal:
+    owner: d
+    purpose: KEEP/PARK/KILL judgment layer over GithubRepoAuditor portfolio truth
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.1 graduated 2026-07-17; 182 repos judged and dispositions merged. Re-runnable on demand, not scheduled.
+  drift-court:
+    owner: d
+    purpose: intent-vs-diff arbitration for delegated agent work, pricing silence and disguise
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.0 graduated 2026-07-17 at zero overrides. Live post-dispatch gate; runs on demand.
+  regret-oracle:
+    owner: d
+    purpose: grounded pre-mortem judging pending decisions against the operator's own regret corpus
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.0 graduated 2026-07-17. Live pre-decision gate; runs on demand.
+  consolidation-map:
+    owner: d
+    purpose: border arbitration over tribunal KEEP repos, ruling MERGE/ABSORB/SHARE_INFRA/STAND_ALONE
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.0 graduated 2026-07-17. Runs on operator request or after a tribunal re-run; not scheduled.
+  instrument-foundry:
+    owner: d
+    purpose: extracted judgment-instrument chassis and doctrine proven across graduated instruments
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Reference doctrine for building new instruments. Consulted, not run.
+  corpus-court:
+    owner: d
+    purpose: wikilink and corpus drift arbitration over the SecondBrain knowledge vault
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Answered 2026-07-17 — 240/240 case IDs ruled (KEEP 210, AMEND 27, MERGE 3). Ledger in repo.
+  review-judge-calibration:
+    owner: d
+    purpose: measures the review-prose judge against operator blind grades
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Answered 2026-07-17 — operator-judge kappa 0.78, 29/30 exact, judge-judge 1.00. Receipt in repo.
+  calibration-bench:
+    owner: d
+    purpose: L3 calibration lane for scoring judgment instruments against known answers
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Closed at generation 6 on 2026-07-18 with an in-repo receipt and three refuted designs. Do not rebuild.
+  transcript-autopsy:
+    owner: d
+    purpose: mines agent-session corpora for harness weaknesses and failure taxonomy
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Answered 2026-07-18 — findings landed as durable feedback memory. Reads source corpora read-only; commits none.
+  spec-shift-tribunal:
+    owner: d
+    purpose: point-in-time ruling on mcp-trust registry servers against the published MCP specification
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Ruled 2026-07-18, delta pass 2026-08-02 confirmed no pinned spec text moved. BREAKS 6 / READY 25 / EXPOSED 0. Follow-ups remain open outside this repo.
+  canon-court:
+    owner: d
+    purpose: portfolio-truth canonical-key reconciliation docket
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Scaffold only — one commit, 2026-07-17. Its design doc awaits a judgment session that never ran; no rulings were ever issued.
+  operating-memory-os:
+    owner: d
+    purpose: local-first system that remembers the operator's work life and can be queried about it
+    lifecycle_state: manual-only
+    criticality: high
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: In flight, operator-driven. Ships 1-3 closed; Ship 4 merge-ready with scheduled assets deliberately unarmed pending a supervised run. Held at manual-only rather than active on purpose - active + maintain + infrastructure enrolls a repo in the Tier 0 cohort, whose size is a fail-closed contract pinned in two scheduled jobs. Promote only alongside those pins.
