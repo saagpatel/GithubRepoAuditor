@@ -393,7 +393,7 @@ index 8dbb55b..02528ff 100644
  - `src/data/prompts.ts` — system prompts for each fortune style (Mystical Oracle, Sassy Psychic, Corporate Oracle, Pirate Seer)
  - `src/data/luckyAttributes.ts` — curated lists for lucky colors, spirit animals, number generation
  
-@@ -144,7 +147,7 @@ AIFortuneTeller is an active local project in the /Users/d/Projects portfolio.
+@@ -144,7 +147,7 @@ AIFortuneTeller is an active local project in the ~/Projects portfolio.
  - **Styling:** Tailwind CSS 4.x + custom CSS keyframe animations
  - **Animation:** Canvas2D for particle systems, CSS for scan line overlays and UI transitions
  - **Audio:** Tone.js 15.x — ambient drone during scanning, chime on fortune reveal
@@ -2577,20 +2577,20 @@ apply these fixes.
 ### `CONTRIBUTING.md:12`
 
 **What is wrong:** References `.gitignore` at the absolute path
-`` `/Users/d/Projects/OrbitForge/.gitignore` `` — but the canonical repo path is
-`/Users/d/Projects/Fun:GamePrjs/OrbitForge` (note the `Fun:GamePrjs` parent with a colon).
+`` `~/Projects/OrbitForge/.gitignore` `` — but the canonical repo path is
+`~/Projects/Fun:GamePrjs/OrbitForge` (note the `Fun:GamePrjs` parent with a colon).
 
-**One-line fix:** Replace `/Users/d/Projects/OrbitForge/.gitignore` with
-`/Users/d/Projects/Fun:GamePrjs/OrbitForge/.gitignore`, or drop the absolute path entirely and
+**One-line fix:** Replace `~/Projects/OrbitForge/.gitignore` with
+`~/Projects/Fun:GamePrjs/OrbitForge/.gitignore`, or drop the absolute path entirely and
 write "the project's `.gitignore`".
 
 ### `CONTRIBUTING.md:32`
 
 **What is wrong:** References `package.json` at
-`` `/Users/d/Projects/OrbitForge/package.json` `` — same wrong path as above.
+`` `~/Projects/OrbitForge/package.json` `` — same wrong path as above.
 
-**One-line fix:** Replace `/Users/d/Projects/OrbitForge/package.json` with
-`/Users/d/Projects/Fun:GamePrjs/OrbitForge/package.json`, or drop the absolute path entirely.
+**One-line fix:** Replace `~/Projects/OrbitForge/package.json` with
+`~/Projects/Fun:GamePrjs/OrbitForge/package.json`, or drop the absolute path entirely.
 
 ---
 
@@ -2614,9 +2614,9 @@ index e38b8ff..2cb1186 100644
  
  | Path | Branch tip | Status |
  |---|---|---|
--| `/Users/d/Projects/Fun:GamePrjs/OrbitForge` | `codex/chore/bootstrap-codex-os` at `07ef263` (feat: harden runtime safety and release gates) | **Canonical** — work here. |
-+| `/Users/d/Projects/Fun:GamePrjs/OrbitForge` | `master` at `8f7d64a` (docs: identify canonical local checkout and document typo-dup disposition) | **Canonical** — work here. |
- | `/Users/d/Projects/FunGamePrjs/OrbitForge` | `codex/chore/bootstrap-codex-os` at `a383f37` (chore: finalize codex os bootstrap baseline) | Stale — one commit behind canonical and ~61 dirty files of abandoned WIP. |
+-| `~/Projects/Fun:GamePrjs/OrbitForge` | `codex/chore/bootstrap-codex-os` at `07ef263` (feat: harden runtime safety and release gates) | **Canonical** — work here. |
++| `~/Projects/Fun:GamePrjs/OrbitForge` | `master` at `8f7d64a` (docs: identify canonical local checkout and document typo-dup disposition) | **Canonical** — work here. |
+ | `~/Projects/FunGamePrjs/OrbitForge` | `codex/chore/bootstrap-codex-os` at `a383f37` (chore: finalize codex os bootstrap baseline) | Stale — one commit behind canonical and ~61 dirty files of abandoned WIP. |
  
  Both copies point `origin` at the same GitHub repository
 @@ -141,6 +141,6 @@ For full feature detail see `README.md`.

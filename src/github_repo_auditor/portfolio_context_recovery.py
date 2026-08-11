@@ -411,7 +411,7 @@ def _build_context_sections(
         readme_sections.get("product goal"),
         _usable_summary(readme_sections.get("__preamble__", "")),
         project.declared.purpose,
-        f"{project.identity.display_name} is an active local project in the /Users/d/Projects portfolio.",
+        f"{project.identity.display_name} is an active local project in the ~/Projects portfolio.",
     )
     current_state = _first_nonempty(
         primary_sections.get("current state"),

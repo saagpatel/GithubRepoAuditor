@@ -294,8 +294,8 @@ def build_restart_packet(
         ],
         "next_commands": [
             'python -m github_repo_auditor.codex_restart_packet --workspace-root "$HOME/Projects"',
-            "git -C /Users/d/.local/share/personal-ops status --short --branch",
-            "git -C /Users/d/.codex/codexkit status --short --branch",
+            'git -C "$HOME/.local/share/personal-ops" status --short --branch',
+            'git -C "$HOME/.codex/codexkit" status --short --branch',
             "audit report saagpatel --portfolio-truth --portfolio-truth-include-security",
         ],
     }

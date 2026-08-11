@@ -9,7 +9,7 @@
 - Legacy audit report: `output/audit-report-saagpatel-2026-06-19.json`
   - `generated_at`: `2026-06-19T07:46:41.857483+00:00`
   - audited repo count: 149
-- Local Notion projection snapshot after approved row creation: `/Users/d/.local/share/notion-os/project-snapshot.json`
+- Local Notion projection snapshot after approved row creation: `~/.local/share/notion-os/project-snapshot.json`
   - generated on 2026-06-19
   - project count: 143
 - `cross-system-smoke` `contract-health` now passes.
@@ -107,14 +107,14 @@ from portfolio truth's repo set. They are not all the same kind of drift.
 
 | Audit-only repo | Verified evidence | Classification | Recommended disposition |
 | --- | --- | --- | --- |
-| `saagpatel/ApplyKit-private-archive-20260517` | Local `/Users/d/Projects/ApplyKit` exists. Local `origin` points to `ApplyKit-private-archive-20260517`; `legacy-origin` points to `ApplyKit`. Portfolio truth now tracks `saagpatel/ApplyKit`, so the remaining audit-only repo is the private archive identity. | private archive mirror | Keep outside portfolio truth. Optional future repo-config cleanup: rename or demote the archive remote so local git configuration is less misleading, but do not create a Local Portfolio Project row. |
-| `saagpatel/GithubRepoAuditor-private-archive-20260518` | Local `/Users/d/Projects/GithubRepoAuditor` exists. Local `canonical` points to `GithubRepoAuditor`; `origin` points to `GithubRepoAuditor-private-archive-20260518`. Portfolio truth now tracks `saagpatel/GithubRepoAuditor`, so the remaining audit-only repo is the private archive identity. | private archive mirror | Keep outside portfolio truth. Optional future repo-config cleanup: make the public canonical remote the less surprising local default if approved, but no truth or Notion row action is needed. |
+| `saagpatel/ApplyKit-private-archive-20260517` | Local `~/Projects/ApplyKit` exists. Local `origin` points to `ApplyKit-private-archive-20260517`; `legacy-origin` points to `ApplyKit`. Portfolio truth now tracks `saagpatel/ApplyKit`, so the remaining audit-only repo is the private archive identity. | private archive mirror | Keep outside portfolio truth. Optional future repo-config cleanup: rename or demote the archive remote so local git configuration is less misleading, but do not create a Local Portfolio Project row. |
+| `saagpatel/GithubRepoAuditor-private-archive-20260518` | Local `~/Projects/GithubRepoAuditor` exists. Local `canonical` points to `GithubRepoAuditor`; `origin` points to `GithubRepoAuditor-private-archive-20260518`. Portfolio truth now tracks `saagpatel/GithubRepoAuditor`, so the remaining audit-only repo is the private archive identity. | private archive mirror | Keep outside portfolio truth. Optional future repo-config cleanup: make the public canonical remote the less surprising local default if approved, but no truth or Notion row action is needed. |
 | `saagpatel/GithubRepoAuditor-scrubbed-import-20260518` | No direct local path. Private repo, no explicit catalog entry, same description/topics as GithubRepoAuditor. | import/scrub mirror | Keep outside portfolio truth. Consider upstream archive after confirming it is no longer needed for import provenance. |
-| `saagpatel/SecondBrain` | Local path is `/Users/d/Documents/SecondBrain`, outside `/Users/d/Projects`. Project registry already has `supp:SecondBrain` and Notion projection-only treatment. | supplementary non-Projects knowledge vault | Keep outside portfolio truth unless the operator explicitly widens truth beyond `/Users/d/Projects`. Optional future registry cleanup: add repo metadata to supplementary evidence without making it first-class truth. |
-| `saagpatel/personal-ops` | Local path is `/Users/d/.local/share/personal-ops`, outside `/Users/d/Projects`. Prior reconciliation explicitly keeps it supplementary unless approved. | supplementary non-Projects control plane | Keep outside portfolio truth without explicit operator approval. It can remain supplementary registry evidence. |
-| `saagpatel/codexkit` | Local path is `/Users/d/.codex/codexkit`, outside `/Users/d/Projects`; dirty local operating-layer repo. | supplementary Codex operating surface | Keep outside portfolio truth by default. If promoted later, treat as local operating-system state, not normal product work. |
-| `saagpatel/claude-code-workstation-bootstrap` | Local path is `/Users/d/claude-code-workstation-bootstrap`, outside `/Users/d/Projects`; bootstrap branch. | workstation bootstrap/support repo | Keep outside portfolio truth. Archive or mark manual-only upstream if it should stop appearing in legacy audit attention. |
-| `saagpatel/portfolio-actuation-sandbox` | Local path is `/Users/d/portfolio-actuation-sandbox`, outside `/Users/d/Projects`; sandbox fixture repo with local dirty files. | actuation sandbox fixture | Keep outside portfolio truth. It is already represented as a Notion projection-only sandbox row, not a portfolio project. |
+| `saagpatel/SecondBrain` | Local path is `~/Documents/SecondBrain`, outside `~/Projects`. Project registry already has `supp:SecondBrain` and Notion projection-only treatment. | supplementary non-Projects knowledge vault | Keep outside portfolio truth unless the operator explicitly widens truth beyond `~/Projects`. Optional future registry cleanup: add repo metadata to supplementary evidence without making it first-class truth. |
+| `saagpatel/personal-ops` | Local path is `~/.local/share/personal-ops`, outside `~/Projects`. Prior reconciliation explicitly keeps it supplementary unless approved. | supplementary non-Projects control plane | Keep outside portfolio truth without explicit operator approval. It can remain supplementary registry evidence. |
+| `saagpatel/codexkit` | Local path is `~/.codex/codexkit`, outside `~/Projects`; dirty local operating-layer repo. | supplementary Codex operating surface | Keep outside portfolio truth by default. If promoted later, treat as local operating-system state, not normal product work. |
+| `saagpatel/claude-code-workstation-bootstrap` | Local path is `~/claude-code-workstation-bootstrap`, outside `~/Projects`; bootstrap branch. | workstation bootstrap/support repo | Keep outside portfolio truth. Archive or mark manual-only upstream if it should stop appearing in legacy audit attention. |
+| `saagpatel/portfolio-actuation-sandbox` | Local path is `~/portfolio-actuation-sandbox`, outside `~/Projects`; sandbox fixture repo with local dirty files. | actuation sandbox fixture | Keep outside portfolio truth. It is already represented as a Notion projection-only sandbox row, not a portfolio project. |
 | `saagpatel/app` | GitHub repo is private and archived; no local direct path. Name collides with existing projection-only Local Portfolio placeholder `app`, but audit description is an archived SwiftUI app. | archived generic app repo | Keep outside portfolio truth. No Local Portfolio row; no action unless upstream archive hygiene is being cleaned. |
 | `saagpatel/hermes-agent` | GitHub audit marks it as a fork; no local direct path; no explicit catalog entry. | fork/upstream-derived repo | Keep outside portfolio truth. Archive/delete decision is upstream GitHub hygiene, not portfolio truth work. |
 | `saagpatel/agent-harness-hardening` | Public repo, no direct local path, no explicit catalog entry; sanitized hardening artifact. | published support artifact | Keep outside portfolio truth unless it becomes an active infra project with a local operating root. |
@@ -190,7 +190,7 @@ Approval-gated:
 3. If more approved rows are needed later, use the scoped Notion command:
 
 ```bash
-cd /Users/d/Projects/Notion
+cd ~/Projects/Notion
 npm run portfolio-audit:create-local-project-rows-from-truth -- \
   --today 2026-06-19 \
   --project-title <exact truth display name>

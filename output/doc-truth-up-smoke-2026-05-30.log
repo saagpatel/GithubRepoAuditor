@@ -9,5 +9,5 @@ doc-truth-up batch · 8 repo(s) · tier=2 · model=sonnet · concurrency=8 · EX
 [8/8] AIFortuneTeller → ran
 
 Done. {'skipped': 2, 'ran': 6}
-Results: /Users/d/Projects/GithubRepoAuditor/output/doc-truth-up-run-2026-05-30.json
+Results: ~/Projects/GithubRepoAuditor/output/doc-truth-up-run-2026-05-30.json
 Review each repo's docs/truth-up-* branch, then merge or delete. Nothing was pushed.

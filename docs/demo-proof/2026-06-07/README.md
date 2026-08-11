@@ -2,7 +2,7 @@
 
 Durable screenshot proof for the five-tab local PortfolioCommandCenter demo.
 
-Captured from `/Users/d/Projects/PortfolioCommandCenter` with:
+Captured from `~/Projects/PortfolioCommandCenter` with:
 
 ```sh
 pnpm demo:desktop

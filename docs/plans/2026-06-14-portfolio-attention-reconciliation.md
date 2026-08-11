@@ -8,12 +8,12 @@ This note records the narrow truth update from the 2026-06-14 portfolio attentio
 
 - `bridge-db` is cataloged as `infrastructure` so generated portfolio truth resolves it as `active-infra`. Its repo-local docs still define it as scope-closed steady maintenance, so weekly attention should surface only concrete bridge, sync, health, or cross-system state decisions.
 - `notification-hub` is cataloged as `infrastructure` so generated portfolio truth resolves it as `active-infra`. Runtime or operator-signal claims still require fresh read-only verification before they drive work.
-- `AIGCCore` repo-local canonical paths were aligned to `/Users/d/Projects/MoneyPRJsViaGPT/AIGCCore`, matching the live checkout and the portfolio truth path.
+- `AIGCCore` repo-local canonical paths were aligned to `~/Projects/MoneyPRJsViaGPT/AIGCCore`, matching the live checkout and the portfolio truth path.
 
 ## Deferred Decisions
 
 - `AIGCCore` remains active infrastructure. The snapshot's Notion advisory still says `Archive` / `Archived`, but archiving or changing lifecycle/disposition requires explicit operator approval.
-- `personal-ops` remains supplementary registry evidence, not a first-class portfolio truth row. Adding it to portfolio truth requires explicit operator approval because it lives outside `/Users/d/Projects` and would widen the registry contract.
+- `personal-ops` remains supplementary registry evidence, not a first-class portfolio truth row. Adding it to portfolio truth requires explicit operator approval because it lives outside `~/Projects` and would widen the registry contract.
 
 ## Verification
 
@@ -42,7 +42,7 @@ Expected state:
 - A non-publishing build with `include_notion=False` validated the catalog logic: `bridge-db`, `notification-hub`, and `AIGCCore` all resolved to `category=infrastructure` and `attention_state=active-infra`; snapshot validation reported no warnings.
 - `uv run pytest -q tests/test_portfolio_truth.py tests/test_catalog_validator.py`: 56 passed, 1 deprecation warning from a legacy CLI invocation test.
 - `uv run ruff check .`: passed.
-- AIGCCore path cleanup was checked with `rg -n "/Users/d/Projects/AIGCCore" /Users/d/Projects/MoneyPRJsViaGPT/AIGCCore/AGENTS.md`; no stale matches remained.
+- AIGCCore path cleanup was checked with `rg -n "~/Projects/AIGCCore" ~/Projects/MoneyPRJsViaGPT/AIGCCore/AGENTS.md`; no stale matches remained.
 
 ## 2026-06-19 Publish Result
 
