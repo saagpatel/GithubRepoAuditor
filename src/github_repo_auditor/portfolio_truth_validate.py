@@ -1205,7 +1205,7 @@ def _validate_repository_state_shape(
     for index, worktree in enumerate(worktrees):
         _validate_worktree(worktree, project_key=project_key, index=index)
     paths = [worktree["path"] for worktree in worktrees]
-    if len({Path(path).resolve() for path in paths}) != len(paths):
+    if len({_path_identity(path) for path in paths}) != len(paths):
         raise ValueError(f"Repository worktree paths for {project_key} are duplicated.")
 
     topology = repository_state.get("topology")
@@ -1639,11 +1639,30 @@ def _optional_git_branch(value: Any) -> bool:
     return value is None or _valid_git_branch(value)
 
 
+def _path_identity(value: str) -> str:
+    """Identity for comparing a recorded worktree path.
+
+    A worktree outside the observed workspace is recorded as an opaque label such as
+    "external-worktree-2" rather than a real path, deliberately, so that paths outside
+    the workspace never reach published output. Those labels are not filesystem paths
+    and must not be resolved.
+
+    Resolving a value that is not absolute makes Python ask the operating system for
+    the process's working directory. For a label that answer is meaningless, and once
+    that directory has been deleted underneath the process the call raises
+    FileNotFoundError instead. That is what stopped the nightly portfolio job twice on
+    2026-08-11: a redacted label reached `.resolve()`, and the failure surfaced as a
+    bare traceback with no indication that a placeholder had been mistaken for a path.
+    """
+    candidate = Path(value)
+    return str(candidate.resolve()) if candidate.is_absolute() else value
+
+
 def _same_repository_path(left: Any, right: Any) -> bool:
     return (
         isinstance(left, str)
         and isinstance(right, str)
-        and Path(left).resolve() == Path(right).resolve()
+        and _path_identity(left) == _path_identity(right)
     )
 
 
