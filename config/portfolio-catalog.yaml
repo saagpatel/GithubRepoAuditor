@@ -1726,4 +1726,4 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: In flight, operator-driven. Ships 1-3 closed; Ship 4 Pump merge-ready on feat/ship4-pump with launchd assets deliberately unarmed pending a supervised run. Held at manual-only rather than active on purpose - active + maintain + infrastructure enrolls a repo in the Tier 0 cohort, whose size is a fail-closed contract pinned in the 01:30 collector and the 02:00 truth job. Promote only alongside those pins.
+    notes: In flight, operator-driven. Ships 1-3 closed; Ship 4 merge-ready with scheduled assets deliberately unarmed pending a supervised run. Held at manual-only rather than active on purpose - active + maintain + infrastructure enrolls a repo in the Tier 0 cohort, whose size is a fail-closed contract pinned in two scheduled jobs. Promote only alongside those pins.
