@@ -53,6 +53,8 @@ from github_repo_auditor.portfolio_truth_sources import (
     load_safe_notion_project_context,
 )
 from github_repo_auditor.portfolio_truth_validate import (
+    _path_identity,
+    _same_repository_path,
     canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
     validate_truth_snapshot,
@@ -1592,6 +1594,49 @@ def test_external_linked_worktree_flows_through_truth_validation_and_report(
     assert "No same-origin checkout collisions were observed." not in markdown
     assert str(external) not in markdown
     validate_portfolio_report_markdown(markdown)
+
+
+def test_opaque_worktree_label_is_not_resolved_against_the_filesystem(
+    tmp_path: Path,
+) -> None:
+    """A redacted label must keep its identity even with no working directory.
+
+    Deleting the process's working directory is the condition that took the nightly
+    portfolio job down: resolving a value that is not absolute asks the operating
+    system where the process is, and that question has no answer once the directory is
+    gone. The `pytest.raises` below is the point of the test rather than decoration. It
+    proves the hazard is still live in the standard library, so a later reader can see
+    that the guard is load-bearing and not a leftover.
+    """
+    previous = Path.cwd()
+    doomed = tmp_path / "doomed"
+    doomed.mkdir()
+    os.chdir(doomed)
+    doomed.rmdir()
+    try:
+        with pytest.raises(FileNotFoundError):
+            Path("external-worktree-2").resolve()
+        assert _path_identity("external-worktree-2") == "external-worktree-2"
+        assert _same_repository_path("external-worktree", "external-worktree")
+        assert not _same_repository_path("external-worktree", "external-worktree-2")
+    finally:
+        os.chdir(previous)
+
+
+def test_absolute_worktree_paths_still_compare_by_resolved_location(
+    tmp_path: Path,
+) -> None:
+    """Redaction must not cost the real check: two spellings of one path are one path."""
+    real = tmp_path / "repo"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real)
+
+    assert _path_identity(str(real)) == _path_identity(str(link))
+    assert _same_repository_path(str(real), str(link))
+    assert _same_repository_path(str(real), f"{real}/../repo")
+    assert not _same_repository_path(str(real), str(tmp_path / "other"))
+    assert not _same_repository_path(str(real), "external-worktree")
 
 
 def test_prunable_linked_worktree_is_unknown_not_publication_failure(
