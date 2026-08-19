@@ -23,7 +23,10 @@ from src.portfolio_truth_reconcile import (
     build_portfolio_truth_snapshot,
     load_prior_notion_context,
 )
-from src.portfolio_truth_render import render_portfolio_report_markdown, render_registry_markdown
+from src.portfolio_truth_render import (
+    render_portfolio_report_markdown,
+    render_registry_markdown,
+)
 from src.portfolio_truth_lineage import resolve_notion_origin
 from src.portfolio_truth_types import truth_latest_path
 from src.producer_preflight import ProducerEvidence, verify_evidence_still_current
@@ -131,9 +134,9 @@ def _load_prior_security_alerts(
     prior_final_cohort_count = sum(
         (project.get("derived") or {}).get("attention_state")
         in DEFAULT_ATTENTION_STATES
-        and not str((project.get("identity") or {}).get("project_key") or "").startswith(
-            "supp:"
-        )
+        and not str(
+            (project.get("identity") or {}).get("project_key") or ""
+        ).startswith("supp:")
         for project in projects
     )
     try:
@@ -221,8 +224,7 @@ def _verify_prior_security_evidence_current(
         ) from None
     except OSError as exc:
         raise PortfolioTruthPublishError(
-            "Prior PortfolioTruth could not be revalidated before publication: "
-            f"{exc}"
+            f"Prior PortfolioTruth could not be revalidated before publication: {exc}"
         ) from exc
 
     observed_sha256 = hashlib.sha256(content).hexdigest()
@@ -304,6 +306,7 @@ def publish_portfolio_truth(
     include_notion: bool = True,
     allow_empty_notion: bool = False,
     release_count_by_name: dict[str, int] | None = None,
+    degraded_dimensions_by_name: dict[str, list[str]] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, object] | None = None,
     security_receipt_binding: SecurityCoverageReceiptBinding | None = None,
@@ -314,8 +317,7 @@ def publish_portfolio_truth(
     now: datetime | None = None,
 ) -> PortfolioTruthPublishResult:
     if (
-        security_coverage_metadata is not None
-        or security_receipt_binding is not None
+        security_coverage_metadata is not None or security_receipt_binding is not None
     ) and now is None:
         raise PortfolioTruthPublishError(
             "Receipt-backed security publication requires an explicit evaluation clock."
@@ -360,6 +362,7 @@ def publish_portfolio_truth(
             include_notion=include_notion,
             allow_empty_notion=allow_empty_notion,
             release_count_by_name=release_count_by_name,
+            degraded_dimensions_by_name=degraded_dimensions_by_name,
             security_alerts_by_name=security_alerts_by_name,
             security_coverage_metadata=security_coverage_metadata,
             security_receipt_binding=security_receipt_binding,
@@ -382,6 +385,7 @@ def _publish_portfolio_truth_locked(
     include_notion: bool = True,
     allow_empty_notion: bool = False,
     release_count_by_name: dict[str, int] | None = None,
+    degraded_dimensions_by_name: dict[str, list[str]] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, object] | None = None,
     security_receipt_binding: SecurityCoverageReceiptBinding | None = None,
@@ -392,8 +396,7 @@ def _publish_portfolio_truth_locked(
     now: datetime | None = None,
 ) -> PortfolioTruthPublishResult:
     if (
-        security_coverage_metadata is not None
-        or security_receipt_binding is not None
+        security_coverage_metadata is not None or security_receipt_binding is not None
     ) and now is None:
         raise PortfolioTruthPublishError(
             "Receipt-backed security publication requires an explicit evaluation clock."
@@ -454,6 +457,7 @@ def _publish_portfolio_truth_locked(
         include_notion=include_notion,
         notion_context_fallback=notion_context_fallback,
         release_count_by_name=release_count_by_name,
+        degraded_dimensions_by_name=degraded_dimensions_by_name,
         security_alerts_by_name=security_alerts_by_name,
         security_coverage_metadata=security_coverage_metadata,
         prior_security_alerts_by_name=(
@@ -490,14 +494,18 @@ def _publish_portfolio_truth_locked(
         build_result.snapshot, include_notion=include_notion
     )
     registry_markdown = render_registry_markdown(build_result.snapshot)
-    report_markdown = render_portfolio_report_markdown(build_result.snapshot, latest_name)
+    report_markdown = render_portfolio_report_markdown(
+        build_result.snapshot, latest_name
+    )
 
     with tempfile.NamedTemporaryFile(
         "w", delete=False, dir=output_dir, suffix=".registry-check.md"
     ) as handle:
         temp_registry_path = Path(handle.name)
     try:
-        validate_registry_markdown(registry_markdown, build_result.snapshot, temp_registry_path)
+        validate_registry_markdown(
+            registry_markdown, build_result.snapshot, temp_registry_path
+        )
         validate_portfolio_report_markdown(report_markdown)
     finally:
         if temp_registry_path.exists():
@@ -512,7 +520,9 @@ def _publish_portfolio_truth_locked(
     }
     changed: dict[Path, bool] = {
         registry_output: _content_changed(registry_output, registry_markdown),
-        portfolio_report_output: _content_changed(portfolio_report_output, report_markdown),
+        portfolio_report_output: _content_changed(
+            portfolio_report_output, report_markdown
+        ),
         snapshot_path: True,
         latest_path: True,
         project_registry_path: True,
@@ -546,7 +556,10 @@ def _publish_portfolio_truth_locked(
             if prior_security_evidence is not None:
                 _verify_prior_security_evidence_current(prior_security_evidence)
             for path, staged in temp_files.items():
-                if path in {registry_output, portfolio_report_output} and not changed[path]:
+                if (
+                    path in {registry_output, portfolio_report_output}
+                    and not changed[path]
+                ):
                     continue
                 staged.replace(path)
                 _fsync_directory(path.parent)

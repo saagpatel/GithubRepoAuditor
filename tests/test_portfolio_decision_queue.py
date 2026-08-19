@@ -105,7 +105,7 @@ def _project(
 
 def _truth(projects: list[dict], *, generated_at: str = GENERATED_AT) -> dict:
     return {
-        "schema_version": "0.11.0",
+        "schema_version": "0.12.0",
         "generated_at": generated_at,
         "producer": {
             "commit": PRODUCER_COMMIT,

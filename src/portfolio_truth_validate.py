@@ -414,6 +414,12 @@ def _validate_runtime_dataclass(value: object, path: str) -> None:
             raise ValueError(
                 f"Portfolio truth {path} observation counts must be non-negative."
             )
+        if value.degraded_dimensions is not None and any(
+            not isinstance(name, str) or not name for name in value.degraded_dimensions
+        ):
+            raise ValueError(
+                f"Portfolio truth {path}.degraded_dimensions must be nonempty strings."
+            )
     if isinstance(value, SecurityFields):
         count_fields = (
             value.dependabot_critical,
@@ -1936,9 +1942,7 @@ def canonicalize_prior_security_truth_payload(
             expected_warnings = build_warnings(
                 catalog_errors=summary["catalog_errors"],
                 catalog_warnings=summary["catalog_warnings"],
-                unresolved_duplicates=summary[
-                    "unresolved_duplicate_display_names"
-                ],
+                unresolved_duplicates=summary["unresolved_duplicate_display_names"],
                 checkout_collisions=[],
             )
             if snapshot.warnings != expected_warnings:
@@ -1973,11 +1977,9 @@ def canonicalize_prior_security_truth_payload(
                     raise ValueError(
                         "Legacy prior PortfolioTruth project envelope is invalid."
                     )
-                current_risk, current_attention = (
-                    _project_decision_for_security_policy(
-                        project,
-                        legacy_dependabot_only=False,
-                    )
+                current_risk, current_attention = _project_decision_for_security_policy(
+                    project,
+                    legacy_dependabot_only=False,
                 )
                 raw_project["risk"] = current_risk
                 raw_project["derived"]["attention_state"] = current_attention

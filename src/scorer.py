@@ -198,6 +198,7 @@ def score_repo(
         interest_tier=interest_tier,
         grade=grade,
         scored_dimensions=scored_dimensions,
+        degraded_dimensions=degraded_dimensions,
         scored_weight_sum=weight_sum,
         interest_grade=letter_grade(interest_score, grade_thresholds),
         flags=flags,

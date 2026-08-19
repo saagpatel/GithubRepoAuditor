@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Optional
 
 
-
 def _parse_dt(value: str | None) -> Optional[datetime]:
     """Parse GitHub API datetime string to timezone-aware datetime."""
     if not value:
@@ -98,6 +97,10 @@ class RepoAudit:
     interest_tier: str = "mundane"
     grade: str = "F"
     scored_dimensions: list[str] = field(default_factory=list)
+    # Dimensions whose analyzer crashed this run (details["error"] set) and were
+    # excluded from the score, so a consumer can tell "graded low" from "could
+    # not grade". Empty when every analyzer ran; see scorer.score_repo.
+    degraded_dimensions: list[str] = field(default_factory=list)
     scored_weight_sum: float = 0.0
     interest_grade: str = "F"
     badges: list[str] = field(default_factory=list)
@@ -125,6 +128,7 @@ class RepoAudit:
             "interest_tier": self.interest_tier,
             "grade": self.grade,
             "scored_dimensions": self.scored_dimensions,
+            "degraded_dimensions": self.degraded_dimensions,
             "scored_weight_sum": round(self.scored_weight_sum, 3),
             "interest_grade": self.interest_grade,
             "badges": self.badges,

@@ -11,9 +11,13 @@ from src.security_admission import (
     derive_security_admission,
 )
 
-SCHEMA_VERSION = "0.11.0"
+SCHEMA_VERSION = "0.12.0"
 CHECKOUT_COLLISION_SCHEMA_VERSION = "CheckoutCollisionV1"
 CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION = "CheckoutCollisionSummaryV1"
+# 0.12.0: additive opt-in derived.degraded_dimensions overlay names the analyzer
+# dimensions that crashed in the prior audit run (excluded from the score) so a
+# truth consumer can tell "graded low" from "could not grade"; null when no audit
+# overlay was requested. 0.11 readers ignore the additive key.
 # 0.11.0: provenance-bearing GitHub security receipts preserve per-provider
 # states and expose complete/partial/stale/unknown coverage denominators.
 # Additive 0.11.0 fields bind normalized provider reason codes, completed-zero
@@ -26,7 +30,7 @@ CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION = "CheckoutCollisionSummaryV1"
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
 # activity_status); derived.archived added as a first-class lifecycle boolean;
 # source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
-LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0"}
+LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}
 DERIVATION_POLICY_VERSION = "portfolio_attention.v3"
 
 # The published "latest" portfolio-truth artifact. The producer
@@ -173,6 +177,10 @@ class DerivedFields:
     readme_char_count: int = 0
     # Opt-in: populated from prior warehouse audit via --portfolio-truth-include-release-count
     release_count: int | None = None
+    # Opt-in: analyzer dimensions that crashed in the prior audit run and were
+    # excluded from the score, via --portfolio-truth-include-degraded-dimensions.
+    # None = no audit overlay this run; [] = the audit ran with every analyzer clean.
+    degraded_dimensions: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = dataclasses.asdict(self)

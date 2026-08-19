@@ -388,6 +388,7 @@ def build_portfolio_truth_snapshot(
     notion_context_fallback: dict[str, dict[str, str]] | None = None,
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
+    degraded_dimensions_by_name: dict[str, list[str]] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, Any] | None = None,
     prior_security_alerts_by_name: dict[str, dict] | None = None,
@@ -448,6 +449,7 @@ def build_portfolio_truth_snapshot(
                 now=now,
                 workspace_root=workspace_root,
                 release_count_by_name=release_count_by_name,
+                degraded_dimensions_by_name=degraded_dimensions_by_name,
                 security_alerts_by_name=security_lookup,
                 repo_status_by_name=repo_status_lookup,
             )
@@ -802,6 +804,7 @@ def _build_truth_project(
     now: datetime,
     workspace_root: Path,
     release_count_by_name: dict[str, int] | None = None,
+    degraded_dimensions_by_name: dict[str, list[str]] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthProject:
@@ -1115,6 +1118,11 @@ def _build_truth_project(
     derived_release_count: int | None = None
     if release_count_by_name is not None:
         derived_release_count = release_count_by_name.get(raw_project["name"])
+    derived_degraded_dimensions: list[str] | None = None
+    if degraded_dimensions_by_name is not None:
+        derived_degraded_dimensions = degraded_dimensions_by_name.get(
+            raw_project["name"]
+        )
 
     derived = DerivedFields(
         stack=raw_project["stack"],
@@ -1142,6 +1150,7 @@ def _build_truth_project(
         has_license=derived_has_license,
         readme_char_count=derived_readme_char_count,
         release_count=derived_release_count,
+        degraded_dimensions=derived_degraded_dimensions,
     )
     advisory = AdvisoryFields(
         notion_portfolio_call=notion.get("portfolio_call", ""),

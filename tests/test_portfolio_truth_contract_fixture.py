@@ -57,10 +57,7 @@ def test_committed_contract_artifacts_match_the_deterministic_generator() -> Non
 
 
 def test_portable_profile_artifacts_match_the_deterministic_generator() -> None:
-    assert (
-        Path(PORTABLE_FIXTURE_RELATIVE_PATH).read_bytes()
-        == portable_fixture_bytes()
-    )
+    assert Path(PORTABLE_FIXTURE_RELATIVE_PATH).read_bytes() == portable_fixture_bytes()
     for profile_id, manifest_path in CONSUMER_PROFILE_MANIFEST_PATHS.items():
         assert Path(manifest_path).read_bytes() == consumer_profile_manifest_bytes(
             profile_id
@@ -78,15 +75,11 @@ def test_portable_profiles_share_one_public_safe_artifact() -> None:
     assert fixture["contract_fixture"]["contract_version"] == (
         PORTABLE_CONTRACT_VERSION
     )
-    assert {
-        manifest["producer"]["artifact_path"] for manifest in manifests
-    } == {PORTABLE_FIXTURE_RELATIVE_PATH}
-    assert len(
-        {manifest["producer"]["artifact_sha256"] for manifest in manifests}
-    ) == 1
-    assert {
-        manifest["consumer_profile"]["id"] for manifest in manifests
-    } == {
+    assert {manifest["producer"]["artifact_path"] for manifest in manifests} == {
+        PORTABLE_FIXTURE_RELATIVE_PATH
+    }
+    assert len({manifest["producer"]["artifact_sha256"] for manifest in manifests}) == 1
+    assert {manifest["consumer_profile"]["id"] for manifest in manifests} == {
         "operator-control-plane-v1",
         "public-site-projection-v1",
     }
@@ -109,9 +102,7 @@ def test_portable_profiles_bind_fixed_clock_additions_and_fail_closed_cases() ->
             case["case_id"]: case for case in manifest["acceptance"]["coverage_cases"]
         }
         assert cases["valid-current-schema"]["expected"] == "accept"
-        assert cases["additive-canary"]["expected"] == (
-            "accept-ignore-addition"
-        )
+        assert cases["additive-canary"]["expected"] == ("accept-ignore-addition")
         assert cases["missing-schema-version"]["expected"] == "reject"
         assert cases["malformed-root"]["expected"] == "reject"
         assert manifest["acceptance"]["fail_closed_behavior"]
@@ -121,8 +112,9 @@ def test_portable_profiles_bind_fixed_clock_additions_and_fail_closed_cases() ->
         "dovetail-forge",
         "kestrel-loom",
     ]
-    assert projection["expected_curated_repo_slugs"] == (
-        projection["allowlisted_repo_slugs"]
+    assert (
+        projection["expected_curated_repo_slugs"]
+        == (projection["allowlisted_repo_slugs"])
     )
 
 
@@ -198,8 +190,7 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
 def test_contract_fixture_paths_match_the_production_helper() -> None:
     fixture = build_contract_fixture()
     projects = {
-        project["identity"]["display_name"]: project
-        for project in fixture["projects"]
+        project["identity"]["display_name"]: project for project in fixture["projects"]
     }
 
     for project in projects.values():
@@ -231,6 +222,13 @@ def test_contract_fixture_paths_match_the_production_helper() -> None:
     assert projects["Solstice Cairn"]["risk"]["path_risk"] is True
     assert projects["Solstice Cairn"]["risk"]["risk_tier"] == "elevated"
     assert projects["Solstice Cairn"]["derived"]["attention_state"] == "manual-only"
+
+
+def test_contract_accepts_populated_degraded_dimensions_overlay() -> None:
+    fixture = build_contract_fixture()
+    fixture["projects"][0]["derived"]["degraded_dimensions"] = ["cicd", "testing"]
+
+    validate_truth_snapshot_payload(fixture)
 
 
 def test_contract_fixture_carries_the_required_project_provenance_set() -> None:
@@ -511,21 +509,19 @@ def test_contract_matrix_marker_does_not_auto_enable_with_producer_evidence() ->
             "source summary",
         ),
         (
-            lambda payload: payload["source_summary"].pop(
-                "activity_status_counts"
+            lambda payload: payload["source_summary"].pop("activity_status_counts"),
+            "source summary",
+        ),
+        (
+            lambda payload: payload["source_summary"]["context_quality_counts"].update(
+                full=99
             ),
             "source summary",
         ),
         (
-            lambda payload: payload["source_summary"][
-                "context_quality_counts"
-            ].update(full=99),
-            "source summary",
-        ),
-        (
-            lambda payload: payload["source_summary"][
-                "attention_state_counts"
-            ].update(parked=99),
+            lambda payload: payload["source_summary"]["attention_state_counts"].update(
+                parked=99
+            ),
             "source summary",
         ),
         (
@@ -533,9 +529,7 @@ def test_contract_matrix_marker_does_not_auto_enable_with_producer_evidence() ->
             "source summary",
         ),
         (
-            lambda payload: payload["source_summary"].update(
-                github_archived_count=99
-            ),
+            lambda payload: payload["source_summary"].update(github_archived_count=99),
             "source summary",
         ),
         (
@@ -555,9 +549,7 @@ def test_contract_matrix_marker_does_not_auto_enable_with_producer_evidence() ->
             "workspace_root",
         ),
         (
-            lambda payload: payload["inputs"]["catalog"].update(
-                source_id="fabricated"
-            ),
+            lambda payload: payload["inputs"]["catalog"].update(source_id="fabricated"),
             "catalog input",
         ),
         (
@@ -587,9 +579,7 @@ def test_contract_matrix_marker_does_not_auto_enable_with_producer_evidence() ->
             "workspace input",
         ),
         (
-            lambda payload: payload["source_summary"].update(
-                notion_context_rows=1
-            ),
+            lambda payload: payload["source_summary"].update(notion_context_rows=1),
             "Notion input",
         ),
         (
@@ -742,12 +732,12 @@ def test_contract_accepts_canonical_producer_evidence_shape() -> None:
 def test_contract_rejects_future_producer_evidence() -> None:
     fixture = build_contract_fixture()
     fixture["producer"] = _valid_producer_evidence()
-    fixture["producer"]["verified_at"] = (GENERATED_AT + timedelta(seconds=1)).isoformat()
+    fixture["producer"]["verified_at"] = (
+        GENERATED_AT + timedelta(seconds=1)
+    ).isoformat()
 
     with pytest.raises(ValueError, match="future-dated"):
-        validate_truth_snapshot_payload(
-            fixture, allow_synthetic_security_matrix=True
-        )
+        validate_truth_snapshot_payload(fixture, allow_synthetic_security_matrix=True)
 
 
 def test_contract_binds_github_security_commit_to_producer_evidence() -> None:
@@ -768,9 +758,7 @@ def test_contract_binds_github_security_commit_to_producer_evidence() -> None:
     }
 
     with pytest.raises(ValueError, match="differs from producer evidence"):
-        validate_truth_snapshot_payload(
-            fixture, allow_synthetic_security_matrix=True
-        )
+        validate_truth_snapshot_payload(fixture, allow_synthetic_security_matrix=True)
 
 
 @pytest.mark.parametrize(
@@ -799,9 +787,7 @@ def test_contract_rejects_malformed_producer_evidence(
     mutation(fixture["producer"])
 
     with pytest.raises(ValueError, match=message):
-        validate_truth_snapshot_payload(
-            fixture, allow_synthetic_security_matrix=True
-        )
+        validate_truth_snapshot_payload(fixture, allow_synthetic_security_matrix=True)
 
 
 @pytest.mark.parametrize(
@@ -830,9 +816,7 @@ def test_contract_rejects_old_delimiter_collision_producer_identities(
     fixture["producer"] = producer
 
     with pytest.raises(ValueError, match="control-free text"):
-        validate_truth_snapshot_payload(
-            fixture, allow_synthetic_security_matrix=True
-        )
+        validate_truth_snapshot_payload(fixture, allow_synthetic_security_matrix=True)
 
 
 def test_contract_rejects_forged_supplementary_project_key() -> None:
@@ -900,6 +884,8 @@ def test_contract_rejects_malformed_project_metadata(
         ("derived", "context_files", 7, "context_files"),
         ("derived", "context_file_count", -99, "context_file_count"),
         ("derived", "has_ci", "yes", "has_ci"),
+        ("derived", "degraded_dimensions", 7, "degraded_dimensions"),
+        ("derived", "degraded_dimensions", [""], "degraded_dimensions"),
         ("advisory", "notion_momentum", 7, "notion_momentum"),
         ("risk", "risk_factors", {}, "risk_factors"),
         ("risk", "security_risk", "false", "security_risk"),
@@ -1122,9 +1108,7 @@ def test_canonical_payload_validation_rejects_invalid_provider_state() -> None:
 
 def test_canonical_payload_validation_rejects_observed_provider_count_shape() -> None:
     fixture = build_contract_fixture()
-    counts = _complete_project(fixture)["security"]["providers"]["dependabot"][
-        "counts"
-    ]
+    counts = _complete_project(fixture)["security"]["providers"]["dependabot"]["counts"]
     del counts["low"]
 
     with pytest.raises(ValueError, match="counts are invalid"):
@@ -1795,9 +1779,9 @@ def test_canonical_payload_validation_rejects_invalid_remote_branch_shape(
     value: object,
 ) -> None:
     fixture = build_contract_fixture()
-    _complete_project(fixture)["repository_state"]["remote_default_branch"][
-        field
-    ] = value
+    _complete_project(fixture)["repository_state"]["remote_default_branch"][field] = (
+        value
+    )
 
     with pytest.raises(ValueError, match="Invalid remote default branch"):
         validate_truth_snapshot_payload(fixture)

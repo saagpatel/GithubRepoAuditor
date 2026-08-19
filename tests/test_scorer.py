@@ -66,6 +66,8 @@ def test_crashed_analyzer_is_not_counted_as_a_genuine_zero():
 
     # The crash is surfaced, not swallowed.
     assert "analyzer-degraded" in audit.flags
+    # ...and the specific degraded dimension is named, not just flagged.
+    assert audit.degraded_dimensions == ["readme"]
     # The failed dimension is excluded from the scored basis → partial run.
     assert "readme" not in audit.scored_dimensions
     assert audit.scored_weight_sum < sum(WEIGHTS.values())
@@ -82,6 +84,7 @@ def test_genuine_zero_is_still_counted():
     audit = score_repo(_make_metadata(), results)
 
     assert "analyzer-degraded" not in audit.flags
+    assert audit.degraded_dimensions == []
     assert "readme" in audit.scored_dimensions
     assert "no-readme" in audit.flags
     # Full basis: nothing was excluded.
