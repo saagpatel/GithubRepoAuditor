@@ -18,7 +18,9 @@ from src.github_security_coverage import (
 )
 
 
-def load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
+def load_release_count_by_name(
+    *, output_dir: Path, username: str
+) -> dict[str, int] | None:
     audit_files = sorted(
         output_dir.glob(f"audit-report-{username}-*.json"),
         key=lambda path: path.stat().st_mtime,
@@ -48,10 +50,52 @@ def load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, 
             continue
         for analyzer_result in audit.get("analyzer_results") or []:
             if analyzer_result.get("dimension") == "activity":
-                release_count = (analyzer_result.get("details") or {}).get("release_count")
+                release_count = (analyzer_result.get("details") or {}).get(
+                    "release_count"
+                )
                 if isinstance(release_count, int):
                     result[name] = release_count
                 break
+    return result
+
+
+def load_degraded_dimensions_by_name(
+    *, output_dir: Path, username: str
+) -> dict[str, list[str]] | None:
+    audit_files = sorted(
+        output_dir.glob(f"audit-report-{username}-*.json"),
+        key=lambda path: path.stat().st_mtime,
+    )
+    if not audit_files:
+        logging.getLogger(__name__).warning(
+            "--portfolio-truth-include-degraded-dimensions requires a prior audit run; "
+            "no audit-report-%s-*.json found in %s — skipping degraded_dimensions overlay",
+            username,
+            output_dir,
+        )
+        return None
+    try:
+        with audit_files[-1].open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).warning(
+            "--portfolio-truth-include-degraded-dimensions: could not read %s: %s — skipping",
+            audit_files[-1],
+            exc,
+        )
+        return None
+    result: dict[str, list[str]] = {}
+    for audit in data.get("audits") or []:
+        name = (audit.get("metadata") or {}).get("name")
+        if not name:
+            continue
+        degraded = audit.get("degraded_dimensions")
+        if isinstance(degraded, list):
+            # [] here means the audit ran with every analyzer clean.
+            result[name] = sorted(str(item) for item in degraded)
+        # An audit report predating the field carries no degraded evidence:
+        # leave the repo out so the overlay resolves to None ("unknown") rather
+        # than a false empty list ("audit ran clean").
     return result
 
 

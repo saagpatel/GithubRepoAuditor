@@ -97,8 +97,17 @@ def score_repo(
         for k in other_keys:
             weights[k] += activity_reduction * (weights[k] / other_total)
 
-    # Compute completeness score (weighted average of all non-interest dimensions)
-    score_map = {r.dimension: r.score for r in results}
+    # Compute completeness score (weighted average of all non-interest dimensions).
+    # A crashed analyzer is recorded with score=0.0 and details={"error": ...}
+    # (analyzers.run_all_analyzers). Excluding those results here keeps a transient
+    # failure (a rate-limit, a file that chokes an analyzer) from masquerading as a
+    # genuine zero: the dimension drops out of the weighted average, which then
+    # renormalizes over the dimensions that actually ran, and out of
+    # scored_weight_sum, so the existing partial-run disclosure fires instead of a
+    # silently deflated grade. "error" is set only by the crash handler, so this
+    # never excludes a legitimate zero.
+    degraded_dimensions = sorted(r.dimension for r in results if r.details.get("error"))
+    score_map = {r.dimension: r.score for r in results if not r.details.get("error")}
     weighted_sum = 0.0
     weight_sum = 0.0
 
@@ -109,6 +118,10 @@ def score_repo(
 
     overall_score = weighted_sum / weight_sum if weight_sum > 0 else 0.0
     scored_dimensions = [dimension for dimension in weights if dimension in score_map]
+    if degraded_dimensions:
+        # Surfaced signal so downstream (truth JSON, dashboards) can tell
+        # "graded low" from "couldn't grade this run".
+        flags.append("analyzer-degraded")
 
     # Compute interest score (separate axis, from interest analyzer)
     interest_score = score_map.get("interest", 0.0)
@@ -185,6 +198,7 @@ def score_repo(
         interest_tier=interest_tier,
         grade=grade,
         scored_dimensions=scored_dimensions,
+        degraded_dimensions=degraded_dimensions,
         scored_weight_sum=weight_sum,
         interest_grade=letter_grade(interest_score, grade_thresholds),
         flags=flags,

@@ -79,10 +79,10 @@
     "producer_evidence": "absent",
     "project_count": 4
   },
-  "portfolio_truth_schema_version": "0.11.0",
+  "portfolio_truth_schema_version": "0.12.0",
   "producer": {
     "artifact_path": "fixtures/contracts/portable-consumers-v1/portfolio-truth.json",
-    "artifact_sha256": "e79ca6b203ff58b8b6ffbb01e778305887dfba4e4caf66334defea6ccc1713df",
+    "artifact_sha256": "ef77eda2c5bd7e6dd1b668d67a378308e08e9ece26744fa0b0e8843ab5f38008",
     "generator": "src.portfolio_truth_contract_fixture:build_portable_contract_fixture",
     "manifest_path": "fixtures/contracts/public-site-projection-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"

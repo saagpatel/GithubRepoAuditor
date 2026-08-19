@@ -261,6 +261,7 @@
         ],
         "context_quality": "minimum-viable",
         "current_state_present": true,
+        "degraded_dimensions": null,
         "has_ci": true,
         "has_license": true,
         "has_tests": true,
@@ -606,6 +607,7 @@
         ],
         "context_quality": "boilerplate",
         "current_state_present": false,
+        "degraded_dimensions": null,
         "has_ci": true,
         "has_license": true,
         "has_tests": false,
@@ -897,6 +899,7 @@
         ],
         "context_quality": "full",
         "current_state_present": true,
+        "degraded_dimensions": null,
         "has_ci": true,
         "has_license": true,
         "has_tests": true,
@@ -1258,6 +1261,7 @@
         ],
         "context_quality": "standard",
         "current_state_present": true,
+        "degraded_dimensions": null,
         "has_ci": true,
         "has_license": true,
         "has_tests": true,
@@ -1618,7 +1622,7 @@
       "unknown_count": 1
     }
   },
-  "schema_version": "0.11.0",
+  "schema_version": "0.12.0",
   "source_summary": {
     "activity_status_counts": {
       "active": 1,

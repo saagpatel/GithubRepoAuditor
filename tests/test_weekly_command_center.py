@@ -420,7 +420,7 @@ def _security_project(
 
 def _digest_for(portfolio_truth: dict) -> dict:
     portfolio_truth = {
-        "schema_version": "0.11.0",
+        "schema_version": "0.12.0",
         "generated_at": "2026-04-14T12:00:00+00:00",
         "producer": {
             "commit": "a" * 40,

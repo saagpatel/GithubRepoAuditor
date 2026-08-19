@@ -16,7 +16,9 @@ def _make_results(scores: dict[str, float]) -> list[AnalyzerResult]:
         if dim == "code_quality":
             details = {"entry_point": "main.py", "total_loc": 500}
         results.append(
-            AnalyzerResult(dimension=dim, score=score, max_score=1.0, findings=[], details=details)
+            AnalyzerResult(
+                dimension=dim, score=score, max_score=1.0, findings=[], details=details
+            )
         )
     return results
 
@@ -45,6 +47,48 @@ def _make_metadata(**overrides) -> RepoMetadata:
     )
     defaults.update(overrides)
     return RepoMetadata(**defaults)
+
+
+def test_crashed_analyzer_is_not_counted_as_a_genuine_zero():
+    """A crashed analyzer (details={"error": ...}, score=0.0) must not deflate the
+    grade as if the dimension genuinely scored zero. It drops out of the weighted
+    average and scored_weight_sum (so the partial-run disclosure can fire) and the
+    audit is flagged degraded, instead of silently reading as a real failing grade."""
+    healthy = _make_results({dim: 1.0 for dim in WEIGHTS if dim != "readme"})
+    crashed = AnalyzerResult(
+        dimension="readme",
+        score=0.0,
+        max_score=1.0,
+        findings=["Analysis failed: boom"],
+        details={"error": "boom"},
+    )
+    audit = score_repo(_make_metadata(), healthy + [crashed])
+
+    # The crash is surfaced, not swallowed.
+    assert "analyzer-degraded" in audit.flags
+    # ...and the specific degraded dimension is named, not just flagged.
+    assert audit.degraded_dimensions == ["readme"]
+    # The failed dimension is excluded from the scored basis → partial run.
+    assert "readme" not in audit.scored_dimensions
+    assert audit.scored_weight_sum < sum(WEIGHTS.values())
+    # Renormalized over the dimensions that actually ran (all 1.0), NOT dragged to F.
+    assert audit.overall_score > 0.9
+    # A crashed readme analyzer must not assert the false "no-readme" claim.
+    assert "no-readme" not in audit.flags
+
+
+def test_genuine_zero_is_still_counted():
+    """A real zero (score=0.0, no error marker) must still count normally — the
+    crash-exclusion must not accidentally drop legitimate zeros."""
+    results = _make_results({dim: (0.0 if dim == "readme" else 1.0) for dim in WEIGHTS})
+    audit = score_repo(_make_metadata(), results)
+
+    assert "analyzer-degraded" not in audit.flags
+    assert audit.degraded_dimensions == []
+    assert "readme" in audit.scored_dimensions
+    assert "no-readme" in audit.flags
+    # Full basis: nothing was excluded.
+    assert abs(audit.scored_weight_sum - sum(WEIGHTS.values())) < 1e-9
 
 
 class TestScoring:
@@ -125,7 +169,9 @@ class TestFlags:
 class TestPortfolioNovelty:
     """Portfolio-relative novelty reduces interest for dominant 'novel' languages."""
 
-    def _results_with_interest(self, novelty: float = 0.10, total_interest: float = 0.50):
+    def _results_with_interest(
+        self, novelty: float = 0.10, total_interest: float = 0.50
+    ):
         results = _make_results({dim: 0.5 for dim in WEIGHTS})
         results.append(
             AnalyzerResult(
@@ -322,7 +368,9 @@ class TestCompletenessTiers:
     def test_abandoned_tier_name(self):
         # Results with no structure/code_quality details → no meaningful files
         bare_results = [
-            AnalyzerResult(dimension=dim, score=0.0, max_score=1.0, findings=[], details={})
+            AnalyzerResult(
+                dimension=dim, score=0.0, max_score=1.0, findings=[], details={}
+            )
             for dim in WEIGHTS
         ]
         audit = score_repo(_make_metadata(), bare_results)
@@ -457,7 +505,9 @@ class TestScoreRepoDefaults:
 class TestComputePortfolioGrade:
     from src.scorer import compute_portfolio_grade
 
-    def _audit(self, score: float, tier: str, language: str = "Python", badges: int = 0):
+    def _audit(
+        self, score: float, tier: str, language: str = "Python", badges: int = 0
+    ):
         results = _make_results({dim: score for dim in WEIGHTS})
         meta = _make_metadata(language=language)
         audit = score_repo(meta, results)
@@ -527,7 +577,16 @@ class TestComputePortfolioGrade:
 
         audits = [
             self._audit(0.5, "functional", lang)
-            for lang in ["Python", "Rust", "Go", "Swift", "TypeScript", "Java", "C++", "Kotlin"]
+            for lang in [
+                "Python",
+                "Rust",
+                "Go",
+                "Swift",
+                "TypeScript",
+                "Java",
+                "C++",
+                "Kotlin",
+            ]
         ]
         _, score = compute_portfolio_grade(audits)
         # Bonus capped at 0.10, not 1.10
@@ -550,7 +609,9 @@ class TestComputePortfolioGrade:
         from src.scorer import compute_portfolio_grade
 
         audits_3 = [self._audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go"]]
-        audits_4 = [self._audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go", "Swift"]]
+        audits_4 = [
+            self._audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go", "Swift"]
+        ]
         _, score3 = compute_portfolio_grade(audits_3)
         _, score4 = compute_portfolio_grade(audits_4)
         # 4 langs gives 0.05 bonus, 3 langs gives 0 bonus
@@ -566,7 +627,11 @@ class TestComputePortfolioGrade:
             self._audit(0.5, "wip"),
         ]
         _, score_high = compute_portfolio_grade(audits)
-        audits_low = [self._audit(0.5, "wip"), self._audit(0.5, "wip"), self._audit(0.5, "wip")]
+        audits_low = [
+            self._audit(0.5, "wip"),
+            self._audit(0.5, "wip"),
+            self._audit(0.5, "wip"),
+        ]
         _, score_low = compute_portfolio_grade(audits_low)
         assert score_high > score_low
 
@@ -724,7 +789,9 @@ class TestCountMeaningfulFiles:
     def test_no_relevant_dimensions_returns_zero(self):
         # Kills return 0 → return 1 mutation
         results = [
-            AnalyzerResult(dimension="readme", score=0.5, max_score=1.0, findings=[], details={})
+            AnalyzerResult(
+                dimension="readme", score=0.5, max_score=1.0, findings=[], details={}
+            )
         ]
         from src.scorer import _count_meaningful_files
 
@@ -748,7 +815,9 @@ class TestCountMeaningfulFiles:
     def test_readme_only_repo_forces_skeleton_tier(self):
         # Kills tier = "XXskeletonXX" and tier = None mutations in score_repo
         bare = [
-            AnalyzerResult(dimension=dim, score=0.9, max_score=1.0, findings=[], details={})
+            AnalyzerResult(
+                dimension=dim, score=0.9, max_score=1.0, findings=[], details={}
+            )
             for dim in WEIGHTS
         ]
         audit = score_repo(_make_metadata(), bare)
@@ -758,7 +827,9 @@ class TestCountMeaningfulFiles:
     def test_readme_only_flag_present(self):
         # Kills flags.append("XXreadme-onlyXX") mutation
         bare = [
-            AnalyzerResult(dimension=dim, score=0.9, max_score=1.0, findings=[], details={})
+            AnalyzerResult(
+                dimension=dim, score=0.9, max_score=1.0, findings=[], details={}
+            )
             for dim in WEIGHTS
         ]
         audit = score_repo(_make_metadata(), bare)
@@ -880,7 +951,9 @@ class TestScoreRepoAdditional:
                 score=0.1,
                 max_score=1.0,
                 findings=[],
-                details=({"config_files": ["pyproject.toml"]} if dim == "structure" else {}),
+                details=(
+                    {"config_files": ["pyproject.toml"]} if dim == "structure" else {}
+                ),
             )
             for dim in WEIGHTS
         ]
@@ -942,8 +1015,12 @@ class TestScoreRepoAdditional:
     def test_fork_activity_weight_set_correctly(self):
         # Kills weights["XXactivityXX"] mutation
         # Vary only activity score to verify fork reduces its impact
-        results_high_act = _make_results({**{dim: 0.5 for dim in WEIGHTS}, "activity": 1.0})
-        results_low_act = _make_results({**{dim: 0.5 for dim in WEIGHTS}, "activity": 0.0})
+        results_high_act = _make_results(
+            {**{dim: 0.5 for dim in WEIGHTS}, "activity": 1.0}
+        )
+        results_low_act = _make_results(
+            {**{dim: 0.5 for dim in WEIGHTS}, "activity": 0.0}
+        )
         meta_fork = _make_metadata(fork=True)
         audit_high = score_repo(meta_fork, results_high_act)
         audit_low = score_repo(meta_fork, results_low_act)
@@ -1025,7 +1102,9 @@ class TestScoreRepoAdditional:
 class TestComputePortfolioGradeAdditional:
     """Extra coverage for portfolio grade boundary mutations."""
 
-    def _simple_audit(self, score: float, tier: str, language: str = "Python", badges: int = 0):
+    def _simple_audit(
+        self, score: float, tier: str, language: str = "Python", badges: int = 0
+    ):
         results = _make_results({dim: score for dim in WEIGHTS})
         meta = _make_metadata(language=language)
         audit = score_repo(meta, results)
@@ -1060,8 +1139,14 @@ class TestComputePortfolioGradeAdditional:
         # With ratio=0.5 (> 0.5 is False, but > 0.3 is True) → gets 0.05 bonus, not 0.10
         from src.scorer import compute_portfolio_grade
 
-        audits_exactly_50 = [self._simple_audit(0.5, "shipped"), self._simple_audit(0.5, "wip")]
-        audits_all_wip = [self._simple_audit(0.5, "wip"), self._simple_audit(0.5, "wip")]
+        audits_exactly_50 = [
+            self._simple_audit(0.5, "shipped"),
+            self._simple_audit(0.5, "wip"),
+        ]
+        audits_all_wip = [
+            self._simple_audit(0.5, "wip"),
+            self._simple_audit(0.5, "wip"),
+        ]
         _, score_50 = compute_portfolio_grade(audits_exactly_50)
         _, score_0 = compute_portfolio_grade(audits_all_wip)
         assert score_50 > score_0  # 0.05 bonus
@@ -1100,7 +1185,9 @@ class TestComputePortfolioGradeAdditional:
         from src.scorer import compute_portfolio_grade
 
         # 1 abandoned out of 5: / → 0.2; * → 1.0 (then penalty would be -0.10 not -0.05)
-        audits = [self._simple_audit(0.5, "abandoned")] + [self._simple_audit(0.5, "wip")] * 4
+        audits = [self._simple_audit(0.5, "abandoned")] + [
+            self._simple_audit(0.5, "wip")
+        ] * 4
         _, score = compute_portfolio_grade(audits)
         # 0.2 abandon ratio → -0 penalty (below 0.4 threshold)
         audits_none = [self._simple_audit(0.5, "wip")] * 5
@@ -1116,7 +1203,9 @@ class TestComputePortfolioGradeAdditional:
         audits_60 = [self._simple_audit(0.5, "abandoned")] * 3 + [
             self._simple_audit(0.5, "wip")
         ] * 2
-        audits_80 = [self._simple_audit(0.5, "abandoned")] * 4 + [self._simple_audit(0.5, "wip")]
+        audits_80 = [self._simple_audit(0.5, "abandoned")] * 4 + [
+            self._simple_audit(0.5, "wip")
+        ]
         _, score_60 = compute_portfolio_grade(audits_60)
         _, score_80 = compute_portfolio_grade(audits_80)
         # 80% > 60% → score_80 should be lower (more penalty)
@@ -1175,7 +1264,8 @@ class TestComputePortfolioGradeAdditional:
         # Both wrong paths give 0.10 instead of 0.05 for 4 languages
         # We need a test that distinguishes 0.05 from 0.10 for 4 languages
         audits_4langs = [
-            self._simple_audit(0.5, "wip", lang) for lang in ["Python", "Rust", "Go", "Swift"]
+            self._simple_audit(0.5, "wip", lang)
+            for lang in ["Python", "Rust", "Go", "Swift"]
         ]
         audits_5langs = [
             self._simple_audit(0.5, "wip", lang)
@@ -1200,7 +1290,9 @@ class TestComputePortfolioGradeAdditional:
         # Kills -0.10 → -1.10 for high abandonment penalty
         from src.scorer import compute_portfolio_grade
 
-        audits = [self._simple_audit(0.5, "abandoned")] * 4 + [self._simple_audit(0.5, "wip")]
+        audits = [self._simple_audit(0.5, "abandoned")] * 4 + [
+            self._simple_audit(0.5, "wip")
+        ]
         _, score = compute_portfolio_grade(audits)
         assert score >= 0.0  # clamped; -1.1 would cause max(0, ...) to rescue it
 
@@ -1244,7 +1336,9 @@ class TestComputePortfolioGradeAdditional:
         # With -1.1: 0.5 - 1.1 = max(0, -0.6) = 0.0 → diff detectable
         from src.scorer import compute_portfolio_grade
 
-        audits = [self._simple_audit(0.5, "abandoned")] * 4 + [self._simple_audit(0.5, "wip")]
+        audits = [self._simple_audit(0.5, "abandoned")] * 4 + [
+            self._simple_audit(0.5, "wip")
+        ]
         _, score = compute_portfolio_grade(audits)
         assert abs(score - 0.40) < 0.01  # 0.5 avg - 0.10 penalty = 0.40
 

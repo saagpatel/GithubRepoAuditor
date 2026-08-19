@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,8 @@ from src.scoring_dimensions import display_dimension
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_packaging import finalize_weekly_pack
 from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
+
+logger = logging.getLogger(__name__)
 
 COMPLETENESS_THRESHOLDS = [
     ("shipped", 0.75),
@@ -166,7 +169,18 @@ def build_risk_lookup(output_dir: Path | None) -> dict[str, RiskLookupEntry]:
         return {}
     try:
         truth = json.loads(truth_path.read_text())
-    except Exception:
+    except (OSError, ValueError) as exc:
+        # A corrupt/truncated truth snapshot is NOT the same as an absent one. Absence
+        # is a legitimate "risk unavailable" (handled above). Silently swallowing a
+        # parse failure here empties the whole risk lookup, so every elevated repo
+        # renders as clear with no signal that anything went wrong. Surface it loudly.
+        # (json.JSONDecodeError is a ValueError; read_text failures are OSError.)
+        logger.error(
+            "risk lookup: truth snapshot at %s is unreadable/corrupt (%s); "
+            "risk posture will read as unavailable this run",
+            truth_path,
+            exc,
+        )
         return {}
     lookup: dict[str, RiskLookupEntry] = {}
     for project in truth.get("projects") or []:
