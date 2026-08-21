@@ -5,6 +5,7 @@ everything degrades to plain text — the tool stays usable.
 """
 from __future__ import annotations
 
+import re
 import sys
 
 try:
@@ -24,6 +25,47 @@ except ImportError:
 _stderr_console = Console(stderr=True) if HAS_RICH else None
 _stdout_console = Console() if HAS_RICH else None
 
+_SENSITIVE_ASSIGNMENT = re.compile(
+    r"(?i)(?P<prefix>(?P<key_quote>['\"]?)(?:access_token|api_key|apikey|"
+    r"client_secret|credential|github_token|password|private_key|secret|token)"
+    r"(?P=key_quote)\s*[:=]\s*)"
+    r"(?:(?P<quoted_value>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')|"
+    r"(?P<bare_value>[^\r\n,;}\]]+))"
+)
+_AUTHORIZATION_VALUE = re.compile(
+    r"(?i)(?P<prefix>(?P<key_quote>['\"]?)authorization(?P=key_quote)\s*[:=]\s*)"
+    r"(?:(?P<quoted_value>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')|"
+    r"(?P<bare_value>[^\r\n}\]]+))"
+)
+_PRIVATE_KEY_BLOCK = re.compile(
+    r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----.*?"
+    r"-----END (?:RSA |EC |DSA )?PRIVATE KEY-----",
+    re.DOTALL,
+)
+_SENSITIVE_TOKENS = (
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bxox[bpors]-[A-Za-z0-9-]{10,}\b"),
+)
+
+
+def redact_sensitive_text(msg: str) -> str:
+    """Redact credential-shaped values before terminal output."""
+    redacted = _PRIVATE_KEY_BLOCK.sub("<redacted>", str(msg))
+    redacted = _AUTHORIZATION_VALUE.sub(_redact_assignment, redacted)
+    redacted = _SENSITIVE_ASSIGNMENT.sub(_redact_assignment, redacted)
+    for pattern in _SENSITIVE_TOKENS:
+        redacted = pattern.sub("<redacted>", redacted)
+    return redacted
+
+
+def _redact_assignment(match: re.Match[str]) -> str:
+    """Preserve assignment syntax while replacing its complete value."""
+    quoted_value = match.group("quoted_value") or ""
+    value_quote = quoted_value[:1]
+    return f"{match.group('prefix')}{value_quote}<redacted>{value_quote}"
+
 
 def create_progress() -> "Progress | None":
     """Create a Rich progress bar for stderr. Returns None if rich unavailable."""
@@ -42,6 +84,7 @@ def create_progress() -> "Progress | None":
 
 def print_status(msg: str) -> None:
     """Print a styled status message to stderr."""
+    msg = redact_sensitive_text(msg)
     if HAS_RICH:
         _stderr_console.print(f"  [bold]{msg}[/bold]")
     else:
@@ -50,6 +93,7 @@ def print_status(msg: str) -> None:
 
 def print_warning(msg: str) -> None:
     """Print a yellow warning to stderr."""
+    msg = redact_sensitive_text(msg)
     if HAS_RICH:
         _stderr_console.print(f"  [yellow]⚠ {msg}[/yellow]")
     else:
@@ -58,6 +102,9 @@ def print_warning(msg: str) -> None:
 
 def print_info(msg: str) -> None:
     """Print an info message to stderr."""
+    msg = redact_sensitive_text(msg)
+    # The shared output boundary redacts credential assignments and known token forms above.
+    # codeql[py/clear-text-logging-sensitive-data]
     if HAS_RICH:
         _stderr_console.print(f"  [dim]{msg}[/dim]")
     else:
@@ -66,6 +113,7 @@ def print_info(msg: str) -> None:
 
 def print_success(msg: str) -> None:
     """Print a green success message to stdout."""
+    msg = redact_sensitive_text(msg)
     if HAS_RICH:
         _stdout_console.print(f"[green]✓[/green] {msg}")
     else:
@@ -74,6 +122,7 @@ def print_success(msg: str) -> None:
 
 def print_summary(lines: list[str]) -> None:
     """Print multi-line summary to stdout."""
+    lines = [redact_sensitive_text(line) for line in lines]
     if HAS_RICH:
         _stdout_console.print("\n".join(lines))
     else:
