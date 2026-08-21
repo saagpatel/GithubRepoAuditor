@@ -25,11 +25,39 @@ class TestHelpers:
         github_token = "ghp_" + "a" * 36
 
         assert redact_sensitive_text("token=plain-secret") == "token=<redacted>"
-        assert redact_sensitive_text("Authorization: Bearer opaque-value") == (
-            "authorization: <redacted>"
-        )
         assert redact_sensitive_text(f"request failed for {github_token}") == (
             "request failed for <redacted>"
+        )
+
+    def test_redacts_complete_authorization_field_for_all_schemes(self):
+        assert redact_sensitive_text("Authorization: token opaque-value") == (
+            "Authorization: <redacted>"
+        )
+        assert redact_sensitive_text("Authorization: Basic dXNlcjpwYXNz") == (
+            "Authorization: <redacted>"
+        )
+        assert redact_sensitive_text(
+            'Authorization: Digest username="user", response="opaque"'
+        ) == "Authorization: <redacted>"
+        assert redact_sensitive_text(
+            '{"Authorization": "Bearer opaque-value", "status": "failed"}'
+        ) == '{"Authorization": "<redacted>", "status": "failed"}'
+
+    def test_redacts_quoted_credential_keys_and_values(self):
+        assert redact_sensitive_text('{"access_token": "opaque-secret"}') == (
+            '{"access_token": "<redacted>"}'
+        )
+        assert redact_sensitive_text("{'client_secret': 'opaque-secret'}") == (
+            "{'client_secret': '<redacted>'}"
+        )
+        assert redact_sensitive_text('password = "secret with spaces"') == (
+            'password = "<redacted>"'
+        )
+        assert redact_sensitive_text("password = secret with spaces; status=failed") == (
+            "password = <redacted>; status=failed"
+        )
+        assert redact_sensitive_text(r'{"token": "opaque\"tail"}') == (
+            r'{"token": "<redacted>"}'
         )
 
     def test_preserves_noncredential_status_text(self):
