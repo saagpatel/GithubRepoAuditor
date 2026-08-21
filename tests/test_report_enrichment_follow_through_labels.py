@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-import src.report_enrichment as RE
+import github_repo_auditor.report_enrichment as RE
 
 # (builder name -> (mapping key, default status, {status: label})) transcribed
 # verbatim from the pre-refactor builder bodies.

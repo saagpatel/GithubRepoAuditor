@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from src.analyzers.base import BaseAnalyzer
-from src.github_client import GitHubClient
-from src.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.analyzers.base import BaseAnalyzer
+from github_repo_auditor.github_client import GitHubClient
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 
 class DockerfileAnalyzer(BaseAnalyzer):

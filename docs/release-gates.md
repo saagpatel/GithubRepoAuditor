@@ -15,8 +15,8 @@ Mutation testing is scoped to the two files that guard automated actions:
 
 | File | Why gated |
 |------|-----------|
-| `src/auto_apply.py` | Trust-bar gating — controls which repos receive automated writes |
-| `src/scorer.py` | Scoring/tier logic — drives completeness tiers and portfolio grades |
+| `src/github_repo_auditor/auto_apply.py` | Trust-bar gating — controls which repos receive automated writes |
+| `src/github_repo_auditor/scorer.py` | Scoring/tier logic — drives completeness tiers and portfolio grades |
 
 ### Required threshold
 
@@ -31,34 +31,32 @@ make release-gate
 Or manually:
 
 ```bash
-rm -rf .mutmut-cache mutants/
-python3.13 -m mutmut run
+PYTHONPATH=src uv run --extra dev --python 3.13 mutmut run
+uv run --no-sync python scripts/check_mutation_score.py --minimum 0.85
 ```
 
-Query results directly (the `mutmut results` command crashes on Python 3.13):
+The score checker reads mutmut 3's JSON metadata, excludes timeouts from the
+denominator, and fails closed on unchecked, skipped, no-test, suspicious,
+interrupted, or otherwise unknown results.
+
+Inspect individual results when needed:
 
 ```bash
-python3.13 -c "
-import sqlite3
-conn = sqlite3.connect('.mutmut-cache')
-rows = conn.execute('SELECT status, count(*) FROM Mutant GROUP BY status').fetchall()
-for r in rows: print(r)
-killed = next(r[1] for r in rows if r[0] == 'ok_killed')
-survived = next((r[1] for r in rows if r[0] == 'bad_survived'), 0)
-print(f'Kill rate: {killed / (killed + survived):.1%}')
-"
+PYTHONPATH=src uv run --no-sync mutmut results --all true
 ```
 
 ### Setup requirements
 
-mutmut 2.x is incompatible with Python 3.14 (pony ORM `deepcopy` crash). Use Python 3.13:
+The mutation gate uses the locked mutmut 3.x development dependency and Python
+3.13:
 
 ```bash
-python3.13 -m pip install 'mutmut>=2.0,<3.0'
-python3.13 -m pip install -e ".[dev,config]"
+uv sync --extra dev --python 3.13 --locked
 ```
 
-mutmut 3.x is incompatible with this project's `src.` layout (rejects module names starting with `src.`). The locked version constraint in `pyproject.toml` (`mutmut>=2.5` under `[tool.mutmut]`) documents this.
+The project uses a conventional source layout: `src/` is the source root and
+`github_repo_auditor` is the import package. This keeps mutmut's path-derived
+keys aligned with the module names recorded by the test suite.
 
 ### Configuration
 
@@ -66,16 +64,24 @@ mutmut 3.x is incompatible with this project's `src.` layout (rejects module nam
 
 ```toml
 [tool.mutmut]
-paths_to_mutate = "src/auto_apply.py,src/scorer.py"
-runner = "python3.13 -m pytest -q -p no:cacheprovider -x tests/test_auto_apply.py tests/test_scorer.py"
-tests_dir = "tests/"
+source_paths = ["src"]
+only_mutate = ["src/github_repo_auditor/auto_apply.py", "src/github_repo_auditor/scorer.py"]
+pytest_add_cli_args = ["-p", "no:cacheprovider"]
+pytest_add_cli_args_test_selection = [
+    "tests/test_auto_apply.py",
+    "tests/test_scorer.py",
+]
 ```
 
-### Equivalent mutants
+### Historical equivalent-mutant notes
+
+The IDs below came from the earlier mutmut 2.x baseline. Treat them as review
+notes, not current identifiers; regenerate and reclassify them after a full
+mutmut 3.x gate.
 
 The following survivors are confirmed equivalent mutants — behavioral tests cannot distinguish them:
 
-**src/auto_apply.py**
+**src/github_repo_auditor/auto_apply.py**
 
 | ID | Line | Pattern | Why equivalent |
 |----|------|---------|----------------|
@@ -85,7 +91,7 @@ The following survivors are confirmed equivalent mutants — behavioral tests ca
 | 75, 80 | 92–93 | `or "XXXX"` in get_approved_manual_campaigns | Mutated default never equals the string being compared |
 | 106 | 132 | `or "XXXX"` in filter_trusted_repo_actions | Same pattern |
 
-**src/scorer.py**
+**src/github_repo_auditor/scorer.py**
 
 | ID | Line | Pattern | Why equivalent |
 |----|------|---------|----------------|
@@ -101,12 +107,12 @@ The following survivors are confirmed equivalent mutants — behavioral tests ca
 | 251 | 136 | `>= 0.5` vs `> 0.5` | Score exactly 0.5 yields "functional" tier anyway (not "shipped"), so cap doesn't fire |
 | 304 | 213 | `>= 0.3` vs `> 0.3` for mid-tier boundary | Exact 0.3 shipped_ratio is rare in test scenarios |
 
-### Current kill rates (last measured: 2026-05-10)
+### Historical kill rates (last measured: 2026-05-10)
 
 | File | Mutants | Killed | Survived | Kill Rate |
 |------|---------|--------|----------|-----------|
-| src/auto_apply.py | ~155 | ~146 | ~9 | ~94% |
-| src/scorer.py | ~200 | ~182 | ~16 | ~92% |
+| src/github_repo_auditor/auto_apply.py | ~155 | ~146 | ~9 | ~94% |
+| src/github_repo_auditor/scorer.py | ~200 | ~182 | ~16 | ~92% |
 | **Combined** | **354** | **328** | **25** | **92.9%** |
 
 (1 timeout excluded from denominator; 1 suspicious counted as killed)
@@ -170,7 +176,7 @@ checklist.
 
 ## Web UI Gate (scope: audit serve)
 
-Run when any change touches `src/serve/` or `tests/test_serve.py`.
+Run when any change touches `src/github_repo_auditor/serve/` or `tests/test_serve.py`.
 
 ### Steps
 

@@ -1,4 +1,4 @@
-from src.cli_output import (
+from github_repo_auditor.cli_output import (
     HAS_RICH,
     create_progress,
     print_info,

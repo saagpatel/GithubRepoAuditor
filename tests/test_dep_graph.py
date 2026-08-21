@@ -1,7 +1,7 @@
-"""Tests for src/dep_graph.py — cross-repo dependency graph."""
+"""Tests for src/github_repo_auditor/dep_graph.py — cross-repo dependency graph."""
 from __future__ import annotations
 
-from src.dep_graph import build_dependency_graph, find_vulnerability_impact
+from github_repo_auditor.dep_graph import build_dependency_graph, find_vulnerability_impact
 
 
 def _make_audit(name: str, dep_names: list[str]) -> dict:

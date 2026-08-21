@@ -12,9 +12,9 @@ ROOT = ensure_project_root()
 
 
 def _load_export_tools() -> tuple[object, object, object]:
-    from src.excel_export import export_excel
-    from src.report_enrichment import build_score_explanation
-    from src.web_export import export_html_dashboard
+    from github_repo_auditor.excel_export import export_excel
+    from github_repo_auditor.report_enrichment import build_score_explanation
+    from github_repo_auditor.web_export import export_html_dashboard
 
     return export_excel, build_score_explanation, export_html_dashboard
 

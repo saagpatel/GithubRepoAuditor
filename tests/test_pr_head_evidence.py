@@ -7,7 +7,7 @@ from typing import cast
 
 import pytest
 
-from src.pr_head_evidence import (
+from github_repo_auditor.pr_head_evidence import (
     SnapshotValidationError,
     evaluate_snapshot,
     parse_snapshot,

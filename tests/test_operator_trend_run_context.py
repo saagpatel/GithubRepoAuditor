@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_run_context import build_resolution_run_context
+from github_repo_auditor.operator_trend_run_context import build_resolution_run_context
 
 
 def _snapshot_from_queue(queue: list[dict], *, generated_at: str = "") -> dict:

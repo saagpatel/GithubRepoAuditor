@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.vuln_check import (
+from github_repo_auditor.vuln_check import (
     check_vulnerabilities,
     format_vuln_summary,
 )
@@ -48,7 +48,7 @@ class TestCheckVulnerabilities:
                 {"dimension": "dependencies", "score": 1.0, "details": {}}
             ],
         }
-        with patch("src.vuln_check.requests.post") as mock_post:
+        with patch("github_repo_auditor.vuln_check.requests.post") as mock_post:
             result = check_vulnerabilities([audit])
         mock_post.assert_not_called()
         assert result == {}
@@ -64,7 +64,7 @@ class TestCheckVulnerabilities:
                 }
             ],
         }
-        with patch("src.vuln_check.requests.post") as mock_post:
+        with patch("github_repo_auditor.vuln_check.requests.post") as mock_post:
             result = check_vulnerabilities([audit])
         mock_post.assert_not_called()
         assert result == {}
@@ -77,7 +77,7 @@ class TestCheckVulnerabilities:
             "severity": [{"type": "CVSS_V3", "score": "9.8"}],
         }
         mock_resp = _osv_response([[vuln]])
-        with patch("src.vuln_check.requests.post", return_value=mock_resp):
+        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
             result = check_vulnerabilities([audit])
 
         assert "my-repo" in result
@@ -90,7 +90,7 @@ class TestCheckVulnerabilities:
     def test_empty_vulns_list_not_included(self) -> None:
         audit = _make_audit("clean-repo", [("flask", "2.0.0", "pypi")])
         mock_resp = _osv_response([[]])  # no vulns
-        with patch("src.vuln_check.requests.post", return_value=mock_resp):
+        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
             result = check_vulnerabilities([audit])
         assert result == {}
 
@@ -107,7 +107,7 @@ class TestCheckVulnerabilities:
             captured_body.append(json)
             return _osv_response([[], [], []])
 
-        with patch("src.vuln_check.requests.post", side_effect=fake_post):
+        with patch("github_repo_auditor.vuln_check.requests.post", side_effect=fake_post):
             check_vulnerabilities([audit])
 
         assert captured_body
@@ -117,7 +117,7 @@ class TestCheckVulnerabilities:
 
     def test_api_error_returns_empty(self, capsys) -> None:
         audit = _make_audit("repo", [("requests", "2.0", "pypi")])
-        with patch("src.vuln_check.requests.post", side_effect=Exception("network error")):
+        with patch("github_repo_auditor.vuln_check.requests.post", side_effect=Exception("network error")):
             result = check_vulnerabilities([audit])
         assert result == {}
         captured = capsys.readouterr()
@@ -127,24 +127,24 @@ class TestCheckVulnerabilities:
         audit = _make_audit("repo", [("requests", "2.0", "pypi")])
         mock_resp = MagicMock()
         mock_resp.status_code = 500
-        with patch("src.vuln_check.requests.post", return_value=mock_resp):
+        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
             result = check_vulnerabilities([audit])
         assert result == {}
 
     def test_uses_cache_on_second_call(self, tmp_path: Path) -> None:
-        from src.cache import ResponseCache
+        from github_repo_auditor.cache import ResponseCache
 
         cache = ResponseCache(cache_dir=tmp_path / ".cache", ttl=3600)
         audit = _make_audit("repo", [("requests", "2.0", "pypi")])
         vuln = {"id": "CVE-001", "summary": "bug", "severity": []}
         mock_resp = _osv_response([[vuln]])
 
-        with patch("src.vuln_check.requests.post", return_value=mock_resp) as mock_post:
+        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp) as mock_post:
             result1 = check_vulnerabilities([audit], cache=cache)
         assert mock_post.call_count == 1
 
         # Second call should use cache — no new HTTP request
-        with patch("src.vuln_check.requests.post", return_value=mock_resp) as mock_post2:
+        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp) as mock_post2:
             result2 = check_vulnerabilities([audit], cache=cache)
         assert mock_post2.call_count == 0
         assert result2 == result1
@@ -154,7 +154,7 @@ class TestCheckVulnerabilities:
         audit = _make_audit("repo", [("pkg", "1.0", "pypi")])
         vuln = {"id": "CVE-001", "summary": long_summary, "severity": []}
         mock_resp = _osv_response([[vuln]])
-        with patch("src.vuln_check.requests.post", return_value=mock_resp):
+        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
             result = check_vulnerabilities([audit])
         assert len(result["repo"][0]["summary"]) <= 200
 

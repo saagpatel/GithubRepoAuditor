@@ -10,8 +10,8 @@
     "repo": "GithubRepoAuditor",
     "mode": "demo",
     "commands": [
-      "python -m src.cli --portfolio-truth --portfolio-truth-include-security saagpatel",
-      "python -m src.cli triage saagpatel --control-center",
+      "python -m github_repo_auditor.cli --portfolio-truth --portfolio-truth-include-security saagpatel",
+      "python -m github_repo_auditor.cli triage saagpatel --control-center",
       "pnpm demo:desktop"
     ]
   },

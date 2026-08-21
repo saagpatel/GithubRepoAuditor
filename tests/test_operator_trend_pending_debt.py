@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_pending_debt import (
+from github_repo_auditor.operator_trend_pending_debt import (
     class_pending_debt_for_target,
     class_pending_debt_hotspots,
     closure_forecast_reweight_scores_for_target,

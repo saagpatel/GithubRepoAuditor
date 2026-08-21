@@ -59,7 +59,7 @@ Steps:
 2. Restore cached audit history and incremental fingerprints.
 3. Run the audit in `standard` workbook mode, using incremental mode when a trustworthy cached baseline already exists.
 4. Run `audit <username> --control-center` to generate the read-only operator triage artifact.
-5. Inspect the canonical scheduled handoff issue state, then run `python3 -m src.scheduled_handoff --output-dir output ...` to build the scheduled handoff JSON + Markdown summary with the right lifecycle action.
+5. Inspect the canonical scheduled handoff issue state, then run `python3 -m github_repo_auditor.scheduled_handoff --output-dir output ...` to build the scheduled handoff JSON + Markdown summary with the right lifecycle action.
 6. Upload `output/` as the primary artifact output.
 7. Open, update, close, or reopen one canonical `scheduled-audit-handoff` issue depending on whether the latest handoff is noisy or quiet.
 

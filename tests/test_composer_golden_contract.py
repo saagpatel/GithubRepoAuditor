@@ -96,7 +96,7 @@ def test_magnitude_floor_unifies_rebuild_and_rererestore_tiers() -> None:
     # a `key`/`generated_at` that matches the target's `queue_identity`, so
     # `ordered_reset_reentry_events_for_target` takes its `current_index == 0` shortcut
     # and returns the two events unchanged. This sidesteps a known pre-existing gap:
-    # `current_closure_forecast_event_for_target` (src/operator_trend_support.py,
+    # `current_closure_forecast_event_for_target` (src/github_repo_auditor/operator_trend_support.py,
     # ~line 210) synthesizes a "current" event from the target dict whose key coverage
     # stops at the "rerestore" tier and never reaches "rererestore", so when the shared
     # corpus fixture (which has no matching key/generated_at) falls through to that

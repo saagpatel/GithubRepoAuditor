@@ -8,14 +8,14 @@ from typing import Any
 
 import pytest
 
-import src.portfolio_repository_state as repository_state
-from src.portfolio_repository_state import (
+import github_repo_auditor.portfolio_repository_state as repository_state
+from github_repo_auditor.portfolio_repository_state import (
     _local_from_worktree,
     _observed_result,
     _select_remote_default_worktree,
     observe_repository_state,
 )
-from src.portfolio_truth_validate import _validate_repository_state_shape
+from github_repo_auditor.portfolio_truth_validate import _validate_repository_state_shape
 
 
 def _git(path: Path, *args: str) -> str:

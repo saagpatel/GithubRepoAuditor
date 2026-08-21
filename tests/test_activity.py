@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.analyzers.activity import (
+from github_repo_auditor.analyzers.activity import (
     ActivityAnalyzer,
     _classify_commit_pattern,
     _compute_bus_factor,
     _count_clusters,
     _recent_commit_count,
 )
-from src.models import RepoMetadata
+from github_repo_auditor.models import RepoMetadata
 
 
 def _make_metadata(**kwargs) -> RepoMetadata:

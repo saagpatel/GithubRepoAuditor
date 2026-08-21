@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_effectiveness import build_operator_effectiveness_bundle
+from github_repo_auditor.operator_effectiveness import build_operator_effectiveness_bundle
 
 
 def _state(run_id: str, generated_at: str, blocked: int, urgent: int, *, reopened: int = 0, resolved: int = 0) -> dict:

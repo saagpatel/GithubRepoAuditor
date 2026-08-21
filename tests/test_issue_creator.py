@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from src.issue_creator import create_audit_issues
+from github_repo_auditor.issue_creator import create_audit_issues
 
 
 def _mock_client(existing_issues=None):

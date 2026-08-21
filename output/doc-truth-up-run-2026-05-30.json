@@ -1,97 +1,97 @@
 [
   {
     "project_key": "AssistSupport-security-alerts",
-    "abs_path": "/Users/d/Projects/AssistSupport-security-alerts",
+    "abs_path": "~/Projects/AssistSupport-security-alerts",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "AIFortuneTeller",
-    "abs_path": "/Users/d/Projects/AIFortuneTeller",
+    "abs_path": "~/Projects/AIFortuneTeller",
     "status": "already_done",
     "branch": "docs/truth-up-2026-05-30"
   },
   {
     "project_key": "ArguMap",
-    "abs_path": "/Users/d/Projects/ArguMap",
+    "abs_path": "~/Projects/ArguMap",
     "status": "already_done",
     "branch": "docs/truth-up-2026-05-30"
   },
   {
     "project_key": "APIReverse",
-    "abs_path": "/Users/d/Projects/APIReverse",
+    "abs_path": "~/Projects/APIReverse",
     "status": "already_done",
     "branch": "docs/truth-up-2026-05-30"
   },
   {
     "project_key": "BrowserHistoryVisualizer",
-    "abs_path": "/Users/d/Projects/BrowserHistoryVisualizer",
+    "abs_path": "~/Projects/BrowserHistoryVisualizer",
     "status": "already_done",
     "branch": "docs/truth-up-2026-05-30"
   },
   {
     "project_key": "Calibrate",
-    "abs_path": "/Users/d/Projects/Calibrate",
+    "abs_path": "~/Projects/Calibrate",
     "status": "already_done",
     "branch": "docs/truth-up-2026-05-30"
   },
   {
     "project_key": "Chromafield",
-    "abs_path": "/Users/d/Projects/Chromafield",
+    "abs_path": "~/Projects/Chromafield",
     "status": "already_done",
     "branch": "docs/truth-up-2026-05-30"
   },
   {
     "project_key": "Codec",
-    "abs_path": "/Users/d/Projects/Codec",
+    "abs_path": "~/Projects/Codec",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "AssistSupport",
-    "abs_path": "/Users/d/Projects/AssistSupport",
+    "abs_path": "~/Projects/AssistSupport",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Fun:GamePrjs/DeepTank",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/DeepTank",
+    "abs_path": "~/Projects/Fun:GamePrjs/DeepTank",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Fun:GamePrjs/ CryptForge",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/ CryptForge",
+    "abs_path": "~/Projects/Fun:GamePrjs/ CryptForge",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Fun:GamePrjs/DesktopPEt",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/DesktopPEt",
+    "abs_path": "~/Projects/Fun:GamePrjs/DesktopPEt",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Fun:GamePrjs/EarthPulse",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/EarthPulse",
+    "abs_path": "~/Projects/Fun:GamePrjs/EarthPulse",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "FunGamePrjs/OrbitForge",
-    "abs_path": "/Users/d/Projects/FunGamePrjs/OrbitForge",
+    "abs_path": "~/Projects/FunGamePrjs/OrbitForge",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "GPT_RAG",
-    "abs_path": "/Users/d/Projects/GPT_RAG",
+    "abs_path": "~/Projects/GPT_RAG",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "EvolutionSandbox",
-    "abs_path": "/Users/d/Projects/EvolutionSandbox",
+    "abs_path": "~/Projects/EvolutionSandbox",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -104,7 +104,7 @@
   },
   {
     "project_key": "Devil's Advocate",
-    "abs_path": "/Users/d/Projects/Devil's Advocate",
+    "abs_path": "~/Projects/Devil's Advocate",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -117,25 +117,25 @@
   },
   {
     "project_key": "ITPRJsViaClaude/IncidentWorkbench",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/IncidentWorkbench",
+    "abs_path": "~/Projects/ITPRJsViaClaude/IncidentWorkbench",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "ITPRJsViaClaude/KBFreshnessDetector",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/KBFreshnessDetector",
+    "abs_path": "~/Projects/ITPRJsViaClaude/KBFreshnessDetector",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "ITPRJsViaClaude/PersonalKBDrafter",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/PersonalKBDrafter",
+    "abs_path": "~/Projects/ITPRJsViaClaude/PersonalKBDrafter",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Fun:GamePrjs/DesktopTerrarium/desktop_terrarium",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/DesktopTerrarium/desktop_terrarium",
+    "abs_path": "~/Projects/Fun:GamePrjs/DesktopTerrarium/desktop_terrarium",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -147,13 +147,13 @@
   },
   {
     "project_key": "ITPRJsViaClaude/SmartClipboard",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/SmartClipboard",
+    "abs_path": "~/Projects/ITPRJsViaClaude/SmartClipboard",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "ConvictionMapper",
-    "abs_path": "/Users/d/Projects/ConvictionMapper",
+    "abs_path": "~/Projects/ConvictionMapper",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -167,31 +167,31 @@
   },
   {
     "project_key": "ITPRJsViaClaude/TicketDashboard",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/TicketDashboard",
+    "abs_path": "~/Projects/ITPRJsViaClaude/TicketDashboard",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "ITPRJsViaClaude/TicketHandoff",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/TicketHandoff",
+    "abs_path": "~/Projects/ITPRJsViaClaude/TicketHandoff",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "IncidentMgmt",
-    "abs_path": "/Users/d/Projects/IncidentMgmt",
+    "abs_path": "~/Projects/IncidentMgmt",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "IncidentReview",
-    "abs_path": "/Users/d/Projects/IncidentReview",
+    "abs_path": "~/Projects/IncidentReview",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "GlassLayer",
-    "abs_path": "/Users/d/Projects/GlassLayer",
+    "abs_path": "~/Projects/GlassLayer",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -204,13 +204,13 @@
   },
   {
     "project_key": "JSMTicketAnalyticsExport",
-    "abs_path": "/Users/d/Projects/JSMTicketAnalyticsExport",
+    "abs_path": "~/Projects/JSMTicketAnalyticsExport",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Fun:GamePrjs/PomGambler",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/PomGambler",
+    "abs_path": "~/Projects/Fun:GamePrjs/PomGambler",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -222,7 +222,7 @@
   },
   {
     "project_key": "Fun:GamePrjs/OrbitForge",
-    "abs_path": "/Users/d/Projects/Fun:GamePrjs/OrbitForge",
+    "abs_path": "~/Projects/Fun:GamePrjs/OrbitForge",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -230,11 +230,11 @@
       "docs/LOCAL-CHECKOUT-DISPOSITION.md"
     ],
     "orig_branch": "master",
-    "claude_summary": "refs)\n  next-move       unverifiable   (UI polish status can't be read from code)\n\ncounts:  consistent 4 / drifted-fixed 1 / unverifiable 1\n\ndoc files changed:\n  docs/LOCAL-CHECKOUT-DISPOSITION.md  (stale branch codex/chore/bootstrap-codex-os \u2192\n                                       master; stale SHA 07ef263 \u2192 8f7d64a)\n  DOC-RECONCILIATION.md               (new \u2014 full audit record)\n\ncontradictions for human review (files outside editable scope):\n  CONTRIBUTING.md:12  \u2014 absolute path /Users/d/Projects/OrbitForge/.gitignore is wrong;\n                        canonical path is Fun:GamePrjs/OrbitForge (colon in parent dir)\n  CONTRIBUTING.md:32  \u2014 same wrong absolute path for package.json reference\n\nnon-doc files in git status:  none (AGENTS.md and .perf-results/ are pre-existing untracked)\n```"
+    "claude_summary": "refs)\n  next-move       unverifiable   (UI polish status can't be read from code)\n\ncounts:  consistent 4 / drifted-fixed 1 / unverifiable 1\n\ndoc files changed:\n  docs/LOCAL-CHECKOUT-DISPOSITION.md  (stale branch codex/chore/bootstrap-codex-os \u2192\n                                       master; stale SHA 07ef263 \u2192 8f7d64a)\n  DOC-RECONCILIATION.md               (new \u2014 full audit record)\n\ncontradictions for human review (files outside editable scope):\n  CONTRIBUTING.md:12  \u2014 absolute path ~/Projects/OrbitForge/.gitignore is wrong;\n                        canonical path is Fun:GamePrjs/OrbitForge (colon in parent dir)\n  CONTRIBUTING.md:32  \u2014 same wrong absolute path for package.json reference\n\nnon-doc files in git status:  none (AGENTS.md and .perf-results/ are pre-existing untracked)\n```"
   },
   {
     "project_key": "ComplianceKit",
-    "abs_path": "/Users/d/Projects/ComplianceKit",
+    "abs_path": "~/Projects/ComplianceKit",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -246,7 +246,7 @@
   },
   {
     "project_key": "HowMoneyMoves",
-    "abs_path": "/Users/d/Projects/HowMoneyMoves",
+    "abs_path": "~/Projects/HowMoneyMoves",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -259,7 +259,7 @@
   },
   {
     "project_key": "LifeCadenceLedger",
-    "abs_path": "/Users/d/Projects/LifeCadenceLedger",
+    "abs_path": "~/Projects/LifeCadenceLedger",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -272,19 +272,19 @@
   },
   {
     "project_key": "MoneyPRJsViaGPT/AIGCCore",
-    "abs_path": "/Users/d/Projects/MoneyPRJsViaGPT/AIGCCore",
+    "abs_path": "~/Projects/MoneyPRJsViaGPT/AIGCCore",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "MoneyPRJsViaGPT/SignalFlow",
-    "abs_path": "/Users/d/Projects/MoneyPRJsViaGPT/SignalFlow",
+    "abs_path": "~/Projects/MoneyPRJsViaGPT/SignalFlow",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "ITPRJsViaClaude/SnippetLibrary",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/SnippetLibrary",
+    "abs_path": "~/Projects/ITPRJsViaClaude/SnippetLibrary",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -297,7 +297,7 @@
   },
   {
     "project_key": "MCPAudit",
-    "abs_path": "/Users/d/Projects/MCPAudit",
+    "abs_path": "~/Projects/MCPAudit",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -309,13 +309,13 @@
   },
   {
     "project_key": "Premise",
-    "abs_path": "/Users/d/Projects/Premise",
+    "abs_path": "~/Projects/Premise",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "JobMarketHeatmap",
-    "abs_path": "/Users/d/Projects/JobMarketHeatmap",
+    "abs_path": "~/Projects/JobMarketHeatmap",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -328,7 +328,7 @@
   },
   {
     "project_key": "ITPRJsViaClaude/ScreenshotAnnotate",
-    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/ScreenshotAnnotate",
+    "abs_path": "~/Projects/ITPRJsViaClaude/ScreenshotAnnotate",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -340,7 +340,7 @@
   },
   {
     "project_key": "Interruption Resume Studio",
-    "abs_path": "/Users/d/Projects/Interruption Resume Studio",
+    "abs_path": "~/Projects/Interruption Resume Studio",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -354,7 +354,7 @@
   },
   {
     "project_key": "Misc:NoGoPRJs/app",
-    "abs_path": "/Users/d/Projects/Misc:NoGoPRJs/app",
+    "abs_path": "~/Projects/Misc:NoGoPRJs/app",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -366,7 +366,7 @@
   },
   {
     "project_key": "Liminal",
-    "abs_path": "/Users/d/Projects/Liminal",
+    "abs_path": "~/Projects/Liminal",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -379,7 +379,7 @@
   },
   {
     "project_key": "NetworkDecoder",
-    "abs_path": "/Users/d/Projects/NetworkDecoder",
+    "abs_path": "~/Projects/NetworkDecoder",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -392,7 +392,7 @@
   },
   {
     "project_key": "NeuralNetwork",
-    "abs_path": "/Users/d/Projects/NeuralNetwork",
+    "abs_path": "~/Projects/NeuralNetwork",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -405,7 +405,7 @@
   },
   {
     "project_key": "ScreenshottoDataSelect",
-    "abs_path": "/Users/d/Projects/ScreenshottoDataSelect",
+    "abs_path": "~/Projects/ScreenshottoDataSelect",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -418,7 +418,7 @@
   },
   {
     "project_key": "Pulse Orbit",
-    "abs_path": "/Users/d/Projects/Pulse Orbit",
+    "abs_path": "~/Projects/Pulse Orbit",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -431,7 +431,7 @@
   },
   {
     "project_key": "RedditSentimentAnalyzer",
-    "abs_path": "/Users/d/Projects/RedditSentimentAnalyzer",
+    "abs_path": "~/Projects/RedditSentimentAnalyzer",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -445,7 +445,7 @@
   },
   {
     "project_key": "ResumeEvolver",
-    "abs_path": "/Users/d/Projects/ResumeEvolver",
+    "abs_path": "~/Projects/ResumeEvolver",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -458,7 +458,7 @@
   },
   {
     "project_key": "ReturnRadar",
-    "abs_path": "/Users/d/Projects/ReturnRadar",
+    "abs_path": "~/Projects/ReturnRadar",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -471,7 +471,7 @@
   },
   {
     "project_key": "RoomTone",
-    "abs_path": "/Users/d/Projects/RoomTone",
+    "abs_path": "~/Projects/RoomTone",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -484,7 +484,7 @@
   },
   {
     "project_key": "TradeOffAtlas",
-    "abs_path": "/Users/d/Projects/TradeOffAtlas",
+    "abs_path": "~/Projects/TradeOffAtlas",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -496,13 +496,13 @@
   },
   {
     "project_key": "VanityPRJs/Relay",
-    "abs_path": "/Users/d/Projects/VanityPRJs/Relay",
+    "abs_path": "~/Projects/VanityPRJs/Relay",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "Sovereign",
-    "abs_path": "/Users/d/Projects/Sovereign",
+    "abs_path": "~/Projects/Sovereign",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -515,7 +515,7 @@
   },
   {
     "project_key": "VanityPRJs/Chronomap",
-    "abs_path": "/Users/d/Projects/VanityPRJs/Chronomap",
+    "abs_path": "~/Projects/VanityPRJs/Chronomap",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -529,7 +529,7 @@
   },
   {
     "project_key": "Seismoscope",
-    "abs_path": "/Users/d/Projects/Seismoscope",
+    "abs_path": "~/Projects/Seismoscope",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -542,7 +542,7 @@
   },
   {
     "project_key": "Signal & Noise",
-    "abs_path": "/Users/d/Projects/Signal & Noise",
+    "abs_path": "~/Projects/Signal & Noise",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -557,7 +557,7 @@
   },
   {
     "project_key": "VanityPRJs/Conductor",
-    "abs_path": "/Users/d/Projects/VanityPRJs/Conductor",
+    "abs_path": "~/Projects/VanityPRJs/Conductor",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -570,13 +570,13 @@
   },
   {
     "project_key": "evals",
-    "abs_path": "/Users/d/Projects/evals",
+    "abs_path": "~/Projects/evals",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "VanityPRJs/Echolocate",
-    "abs_path": "/Users/d/Projects/VanityPRJs/Echolocate",
+    "abs_path": "~/Projects/VanityPRJs/Echolocate",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -589,7 +589,7 @@
   },
   {
     "project_key": "da-scaffold",
-    "abs_path": "/Users/d/Projects/da-scaffold",
+    "abs_path": "~/Projects/da-scaffold",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -602,7 +602,7 @@
   },
   {
     "project_key": "Terroir",
-    "abs_path": "/Users/d/Projects/Terroir",
+    "abs_path": "~/Projects/Terroir",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -615,49 +615,49 @@
   },
   {
     "project_key": "mcpforge-hosted-ts-smoke",
-    "abs_path": "/Users/d/Projects/mcpforge-hosted-ts-smoke",
+    "abs_path": "~/Projects/mcpforge-hosted-ts-smoke",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "mcpforge-openai-full-smoke-gate",
-    "abs_path": "/Users/d/Projects/mcpforge-openai-full-smoke-gate",
+    "abs_path": "~/Projects/mcpforge-openai-full-smoke-gate",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "mcpforge-openai-remote-openapi-readiness",
-    "abs_path": "/Users/d/Projects/mcpforge-openai-remote-openapi-readiness",
+    "abs_path": "~/Projects/mcpforge-openai-remote-openapi-readiness",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "mcpforge-openapi-auth-smoke-fixture",
-    "abs_path": "/Users/d/Projects/mcpforge-openapi-auth-smoke-fixture",
+    "abs_path": "~/Projects/mcpforge-openapi-auth-smoke-fixture",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "mcpforge-ts-hardening",
-    "abs_path": "/Users/d/Projects/mcpforge-ts-hardening",
+    "abs_path": "~/Projects/mcpforge-ts-hardening",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "mcpforge-v03-builder",
-    "abs_path": "/Users/d/Projects/mcpforge-v03-builder",
+    "abs_path": "~/Projects/mcpforge-v03-builder",
     "status": "skipped",
     "reason": "not a git repo"
   },
   {
     "project_key": "resume-evolver-tmp-1776063720",
-    "abs_path": "/Users/d/Projects/resume-evolver-tmp-1776063720",
+    "abs_path": "~/Projects/resume-evolver-tmp-1776063720",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "VanityPRJs/TerraSynth",
-    "abs_path": "/Users/d/Projects/VanityPRJs/TerraSynth",
+    "abs_path": "~/Projects/VanityPRJs/TerraSynth",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -670,7 +670,7 @@
   },
   {
     "project_key": "bridge-db",
-    "abs_path": "/Users/d/Projects/bridge-db",
+    "abs_path": "~/Projects/bridge-db",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -682,13 +682,13 @@
   },
   {
     "project_key": "visual-album-studio",
-    "abs_path": "/Users/d/Projects/visual-album-studio",
+    "abs_path": "~/Projects/visual-album-studio",
     "status": "skipped",
     "reason": "uncommitted tracked changes"
   },
   {
     "project_key": "cross-system-smoke",
-    "abs_path": "/Users/d/Projects/cross-system-smoke",
+    "abs_path": "~/Projects/cross-system-smoke",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -700,7 +700,7 @@
   },
   {
     "project_key": "ink",
-    "abs_path": "/Users/d/Projects/ink",
+    "abs_path": "~/Projects/ink",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -713,7 +713,7 @@
   },
   {
     "project_key": "Wavelength",
-    "abs_path": "/Users/d/Projects/Wavelength",
+    "abs_path": "~/Projects/Wavelength",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -726,7 +726,7 @@
   },
   {
     "project_key": "knowledgecore",
-    "abs_path": "/Users/d/Projects/knowledgecore",
+    "abs_path": "~/Projects/knowledgecore",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -738,7 +738,7 @@
   },
   {
     "project_key": "stockpulse",
-    "abs_path": "/Users/d/Projects/stockpulse",
+    "abs_path": "~/Projects/stockpulse",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -751,7 +751,7 @@
   },
   {
     "project_key": "thought-trails",
-    "abs_path": "/Users/d/Projects/thought-trails",
+    "abs_path": "~/Projects/thought-trails",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [
@@ -763,7 +763,7 @@
   },
   {
     "project_key": "mcpforge",
-    "abs_path": "/Users/d/Projects/mcpforge",
+    "abs_path": "~/Projects/mcpforge",
     "status": "ran",
     "branch": "docs/truth-up-2026-05-30",
     "changed_files": [

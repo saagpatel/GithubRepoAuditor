@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.config import inspect_config
+from github_repo_auditor.config import inspect_config
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,12 +27,27 @@ def _requirements_names() -> set[str]:
 
 def test_pyproject_exposes_audit_console_script():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text())
-    assert data["project"]["scripts"]["audit"] == "src.cli:main"
+    assert data["project"]["scripts"]["audit"] == "github_repo_auditor.cli:main"
+
+
+def test_import_package_uses_conventional_src_layout():
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text())
+
+    assert data["tool"]["setuptools"]["packages"]["find"] == {
+        "where": ["src"],
+        "include": ["github_repo_auditor*"],
+    }
+    assert not (ROOT / "src" / "__init__.py").exists()
+    assert (ROOT / "src" / "github_repo_auditor" / "__init__.py").is_file()
+    assert data["tool"]["setuptools"]["package-data"]["github_repo_auditor"]
+    assert "assets/excel/*.xlsx" in data["tool"]["setuptools"]["package-data"][
+        "github_repo_auditor"
+    ]
 
 
 def test_cli_module_executes_help():
     result = subprocess.run(
-        [sys.executable, "-m", "src.cli", "--help"],
+        [sys.executable, "-m", "github_repo_auditor.cli", "--help"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -53,12 +68,13 @@ def test_makefile_includes_operator_entrypoints():
     makefile = (ROOT / "Makefile").read_text()
     for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "workbook-gate:", "workbook-signoff:", "test:"):
         assert target in makefile
-    assert "CLI := uv run python -m src.cli" in makefile
+    assert "SOURCE_ENV := PYTHONPATH=src" in makefile
+    assert "CLI := $(SOURCE_ENV) uv run python -m github_repo_auditor.cli" in makefile
     assert "$(CLI) $(USERNAME) --doctor $(ARGS)" in makefile
     assert "$(CLI) $(USERNAME) --excel-mode standard $(ARGS)" in makefile
     assert "$(CLI) $(USERNAME) --control-center $(ARGS)" in makefile
-    assert "$(PYTHON) -m src.workbook_gate $(ARGS)" in makefile
-    assert "$(PYTHON) -m src.workbook_gate --record-signoff $(ARGS)" in makefile
+    assert "$(PYTHON) -m github_repo_auditor.workbook_gate $(ARGS)" in makefile
+    assert "$(PYTHON) -m github_repo_auditor.workbook_gate --record-signoff $(ARGS)" in makefile
     assert "$(CLI) --help" in makefile
 
 

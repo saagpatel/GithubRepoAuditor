@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.weekly_command_center import (
+from github_repo_auditor.weekly_command_center import (
     build_weekly_command_center_digest,
     render_weekly_command_center_markdown,
 )

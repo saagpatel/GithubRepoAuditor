@@ -53,14 +53,14 @@ Re-evaluate if any graduate to wip or functional tier.
 
 Three bugs discovered during this work and fixed in `fix/analyzer-bugs`:
 
-1. **`src/analyzers/testing.py`** — `*Tests.swift` / `*Test.swift` missing from
+1. **`src/github_repo_auditor/analyzers/testing.py`** — `*Tests.swift` / `*Test.swift` missing from
    `TEST_PATTERNS`. XCTest file count was always 0, capping Swift repos at 0.7.
    After fix: all 12 affected repos jumped to testing score 1.0, revealing
    101 previously invisible test files across the portfolio.
 
-2. **`src/analyzers/cicd.py`** — `Package.swift`, `Podfile`, `project.yml`/`project.yaml`
+2. **`src/github_repo_auditor/analyzers/cicd.py`** — `Package.swift`, `Podfile`, `project.yml`/`project.yaml`
    not in `_has_build_scripts()`. XcodeGen repos had no build score.
 
-3. **`src/cloner.py`** — hardcoded `/tmp/audit-repos` shared across sessions.
+3. **`src/github_repo_auditor/cloner.py`** — hardcoded `/tmp/audit-repos` shared across sessions.
    Replaced with `tempfile.TemporaryDirectory` — each session gets an isolated dir,
    eliminating cross-run collisions on batch audits.

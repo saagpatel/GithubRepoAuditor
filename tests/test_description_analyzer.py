@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.models import RepoMetadata
+from github_repo_auditor.models import RepoMetadata
 
 _DT = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
@@ -35,7 +35,7 @@ def _meta(**kwargs) -> RepoMetadata:
 
 
 def test_correct_swift_classification(tmp_path: Path) -> None:
-    from src.analyzers.description_analyzer import DescriptionAnalyzer
+    from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     (tmp_path / "MyApp.xcodeproj").mkdir()
     meta = _meta(description="A SwiftUI iOS app for tracking habits", language="Swift")
@@ -46,7 +46,7 @@ def test_correct_swift_classification(tmp_path: Path) -> None:
 
 
 def test_misclassified_ios_repo_with_python_description(tmp_path: Path) -> None:
-    from src.analyzers.description_analyzer import DescriptionAnalyzer
+    from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     (tmp_path / "MyApp.xcodeproj").mkdir()
     meta = _meta(description="A Python CLI script for data processing", language="Swift")
@@ -56,7 +56,7 @@ def test_misclassified_ios_repo_with_python_description(tmp_path: Path) -> None:
 
 
 def test_missing_description(tmp_path: Path) -> None:
-    from src.analyzers.description_analyzer import DescriptionAnalyzer
+    from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     meta = _meta(description=None, language="Python")
     result = DescriptionAnalyzer().analyze(tmp_path, meta)
@@ -66,7 +66,7 @@ def test_missing_description(tmp_path: Path) -> None:
 
 
 def test_unknown_language_returns_full_score(tmp_path: Path) -> None:
-    from src.analyzers.description_analyzer import DescriptionAnalyzer
+    from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     meta = _meta(description="A COBOL mainframe batch processor", language="COBOL")
     result = DescriptionAnalyzer().analyze(tmp_path, meta)
@@ -75,7 +75,7 @@ def test_unknown_language_returns_full_score(tmp_path: Path) -> None:
 
 
 def test_conflict_with_expected_match_gives_partial_score(tmp_path: Path) -> None:
-    from src.analyzers.description_analyzer import DescriptionAnalyzer
+    from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     meta = _meta(
         description="A swift iOS app with some react components",
@@ -90,7 +90,7 @@ def test_conflict_with_expected_match_gives_partial_score(tmp_path: Path) -> Non
 
 
 def test_topics_used_as_conflict_signals(tmp_path: Path) -> None:
-    from src.analyzers.description_analyzer import DescriptionAnalyzer
+    from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     meta = _meta(
         description="An xcode project for iOS",

@@ -25,7 +25,7 @@
   "producer": {
     "artifact_path": "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json",
     "artifact_sha256": "3a00a034463ecb2aeb4667387da1f84f94303d955f28934788196fd1733b41ec",
-    "generator": "src.portfolio_truth_contract_fixture:build_contract_fixture",
+    "generator": "github_repo_auditor.portfolio_truth_contract_fixture:build_contract_fixture",
     "manifest_path": "fixtures/contracts/portfolio-command-center-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"
   }

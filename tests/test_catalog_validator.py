@@ -3,7 +3,7 @@
 import pytest
 import yaml
 
-from src.catalog_validator import REQUIRED_FIELDS, score_catalog_entry, validate_catalog
+from github_repo_auditor.catalog_validator import REQUIRED_FIELDS, score_catalog_entry, validate_catalog
 
 
 def test_full_entry_scores_one():

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.portfolio_decision_queue import (
+from github_repo_auditor.portfolio_decision_queue import (
     DIGEST_CONTRACT_VERSION,
     SECURITY_DECISION_VALIDITY_HOURS,
     build_decision_digest,
@@ -490,7 +490,12 @@ def test_absolute_cli_entrypoint_runs_from_arbitrary_cwd(tmp_path: Path) -> None
         ),
         encoding="utf-8",
     )
-    script = Path(__file__).resolve().parents[1] / "src" / "portfolio_decision_queue.py"
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "github_repo_auditor"
+        / "portfolio_decision_queue.py"
+    )
     unrelated_cwd = tmp_path / "unrelated-cwd"
     unrelated_cwd.mkdir()
 

@@ -4,7 +4,7 @@ from argparse import Namespace
 
 import pytest
 
-from src.cli_mode_validation import CliModeState, validate_cli_mode_args
+from github_repo_auditor.cli_mode_validation import CliModeState, validate_cli_mode_args
 
 
 def _make_args(**overrides) -> Namespace:

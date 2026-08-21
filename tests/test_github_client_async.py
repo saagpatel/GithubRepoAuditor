@@ -1,4 +1,4 @@
-"""Tests for src.github_client_async — async parallel enrichment fetcher."""
+"""Tests for github_repo_auditor.github_client_async — async parallel enrichment fetcher."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from urllib.parse import urlparse
 import httpx
 import pytest
 
-from src.github_client import GitHubClientError
-from src.github_client_async import (
+from github_repo_auditor.github_client import GitHubClientError
+from github_repo_auditor.github_client_async import (
     AsyncGitHubClient,
     _enrichment_endpoints,
     fetch_enrichment_sync,
@@ -241,7 +241,7 @@ class TestServerErrorRetryExhaustion:
 
     def test_5xx_retry_count_is_bounded(self):
         """Exactly _MAX_5XX_RETRIES + 1 attempts are made before exhaustion."""
-        from src.github_client_async import _MAX_5XX_RETRIES
+        from github_repo_auditor.github_client_async import _MAX_5XX_RETRIES
 
         call_count = 0
 

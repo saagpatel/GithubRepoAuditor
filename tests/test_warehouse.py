@@ -3,10 +3,10 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-from src.baseline_context import build_baseline_context
-from src.models import AnalyzerResult, RepoMetadata
-from src.scorer import WEIGHTS, score_repo
-from src.warehouse import (
+from github_repo_auditor.baseline_context import build_baseline_context
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.scorer import WEIGHTS, score_repo
+from github_repo_auditor.warehouse import (
     load_action_sync_automation,
     load_approval_followup_events,
     load_approval_records,
@@ -111,7 +111,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         }
     ]
 
-    from src.models import AuditReport
+    from github_repo_auditor.models import AuditReport
 
     report = AuditReport.from_audits("user", [audit], [], 1)
     report.baseline_context = build_baseline_context(
@@ -553,7 +553,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
 def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_style_rows(tmp_path):
     audit = score_repo(_make_metadata(), _make_results())
 
-    from src.models import AuditReport
+    from github_repo_auditor.models import AuditReport
 
     report = AuditReport.from_audits("user", [audit], [], 1)
     write_warehouse_snapshot(report, tmp_path)
@@ -577,7 +577,7 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
 def test_write_warehouse_snapshot_expands_multi_action_target_results(tmp_path):
     audit = score_repo(_make_metadata(), _make_results())
 
-    from src.models import AuditReport
+    from github_repo_auditor.models import AuditReport
 
     report = AuditReport.from_audits("user", [audit], [], 1)
     report.writeback_results = {
@@ -630,7 +630,7 @@ def test_write_warehouse_snapshot_expands_multi_action_target_results(tmp_path):
 def test_approval_workflow_summary_and_records_round_trip(tmp_path):
     audit = score_repo(_make_metadata(), _make_results())
 
-    from src.models import AuditReport
+    from github_repo_auditor.models import AuditReport
 
     report = AuditReport.from_audits("user", [audit], [], 1)
     report.approval_workflow_summary = {
@@ -682,7 +682,7 @@ def test_approval_workflow_summary_and_records_round_trip(tmp_path):
 def test_approval_followup_events_round_trip(tmp_path):
     audit = score_repo(_make_metadata(), _make_results())
 
-    from src.models import AuditReport
+    from github_repo_auditor.models import AuditReport
 
     report = AuditReport.from_audits("user", [audit], [], 1)
     write_warehouse_snapshot(report, tmp_path)

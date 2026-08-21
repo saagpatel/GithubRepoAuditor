@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.producer_preflight import (
+from github_repo_auditor.producer_preflight import (
     PREFLIGHT_SCHEMA_VERSION,
     PREFLIGHT_PASS_CHECKS,
     ProducerEvidence,
@@ -325,7 +325,7 @@ def test_rewritten_repository_identity_failure_cannot_load_as_pass(
 def test_rewritten_head_ref_failure_fails_currentness_and_publication(
     tmp_path: Path,
 ) -> None:
-    from src.portfolio_truth_publish import (
+    from github_repo_auditor.portfolio_truth_publish import (
         PortfolioTruthPublishError,
         publish_portfolio_truth,
     )

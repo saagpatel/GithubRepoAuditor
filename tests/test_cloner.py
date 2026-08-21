@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.cloner import clone_repo
+from github_repo_auditor.cloner import clone_repo
 
 
 class TestCloneRepoHardening:

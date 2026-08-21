@@ -1,5 +1,5 @@
 // Mirrors the JSON shape emitted by the Python engine's
-// `ApiOnlyReport.to_dict()` / `RepoAudit.to_dict()` (src/api_only.py, src/models.py).
+// `ApiOnlyReport.to_dict()` / `RepoAudit.to_dict()` (src/github_repo_auditor/api_only.py, src/github_repo_auditor/models.py).
 // Only the fields the UI renders are typed; the payload carries more.
 
 export interface RepoMetadata {

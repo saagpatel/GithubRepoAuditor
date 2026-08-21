@@ -4,7 +4,7 @@
 
 **Goal:** Independently re-check the snapshot's `run_instructions_present` claim against on-disk ground truth across a stratified pilot of ~19 repos, and produce a discrepancy report.
 
-**Architecture:** A deterministic, read-only Python pre-step (`src/run_instructions_audit.py`, TDD'd) selects the pilot and computes per-repo metadata + a live `tool_today` recompute, emitting compact JSON. A `Workflow` (`scripts/run-instructions-audit.workflow.js`) fans out one Haiku subagent per repo to read the files and judge (blind to the tool's answer), tallies buckets in deterministic JS, and a single Sonnet call writes the markdown report.
+**Architecture:** A deterministic, read-only Python pre-step (`src/github_repo_auditor/run_instructions_audit.py`, TDD'd) selects the pilot and computes per-repo metadata + a live `tool_today` recompute, emitting compact JSON. A `Workflow` (`scripts/run-instructions-audit.workflow.js`) fans out one Haiku subagent per repo to read the files and judge (blind to the tool's answer), tallies buckets in deterministic JS, and a single Sonnet call writes the markdown report.
 
 **Tech Stack:** Python 3.11+ (pytest), the `Workflow` tool (JS orchestration, Haiku verifiers, Sonnet synthesis), `ctx_execute` to run the pre-step.
 
@@ -16,7 +16,7 @@
 
 | File | Responsibility |
 |---|---|
-| `src/run_instructions_audit.py` (create) | Stage 0 pilot selection + Stage 1 evidence prep + Stage 3 bucket logic (pure fns reused by the workflow's JS mirror). Read-only. |
+| `src/github_repo_auditor/run_instructions_audit.py` (create) | Stage 0 pilot selection + Stage 1 evidence prep + Stage 3 bucket logic (pure fns reused by the workflow's JS mirror). Read-only. |
 | `tests/test_run_instructions_audit.py` (create) | Unit tests for every pure fn + tmp_path tests for the IO fns. |
 | `scripts/run-instructions-audit.workflow.js` (create) | Stage 2 verifier fan-out + Stage 3 JS tally + Stage 4 synthesis. |
 | `output/run-instructions-audit-2026-05-29.md` (generated) | The report. Gitignored. |
@@ -28,14 +28,14 @@
 ## Task 1: Module scaffold + `is_fork_junk` + `assign_bucket` (Stage 3 truth table)
 
 **Files:**
-- Create: `src/run_instructions_audit.py`
+- Create: `src/github_repo_auditor/run_instructions_audit.py`
 - Test: `tests/test_run_instructions_audit.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_run_instructions_audit.py
-from src.run_instructions_audit import assign_bucket, is_fork_junk
+from github_repo_auditor.run_instructions_audit import assign_bucket, is_fork_junk
 
 
 def test_is_fork_junk_flags_known_patterns():
@@ -61,12 +61,12 @@ def test_assign_bucket_truth_table():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_run_instructions_audit.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'src.run_instructions_audit'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'github_repo_auditor.run_instructions_audit'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# src/run_instructions_audit.py
+# src/github_repo_auditor/run_instructions_audit.py
 """External audit of the snapshot's run_instructions_present claim (pre-step).
 
 Stage 0 (stratified pilot selection) + Stage 1 (evidence prep + live tool_today
@@ -82,11 +82,11 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from src.portfolio_context_contract import (
+from github_repo_auditor.portfolio_context_contract import (
     analyze_project_context,
     choose_primary_context_file,
 )
-from src.portfolio_truth_sources import _collect_context_files
+from github_repo_auditor.portfolio_truth_sources import _collect_context_files
 
 FORK_JUNK_PATTERNS = (r"-security-fix", r"-cve-", r"-backup-", r"\.bundle$", r"-openssl-")
 
@@ -111,7 +111,7 @@ Expected: PASS (2 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/run_instructions_audit.py tests/test_run_instructions_audit.py
+git add src/github_repo_auditor/run_instructions_audit.py tests/test_run_instructions_audit.py
 git commit -m "feat: add run-instructions audit pre-step scaffold + bucket logic"
 ```
 
@@ -120,13 +120,13 @@ git commit -m "feat: add run-instructions audit pre-step scaffold + bucket logic
 ## Task 2: `assign_drift_bucket` (snapshot-vs-today drift)
 
 **Files:**
-- Modify: `src/run_instructions_audit.py`
+- Modify: `src/github_repo_auditor/run_instructions_audit.py`
 - Test: `tests/test_run_instructions_audit.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from src.run_instructions_audit import assign_drift_bucket
+from github_repo_auditor.run_instructions_audit import assign_drift_bucket
 
 
 def test_assign_drift_bucket():
@@ -146,7 +146,7 @@ Expected: FAIL — `ImportError: cannot import name 'assign_drift_bucket'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `src/run_instructions_audit.py` after `assign_bucket`:
+Add to `src/github_repo_auditor/run_instructions_audit.py` after `assign_bucket`:
 
 ```python
 def assign_drift_bucket(snapshot_claim: bool, tool_today: bool, repo_drifted: bool) -> str:
@@ -163,7 +163,7 @@ Expected: PASS (3 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/run_instructions_audit.py tests/test_run_instructions_audit.py
+git add src/github_repo_auditor/run_instructions_audit.py tests/test_run_instructions_audit.py
 git commit -m "feat: add drift bucket logic to run-instructions audit"
 ```
 
@@ -172,13 +172,13 @@ git commit -m "feat: add drift bucket logic to run-instructions audit"
 ## Task 3: `select_pilot` (Stage 0 — stratified, deterministic)
 
 **Files:**
-- Modify: `src/run_instructions_audit.py`
+- Modify: `src/github_repo_auditor/run_instructions_audit.py`
 - Test: `tests/test_run_instructions_audit.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from src.run_instructions_audit import select_pilot
+from github_repo_auditor.run_instructions_audit import select_pilot
 
 
 def _project(key, quality, *, status="active", path=None):
@@ -261,7 +261,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/run_instructions_audit.py tests/test_run_instructions_audit.py
+git add src/github_repo_auditor/run_instructions_audit.py tests/test_run_instructions_audit.py
 git commit -m "feat: add stratified pilot selection (Stage 0)"
 ```
 
@@ -270,13 +270,13 @@ git commit -m "feat: add stratified pilot selection (Stage 0)"
 ## Task 4: `build_record` (Stage 1a — compact record from snapshot, pure)
 
 **Files:**
-- Modify: `src/run_instructions_audit.py`
+- Modify: `src/github_repo_auditor/run_instructions_audit.py`
 - Test: `tests/test_run_instructions_audit.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from src.run_instructions_audit import build_record
+from github_repo_auditor.run_instructions_audit import build_record
 
 
 def test_build_record_resolves_path_and_primary():
@@ -291,9 +291,9 @@ def test_build_record_resolves_path_and_primary():
             "run_instructions_present": False,
         },
     }
-    record = build_record(project, "/Users/d/Projects")
+    record = build_record(project, "~/Projects")
 
-    assert record["abs_path"] == "/Users/d/Projects/Fun:GamePrjs/BattleGrid"
+    assert record["abs_path"] == "~/Projects/Fun:GamePrjs/BattleGrid"
     assert record["primary_file_name"] == "AGENTS.md"   # no CLAUDE.md → AGENTS.md
     assert record["snapshot_claim"] is False
     assert record["context_files"] == ["AGENTS.md", "README.md"]
@@ -337,7 +337,7 @@ Expected: PASS (6 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/run_instructions_audit.py tests/test_run_instructions_audit.py
+git add src/github_repo_auditor/run_instructions_audit.py tests/test_run_instructions_audit.py
 git commit -m "feat: add build_record (Stage 1a) for run-instructions audit"
 ```
 
@@ -346,7 +346,7 @@ git commit -m "feat: add build_record (Stage 1a) for run-instructions audit"
 ## Task 5: IO fns — `is_after`, `compute_drifted`, `compute_tool_today` (Stage 1b/c)
 
 **Files:**
-- Modify: `src/run_instructions_audit.py`
+- Modify: `src/github_repo_auditor/run_instructions_audit.py`
 - Test: `tests/test_run_instructions_audit.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -355,7 +355,7 @@ git commit -m "feat: add build_record (Stage 1a) for run-instructions audit"
 import os
 import subprocess
 
-from src.run_instructions_audit import compute_drifted, compute_tool_today, is_after
+from github_repo_auditor.run_instructions_audit import compute_drifted, compute_tool_today, is_after
 
 
 def test_is_after_compares_tz_aware_iso():
@@ -446,7 +446,7 @@ Expected: PASS (12 passed). If `compute_tool_today` cases fail on heading parsin
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/run_instructions_audit.py tests/test_run_instructions_audit.py
+git add src/github_repo_auditor/run_instructions_audit.py tests/test_run_instructions_audit.py
 git commit -m "feat: add live tool_today recompute + git drift detection (Stage 1)"
 ```
 
@@ -455,7 +455,7 @@ git commit -m "feat: add live tool_today recompute + git drift detection (Stage 
 ## Task 6: `prepare_pilot` + `main` (Stage 0+1 orchestration)
 
 **Files:**
-- Modify: `src/run_instructions_audit.py`
+- Modify: `src/github_repo_auditor/run_instructions_audit.py`
 - Test: `tests/test_run_instructions_audit.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -463,7 +463,7 @@ git commit -m "feat: add live tool_today recompute + git drift detection (Stage 
 ```python
 import json
 
-from src.run_instructions_audit import prepare_pilot
+from github_repo_auditor.run_instructions_audit import prepare_pilot
 
 
 def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
@@ -562,13 +562,13 @@ Expected: PASS (13 passed)
 
 - [ ] **Step 5: Verify ruff + run against the real snapshot (smoke, read-only)**
 
-Run: `python -m ruff check src/run_instructions_audit.py && python -m src.run_instructions_audit output/portfolio-truth-latest.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('records', len(d['records']), 'errors', len(d['errors']))"`
+Run: `python -m ruff check src/github_repo_auditor/run_instructions_audit.py && python -m github_repo_auditor.run_instructions_audit output/portfolio-truth-latest.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('records', len(d['records']), 'errors', len(d['errors']))"`
 Expected: ruff clean; ~15–20 records, errors listed (not crashed). Confirms real paths resolve.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/run_instructions_audit.py tests/test_run_instructions_audit.py
+git add src/github_repo_auditor/run_instructions_audit.py tests/test_run_instructions_audit.py
 git commit -m "feat: add prepare_pilot orchestrator + CLI entrypoint (Stage 0+1)"
 ```
 
@@ -626,7 +626,7 @@ function verifierPrompt(rec) {
   ].join('\n')
 }
 
-// --- Stage 3 tally logic (mirror of src/run_instructions_audit.py) ---
+// --- Stage 3 tally logic (mirror of src/github_repo_auditor/run_instructions_audit.py) ---
 function assignBucket(toolToday, verdict, inPrimary) {
   if (toolToday === verdict) return verdict ? 'agree_present' : 'agree_absent'
   if (verdict && !toolToday) return inPrimary ? 'fn_alias_gap' : 'fn_blind_spot'
@@ -694,13 +694,13 @@ return {
 
 - [ ] **Step 2: Sanity-check the JS bucket logic matches Python**
 
-Confirm by eye that `assignBucket`/`assignDrift` in the JS are line-for-line equivalent to `assign_bucket`/`assign_drift_bucket` in `src/run_instructions_audit.py` (same branch order, same string returns). They are the same six lines.
+Confirm by eye that `assignBucket`/`assignDrift` in the JS are line-for-line equivalent to `assign_bucket`/`assign_drift_bucket` in `src/github_repo_auditor/run_instructions_audit.py` (same branch order, same string returns). They are the same six lines.
 
 - [ ] **Step 3: 2-repo smoke run (main session)**
 
 In the main session:
 1. Run the pre-step and capture the JSON payload:
-   `python -m src.run_instructions_audit output/portfolio-truth-latest.json`
+   `python -m github_repo_auditor.run_instructions_audit output/portfolio-truth-latest.json`
 2. Slice the payload to its first 2 `records` (keep `generated_at`, `workspace_root`, `errors`).
 3. Call `Workflow({ scriptPath: "scripts/run-instructions-audit.workflow.js", args: <sliced payload> })`.
 
@@ -721,7 +721,7 @@ This task is **main-session only**. No pytest.
 
 - [ ] **Step 1: Run the pilot end-to-end**
 
-1. `python -m src.run_instructions_audit output/portfolio-truth-latest.json` → full payload (~19 records).
+1. `python -m github_repo_auditor.run_instructions_audit output/portfolio-truth-latest.json` → full payload (~19 records).
 2. `Workflow({ scriptPath: "scripts/run-instructions-audit.workflow.js", args: <full payload> })`.
 
 Expected: ~19 Haiku verifiers + 1 Sonnet synthesis; returns `{ report, stats, rows }`.

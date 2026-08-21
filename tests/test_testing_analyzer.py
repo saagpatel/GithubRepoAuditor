@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.analyzers.testing import TestingAnalyzer
+from github_repo_auditor.analyzers.testing import TestingAnalyzer
 
 
 class TestTestingAnalyzer:

@@ -1,4 +1,4 @@
-"""Tests for src/semantic_index.py — portfolio semantic index (Arc F S3.1)."""
+"""Tests for src/github_repo_auditor/semantic_index.py — portfolio semantic index (Arc F S3.1)."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import responses as responses_lib
 
-from src.models import AnalyzerResult, RepoAudit, RepoMetadata
-from src.semantic_index import (
+from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
+from github_repo_auditor.semantic_index import (
     VOYAGE_DIM,
     SearchResult,
     SemanticIndex,
@@ -359,7 +359,7 @@ class TestVoyageEmbedder:
         fake_dim = VOYAGE_DIM
         fake_vecs = [[0.1] * fake_dim]
 
-        from src.semantic_index import VOYAGE_API_BASE_URL
+        from github_repo_auditor.semantic_index import VOYAGE_API_BASE_URL
 
         responses_lib.add(
             responses_lib.POST,
@@ -382,7 +382,7 @@ class TestVoyageEmbedder:
     def test_auth_header_uses_api_key(self) -> None:
         fake_key = "vk-auth-header-test"
 
-        from src.semantic_index import VOYAGE_API_BASE_URL
+        from github_repo_auditor.semantic_index import VOYAGE_API_BASE_URL
 
         responses_lib.add(
             responses_lib.POST,
@@ -404,7 +404,7 @@ class TestVoyageEmbedder:
 class TestLocalEmbedder:
     def test_raises_import_error_when_not_installed(self) -> None:
         with patch.dict("sys.modules", {"sentence_transformers": None}):
-            from src.semantic_index import LocalEmbedder
+            from github_repo_auditor.semantic_index import LocalEmbedder
 
             with pytest.raises(ImportError, match="sentence-transformers"):
                 LocalEmbedder()
@@ -419,7 +419,7 @@ class TestLocalEmbedder:
         mock_st.SentenceTransformer.return_value = mock_model
 
         with patch.dict("sys.modules", {"sentence_transformers": mock_st}):
-            from src.semantic_index import LocalEmbedder  # fresh import
+            from github_repo_auditor.semantic_index import LocalEmbedder  # fresh import
 
             emb = LocalEmbedder()
             result = emb.embed(["sample text"])
@@ -481,7 +481,7 @@ class TestCLIIntegration:
         audits = [_make_audit("Repo1"), _make_audit("Repo2")]
 
         # Simulate the CLI post-audit hook
-        from src.semantic_index import _run_reindex
+        from github_repo_auditor.semantic_index import _run_reindex
 
         _run_reindex(mock_idx, audits, force=False)
 
@@ -493,7 +493,7 @@ class TestCLIIntegration:
             SearchResult(repo_name="RustDB", score=0.1, snippet="repo: RustDB")
         ]
 
-        from src.semantic_index import _run_search
+        from github_repo_auditor.semantic_index import _run_search
 
         results = _run_search(mock_idx, "rust database", k=5)
 

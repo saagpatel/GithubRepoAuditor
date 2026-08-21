@@ -19,16 +19,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from src.analyzer_cache import _deep_equal, _diff_summary, reconcile, store
-from src.analyzers.readme import ReadmeAnalyzer
-from src.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.analyzer_cache import _deep_equal, _diff_summary, reconcile, store
+from github_repo_auditor.analyzers.readme import ReadmeAnalyzer
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
 
 def _fresh_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
-    from src.warehouse import _ensure_schema
+    from github_repo_auditor.warehouse import _ensure_schema
 
     _ensure_schema(conn)
     return conn
@@ -326,7 +326,7 @@ class TestReconcileOptOutAnalyzer:
             return [opt_out.analyze(path, m)]
 
         # Patch ALL_ANALYZERS in the namespace used by reconcile's inner import.
-        with patch("src.analyzers.ALL_ANALYZERS", [opt_out]):
+        with patch("github_repo_auditor.analyzers.ALL_ANALYZERS", [opt_out]):
             report = reconcile(
                 {"repo": repo_dir},
                 {"repo": meta},

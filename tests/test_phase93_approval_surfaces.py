@@ -4,11 +4,11 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from src.approval_ledger import render_approval_center_markdown
-from src.excel_export import _build_approval_ledger, _build_hidden_data_sheets
-from src.review_pack import export_review_pack
-from src.scheduled_handoff import render_scheduled_handoff_markdown
-from src.web_export import _render_html
+from github_repo_auditor.approval_ledger import render_approval_center_markdown
+from github_repo_auditor.excel_export import _build_approval_ledger, _build_hidden_data_sheets
+from github_repo_auditor.review_pack import export_review_pack
+from github_repo_auditor.scheduled_handoff import render_scheduled_handoff_markdown
+from github_repo_auditor.web_export import _render_html
 
 
 def _report() -> dict:

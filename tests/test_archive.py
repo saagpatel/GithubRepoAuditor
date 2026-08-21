@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.archive_candidates import export_archive_report, find_archive_candidates
+from github_repo_auditor.archive_candidates import export_archive_report, find_archive_candidates
 
 
 class TestFindArchiveCandidates:

@@ -21,7 +21,7 @@ The current machine-readable truth surface is `output/portfolio-truth-latest.jso
 Refresh and verify the local portfolio truth snapshot:
 
 ```sh
-uv run python -m src.cli report saagpatel --portfolio-truth
+uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth
 jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
 uv run operator-os-seam-linter --truth output/portfolio-truth-latest.json --json
 ```
