@@ -684,7 +684,7 @@ def test_prior_security_loader_accepts_bounded_legacy_truth(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     payload, metadata, _ = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -715,7 +715,7 @@ def test_prior_security_loader_allows_same_receipt_truth_generated_after_receipt
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -742,7 +742,7 @@ def test_prior_security_loader_accepts_immediate_additive_schema_predecessor(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -800,7 +800,7 @@ def test_prior_security_loader_refuses_future_truth_from_different_receipt(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
