@@ -684,7 +684,7 @@ def test_prior_security_loader_accepts_bounded_legacy_truth(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     payload, metadata, _ = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -715,7 +715,7 @@ def test_prior_security_loader_allows_same_receipt_truth_generated_after_receipt
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,
@@ -736,6 +736,54 @@ def test_prior_security_loader_allows_same_receipt_truth_generated_after_receipt
     assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
 
 
+def test_prior_security_loader_accepts_immediate_additive_schema_predecessor(
+    tmp_path: Path,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
+
+    _, metadata, payload = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+    )
+    payload["schema_version"] = "0.11.0"
+    for project in payload["projects"]:
+        project["derived"].pop("degraded_dimensions")
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(json.dumps(payload), encoding="utf-8")
+
+    evidence = publish_mod._load_prior_security_alerts(
+        latest,
+        current_security_metadata=metadata,
+        security_max_age_hours=24,
+    )
+
+    assert evidence.final_cohort_repositories == ("d/Alpha",)
+    assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
+
+
+def test_immediate_additive_schema_predecessor_rejects_new_field(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    _, _, payload = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+    )
+    payload["schema_version"] = "0.11.0"
+
+    with pytest.raises(
+        ValueError,
+        match="0.11.0 cannot declare derived.degraded_dimensions",
+    ):
+        canonicalize_prior_security_truth_payload(payload)
+
+
 @pytest.mark.parametrize(
     ("binding_field", "replacement"),
     (
@@ -752,7 +800,7 @@ def test_prior_security_loader_refuses_future_truth_from_different_receipt(
     portfolio_catalog: Path,
     legacy_registry: Path,
 ) -> None:
-    import github_repo_auditor.portfolio_truth_publish as publish_mod
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
 
     _, metadata, payload = _legacy_prior_security_payload(
         portfolio_workspace=portfolio_workspace,

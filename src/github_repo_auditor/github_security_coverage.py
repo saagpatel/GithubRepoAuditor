@@ -31,7 +31,9 @@ REMOTE_REPOSITORY_SOURCE = "github-graphql-default-branch-head-v1"
 DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
-DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 11
+# Owner-confirmed 2026-08-21 after agent-session-replay legitimately entered
+# decision-needed while remaining on its active finish path.
+DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 12
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
 ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
 ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"
