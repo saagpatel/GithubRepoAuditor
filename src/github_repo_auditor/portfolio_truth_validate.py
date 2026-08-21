@@ -1887,12 +1887,13 @@ def canonicalize_prior_security_truth_payload(
     *,
     security_max_age_hours: int = 24,
 ) -> dict[str, Any]:
-    """Canonicalize prior security evidence across one bounded metadata upgrade.
+    """Canonicalize prior security evidence across bounded metadata upgrades.
 
     Current snapshots always take the ordinary strict path. The compatibility
-    path accepts only the immediately preceding discovery envelope, before
-    checkout-collision metadata existed, and reconstructs those two unrelated
-    metadata envelopes in memory before running the complete current validator.
+    paths accept only the immediately preceding additive schema or the earlier
+    discovery envelope before checkout-collision metadata existed. Each path
+    reconstructs only its named metadata in memory before running the complete
+    current validator.
     """
     try:
         return canonicalize_truth_snapshot_payload(
@@ -1900,6 +1901,36 @@ def canonicalize_prior_security_truth_payload(
             security_max_age_hours=security_max_age_hours,
         )
     except ValueError as strict_error:
+        if payload.get("schema_version") == "0.11.0" and SCHEMA_VERSION == "0.12.0":
+            migrated = deepcopy(dict(payload))
+            projects = migrated.get("projects")
+            if not isinstance(projects, list):
+                raise ValueError(
+                    "Prior PortfolioTruth 0.11.0 project envelope is invalid."
+                ) from strict_error
+            for raw_project in projects:
+                if not isinstance(raw_project, dict) or not isinstance(
+                    raw_project.get("derived"), dict
+                ):
+                    raise ValueError(
+                        "Prior PortfolioTruth 0.11.0 project envelope is invalid."
+                    ) from strict_error
+                derived = raw_project["derived"]
+                if "degraded_dimensions" in derived:
+                    raise ValueError(
+                        "Prior PortfolioTruth 0.11.0 cannot declare "
+                        "derived.degraded_dimensions."
+                    ) from strict_error
+                derived["degraded_dimensions"] = None
+            migrated["schema_version"] = SCHEMA_VERSION
+            try:
+                return canonicalize_truth_snapshot_payload(
+                    migrated,
+                    security_max_age_hours=security_max_age_hours,
+                )
+            except ValueError as migration_error:
+                raise migration_error from strict_error
+
         summary = payload.get("source_summary")
         exclusions = payload.get("exclusions")
         is_bounded_legacy_payload = (
