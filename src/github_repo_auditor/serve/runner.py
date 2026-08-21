@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -43,9 +44,13 @@ _MAX_LINES = 200
 class RunSession:
     """Holds state for one spawned audit subprocess."""
 
-    def __init__(self, run_id: str, cmd: list[str]) -> None:
+    def __init__(self, run_id: str, username: str, flag_args: list[str]) -> None:
         self.run_id = run_id
-        self.cmd = cmd
+        # Keep the OS command line constant. Form-derived values are supplied
+        # to the worker over stdin and become parser arguments only inside the
+        # child process; they never participate in process creation.
+        self.cmd = (sys.executable, "-m", "github_repo_auditor.serve.worker")
+        self._request = {"username": username, "flag_args": flag_args}
         self._lines: deque[str] = deque(maxlen=_MAX_LINES)
         self._lock = threading.Lock()
         self._done = threading.Event()
@@ -68,15 +73,16 @@ class RunSession:
 
     def start(self) -> None:
         self._proc = subprocess.Popen(
-            # Command shape is fixed in spawn_run: sys.executable, module name,
-            # validated GitHub owner, and allowlisted flags; shell remains off.
-            # codeql[py/command-line-injection]
             self.cmd,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             shell=False,  # never shell=True
         )
+        assert self._proc.stdin is not None
+        self._proc.stdin.write(json.dumps(self._request))
+        self._proc.stdin.close()
         t = threading.Thread(target=self._stream, daemon=True)
         t.start()
 
@@ -145,8 +151,7 @@ def spawn_run(username: str, flags: dict[str, str | bool], output_dir: Path) -> 
     safe_username = validate_username(username)
     flag_args = validate_flags(flags)
     run_id = uuid.uuid4().hex
-    cmd = [sys.executable, "-m", "github_repo_auditor.cli", safe_username, *flag_args]
-    session = RunSession(run_id=run_id, cmd=cmd)
+    session = RunSession(run_id=run_id, username=safe_username, flag_args=flag_args)
     with _registry_lock:
         _registry[run_id] = session
     session.start()
