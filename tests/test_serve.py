@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -534,6 +535,60 @@ class TestStreamRoute:
         # SSE endpoint must return 200 with correct media type
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers["content-type"]
+
+
+class TestRunnerCommandBoundary:
+    def test_form_values_are_not_embedded_in_worker_command(self, output_dir: Path) -> None:
+        from github_repo_auditor.serve import runner as runner_mod
+        from github_repo_auditor.serve.runner import spawn_run
+
+        with patch.object(runner_mod.RunSession, "start"):
+            run_id = spawn_run(
+                username="octo-org",
+                flags={"output-dir": "user-controlled-output"},
+                output_dir=output_dir,
+            )
+
+        session = runner_mod.get_session(run_id)
+        assert session is not None
+        assert session.cmd == (
+            sys.executable,
+            "-m",
+            "github_repo_auditor.serve.worker",
+        )
+        assert "octo-org" not in session.cmd
+        assert "user-controlled-output" not in session.cmd
+
+    def test_worker_passes_payload_to_cli_inside_child_process(self, monkeypatch) -> None:
+        from io import StringIO
+
+        import github_repo_auditor.cli as cli
+        from github_repo_auditor.serve import worker
+
+        monkeypatch.setattr(
+            worker.sys,
+            "stdin",
+            StringIO(
+                json.dumps(
+                    {
+                        "username": "octo-org",
+                        "flag_args": ["--portfolio-truth", "--output-dir", "safe-output"],
+                    }
+                )
+            ),
+        )
+        captured: dict[str, list[str]] = {}
+        monkeypatch.setattr(cli, "main", lambda: captured.setdefault("argv", list(sys.argv)))
+
+        worker.main()
+
+        assert captured["argv"] == [
+            "audit",
+            "octo-org",
+            "--portfolio-truth",
+            "--output-dir",
+            "safe-output",
+        ]
 
 
 # ---------------------------------------------------------------------------
