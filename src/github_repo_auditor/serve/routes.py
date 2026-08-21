@@ -407,6 +407,7 @@ def _render_action_row(packet_id: str, idx: int, action: dict[str, Any]) -> str:
     target = _escape(action.get("target") or "—")
     rationale = _escape(action.get("rationale") or "—")
     safe_packet_id = _escape(packet_id)
+    safe_idx = _escape(idx)
 
     if state == "approved":
         state_cell = '<span class="badge badge-approved">&#10003; Approved</span>'
@@ -422,16 +423,16 @@ def _render_action_row(packet_id: str, idx: int, action: dict[str, Any]) -> str:
         state_cell = '<span class="badge badge-pending">Pending</span>'
         buttons = (
             f'<button class="btn-approve" '
-            f'hx-post="/approvals/{safe_packet_id}/actions/{idx}/approve" '
+            f'hx-post="/approvals/{safe_packet_id}/actions/{safe_idx}/approve" '
             f'hx-target="closest tr" hx-swap="outerHTML">&#10003; Approve</button> '
             f'<button class="btn-reject" '
-            f'hx-post="/approvals/{safe_packet_id}/actions/{idx}/reject" '
+            f'hx-post="/approvals/{safe_packet_id}/actions/{safe_idx}/reject" '
             f'hx-target="closest tr" hx-swap="outerHTML">&#10007; Reject</button>'
         )
         row_class = "campaign-plan__row--pending"
 
     return (
-        f'<tr class="{row_class}" id="action-row-{idx}">'
+        f'<tr class="{row_class}" id="action-row-{safe_idx}">'
         f"<td><code>{repo}</code></td>"
         f'<td><span class="campaign-plan__action-type">{action_type}</span></td>'
         f"<td>{target}</td>"
@@ -469,8 +470,6 @@ async def approve_campaign_action(request: Request, packet_id: str, idx: int) ->
     except Exception:
         action_dict = {"state": "approved"}
 
-    # Dynamic values are escaped in _render_action_row before fragment emission.
-    # codeql[py/reflective-xss]
     return HTMLResponse(_render_action_row(packet_id, idx, action_dict))
 
 
@@ -505,8 +504,6 @@ async def reject_campaign_action(
     except Exception:
         action_dict = {"state": "rejected"}
 
-    # Dynamic values are escaped in _render_action_row before fragment emission.
-    # codeql[py/reflective-xss]
     return HTMLResponse(_render_action_row(packet_id, idx, action_dict))
 
 
