@@ -745,6 +745,7 @@ def _remote_graphql_response(count: int) -> _Response:
 
 
 def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
+    assert DEFAULT_EXPECTED_GITHUB_COHORT_COUNT == 12
     truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
     truth["projects"].append(
         {
@@ -759,8 +760,10 @@ def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
 
     assert len(cohort) == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     assert "owner/parked" not in cohort
-    with pytest.raises(SecurityCoverageError, match="expected 11, observed 12"):
-        derive_default_attention_cohort(_truth(12))
+    with pytest.raises(SecurityCoverageError, match="expected 12, observed 13"):
+        derive_default_attention_cohort(
+            _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT + 1)
+        )
 
 
 def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
