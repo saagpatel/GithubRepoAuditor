@@ -81,6 +81,11 @@ def write_control_center_artifacts(
     payload["weekly_command_center_digest_v1"] = weekly_digest
     if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
         raise ValueError("control-center artifacts must not persist credential fields")
+    rendered_markdown = render_control_center_markdown(
+        snapshot, username, generated_at.isoformat()
+    )
+    if contains_sensitive_data(rendered_markdown):
+        raise ValueError("control-center artifacts must not persist credential fields")
     weekly_json, weekly_md = write_weekly_command_center_artifacts(
         output_dir,
         username=username,
@@ -96,7 +101,5 @@ def write_control_center_artifacts(
     json_path.write_text(json.dumps(payload, indent=2))
     # Credential-shaped data is rejected above.
     # codeql[py/clear-text-storage-sensitive-data]
-    md_path.write_text(
-        render_control_center_markdown(snapshot, username, generated_at.isoformat())
-    )
+    md_path.write_text(rendered_markdown)
     return json_path, md_path, weekly_json, weekly_md, payload

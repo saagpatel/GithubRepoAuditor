@@ -15,30 +15,47 @@ _SENSITIVE_FIELD_NAMES = frozenset(
         "access_token",
         "api_key",
         "apikey",
+        "auth_token",
         "authorization",
         "client_secret",
         "credential",
         "password",
         "private_key",
+        "refresh_token",
         "github_token",
         "secret",
         "token",
+        "x_api_key",
     }
 )
+_SENSITIVE_ASSIGNMENT = re.compile(
+    r"(?i)(?<![a-z0-9_-])(?:access[-_]?token|auth[-_]?token|refresh[-_]?token|"
+    r"x[-_]?api[-_]?key|api[-_]?key|apikey|authorization|client[-_]?secret|"
+    r"credential|github[-_]?token|password|private[-_]?key|secret|token)"
+    r"\s*[:=]\s*[^\s,;}&\]]+"
+)
+_URL_WITH_USERINFO = re.compile(r"https?://[^/@\s]+@", re.IGNORECASE)
 _SENSITIVE_VALUE_PATTERNS = (
     re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
     re.compile(r"\bxox[bpors]-[A-Za-z0-9-]{10,}\b"),
-    re.compile(r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----"),
+    re.compile(r"\bsecret_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\bntn_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"-----BEGIN (?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED) )?PRIVATE KEY-----"),
 )
+
+
+def _normalized_field_name(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).casefold()).strip("_")
 
 
 def contains_sensitive_data(value: Any) -> bool:
     """Return whether JSON-compatible data contains credential data."""
     if isinstance(value, dict):
         return any(
-            str(key).lower() in _SENSITIVE_FIELD_NAMES or contains_sensitive_data(item)
+            _normalized_field_name(key) in _SENSITIVE_FIELD_NAMES
+            or contains_sensitive_data(item)
             for key, item in value.items()
         )
     if isinstance(value, list):
@@ -46,12 +63,27 @@ def contains_sensitive_data(value: Any) -> bool:
     if isinstance(value, tuple):
         return any(contains_sensitive_data(item) for item in value)
     if isinstance(value, str):
-        return any(pattern.search(value) for pattern in _SENSITIVE_VALUE_PATTERNS)
+        return (
+            any(pattern.search(value) for pattern in _SENSITIVE_VALUE_PATTERNS)
+            or _SENSITIVE_ASSIGNMENT.search(value) is not None
+            or _URL_WITH_USERINFO.search(value) is not None
+        )
     return False
 
 
-def _url_has_sensitive_query(url: str) -> bool:
-    return any(name.lower() in _SENSITIVE_FIELD_NAMES for name, _value in parse_qsl(urlparse(url).query))
+def _url_has_sensitive_components(url: str) -> bool:
+    parsed = urlparse(url)
+    names = (
+        name
+        for component in (parsed.query, parsed.fragment)
+        for name, _value in parse_qsl(component)
+    )
+    return any(_normalized_field_name(name) in _SENSITIVE_FIELD_NAMES for name in names)
+
+
+def _url_has_embedded_credentials(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.username is not None or parsed.password is not None
 
 
 class ResponseCache:
@@ -95,7 +127,13 @@ class ResponseCache:
         response: object,
     ) -> None:
         """Store response data with current timestamp."""
-        if _url_has_sensitive_query(url) or contains_sensitive_data(params) or contains_sensitive_data(response):
+        if (
+            _url_has_sensitive_components(url)
+            or _url_has_embedded_credentials(url)
+            or contains_sensitive_data(url)
+            or contains_sensitive_data(params)
+            or contains_sensitive_data(response)
+        ):
             return
         path = self._path(url, params)
         entry = {

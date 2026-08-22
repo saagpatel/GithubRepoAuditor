@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import time
 
+import pytest
+
 from github_repo_auditor.cache import ResponseCache
 
 
@@ -64,6 +66,47 @@ class TestResponseCache:
         )
 
         assert not cache._path(url, {"access_token": "secret-param", "per_page": "10"}).exists()
+
+    def test_put_skips_embedded_url_credentials(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://operator:opaque-value@example.invalid/repos"
+
+        cache.put(url, None, {"status": "ok"})
+
+        assert not cache._path(url, None).exists()
+
+    def test_put_skips_hyphenated_credential_alias(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+
+        cache.put(url, None, {"access-token": "opaque-value"})
+
+        assert not cache._path(url, None).exists()
+
+    @pytest.mark.parametrize("alias", ["auth-token", "refresh_token", "x-api-key"])
+    def test_put_skips_additional_credential_aliases(self, tmp_path, alias):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+
+        cache.put(url, None, {alias: "opaque-value"})
+
+        assert not cache._path(url, None).exists()
+
+    def test_put_skips_sensitive_url_fragment(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://example.invalid/callback#access-token=opaque-value"
+
+        cache.put(url, None, {"status": "ok"})
+
+        assert not cache._path(url, None).exists()
+
+    def test_put_skips_additional_provider_token_family(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+
+        cache.put(url, None, {"note": "secret_" + ("a" * 40)})
+
+        assert not cache._path(url, None).exists()
 
     def test_put_skips_credential_shaped_value_under_benign_key(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
