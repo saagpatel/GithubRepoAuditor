@@ -86,11 +86,11 @@ These conventions come from the project's `CLAUDE.md` and must be followed in al
 
 ## Adding a New Analyzer
 
-Analyzers live in `src/analyzers/`. Each one scores a single dimension (0.0–1.0) and returns an `AnalyzerResult`.
+Analyzers live in `src/github_repo_auditor/analyzers/`. Each one scores a single dimension (0.0–1.0) and returns an `AnalyzerResult`.
 
 ### Step 1 — Create the module
 
-Create `src/analyzers/<your_dimension>.py` and implement a class that extends `BaseAnalyzer`:
+Create `src/github_repo_auditor/analyzers/<your_dimension>.py` and implement a class that extends `BaseAnalyzer`:
 
 ```python
 from __future__ import annotations
@@ -98,11 +98,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from src.analyzers.base import BaseAnalyzer
-from src.models import AnalyzerResult, RepoMetadata
+from github_repo_auditor.analyzers.base import BaseAnalyzer
+from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 if TYPE_CHECKING:
-    from src.github_client import GitHubClient
+    from github_repo_auditor.github_client import GitHubClient
 
 
 class YourDimensionAnalyzer(BaseAnalyzer):
@@ -128,13 +128,13 @@ class YourDimensionAnalyzer(BaseAnalyzer):
 
 ### Step 2 — Register the analyzer
 
-Open `src/analyzers/__init__.py` and:
+Open `src/github_repo_auditor/analyzers/__init__.py` and:
 
 1. Import your new class at the top.
 2. Append an instance to `ALL_ANALYZERS`.
 
 ```python
-from src.analyzers.your_dimension import YourDimensionAnalyzer
+from github_repo_auditor.analyzers.your_dimension import YourDimensionAnalyzer
 
 ALL_ANALYZERS = [
     ...
@@ -144,7 +144,7 @@ ALL_ANALYZERS = [
 
 ### Step 3 — Add a weight in the scorer
 
-Open `src/scorer.py` and add your dimension name to the `WEIGHTS` dict. Weights must sum to `1.0` after adding the new entry, so adjust existing weights proportionally.
+Open `src/github_repo_auditor/scorer.py` and add your dimension name to the `WEIGHTS` dict. Weights must sum to `1.0` after adding the new entry, so adjust existing weights proportionally.
 
 ### Step 4 — Write tests
 

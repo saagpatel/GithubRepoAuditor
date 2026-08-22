@@ -30,7 +30,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import src.operator_resolution_trend as m
+import github_repo_auditor.operator_resolution_trend as m
 
 REPO = Path(__file__).resolve().parents[2]
 GOLDEN_PATH = REPO / "tests" / "golden" / "resolution_trend_contract.golden.json"

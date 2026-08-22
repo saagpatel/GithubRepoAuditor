@@ -1,0 +1,235 @@
+{
+  "additive_canary": {
+    "consumer_behavior": "ignore-compatible-addition"
+  },
+  "canonical_reasons": [
+    "within_fresh_window",
+    "within_aging_window",
+    "at_or_beyond_stale_boundary",
+    "timestamp_missing",
+    "timestamp_unparseable",
+    "timestamp_timezone_missing",
+    "timestamp_future_within_tolerance",
+    "timestamp_future_beyond_tolerance",
+    "read_unavailable",
+    "policy_not_applicable"
+  ],
+  "canonical_states": [
+    "fresh",
+    "aging",
+    "stale",
+    "unknown",
+    "unavailable"
+  ],
+  "cases": [
+    {
+      "expected": {
+        "age_ms": 0,
+        "reason": "within_fresh_window",
+        "state": "fresh"
+      },
+      "id": "fresh_at_reader_clock",
+      "input": {
+        "generated_at": "2026-08-01T12:00:00.000Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 604799999,
+        "reason": "within_fresh_window",
+        "state": "fresh"
+      },
+      "id": "fresh_one_ms_before_aging_boundary",
+      "input": {
+        "generated_at": "2026-07-25T12:00:00.001Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 604800000,
+        "reason": "within_aging_window",
+        "state": "aging"
+      },
+      "id": "aging_at_exact_boundary",
+      "input": {
+        "generated_at": "2026-07-25T12:00:00.000Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 1209599999,
+        "reason": "within_aging_window",
+        "state": "aging"
+      },
+      "id": "aging_one_ms_before_stale_boundary",
+      "input": {
+        "generated_at": "2026-07-18T12:00:00.001Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 1209600000,
+        "reason": "at_or_beyond_stale_boundary",
+        "state": "stale"
+      },
+      "id": "stale_at_exact_boundary",
+      "input": {
+        "generated_at": "2026-07-18T12:00:00.000Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 1209600001,
+        "reason": "at_or_beyond_stale_boundary",
+        "state": "stale"
+      },
+      "id": "stale_beyond_boundary",
+      "input": {
+        "generated_at": "2026-07-18T11:59:59.999Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": null,
+        "reason": "timestamp_missing",
+        "state": "unknown"
+      },
+      "id": "missing_timestamp",
+      "input": {
+        "generated_at": null,
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": null,
+        "reason": "timestamp_unparseable",
+        "state": "unknown"
+      },
+      "id": "empty_timestamp",
+      "input": {
+        "generated_at": "",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": null,
+        "reason": "timestamp_unparseable",
+        "state": "unknown"
+      },
+      "id": "unparseable_timestamp",
+      "input": {
+        "generated_at": "not-a-timestamp",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": null,
+        "reason": "timestamp_timezone_missing",
+        "state": "unknown"
+      },
+      "id": "timezone_missing",
+      "input": {
+        "generated_at": "2026-08-01T12:00:00.000",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 0,
+        "reason": "within_fresh_window",
+        "state": "fresh"
+      },
+      "id": "offset_normalizes_to_reader_clock",
+      "input": {
+        "generated_at": "2026-08-01T07:00:00.000-05:00",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 0,
+        "reason": "timestamp_future_within_tolerance",
+        "state": "fresh"
+      },
+      "id": "future_at_skew_tolerance",
+      "input": {
+        "generated_at": "2026-08-01T12:01:00.000Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": null,
+        "reason": "timestamp_future_beyond_tolerance",
+        "state": "unknown"
+      },
+      "id": "future_one_ms_beyond_skew_tolerance",
+      "input": {
+        "generated_at": "2026-08-01T12:01:00.001Z",
+        "policy_state": "configured",
+        "read_state": "available"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": null,
+        "reason": "read_unavailable",
+        "state": "unavailable"
+      },
+      "id": "unavailable_read_wins",
+      "input": {
+        "generated_at": "2026-08-01T12:00:00.000Z",
+        "policy_state": "configured",
+        "read_state": "unavailable"
+      }
+    },
+    {
+      "expected": {
+        "age_ms": 60000,
+        "reason": "policy_not_applicable",
+        "state": "unknown"
+      },
+      "id": "policy_not_applicable_preserves_age",
+      "input": {
+        "generated_at": "2026-08-01T11:59:00.000Z",
+        "policy_state": "not_applicable",
+        "read_state": "available"
+      }
+    }
+  ],
+  "contract_version": "1.0.0",
+  "evaluation_clock": "2026-08-01T12:00:00.000Z",
+  "policy": {
+    "aging_after_ms": 604800000,
+    "boundary_semantics": "fresh_when_age_lt_aging;aging_when_age_lt_stale;stale_when_age_gte_stale",
+    "skew_tolerance_ms": 60000,
+    "stale_after_ms": 1209600000
+  },
+  "schema": "EvidenceFreshnessConformanceV1",
+  "timestamp_contract": {
+    "normalization": "UTC",
+    "reader_clock": "injected-never-wall-clock",
+    "timezone": "explicit-Z-or-offset-required"
+  }
+}

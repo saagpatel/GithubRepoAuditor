@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.analyzers.security import SecurityAnalyzer, _find_dangerous_files, _scan_secrets
-from src.models import RepoMetadata
+from github_repo_auditor.analyzers.security import SecurityAnalyzer, _find_dangerous_files, _scan_secrets
+from github_repo_auditor.models import RepoMetadata
 
 
 def _meta(**overrides) -> RepoMetadata:

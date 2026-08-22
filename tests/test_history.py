@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.history import archive_report, find_previous, load_complexity_trends, load_history_index
+from github_repo_auditor.history import archive_report, find_previous, load_complexity_trends, load_history_index
 
 
 class TestArchive:

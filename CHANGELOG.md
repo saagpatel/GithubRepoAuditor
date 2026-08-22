@@ -13,7 +13,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+### Added
+- Added the local-only `audit pr-evidence <snapshot.json>` operator path with
+  strict `PRHeadEvidenceV1` input validation and deterministic
+  `PRHeadEvidenceVerdictV1` output. Reviews retain actor, state, dismissal, and
+  `commit_id`; checks and suites retain status, conclusion, and `head_sha`;
+  required approvals/checks come only from supplied rules; latest-push
+  approval, stale head evidence, non-success conclusions, missing permissions,
+  incomplete pagination, missing rules, and malformed input remain explicit.
+  The fixture-first evaluator does not consult credentials or GitHub, write
+  files, alter portfolio scoring, or regenerate portfolio truth.
+
 ### Changed
+- Converged the strict security gate, risk/attention derivation, portfolio
+  rollups, registry/report rendering, decision digest, and weekly command-center
+  posture on one
+  fail-closed `SecurityAdmissionV1` interpretation of fresh Dependabot, CodeQL,
+  and secret-scanning evidence. Missing or contradictory evidence now carries
+  explicit reason codes; non-Dependabot blocking findings can no longer vanish
+  from risk or decision surfaces. PortfolioTruth remains schema `0.11.0` and
+  retains its legacy compatibility fields for existing consumers.
 - Kept PortfolioTruth `0.11.0` and
   `GitHubSecurityCoverageReceiptV1` read-compatible while adding normalized
   provider reason codes, explicit completed-zero semantics, producer-commit
@@ -74,7 +93,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - GitHub Models as alternate narrative provider (`--narrative-provider {anthropic,github-models}`, `--narrative-model`) (Arc F S1.2).
 - Dependabot/CodeQL/Secret-scanning alerts surfaced in the risk overlay (`--ghas-alerts`) (Arc F S1.3).
 - README staleness + release-shipped signals (`has_any_release`, `release_count`, `latest_release_age_days`) (Arc F S1.4).
-- mutmut pre-release mutation-testing gate on `src/auto_apply.py` + `src/scorer.py` (~93% combined kill rate). Documented in `docs/release-gates.md` (Arc F S1.5).
+- mutmut pre-release mutation-testing gate on `src/github_repo_auditor/auto_apply.py` + `src/github_repo_auditor/scorer.py` (~93% combined kill rate). Documented in `docs/release-gates.md` (Arc F S1.5).
 - Async fetch layer (`--fetch-mode {sync,async}`, `--fetch-workers N`) via httpx + asyncio.Semaphore. 9.7x speedup on the mock benchmark (Arc F S2.1).
 - Per-(repo, commit-sha, analyzer) cache backed by SQLite with `--no-analyzer-cache` and `--reconcile-cache` controls (Arc F S2.2).
 - SBOM fetch via GitHub API (`--sbom-source github`) + OSSF Scorecard (`--ossf-scorecard`) (Arc F S2.3).
@@ -129,23 +148,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [0.14.0] - 2026-03-29
 ### Added
-- Security surface analyzer (`src/analyzers/security.py`): detects hardcoded secrets, exposed env files, overly-permissive configs
-- README improvement suggestions engine (`src/readme_suggestions.py`): per-repo actionable diff
+- Security surface analyzer (`src/github_repo_auditor/analyzers/security.py`): detects hardcoded secrets, exposed env files, overly-permissive configs
+- README improvement suggestions engine (`src/github_repo_auditor/readme_suggestions.py`): per-repo actionable diff
 - `--readme-suggest` flag to emit inline suggestions in Markdown report
 
 ## [0.13.0] - 2026-03-29
 ### Added
 - Notion external signal integration: pulls star counts, watchers, and topic metadata from Notion
-- Portfolio README generator (`src/portfolio_readme.py`): auto-generates a GitHub profile README from audit data
+- Portfolio README generator (`src/github_repo_auditor/portfolio_readme.py`): auto-generates a GitHub profile README from audit data
 
 ## [0.12.0] - 2026-03-28
 ### Added
 - Rich terminal output with color-coded tier badges, progress bars, and summary panels
-- Unicode sparklines for commit activity trends in CLI output (`src/sparkline.py`)
+- Unicode sparklines for commit activity trends in CLI output (`src/github_repo_auditor/sparkline.py`)
 
 ## [0.11.0] - 2026-03-28
 ### Added
-- Shields.io badge generation per repo (`src/badge_export.py`)
+- Shields.io badge generation per repo (`src/github_repo_auditor/badge_export.py`)
 - Optional Gist upload for badge URLs via `--badges-gist` flag
 
 ## [0.10.0] - 2026-03-28
@@ -167,13 +186,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [0.7.0] - 2026-03-25
 ### Added
-- Flagship Excel dashboard with 10 sheets and a full design system (`src/excel_export.py`, `src/excel_styles.py`)
+- Flagship Excel dashboard with 10 sheets and a full design system (`src/github_repo_auditor/excel_export.py`, `src/github_repo_auditor/excel_styles.py`)
 - Sheets: Summary, All Repos, Tier Breakdown, Top/Bottom 10, Language Distribution, Activity Heatmap, Dimension Radar
 
 ## [0.6.0] - 2026-03-25
 ### Added
-- GraphQL client (`src/graphql_client.py`) for bulk repo queries, reducing API call count
-- Library-years (libyears) staleness metric via `src/libyears.py`
+- GraphQL client (`src/github_repo_auditor/graphql_client.py`) for bulk repo queries, reducing API call count
+- Library-years (libyears) staleness metric via `src/github_repo_auditor/libyears.py`
 - GitHub Releases detection in activity analyzer
 - Radon cyclomatic complexity scoring in code quality analyzer
 - Technology stack summary in report
@@ -181,9 +200,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [0.5.0] - 2026-03-25
 ### Added
-- Letter grades A–F for individual repos and portfolio health (`src/scorer.py`)
-- Badge system: earned badges per repo based on dimension scores (`src/badges.py`)
-- Quick wins: lowest-effort improvements highlighted per repo (`src/quick_wins.py`)
+- Letter grades A–F for individual repos and portfolio health (`src/github_repo_auditor/scorer.py`)
+- Badge system: earned badges per repo based on dimension scores (`src/github_repo_auditor/badges.py`)
+- Quick wins: lowest-effort improvements highlighted per repo (`src/github_repo_auditor/quick_wins.py`)
 - Commit pattern analysis: message quality, burst detection, solo vs. team commits
 - Bus factor estimation from contributor stats
 
@@ -191,13 +210,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
 - Dual-axis scoring: independent completeness and interest scores per repo
 - Auto-sync: background re-audit of stale repos on a configurable schedule
-- Audit history persistence across runs (`src/history.py`)
+- Audit history persistence across runs (`src/github_repo_auditor/history.py`)
 - Test suite expanded to 82 tests
 
 ## [0.3.1] - 2026-03-24
 ### Added
 - Early Excel dashboard with 6 sheets and 6 charts
-- Historical diff view: score changes between two audit runs (`src/diff.py`)
+- Historical diff view: score changes between two audit runs (`src/github_repo_auditor/diff.py`)
 - Swift/iOS-specific analyzer tuning
 - CI pipeline for the auditor itself (GitHub Actions)
 
@@ -205,7 +224,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
 - Registry reconciliation: cross-reference GitHub repos against a local `project-registry.md`
 - `--registry` flag to specify the registry path
-- GitHub API response cache (`src/cache.py`) with 1-hour TTL stored in `output/.cache/`
+- GitHub API response cache (`src/github_repo_auditor/cache.py`) with 1-hour TTL stored in `output/.cache/`
 - Summary statistics: most active, most neglected, highest/lowest scored, language distribution
 
 ## [0.2.0] - 2026-03-24
@@ -219,11 +238,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [0.1.0] - 2026-03-24
 ### Added
-- Initial release: GitHub API client with pagination and rate-limit handling (`src/github_client.py`)
-- Shallow clone pipeline via subprocess (`src/cloner.py`)
-- `argparse` CLI entry point (`src/cli.py`)
-- `RepoMetadata`, `AnalyzerResult`, `RepoAudit`, `AuditReport` dataclasses (`src/models.py`)
+- Initial release: GitHub API client with pagination and rate-limit handling (`src/github_repo_auditor/github_client.py`)
+- Shallow clone pipeline via subprocess (`src/github_repo_auditor/cloner.py`)
+- `argparse` CLI entry point (`src/github_repo_auditor/cli.py`)
+- `RepoMetadata`, `AnalyzerResult`, `RepoAudit`, `AuditReport` dataclasses (`src/github_repo_auditor/models.py`)
 - 9 completeness analyzers: `readme`, `structure`, `code_quality`, `testing`, `cicd`, `dependencies`, `activity`, `documentation`, `build_readiness`
 - `InterestAnalyzer` for tech novelty and project ambition scoring
-- Weighted composite scorer with completeness tier classification (`src/scorer.py`)
-- JSON and Markdown report output (`src/reporter.py`)
+- Weighted composite scorer with completeness tier classification (`src/github_repo_auditor/scorer.py`)
+- JSON and Markdown report output (`src/github_repo_auditor/reporter.py`)

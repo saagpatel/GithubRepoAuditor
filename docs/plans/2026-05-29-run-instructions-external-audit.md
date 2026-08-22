@@ -21,11 +21,11 @@ internal schema/consistency). This audits the snapshot's claims against **ground
 
 Every `derived` presence-boolean traces through one function:
 
-- `_inspect_project_dir` — `src/portfolio_truth_sources.py:200`
-- → `analyze_project_context` — `src/portfolio_context_contract.py:135`
-- → `choose_primary_context_file` — `src/portfolio_context_contract.py:128`
+- `_inspect_project_dir` — `src/github_repo_auditor/portfolio_truth_sources.py:200`
+- → `analyze_project_context` — `src/github_repo_auditor/portfolio_context_contract.py:135`
+- → `choose_primary_context_file` — `src/github_repo_auditor/portfolio_context_contract.py:128`
   (returns `CLAUDE.md`, else `AGENTS.md` — **never `README.md`**)
-- → `_section_has_meaningful_content` — `src/portfolio_context_contract.py:265`
+- → `_section_has_meaningful_content` — `src/github_repo_auditor/portfolio_context_contract.py:265`
   (true iff a markdown heading matches a hardcoded alias in `CONTEXT_SECTION_ALIASES` **and**
   has non-trivial text under it)
 
@@ -57,7 +57,7 @@ are exactly what an LLM reading the prose catches and a regex never will.
 
 - `schema_version`: `0.4.0`
 - `generated_at`: `2026-05-17T05:01:39Z` (**12 days stale as of this spec — drift is real, see §8**)
-- `workspace_root`: `/Users/d/Projects`
+- `workspace_root`: `~/Projects`
 - `projects`: 132 (a list; key on `identity.project_key`, **not** `display_name` — dupes exist:
   `IncidentWorkbench`, `OrbitForge`, `StatusPage`)
 - `context_quality_counts`: `none: 3, boilerplate: 17, minimum-viable: 66, standard: 27, full: 19`
@@ -101,8 +101,8 @@ For each pilot record, compute and attach:
 - `primary_file_name` = `choose_primary_context_file(context_files)`.
 - `tool_today` = live recompute on **today's** files:
   ```python
-  from src.portfolio_context_contract import analyze_project_context
-  from src.portfolio_truth_sources import _collect_context_files
+  from github_repo_auditor.portfolio_context_contract import analyze_project_context
+  from github_repo_auditor.portfolio_truth_sources import _collect_context_files
   tool_today = analyze_project_context(
       abs_path, _collect_context_files(abs_path)
   ).run_instructions_present
@@ -168,7 +168,7 @@ Main session writes the report to `output/run-instructions-audit-2026-05-29.md`.
 {
   "project_key": "Fun:GamePrjs/BattleGrid",
   "display_name": "BattleGrid",
-  "abs_path": "/Users/d/Projects/Fun:GamePrjs/BattleGrid",
+  "abs_path": "~/Projects/Fun:GamePrjs/BattleGrid",
   "primary_file_name": "AGENTS.md",
   "snapshot_claim": false,
   "tool_today": false,
@@ -201,7 +201,7 @@ Main session writes the report to `output/run-instructions-audit-2026-05-29.md`.
 
 ## 9. Out of scope (explicit — future widening, not silent cuts)
 - Verifying the other 5 presence booleans (same subagent file-read; trivial to add later).
-- The numeric `context_quality_score` (Arc-H merge gate) — lives in `src/context_quality.py`, a
+- The numeric `context_quality_score` (Arc-H merge gate) — lives in `src/github_repo_auditor/context_quality.py`, a
   separate code path **not** in the snapshot.
 - Full 132-repo run — invocation #2 after the pilot is hand-validated.
 - Auditing mechanical claims (`has_tests`, `has_ci`, staleness, …) — a script reproduces those
@@ -312,7 +312,7 @@ operator decision.
 Closed the loop: fixed the README blindness, then used this audit as the regression test.
 
 **The fix** wires the dormant `readme_text` parameter of `analyze_project_context`
-(`src/portfolio_context_contract.py`): each presence boolean is now "documented in the primary
+(`src/github_repo_auditor/portfolio_context_contract.py`): each presence boolean is now "documented in the primary
 file **OR** the top-level README"; the `context_quality == "none"` gate also considers the
 README. Primary-file *identity* is unchanged (surgical). Added
 `tests/test_portfolio_context_contract.py` (5 tests; the function previously had **no** direct

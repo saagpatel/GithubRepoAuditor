@@ -33,7 +33,7 @@ jq '{generated_at,decision}' "$latest_weekly"
 
 ## Preflight
 
-- [ ] Run from `/Users/d/Projects/PortfolioCommandCenter`:
+- [ ] Run from `~/Projects/PortfolioCommandCenter`:
   ```sh
   pnpm demo:desktop
   ```

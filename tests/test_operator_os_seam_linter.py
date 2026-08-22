@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.operator_os_seam_linter import (
+from github_repo_auditor.operator_os_seam_linter import (
     build_worklist_payload,
     lint_operator_os_seams,
     main,
 )
-from src.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
-from src.portfolio_truth_types import SCHEMA_VERSION
+from github_repo_auditor.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
+from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
 
 
 NOW = datetime(2026, 7, 3, 12, 0, tzinfo=UTC)
@@ -51,6 +52,10 @@ def _passing_paths(tmp_path: Path) -> tuple[Path, list[Path]]:
 def _refresh_truth_for_cli(path: Path) -> None:
     payload = json.loads(path.read_text())
     payload["generated_at"] = datetime.now(UTC).isoformat()
+    catalog = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
+    payload["inputs"] = {
+        "catalog": {"sha256": hashlib.sha256(catalog.read_bytes()).hexdigest()}
+    }
     path.write_text(json.dumps(payload))
 
 
@@ -135,6 +140,47 @@ def test_fresh_artifact_passes(tmp_path: Path) -> None:
     )
 
     assert result.passed
+
+
+def test_recent_artifact_fails_when_catalog_source_hash_differs(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    catalog = tmp_path / "portfolio-catalog.yaml"
+    catalog.write_text("repos: {}\n", encoding="utf-8")
+    payload = json.loads(truth.read_text())
+    payload["inputs"] = {"catalog": {"sha256": "0" * 64}}
+    truth.write_text(json.dumps(payload))
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        catalog_path=catalog,
+        now=NOW,
+    )
+
+    assert not result.passed
+    finding = next(item for item in result.findings if item.check == "artifact_freshness")
+    assert "different catalog content" in finding.violation
+
+
+def test_recent_artifact_fails_when_catalog_source_hash_is_absent(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    catalog = tmp_path / "portfolio-catalog.yaml"
+    catalog.write_text("repos: {}\n", encoding="utf-8")
+    payload = json.loads(truth.read_text())
+    payload["inputs"] = {"catalog": {"sha256": None}}
+    truth.write_text(json.dumps(payload))
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        catalog_path=catalog,
+        now=NOW,
+    )
+
+    assert not result.passed
+    finding = next(item for item in result.findings if item.check == "artifact_freshness")
+    assert finding.level == "fail"
+    assert "not source-bound" in finding.violation
 
 
 def test_stale_artifact_fails(tmp_path: Path) -> None:
@@ -326,7 +372,7 @@ def test_contract_shadow_fails_when_excluded_backup_leaks_into_projects(
             "source_summary": {"attention_state_counts": {"decision-needed": 1}},
             "rollups": {"decision": {"decision_needed_count": 1}},
             "exclusions": {
-                "policy_version": "workspace_discovery.v2",
+                "policy_version": "workspace_discovery.v3",
                 "counts": {},
             },
             "projects": [

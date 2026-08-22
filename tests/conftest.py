@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.models import RepoMetadata
+from github_repo_auditor.models import RepoMetadata
 
 
 @pytest.fixture

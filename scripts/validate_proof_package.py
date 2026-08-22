@@ -15,15 +15,16 @@ from pathlib import Path
 from typing import Any
 
 # Repo-local imports must work whether this runs as a script or is imported by
-# the test suite, so the project root goes on the path before src/ is touched.
+# the test suite, so the source root goes on the path first.
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+_SOURCE_ROOT = _PROJECT_ROOT / "src"
+if str(_SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SOURCE_ROOT))
 
-from src.portfolio_truth_types import (  # noqa: E402
+from github_repo_auditor.portfolio_truth_types import (  # noqa: E402
     SCHEMA_VERSION as PRODUCER_TRUTH_SCHEMA_VERSION,
 )
-from src.portfolio_truth_types import TRUTH_LATEST_FILENAME  # noqa: E402
+from github_repo_auditor.portfolio_truth_types import TRUTH_LATEST_FILENAME  # noqa: E402
 
 ALLOWED_STATUSES = {"passed", "failed", "partial", "stale"}
 # Portfolio Command Center reads a snapshot older than this as aging, then

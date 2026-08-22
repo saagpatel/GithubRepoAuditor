@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_decision_memory import (
+from github_repo_auditor.operator_trend_decision_memory import (
     absent_decision_memory,
     current_item_last_outcome,
     current_item_resolution_evidence,

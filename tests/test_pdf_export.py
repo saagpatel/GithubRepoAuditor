@@ -1,4 +1,4 @@
-from src.pdf_export import export_pdf_report
+from github_repo_auditor.pdf_export import export_pdf_report
 
 
 def _minimal_report():

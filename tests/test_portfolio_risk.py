@@ -1,4 +1,4 @@
-from src.portfolio_risk import build_portfolio_risk_summary, build_risk_entry
+from github_repo_auditor.portfolio_risk import build_portfolio_risk_summary, build_risk_entry
 
 
 def _baseline_kwargs(**overrides):
@@ -130,7 +130,7 @@ def test_security_high_alert_adds_single_factor_moderate():
     assert result["risk_tier"] == "moderate"
     assert result["risk_factors"] == ["active-high-severity-alerts"]
     assert result["security_risk"] is True
-    assert "open high/critical security alerts" in result["risk_summary"]
+    assert "blocking GitHub security findings" in result["risk_summary"]
 
 
 def test_security_critical_alert_force_elevates():

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.briefing import (
+from github_repo_auditor.briefing import (
     Briefing,
     InitiativeSuggestionRow,
     NeedsAttentionRepo,
@@ -153,7 +153,7 @@ class TestEmptyWeek:
 class TestNoWarehouseHistory:
     def test_health_delta_graceful_without_history_file(self):
         audits = [_make_audit("Repo")]
-        with patch("src.briefing._build_health_delta") as mock_delta:
+        with patch("github_repo_auditor.briefing._build_health_delta") as mock_delta:
             mock_delta.return_value = {"up": [], "down": []}
             briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
         assert briefing.health_delta == {"up": [], "down": []}
@@ -165,7 +165,7 @@ class TestNoWarehouseHistory:
 
     def test_health_delta_graceful_on_load_error(self):
         audits = [_make_audit("Repo")]
-        with patch("src.history.load_repo_score_history", side_effect=OSError("no file")):
+        with patch("github_repo_auditor.history.load_repo_score_history", side_effect=OSError("no file")):
             result = _build_health_delta(audits, use_history=True)
         assert result == {"up": [], "down": []}
 
@@ -353,7 +353,7 @@ class TestLLMJsonParseFail:
 class TestCLIIntegration:
     def test_briefing_writes_markdown_file(self, tmp_path):
         report = _make_report([_make_audit("Repo1", pushed_days_ago=2)])
-        with patch("src.briefing._resolve_provider", return_value=None):
+        with patch("github_repo_auditor.briefing._resolve_provider", return_value=None):
             result = generate_briefing(report, tmp_path, write_voice=False)
         assert "briefing_path" in result
         md_path = result["briefing_path"]
@@ -362,7 +362,7 @@ class TestCLIIntegration:
 
     def test_briefing_voice_flag_writes_both_files(self, tmp_path):
         report = _make_report([_make_audit("Repo1", pushed_days_ago=2)])
-        with patch("src.briefing._resolve_provider", return_value=None):
+        with patch("github_repo_auditor.briefing._resolve_provider", return_value=None):
             result = generate_briefing(report, tmp_path, write_voice=True)
         assert "briefing_path" in result
         assert "voice_path" in result
@@ -372,13 +372,13 @@ class TestCLIIntegration:
     def test_briefing_uses_output_dir_from_report(self, tmp_path):
         report = _make_report()
         subdir = tmp_path / "output"
-        with patch("src.briefing._resolve_provider", return_value=None):
+        with patch("github_repo_auditor.briefing._resolve_provider", return_value=None):
             result = generate_briefing(report, subdir, write_voice=False)
         assert result["briefing_path"].parent == subdir
 
     def test_mutually_exclusive_narrative_and_briefing(self):
         """argparse rejects --narrative together with --briefing."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         with pytest.raises(SystemExit):
@@ -397,7 +397,7 @@ class _FakeSemanticIndex:
         self._neighbor_map = neighbor_map
 
     def find_neighbors(self, repo_name: str, k: int = 3):
-        from src.semantic_index import SearchResult
+        from github_repo_auditor.semantic_index import SearchResult
 
         return [
             SearchResult(repo_name=n, score=0.1, snippet=f"repo: {n}")
@@ -503,7 +503,7 @@ class TestInitiativesBriefing:
         return (date.today() - timedelta(days=days)).isoformat()
 
     def _write_initiatives(self, tmp_path, initiatives):
-        from src.initiatives import initiatives_path, save_initiatives
+        from github_repo_auditor.initiatives import initiatives_path, save_initiatives
 
         save_initiatives(initiatives_path(tmp_path), initiatives)
 
@@ -514,7 +514,7 @@ class TestInitiativesBriefing:
         deadline: str | None = None,
         closed_at: str | None = None,
     ):
-        from src.initiatives import Initiative
+        from github_repo_auditor.initiatives import Initiative
 
         return Initiative(
             repo_name=repo_name,
@@ -691,7 +691,7 @@ class TestSuggestedInitiativesRender:
 
     def test_build_briefing_with_include_suggestions_populates_field(self):
         """build_briefing(include_suggestions=True) with a mock provider populates the field."""
-        from src.suggest_initiatives import InitiativeSuggestion
+        from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
         fake_suggestion = InitiativeSuggestion(
             repo_name="Wavelength",
@@ -703,7 +703,7 @@ class TestSuggestedInitiativesRender:
         )
 
         with patch(
-            "src.suggest_initiatives.generate_suggestions",
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
             return_value=([fake_suggestion], 0.001),
         ):
             audits = [_make_audit("Wavelength")]
@@ -726,7 +726,7 @@ def _write_dismissed_json(tmp_path, entries: list[dict]) -> None:
     """Write dismissed-suggestions.json to tmp_path using the canonical versioned format."""
     import json
 
-    from src.suggest_initiatives import dismissed_path
+    from github_repo_auditor.suggest_initiatives import dismissed_path
 
     payload = {"version": 1, "items": entries}
     dismissed_path(tmp_path).write_text(json.dumps(payload), encoding="utf-8")
@@ -736,18 +736,18 @@ class TestBuildDismissedRepos:
     """Unit tests for _build_dismissed_repos helper."""
 
     def test_none_output_dir_returns_empty(self):
-        from src.briefing import _build_dismissed_repos
+        from github_repo_auditor.briefing import _build_dismissed_repos
 
         assert _build_dismissed_repos(None) == []
 
     def test_missing_file_returns_empty(self, tmp_path):
-        from src.briefing import _build_dismissed_repos
+        from github_repo_auditor.briefing import _build_dismissed_repos
 
         result = _build_dismissed_repos(tmp_path)
         assert result == []
 
     def test_valid_dismissed_file_returns_rows(self, tmp_path):
-        from src.briefing import DismissedRepoRow, _build_dismissed_repos
+        from github_repo_auditor.briefing import DismissedRepoRow, _build_dismissed_repos
 
         _write_dismissed_json(
             tmp_path,
@@ -769,7 +769,7 @@ class TestBuildDismissedRepos:
     def test_skips_expired_entries(self, tmp_path):
         from datetime import date
 
-        from src.briefing import _build_dismissed_repos
+        from github_repo_auditor.briefing import _build_dismissed_repos
 
         # expires_at is yesterday → should be filtered out
         _write_dismissed_json(
@@ -790,7 +790,7 @@ class TestBuildDismissedRepos:
     def test_keeps_entries_expiring_today_or_later(self, tmp_path):
         from datetime import date
 
-        from src.briefing import _build_dismissed_repos
+        from github_repo_auditor.briefing import _build_dismissed_repos
 
         _write_dismissed_json(
             tmp_path,
@@ -819,7 +819,7 @@ class TestBuildDismissedRepos:
 
     def test_keeps_entries_with_malformed_expiry(self, tmp_path):
         """Malformed expires_at is preserved defensively (not filtered)."""
-        from src.briefing import DismissedRepoRow, _build_dismissed_repos
+        from github_repo_auditor.briefing import DismissedRepoRow, _build_dismissed_repos
 
         _write_dismissed_json(
             tmp_path,
@@ -844,7 +844,7 @@ class TestBuildBriefingDismissedField:
     """build_briefing populates dismissed_repos when output_dir is given."""
 
     def test_output_dir_populates_dismissed_repos(self, tmp_path):
-        from src.briefing import build_briefing
+        from github_repo_auditor.briefing import build_briefing
 
         _write_dismissed_json(
             tmp_path,
@@ -865,7 +865,7 @@ class TestBuildBriefingDismissedField:
         assert briefing.dismissed_repos[0].repo_name == "SilencedRepo"
 
     def test_no_output_dir_dismissed_repos_empty(self):
-        from src.briefing import build_briefing
+        from github_repo_auditor.briefing import build_briefing
 
         audits = [_make_audit("AnyRepo")]
         briefing = build_briefing(audits, "alice", "2026-05-12", use_history=False)
@@ -876,7 +876,7 @@ class TestRenderMarkdownDismissedSection:
     """render_markdown emits/omits the Currently Dismissed section correctly."""
 
     def test_non_empty_dismissed_repos_renders_section(self):
-        from src.briefing import DismissedRepoRow
+        from github_repo_auditor.briefing import DismissedRepoRow
 
         briefing = Briefing(
             username="alice",
@@ -899,7 +899,7 @@ class TestRenderMarkdownDismissedSection:
         assert "## Currently Dismissed" not in md
 
     def test_dismissed_count_line_correct(self):
-        from src.briefing import DismissedRepoRow
+        from github_repo_auditor.briefing import DismissedRepoRow
 
         briefing = Briefing(
             username="alice",
@@ -913,7 +913,7 @@ class TestRenderMarkdownDismissedSection:
         assert "2 repo(s) currently suppressed" in md
 
     def test_no_reason_omits_reason_part(self):
-        from src.briefing import DismissedRepoRow
+        from github_repo_auditor.briefing import DismissedRepoRow
 
         briefing = Briefing(
             username="alice",
@@ -930,7 +930,7 @@ class TestRenderVoiceDismissedLine:
     """render_voice mentions dismissed count when non-empty."""
 
     def test_non_empty_dismissed_repos_voice_line(self):
-        from src.briefing import DismissedRepoRow
+        from github_repo_auditor.briefing import DismissedRepoRow
 
         briefing = Briefing(
             username="alice",
@@ -953,7 +953,7 @@ class TestDismissedCrossLink:
     """render_markdown cross-link footer in the Currently Dismissed section (Arc G S13.3)."""
 
     def _dismissed_briefing(self) -> "Briefing":
-        from src.briefing import DismissedRepoRow
+        from github_repo_auditor.briefing import DismissedRepoRow
 
         return Briefing(
             username="alice",

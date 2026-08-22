@@ -1,4 +1,4 @@
-from src.sparkline import sparkline
+from github_repo_auditor.sparkline import sparkline
 
 
 class TestSparkline:

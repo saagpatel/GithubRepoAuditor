@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.excel_dashboard_helpers import build_dashboard_kpi_specs
+from github_repo_auditor.excel_dashboard_helpers import build_dashboard_kpi_specs
 
 
 def test_kpi_specs_include_elevated_risk_when_present() -> None:

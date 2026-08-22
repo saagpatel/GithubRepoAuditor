@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
+from github_repo_auditor.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
 
 
 def _base_weekly_pack() -> dict:

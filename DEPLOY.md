@@ -94,5 +94,5 @@ image. Any Redis server version works (the throttle uses plain `EXPIRE`).
   `SqliteWaitlistStore` needs a sibling implementation behind the existing
   `WaitlistStore` protocol.
 - **Local parity:** run the API with
-  `uv run --extra serve python -m uvicorn --factory src.serve.app:create_app --port 8080`
+  `uv run --extra serve python -m uvicorn --factory github_repo_auditor.serve.app:create_app --port 8080`
   and the frontend with `pnpm dev` in `web/`.

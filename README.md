@@ -113,6 +113,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Public-safe recording plan: [DEMO-PLAN.md](DEMO-PLAN.md)
 - Product brief: [docs/product/operator-os-product-brief.md](docs/product/operator-os-product-brief.md)
 - Public fixture proof package: [docs/demo-proof/public-fixture/README.md](docs/demo-proof/public-fixture/README.md)
+- Portable PCC contract: [fixtures/contracts/portfolio-command-center-v1/manifest.json](fixtures/contracts/portfolio-command-center-v1/manifest.json)
 - proof-pr dogfood: [docs/proof-pr-dogfood.md](docs/proof-pr-dogfood.md)
 - Product modes: [docs/modes.md](docs/modes.md)
 - Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
@@ -126,6 +127,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Project history: [docs/project-history.md](docs/project-history.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security policy: [SECURITY.md](SECURITY.md)
+- PR evidence-to-head binding: [docs/pr-head-evidence.md](docs/pr-head-evidence.md)
 
 ## Features
 
@@ -226,6 +228,19 @@ audit serve --output-dir output/demo
 To record the Portfolio Command Center wedge from the same fixture, follow
 [DEMO-PLAN.md](DEMO-PLAN.md) and point the desktop app at `output/demo/`.
 
+The smaller PCC compatibility fixture is fixed-clock and deterministic. GHRA
+owns its manifest, schema identity, generator, and digest; PCC pins the exact
+producer commit separately so the artifact never needs a self-referential Git
+hash. Because the synthetic fixture is not emitted by an attested producer
+checkout, its canonical `producer` evidence is intentionally empty; partial or
+invented producer evidence fails the same validation gate used for publication.
+Regenerate or verify it with:
+
+```bash
+python scripts/generate_portfolio_truth_contract_fixture.py
+python scripts/generate_portfolio_truth_contract_fixture.py --check
+```
+
 ### Quick start (subcommand form)
 
 ```bash
@@ -272,6 +287,9 @@ audit run <github-username> --repos <repo-name> --html
 
 # Action Sync — managed campaign preview / writeback
 audit report <github-username> --campaign security-review --writeback-target github
+
+# Local PR evidence binding — no token, network request, or output file
+audit pr-evidence tests/fixtures/pr_head_evidence/current.json
 ```
 
 Normal runs perform a lightweight automatic preflight before fetching repos. By default
@@ -287,6 +305,15 @@ and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json`
 groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and
 `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval
 capture stays separate from writeback apply.
+
+`audit pr-evidence <snapshot.json>` is a separate local-only evidence check. It
+validates a versioned `PRHeadEvidenceV1` snapshot and emits deterministic
+`PRHeadEvidenceVerdictV1` JSON showing whether evidence required by the
+supplied rules is current for the supplied PR head, while classifying every
+supplied review and check. It does not read GitHub credentials, call GitHub,
+write files, affect portfolio scoring, or regenerate portfolio truth. See
+[docs/pr-head-evidence.md](docs/pr-head-evidence.md) for the input contract,
+coverage requirements, exit codes, and claim ceiling.
 
 Watch mode supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the
 default and uses the stored baseline contract plus the scheduled full-refresh interval to
@@ -351,7 +378,7 @@ The portfolio truth layer now has its own dedicated generation path. `--portfoli
 After regenerating portfolio truth, verify the canonical snapshot instead of copying numbers into handoff or demo docs:
 
 ```bash
-uv run python -m src.cli report saagpatel --portfolio-truth
+PYTHONPATH=src uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth
 jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
 uv run operator-os-seam-linter --truth output/portfolio-truth-latest.json --json
 ```
@@ -383,7 +410,7 @@ Watch mode now uses that same baseline contract in live execution. Each cycle re
 The workbook now supports two modes:
 
 - `--excel-mode standard` — stable operational workbook path, the CLI default, and the recommended mode for automation and Mac Excel compatibility
-- `--excel-mode template` — template-backed workbook path using `assets/excel/analyst-template.xlsx` for controlled template work
+- `--excel-mode template` — template-backed workbook path using `src/github_repo_auditor/assets/excel/analyst-template.xlsx` for controlled template work
 
 Both modes read from the same report + warehouse facts. Python owns the hidden `Data_*` sheets, stable table names, and workbook facts. The template-backed workbook still owns the template shell, named-range bindings, native sparkline placement, and print layout, but the standard workbook path is now the safest default for automated generation and Excel compatibility.
 
@@ -461,7 +488,7 @@ Common fixes:
 - Missing GitHub token: set `GITHUB_TOKEN` or pass `--token` for private-repo access, GitHub writeback, metadata apply flows, and other authenticated actions.
 - Missing or broken Notion config: create or fix `config/notion-config.json` before using `--notion-sync`, `--notion-registry`, or Notion writeback.
 - Starting from scratch: copy `config/examples/audit-config.example.yaml` to `audit-config.yaml` and `config/examples/notion-config.example.json` to `config/notion-config.json`.
-- Missing Excel template: restore `assets/excel/analyst-template.xlsx` or use `--excel-mode standard`.
+- Missing Excel template: restore `src/github_repo_auditor/assets/excel/analyst-template.xlsx` or use `--excel-mode standard`.
 - Missing baseline report: run a full audit before using `--repos`, `--incremental`, or other baseline-dependent workflows.
 - Config/profile errors: fix `audit-config.yaml` syntax or choose an existing scoring profile under `config/scoring-profiles/`.
 

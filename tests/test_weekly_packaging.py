@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.weekly_packaging import finalize_weekly_pack
+from github_repo_auditor.weekly_packaging import finalize_weekly_pack
 
 
 def test_finalize_weekly_pack_adds_story_and_compact_explainability() -> None:

@@ -86,7 +86,7 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     doctor_standard: full
-    notes: Owns Raycast script commands, active-project verification routing, read-only ops snapshots, and mirrored Codex operating-layer prompt/eval snapshots for /Users/d.
+    notes: Owns Raycast script commands, active-project verification routing, read-only ops snapshots, and mirrored Codex operating-layer prompt/eval snapshots for ~.
   agent-bridge:
     owner: d
     purpose: local SQLite-backed MCP shared-state bus for coordinating coding agents
@@ -644,7 +644,7 @@ repos:
     operating_path: maintain
     tool_provenance: claude-code
     maturity_program: maintain
-    notes: Archived from active operator attention on 2026-06-13. The corrupt local checkout was preserved at /Users/d/Projects/GhostRoutes.corrupt-20260613T124820Z and /Users/d/Projects/GhostRoutes was restored from a fresh origin clone. Keep this repo archived/deferred unless explicitly reactivated.
+    notes: Archived from active operator attention on 2026-06-13. The corrupt local checkout was preserved at ~/Projects/GhostRoutes.corrupt-20260613T124820Z and ~/Projects/GhostRoutes was restored from a fresh origin clone. Keep this repo archived/deferred unless explicitly reactivated.
   Liminal:
     owner: d
     purpose: focused atmospheric iOS experience being finished as an Oddworks release
@@ -971,6 +971,8 @@ repos:
     automation_eligible: false
     doctor_standard: basic
     notes: Lane is live end-to-end as of 2026-06-12; keep residual hardening, policy widening, and hook deployment under explicit operator review.
+    aliases:
+      - egress-guard-oss
   da-scaffold:
     owner: d
     lifecycle_state: archived
@@ -1077,17 +1079,30 @@ repos:
     notes: Not a product repo; the product surface is portfolio-index. Keep this workspace out of default attention except when the site-rebuild campaign is actively being dispatched.
   portfolio-index:
     owner: d
-    purpose: public-safe static portfolio index for hiring-manager review
-    lifecycle_state: active
+    purpose: upstream content source, rollback source, and historical site implementation for SAFELIGHT
+    lifecycle_state: manual-only
     criticality: high
-    review_cadence: monthly
+    review_cadence: ad-hoc
     operating_path: maintain
     category: commercial
     tool_provenance: claude-code
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Tier-0 public workshop and canonical saagarpatel.dev product surface. Keep in default attention as the public front door for the core portfolio.
+    notes: Not the current production target. Remains an upstream content source for SAFELIGHT, a rollback source, and historical site implementation evidence. Keep outside default attention; touch intentionally only for source-content work, rollback, rollback-integrity verification, or migration or pinning of the upstream dependency. It is not a frozen archive while SAFELIGHT reads mutable portfolio-index HEAD.
+  safelight:
+    owner: d
+    purpose: canonical production website repository and publisher for saagarpatel.dev; current public site surface
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    operating_path: maintain
+    category: commercial
+    tool_provenance: unknown
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Canonical production website repository and publisher. SAFELIGHT currently ingests source content from mutable portfolio-index HEAD via scripts/ingest.mjs; it is not pinned. Production deployment is provider-verified separately and remains explicitly gated.
   rag-knowledge-base:
     owner: d
     lifecycle_state: manual-only
@@ -1271,12 +1286,6 @@ repos:
     review_cadence: weekly
     operating_path: finish
     maturity_program: finish
-  egress-guard-oss:
-    owner: d
-    lifecycle_state: active
-    review_cadence: weekly
-    operating_path: finish
-    maturity_program: finish
   proof-pr:
     owner: d
     lifecycle_state: active
@@ -1374,10 +1383,11 @@ repos:
     category: infrastructure
     tool_provenance: codex
     notes: Drill-verified (dated passing drill) at 2026-07-17 tribunal judgment; tribunal
-      KEEP maps to this manual-only standing-tooling contract.
+      KEEP maps to this manual-only standing-tooling contract. The 2026-07-11
+      disposable real-repository recovery drill also passed, including broken-main
+      rejection, timeout handling, and force-tracked .env blocking.
     maturity_program: maintain
     target_maturity: operating
-    notes: Session 2026-07-11 disposable real-repository recovery drill passed, including broken-main rejection, timeout handling, and force-tracked .env blocking.
   sovereign-intelligence:
     owner: d
     purpose: local evidence-receipt intelligence workspace for repeated scenario comparison and decision support
@@ -1574,3 +1584,159 @@ repos:
     review_cadence: weekly
     operating_path: experiment
     category: infrastructure
+  portfolio-tribunal:
+    owner: d
+    purpose: KEEP/PARK/KILL judgment layer over GithubRepoAuditor portfolio truth
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.1 graduated 2026-07-17; 182 repos judged and dispositions merged. Re-runnable on demand, not scheduled.
+  drift-court:
+    owner: d
+    purpose: intent-vs-diff arbitration for delegated agent work, pricing silence and disguise
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.0 graduated 2026-07-17 at zero overrides. Live post-dispatch gate; runs on demand.
+  regret-oracle:
+    owner: d
+    purpose: grounded pre-mortem judging pending decisions against the operator's own regret corpus
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.0 graduated 2026-07-17. Live pre-decision gate; runs on demand.
+  consolidation-map:
+    owner: d
+    purpose: border arbitration over tribunal KEEP repos, ruling MERGE/ABSORB/SHARE_INFRA/STAND_ALONE
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Rubric v1.0 graduated 2026-07-17. Runs on operator request or after a tribunal re-run; not scheduled.
+  instrument-foundry:
+    owner: d
+    purpose: extracted judgment-instrument chassis and doctrine proven across graduated instruments
+    lifecycle_state: manual-only
+    criticality: medium
+    review_cadence: quarterly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Reference doctrine for building new instruments. Consulted, not run.
+  corpus-court:
+    owner: d
+    purpose: wikilink and corpus drift arbitration over the SecondBrain knowledge vault
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Answered 2026-07-17 — 240/240 case IDs ruled (KEEP 210, AMEND 27, MERGE 3). Ledger in repo.
+  review-judge-calibration:
+    owner: d
+    purpose: measures the review-prose judge against operator blind grades
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Answered 2026-07-17 — operator-judge kappa 0.78, 29/30 exact, judge-judge 1.00. Receipt in repo.
+  calibration-bench:
+    owner: d
+    purpose: L3 calibration lane for scoring judgment instruments against known answers
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Closed at generation 6 on 2026-07-18 with an in-repo receipt and three refuted designs. Do not rebuild.
+  transcript-autopsy:
+    owner: d
+    purpose: mines agent-session corpora for harness weaknesses and failure taxonomy
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Answered 2026-07-18 — findings landed as durable feedback memory. Reads source corpora read-only; commits none.
+  spec-shift-tribunal:
+    owner: d
+    purpose: point-in-time ruling on mcp-trust registry servers against the published MCP specification
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Ruled 2026-07-18, delta pass 2026-08-02 confirmed no pinned spec text moved. BREAKS 6 / READY 25 / EXPOSED 0. Follow-ups remain open outside this repo.
+  canon-court:
+    owner: d
+    purpose: portfolio-truth canonical-key reconciliation docket
+    lifecycle_state: dormant
+    criticality: low
+    review_cadence: quarterly
+    operating_path: archive
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Scaffold only — one commit, 2026-07-17. Its design doc awaits a judgment session that never ran; no rulings were ever issued.
+  operating-memory-os:
+    owner: d
+    purpose: local-first system that remembers the operator's work life and can be queried about it
+    lifecycle_state: manual-only
+    criticality: high
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: In flight, operator-driven. Ships 1-3 closed; Ship 4 merge-ready with scheduled assets deliberately unarmed pending a supervised run. Held at manual-only rather than active on purpose - active + maintain + infrastructure enrolls a repo in the Tier 0 cohort, whose size is a fail-closed contract pinned in two scheduled jobs. Promote only alongside those pins.

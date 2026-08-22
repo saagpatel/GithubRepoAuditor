@@ -2,7 +2,7 @@
 
 Durable screenshot proof for the five-tab local PortfolioCommandCenter demo.
 
-Captured from `/Users/d/Projects/PortfolioCommandCenter` with:
+Captured from `~/Projects/PortfolioCommandCenter` with:
 
 ```sh
 pnpm demo:desktop
@@ -50,8 +50,8 @@ The contact sheet is the quickest visual smoke check for all five frames.
 Refreshed on 2026-06-07 after re-running:
 
 ```sh
-python -m src.cli --portfolio-truth --portfolio-truth-include-security saagpatel
-python -m src.cli triage saagpatel --control-center
+python -m github_repo_auditor.cli --portfolio-truth --portfolio-truth-include-security saagpatel
+python -m github_repo_auditor.cli triage saagpatel --control-center
 ```
 
 Use `RECORDING-CHECKLIST.md` for the exact 90-second capture order and

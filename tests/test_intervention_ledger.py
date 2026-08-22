@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.intervention_ledger import build_intervention_ledger_bundle
+from github_repo_auditor.intervention_ledger import build_intervention_ledger_bundle
 
 
 def _queue_item(repo: str, *, lane: str = "ready") -> dict:

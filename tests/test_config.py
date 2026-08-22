@@ -2,7 +2,7 @@ import argparse
 
 import pytest
 
-from src.config import inspect_config, load_config, merge_config_with_args, validate_config_data
+from github_repo_auditor.config import inspect_config, load_config, merge_config_with_args, validate_config_data
 
 
 class TestLoadConfig:

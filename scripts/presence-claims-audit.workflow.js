@@ -2,7 +2,7 @@
 // External audit of the snapshot's SIX presence claims against on-disk ground truth.
 // Stage 2 (verifier fan-out, Haiku — judges all 6 claims per repo in one read)
 //   + Stage 3 (deterministic per-(repo,claim) tally) + Stage 4 (Sonnet synthesis).
-// args = output of `python -m src.run_instructions_audit` ({ generated_at, workspace_root, records, errors }),
+// args = output of `python -m github_repo_auditor.run_instructions_audit` ({ generated_at, workspace_root, records, errors }),
 //   where each record carries snapshot_claims{} and tool_today{} dicts over the 6 fields.
 export const meta = {
 	name: "presence-claims-audit",
@@ -97,7 +97,7 @@ function verifierPrompt(rec) {
 	].join("\n");
 }
 
-// --- Stage 3 tally logic (mirror of src/run_instructions_audit.py) ---
+// --- Stage 3 tally logic (mirror of src/github_repo_auditor/run_instructions_audit.py) ---
 function assignBucket(toolToday, verdict, inPrimary) {
 	if (toolToday === verdict) return verdict ? "agree_present" : "agree_absent";
 	if (verdict && !toolToday)

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.badges import compute_badges, suggest_next_badges
-from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+from github_repo_auditor.badges import compute_badges, suggest_next_badges
+from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
 
 
 def _meta(**overrides) -> RepoMetadata:

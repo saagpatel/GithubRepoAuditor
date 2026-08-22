@@ -2,7 +2,7 @@ import os
 import signal
 from unittest.mock import patch
 
-from src.watch import run_watch_loop
+from github_repo_auditor.watch import run_watch_loop
 
 
 class TestWatchLoop:

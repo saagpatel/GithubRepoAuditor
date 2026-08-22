@@ -1,4 +1,4 @@
-"""Tests for src/maturity_tiers.py — Arc G Sprint 7A.1 + Sprint 8.3."""
+"""Tests for src/github_repo_auditor/maturity_tiers.py — Arc G Sprint 7A.1 + Sprint 8.3."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from src.maturity_tiers import (
+from github_repo_auditor.maturity_tiers import (
     TIER_DEFINITIONS,
     TierCriteria,
     TierGap,

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import requests
 
-from src.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
+from github_repo_auditor.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -212,7 +212,7 @@ class TestPagination:
 
 class TestCacheIntegration:
     def test_cache_hit_skips_api_calls(self, tmp_path: Path) -> None:
-        from src.cache import ResponseCache
+        from github_repo_auditor.cache import ResponseCache
 
         cache = ResponseCache(cache_dir=tmp_path / ".cache", ttl=21600)
         audit = _make_audit("cached-repo")
@@ -427,7 +427,13 @@ class TestCliIntegration:
         """When --vuln-check is active, the GHAS block is also triggered (implied flag)."""
         from pathlib import Path as _Path
 
-        audit_flow_source = (_Path(__file__).parent.parent / "src" / "app" / "run_audit.py").read_text()
+        audit_flow_source = (
+            _Path(__file__).parent.parent
+            / "src"
+            / "github_repo_auditor"
+            / "app"
+            / "run_audit.py"
+        ).read_text()
         # Look for the condition that gates GHAS on either flag in the audit flow.
         assert "ghas_alerts" in audit_flow_source
         assert "vuln_check" in audit_flow_source

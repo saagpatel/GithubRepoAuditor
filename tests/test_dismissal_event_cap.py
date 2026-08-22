@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from src.suggest_initiatives import (
+from github_repo_auditor.suggest_initiatives import (
     _MAX_DISMISSAL_EVENTS,
     DismissalEvent,
     _save_dismissed_full,
@@ -115,7 +115,7 @@ class TestEventCapOverLimit:
 
     def test_items_preserved_through_trim(self, tmp_path):
         """DismissedSuggestion items are unaffected by event log trimming."""
-        from src.suggest_initiatives import DismissedSuggestion
+        from github_repo_auditor.suggest_initiatives import DismissedSuggestion
 
         items = [
             DismissedSuggestion(

@@ -9,7 +9,7 @@ ROOT = ensure_project_root()
 
 
 def _load_template_constants() -> tuple[object, object, object]:
-    from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
+    from github_repo_auditor.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
 
     return DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.models import AnalyzerResult, RepoAudit, RepoMetadata
-from src.quick_wins import find_quick_wins
-from src.scorer import letter_grade
+from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
+from github_repo_auditor.quick_wins import find_quick_wins
+from github_repo_auditor.scorer import letter_grade
 
 
 def _meta(name: str = "test") -> RepoMetadata:

@@ -1,9 +1,10 @@
-"""Tests for src/serve — FastAPI + HTMX local web UI (Arc F S4.1)."""
+"""Tests for src/github_repo_auditor/serve — FastAPI + HTMX local web UI (Arc F S4.1)."""
 
 from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,8 +21,8 @@ pytest.importorskip("jinja2", reason="[serve] extra not installed")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from src.serve.app import create_app  # noqa: E402
-from src.serve.runner import SAFE_FLAG_NAMES, validate_flags, validate_username  # noqa: E402
+from github_repo_auditor.serve.app import create_app  # noqa: E402
+from github_repo_auditor.serve.runner import SAFE_FLAG_NAMES, validate_flags, validate_username  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -161,8 +162,8 @@ class TestRepoDetailRoute:
         assert resp.status_code == 404
 
     def test_known_repo_reads_production_warehouse_schema(self, tmp_path: Path) -> None:
-        from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
-        from src.warehouse import write_warehouse_snapshot
+        from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+        from github_repo_auditor.warehouse import write_warehouse_snapshot
 
         od = tmp_path / "output"
         od.mkdir()
@@ -275,7 +276,7 @@ class TestApprovalsRoute:
                 "approval_state": "not-applicable",
             },
         ]
-        with patch("src.warehouse.load_approval_records", return_value=fake_records):
+        with patch("github_repo_auditor.warehouse.load_approval_records", return_value=fake_records):
             resp = client.get("/approvals")
         assert resp.status_code == 200
         assert "appr-001" in resp.text
@@ -297,7 +298,7 @@ class TestNewRunRoute:
         assert "username" in resp.text.lower()
 
     def test_post_valid_flags_returns_run_id(self, client: TestClient) -> None:
-        with patch("src.serve.routes.spawn_run", return_value="abc123"):
+        with patch("github_repo_auditor.serve.routes.spawn_run", return_value="abc123"):
             resp = client.post(
                 "/runs/new",
                 data={"username": "testuser", "flags": "--portfolio-truth"},
@@ -346,7 +347,7 @@ def _seed_draft_readme_records(output_dir: Path) -> tuple[str, str]:
 
     Returns (record_id_1, record_id_2).
     """
-    from src.warehouse import save_approval_record
+    from github_repo_auditor.warehouse import save_approval_record
 
     id1 = "dr-aabbccdd00000001"
     id2 = "dr-aabbccdd00000002"
@@ -428,7 +429,7 @@ class TestDraftReadmeApprovals:
 
     def test_draft_diff_non_draft_readme_returns_404(self, output_dir: Path) -> None:
         """A record with a different approval_subject_type should return 404."""
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         save_approval_record(
             output_dir,
@@ -510,7 +511,7 @@ class TestStreamRoute:
 
     def test_stream_happy_path(self, client: TestClient, output_dir: Path) -> None:
         """Spawn a trivial subprocess and read at least one SSE event."""
-        from src.serve.runner import spawn_run
+        from github_repo_auditor.serve.runner import spawn_run
 
         # Use python -c "print('hello')" — portable, no shell=True
         run_id = spawn_run(
@@ -519,7 +520,7 @@ class TestStreamRoute:
             output_dir=output_dir,
         )
         # Override the session's command to something safe and instant
-        from src.serve import runner as runner_mod
+        from github_repo_auditor.serve import runner as runner_mod
 
         session = runner_mod.get_session(run_id)
         assert session is not None
@@ -534,6 +535,60 @@ class TestStreamRoute:
         # SSE endpoint must return 200 with correct media type
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers["content-type"]
+
+
+class TestRunnerCommandBoundary:
+    def test_form_values_are_not_embedded_in_worker_command(self, output_dir: Path) -> None:
+        from github_repo_auditor.serve import runner as runner_mod
+        from github_repo_auditor.serve.runner import spawn_run
+
+        with patch.object(runner_mod.RunSession, "start"):
+            run_id = spawn_run(
+                username="octo-org",
+                flags={"output-dir": "user-controlled-output"},
+                output_dir=output_dir,
+            )
+
+        session = runner_mod.get_session(run_id)
+        assert session is not None
+        assert session.cmd == (
+            sys.executable,
+            "-m",
+            "github_repo_auditor.serve.worker",
+        )
+        assert "octo-org" not in session.cmd
+        assert "user-controlled-output" not in session.cmd
+
+    def test_worker_passes_payload_to_cli_inside_child_process(self, monkeypatch) -> None:
+        from io import StringIO
+
+        import github_repo_auditor.cli as cli
+        from github_repo_auditor.serve import worker
+
+        monkeypatch.setattr(
+            worker.sys,
+            "stdin",
+            StringIO(
+                json.dumps(
+                    {
+                        "username": "octo-org",
+                        "flag_args": ["--portfolio-truth", "--output-dir", "safe-output"],
+                    }
+                )
+            ),
+        )
+        captured: dict[str, list[str]] = {}
+        monkeypatch.setattr(cli, "main", lambda: captured.setdefault("argv", list(sys.argv)))
+
+        worker.main()
+
+        assert captured["argv"] == [
+            "audit",
+            "octo-org",
+            "--portfolio-truth",
+            "--output-dir",
+            "safe-output",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -613,7 +668,7 @@ class TestValidateUsername:
 
 class TestHtmxFragmentEscaping:
     def test_campaign_action_values_are_escaped(self) -> None:
-        from src.serve.routes import _render_action_row
+        from github_repo_auditor.serve.routes import _render_action_row
 
         html = _render_action_row(
             'packet"><script>alert(1)</script>',
@@ -632,7 +687,7 @@ class TestHtmxFragmentEscaping:
         assert "&lt;strong&gt;escaping&lt;/strong&gt;" in html
 
     def test_section_card_values_are_escaped(self) -> None:
-        from src.serve.routes import _render_section_card
+        from github_repo_auditor.serve.routes import _render_section_card
 
         html = _render_section_card(
             'section"><script>alert(1)</script>',
@@ -651,7 +706,7 @@ class TestHtmxFragmentEscaping:
 
     def test_campaign_action_error_hides_exception_details(self, client: TestClient) -> None:
         with patch(
-            "src.plan_campaign.approve_action",
+            "github_repo_auditor.plan_campaign.approve_action",
             side_effect=ValueError("internal stack trace /tmp/private.py:99"),
         ):
             resp = client.post("/approvals/packet-1/actions/0/approve")
@@ -663,7 +718,7 @@ class TestHtmxFragmentEscaping:
 
     def test_section_error_hides_exception_details(self, client: TestClient) -> None:
         with patch(
-            "src.draft_readmes.approve_section",
+            "github_repo_auditor.draft_readmes.approve_section",
             side_effect=ValueError("internal stack trace /tmp/private.py:99"),
         ):
             resp = client.post("/approvals/sections/section-1/approve")
@@ -681,7 +736,7 @@ class TestHtmxFragmentEscaping:
 
 class TestCLIServeFlag:
     def test_serve_flag_in_parser(self) -> None:
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         # --serve must be a recognised flag (parse with a dummy username)
@@ -691,7 +746,7 @@ class TestCLIServeFlag:
         assert args.host == "0.0.0.0"
 
     def test_serve_defaults(self) -> None:
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["dummyuser", "--serve"])
@@ -709,7 +764,7 @@ def _seed_campaign_plan_record(output_dir: Path) -> str:
 
     Returns the record_id.
     """
-    from src.warehouse import save_approval_record
+    from github_repo_auditor.warehouse import save_approval_record
 
     record_id = "cp-aabbccdd00000001"
     save_approval_record(

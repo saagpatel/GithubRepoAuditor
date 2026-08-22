@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import types
 
-from src.analyzers.dependencies import DependenciesAnalyzer, _count_dependencies
+from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer, _count_dependencies
 
 
 class TestDependenciesCacheInputsHash:
@@ -209,15 +209,15 @@ class TestDependenciesAnalyzerFindings:
         repo.mkdir()
         (repo / "requirements.txt").write_text("requests\nclick\n")
 
-        fake_cache_module = types.ModuleType("src.cache")
+        fake_cache_module = types.ModuleType("github_repo_auditor.cache")
         fake_cache_module.ResponseCache = lambda ttl: {"ttl": ttl}
-        fake_libyears_module = types.ModuleType("src.libyears")
+        fake_libyears_module = types.ModuleType("github_repo_auditor.libyears")
         fake_libyears_module.compute_libyears = lambda repo_path, manifests, cache: {
             "dep_count": 999,
             "total_libyears": 4.5,
         }
-        monkeypatch.setitem(sys.modules, "src.cache", fake_cache_module)
-        monkeypatch.setitem(sys.modules, "src.libyears", fake_libyears_module)
+        monkeypatch.setitem(sys.modules, "github_repo_auditor.cache", fake_cache_module)
+        monkeypatch.setitem(sys.modules, "github_repo_auditor.libyears", fake_libyears_module)
 
         result = DependenciesAnalyzer().analyze(repo, sample_metadata)
 
@@ -231,16 +231,16 @@ class TestDependenciesAnalyzerFindings:
         repo.mkdir()
         (repo / "requirements.txt").write_text("requests\n")
 
-        fake_cache_module = types.ModuleType("src.cache")
+        fake_cache_module = types.ModuleType("github_repo_auditor.cache")
         fake_cache_module.ResponseCache = lambda ttl: {"ttl": ttl}
-        fake_libyears_module = types.ModuleType("src.libyears")
+        fake_libyears_module = types.ModuleType("github_repo_auditor.libyears")
 
         def fail_compute_libyears(repo_path, manifests, cache):
             raise RuntimeError("registry unavailable")
 
         fake_libyears_module.compute_libyears = fail_compute_libyears
-        monkeypatch.setitem(sys.modules, "src.cache", fake_cache_module)
-        monkeypatch.setitem(sys.modules, "src.libyears", fake_libyears_module)
+        monkeypatch.setitem(sys.modules, "github_repo_auditor.cache", fake_cache_module)
+        monkeypatch.setitem(sys.modules, "github_repo_auditor.libyears", fake_libyears_module)
 
         result = DependenciesAnalyzer().analyze(repo, sample_metadata)
 

@@ -1,10 +1,10 @@
-"""Tests for src/serve/hosting.py — KV store, report cache, per-IP throttle."""
+"""Tests for src/github_repo_auditor/serve/hosting.py — KV store, report cache, per-IP throttle."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.serve.hosting import (
+from github_repo_auditor.serve.hosting import (
     InMemoryKVStore,
     RateLimiter,
     ReportCache,

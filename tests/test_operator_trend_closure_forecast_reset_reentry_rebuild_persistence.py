@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_reset_controls import (
+from github_repo_auditor.operator_trend_closure_forecast_reset_controls import (
     closure_forecast_reset_reentry_rebuild_churn_for_target,
     closure_forecast_reset_reentry_rebuild_churn_summary,
     closure_forecast_reset_reentry_rebuild_hotspots,

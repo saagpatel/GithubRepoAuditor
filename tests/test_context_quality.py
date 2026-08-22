@@ -2,8 +2,8 @@
 """Tests for the composite context_quality_score (Arc H H.4)."""
 import pytest
 
-from src.context_quality import compute_context_quality_score
-from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+from github_repo_auditor.context_quality import compute_context_quality_score
+from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
 
 
 def test_perfect_repo_scores_one():

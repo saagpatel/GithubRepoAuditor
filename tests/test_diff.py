@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from src.diff import diff_reports, format_diff_markdown, print_diff_summary
+from github_repo_auditor.diff import diff_reports, format_diff_markdown, print_diff_summary
 
 
 def _make_report(audits: list[dict], avg: float = 0.5, date: str = "2026-03-20") -> dict:

@@ -6,11 +6,26 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.cli import _run_security_gate_mode, build_subcommand_parser
-from src.portfolio_security_gate import (
+from github_repo_auditor.cli import _run_security_gate_mode, build_subcommand_parser
+from github_repo_auditor.portfolio_security_gate import (
     build_security_gate_report,
     render_security_gate_markdown,
 )
+
+OBSERVED_AT = "2026-07-04T11:03:00+00:00"
+PRODUCED_AT = "2026-07-04T11:04:00+00:00"
+
+
+def _provider(counts: dict[str, int], *, observed: bool) -> dict:
+    return {
+        "state": "observed" if observed else "not_requested",
+        "reason_code": "observed" if observed else "not_requested",
+        "observed_at": OBSERVED_AT if observed else None,
+        "pagination_complete": observed,
+        "completed": observed,
+        "zero_findings": sum(counts.values()) == 0 if observed else None,
+        "counts": counts if observed else None,
+    }
 
 
 def _project(
@@ -31,11 +46,30 @@ def _project(
             "alerts_available": alerts_available,
             "cohort_member": True,
             "coverage_state": "complete" if alerts_available else "unknown",
+            "receipt_state": "fresh",
+            "source_produced_at": PRODUCED_AT,
             "providers": {
-                provider: {
-                    "state": "observed" if alerts_available else "not_requested"
-                }
-                for provider in ("dependabot", "code_scanning", "secret_scanning")
+                "dependabot": _provider(
+                    {
+                        "critical": critical,
+                        "high": high,
+                        "medium": 0,
+                        "low": 0,
+                    },
+                    observed=alerts_available,
+                ),
+                "code_scanning": _provider(
+                    {
+                        "critical": code_critical,
+                        "high": code_high,
+                        "warning": 0,
+                        "note": 0,
+                    },
+                    observed=alerts_available,
+                ),
+                "secret_scanning": _provider(
+                    {"open": secrets}, observed=alerts_available
+                ),
             },
             "dependabot_critical": critical,
             "dependabot_high": high,
@@ -173,9 +207,23 @@ def test_security_gate_treats_missing_overlay_as_unknown_not_pass() -> None:
     assert report.passed is False
     assert report.status == "unknown"
     assert report.scanned_count == 0
-    assert "security coverage is missing or incomplete" in render_security_gate_markdown(
-        report
+    assert (
+        "security coverage is missing or incomplete"
+        in render_security_gate_markdown(report)
     )
+
+
+def test_security_gate_surfaces_admission_reason_for_contradictory_counts() -> None:
+    project = _project("Contradictory")
+    project["security"]["code_scanning_high"] = 4
+
+    report = build_security_gate_report({"projects": [project]})
+
+    assert report.status == "unknown"
+    assert report.complete_count == 0
+    [unadmitted] = report.unadmitted_repos
+    assert "SECURITY_PROVIDER_CODE_SCANNING_COUNT_CONFLICT" in (unadmitted.reason_codes)
+    assert "SECURITY_ADMISSION_UNKNOWN" in render_security_gate_markdown(report)
 
 
 @pytest.mark.parametrize("coverage_state", ["partial", "stale", "unknown"])
@@ -214,13 +262,122 @@ def test_security_gate_cli_json_exits_zero_on_clear_snapshot(tmp_path, capsys) -
     _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=True))
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "pass"
-    assert payload["scanned_count"] == 1
+    assert payload == {
+        "complete_count": 1,
+        "contract_version": "security_gate_cli_v2",
+        "flagged_repos": [],
+        "freshness_error": None,
+        "generated_at": "<redacted>",
+        "partial_count": 0,
+        "passed": True,
+        "redaction_policy": "allowlisted-aggregate-only",
+        "repos_with_open_high_critical": 0,
+        "required_cohort_count": 1,
+        "scanned_count": 1,
+        "source_freshness": "unchecked",
+        "stale_count": 0,
+        "status": "pass",
+        "total_open_critical": 0,
+        "total_open_high": 0,
+        "total_open_secrets": 0,
+        "unadmitted_repos": [],
+        "unknown_count": 0,
+    }
+
+
+def test_security_gate_cli_marks_unbounded_freshness_unchecked(tmp_path, capsys) -> None:
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2000-01-01T00:00:00+00:00",
+                "projects": [_project("OldButClear")],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=False))
+
+    output = capsys.readouterr().out
+    assert "Source freshness: unchecked (no freshness limit enforced)" in output
+    assert "Status: PASS" in output
+
+
+def test_security_gate_cli_distinguishes_verified_stale_freshness(
+    tmp_path, capsys
+) -> None:
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-07-01T11:00:00+00:00",
+                "projects": [_project("Stale")],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit):
+        _run_security_gate_mode(
+            SimpleNamespace(output_dir=str(tmp_path), json=False, max_age_hours=24)
+        )
+
+    output = capsys.readouterr().out
+    assert "Source freshness: stale" in output
+    assert "exceeded the configured freshness threshold" in output
+    assert "could not be verified" not in output
+
+
+def test_security_gate_cli_json_redacts_provider_authored_repo_detail(
+    tmp_path, capsys
+) -> None:
+    project = _project("provider-authored opaque secret", high=1)
+    project["security"]["reason_code"] = "provider-authored opaque secret"
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"projects": [project]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=True))
+
+    assert exc.value.code == 1
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+    assert payload["status"] == "fail"
+    assert payload["total_open_high"] == 1
+    assert payload["flagged_repos"] == []
+    assert "provider-authored opaque secret" not in output
+    assert "generated_at" in payload
+    assert payload["generated_at"] == "<redacted>"
+
+
+def test_security_gate_cli_markdown_redacts_provider_authored_repo_detail(
+    tmp_path, capsys
+) -> None:
+    project = _project("provider-authored opaque secret", high=1)
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"projects": [project]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=False))
+
+    assert exc.value.code == 1
+    output = capsys.readouterr().out
+    assert "provider-authored opaque secret" not in output
+    assert "repo-level detail" in output
+    assert "Output policy: allowlisted aggregate summary" in output
 
 
 def test_security_gate_cli_exits_nonzero_on_stale_snapshot(tmp_path) -> None:
     (tmp_path / "portfolio-truth-latest.json").write_text(
-        json.dumps({"generated_at": "2026-07-01T11:00:00+00:00", "projects": [_project("Clear")]}),
+        json.dumps(
+            {
+                "generated_at": "2026-07-01T11:00:00+00:00",
+                "projects": [_project("Clear")],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -242,3 +399,19 @@ def test_security_gate_cli_exits_nonzero_on_open_alerts(tmp_path) -> None:
         _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=False))
 
     assert exc.value.code == 1
+
+
+def test_security_gate_cli_mentions_secret_findings_in_failure_message(
+    tmp_path, capsys
+) -> None:
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"projects": [_project("SecretOnly", secrets=1)]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit):
+        _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=False))
+
+    output = capsys.readouterr().out
+    assert "Open security findings are present" in output
+    assert "Open high/critical findings are present" not in output

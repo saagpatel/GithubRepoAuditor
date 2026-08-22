@@ -5,8 +5,8 @@ import base64
 import pytest
 import requests
 
-from src.github_client import REST_API_VERSION, GitHubClient
-from src.http_link_header import next_link_from_header
+from github_repo_auditor.github_client import REST_API_VERSION, GitHubClient
+from github_repo_auditor.http_link_header import next_link_from_header
 
 
 class _MemoryCache:

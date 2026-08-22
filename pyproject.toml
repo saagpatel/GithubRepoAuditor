@@ -47,7 +47,7 @@ dev = [
     # is handled as its own cleanup change.
     "ruff>=0.4,<0.17",
     "mypy>=1.10",
-    "mutmut>=2.5",
+    "mutmut>=3.6,<4",
     "responses>=0.25",
     "types-PyYAML>=6.0",
 ]
@@ -81,16 +81,26 @@ Changelog = "https://github.com/saagpatel/GithubRepoAuditor/blob/main/CHANGELOG.
 Documentation = "https://github.com/saagpatel/GithubRepoAuditor#readme"
 
 [project.scripts]
-audit = "src.cli:main"
-operator-os-seam-linter = "src.operator_os_seam_linter:main"
-operator-os-producer-preflight = "src.producer_preflight:main"
+audit = "github_repo_auditor.cli:main"
+operator-os-seam-linter = "github_repo_auditor.operator_os_seam_linter:main"
+operator-os-producer-preflight = "github_repo_auditor.producer_preflight:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+include = ["github_repo_auditor*"]
 
 [tool.setuptools.package-data]
-"src" = ["*.json", "*.yaml", "*.yml", "*.html", "*.jinja2", "*.j2"]
+"github_repo_auditor" = [
+    "*.json",
+    "*.yaml",
+    "*.yml",
+    "*.html",
+    "*.jinja2",
+    "*.j2",
+    "assets/excel/*.xlsx",
+    "serve/static/*.css",
+    "serve/templates/*.html",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -99,9 +109,13 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.mutmut]
-paths_to_mutate = "src/auto_apply.py,src/scorer.py"
-runner = "python3.13 -m pytest -q -p no:cacheprovider -x tests/test_auto_apply.py tests/test_scorer.py"
-tests_dir = "tests/"
+source_paths = ["src"]
+only_mutate = ["src/github_repo_auditor/auto_apply.py", "src/github_repo_auditor/scorer.py"]
+pytest_add_cli_args = ["-p", "no:cacheprovider"]
+pytest_add_cli_args_test_selection = [
+    "tests/test_auto_apply.py",
+    "tests/test_scorer.py",
+]
 
 [tool.ruff]
 target-version = "py311"

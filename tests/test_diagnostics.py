@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from argparse import Namespace
 
-from src.baseline_context import build_baseline_context
-from src.config import inspect_config
-from src.diagnostics import run_diagnostics
+from github_repo_auditor.baseline_context import build_baseline_context
+from github_repo_auditor.config import inspect_config
+from github_repo_auditor.diagnostics import run_diagnostics
 
 
 def _make_args(tmp_path, **overrides) -> Namespace:
@@ -71,7 +71,7 @@ def test_requested_notion_sync_without_token_or_config_is_error(tmp_path, monkey
 
 
 def test_template_mode_missing_asset_is_error(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.diagnostics.DEFAULT_TEMPLATE_PATH", tmp_path / "missing-template.xlsx")
+    monkeypatch.setattr("github_repo_auditor.diagnostics.DEFAULT_TEMPLATE_PATH", tmp_path / "missing-template.xlsx")
     args = _make_args(tmp_path, excel_mode="template")
     result = run_diagnostics(args, full=False)
     assert any(check.category == "excel" and check.status == "error" for check in result.checks)

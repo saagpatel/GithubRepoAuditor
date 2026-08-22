@@ -1,7 +1,8 @@
 .PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release publish-pypi
 
 PYTHON := python3
-CLI := uv run python -m src.cli
+SOURCE_ENV := PYTHONPATH=src
+CLI := $(SOURCE_ENV) uv run python -m github_repo_auditor.cli
 USERNAME ?= saagpatel
 ARGS ?=
 
@@ -27,13 +28,13 @@ benchmark:
 	$(PYTHON) scripts/benchmark_large_portfolio.py
 
 workbook-gate:
-	$(PYTHON) -m src.workbook_gate $(ARGS)
+	$(SOURCE_ENV) $(PYTHON) -m github_repo_auditor.workbook_gate $(ARGS)
 
 workbook-signoff:
-	$(PYTHON) -m src.workbook_gate --record-signoff $(ARGS)
+	$(SOURCE_ENV) $(PYTHON) -m github_repo_auditor.workbook_gate --record-signoff $(ARGS)
 
 test:
-	$(PYTHON) -m pytest tests/ -v
+	$(SOURCE_ENV) $(PYTHON) -m pytest tests/ -v
 
 lint:
 	ruff check src/ tests/
@@ -49,24 +50,11 @@ run:
 
 release-gate:
 	@echo "=== Running release gate: mutation testing ==="
-	@echo "Requires: python3.13, mutmut 2.x installed in python3.13 environment"
-	rm -rf .mutmut-cache mutants/
-	python3.13 -m mutmut run
+	@echo "Requires: Python 3.13 and the locked dev environment"
+	$(SOURCE_ENV) uv run --extra dev --python 3.13 mutmut run
 	@echo ""
 	@echo "=== Mutation results ==="
-	python3.13 -c "\
-import sqlite3; \
-conn = sqlite3.connect('.mutmut-cache'); \
-rows = conn.execute('SELECT status, count(*) FROM Mutant GROUP BY status').fetchall(); \
-total = sum(r[1] for r in rows); \
-killed = next((r[1] for r in rows if r[0] == 'ok_killed'), 0); \
-survived = next((r[1] for r in rows if r[0] == 'bad_survived'), 0); \
-timeout = next((r[1] for r in rows if r[0] == 'bad_timeout'), 0); \
-denom = killed + survived; \
-rate = killed / denom if denom > 0 else 0.0; \
-print(f'Total: {total} | Killed: {killed} | Survived: {survived} | Timeout: {timeout}'); \
-print(f'Kill rate: {rate:.1%}'); \
-exit(0 if rate >= 0.85 else 1)"
+	uv run --no-sync python scripts/check_mutation_score.py --minimum 0.85
 
 clean:
 	rm -rf .pytest_cache __pycache__ dist build *.egg-info src/*.egg-info

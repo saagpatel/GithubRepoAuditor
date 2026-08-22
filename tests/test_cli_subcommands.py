@@ -17,7 +17,7 @@ import io
 import re
 import warnings
 
-import src.cli as cli_module
+import github_repo_auditor.cli as cli_module
 
 _infer_subcommand_from_flags = cli_module._infer_subcommand_from_flags
 _rewrite_legacy_argv = cli_module._rewrite_legacy_argv

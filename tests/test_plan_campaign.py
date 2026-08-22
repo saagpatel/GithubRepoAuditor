@@ -1,4 +1,4 @@
-"""Tests for src/plan_campaign.py — Arc G Sprint 6.1-6.2 + 6.4 (apply path)."""
+"""Tests for src/github_repo_auditor/plan_campaign.py — Arc G Sprint 6.1-6.2 + 6.4 (apply path)."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.llm_cost import BudgetExceededError, CostTracker
-from src.plan_campaign import (
+from github_repo_auditor.llm_cost import BudgetExceededError, CostTracker
+from github_repo_auditor.plan_campaign import (
     ACTION_TYPES,
     CampaignAction,
     CampaignPlanPacket,
@@ -142,7 +142,7 @@ class TestNarrowCandidates:
         assert result == []
 
     def test_with_mock_semantic_index_calls_search(self) -> None:
-        from src.semantic_index import SearchResult
+        from github_repo_auditor.semantic_index import SearchResult
 
         repos = _make_repos(["alpha", "beta", "gamma"])
 
@@ -357,7 +357,7 @@ class TestWritePacketToLedger:
             assert record_id.startswith("cp-")
 
     def test_record_can_be_read_back_from_ledger(self) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -404,7 +404,7 @@ class TestCLIDispatch:
 
     def test_report_subcommand_calls_run_plan_campaign_mode(self) -> None:
         """audit report --plan-campaign 'goal' someuser → dispatches _run_plan_campaign_mode."""
-        with patch("src.cli._run_plan_campaign_mode") as mock_dispatch:
+        with patch("github_repo_auditor.cli._run_plan_campaign_mode") as mock_dispatch:
             with patch(
                 "sys.argv",
                 [
@@ -418,7 +418,7 @@ class TestCLIDispatch:
                 ],
             ):
                 try:
-                    from src.cli import main
+                    from github_repo_auditor.cli import main
 
                     main()
                 except SystemExit:
@@ -431,7 +431,7 @@ class TestCLIDispatch:
 
     def test_legacy_cli_plan_campaign_flag_parsed(self) -> None:
         """Legacy flat form: audit someuser --plan-campaign 'goal' parses correctly."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["someuser", "--plan-campaign", "my goal"])
@@ -439,8 +439,8 @@ class TestCLIDispatch:
 
     def test_legacy_invocation_emits_deprecation_warning(self) -> None:
         """audit someuser --plan-campaign 'goal' via legacy path calls _emit_legacy_deprecation_warning."""
-        with patch("src.cli._run_plan_campaign_mode"):
-            with patch("src.cli._emit_legacy_deprecation_warning") as mock_warn:
+        with patch("github_repo_auditor.cli._run_plan_campaign_mode"):
+            with patch("github_repo_auditor.cli._emit_legacy_deprecation_warning") as mock_warn:
                 with patch(
                     "sys.argv",
                     [
@@ -453,7 +453,7 @@ class TestCLIDispatch:
                     ],
                 ):
                     try:
-                        from src.cli import main
+                        from github_repo_auditor.cli import main
 
                         main()
                     except SystemExit:
@@ -466,7 +466,7 @@ class TestCLIDispatch:
 
     def test_campaign_from_ledger_flag_parsed(self) -> None:
         """--campaign-from-ledger is accepted by build_parser."""
-        from src.cli import build_parser
+        from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["someuser", "--campaign-from-ledger", "--output-dir", "/tmp"])
@@ -474,7 +474,7 @@ class TestCLIDispatch:
 
     def test_campaign_from_ledger_dispatches_run_mode(self) -> None:
         """audit report --writeback-apply --campaign-from-ledger someuser dispatches apply mode."""
-        with patch("src.cli._run_campaign_from_ledger_mode") as mock_dispatch:
+        with patch("github_repo_auditor.cli._run_campaign_from_ledger_mode") as mock_dispatch:
             with patch(
                 "sys.argv",
                 [
@@ -488,7 +488,7 @@ class TestCLIDispatch:
                 ],
             ):
                 try:
-                    from src.cli import main
+                    from github_repo_auditor.cli import main
 
                     main()
                 except SystemExit:
@@ -506,7 +506,7 @@ class TestCLIDispatch:
             # No truth file
 
             captured_output: list[str] = []
-            with patch("src.cli.print_info", side_effect=lambda msg: captured_output.append(msg)):
+            with patch("github_repo_auditor.cli.print_info", side_effect=lambda msg: captured_output.append(msg)):
                 with patch(
                     "sys.argv",
                     [
@@ -520,7 +520,7 @@ class TestCLIDispatch:
                     ],
                 ):
                     try:
-                        from src.cli import main
+                        from github_repo_auditor.cli import main
 
                         main()
                     except SystemExit:
@@ -540,7 +540,7 @@ def _make_approved_packet(
     status: str = "approved-manual",
 ) -> tuple[CampaignPlanPacket, dict]:
     """Return a (packet, ledger_record) pair for test setup."""
-    from src.plan_campaign import _goal_subject_key, _packet_record_id
+    from github_repo_auditor.plan_campaign import _goal_subject_key, _packet_record_id
 
     generated_at = generated_at or _recent_generated_at()
     actions = [
@@ -594,7 +594,7 @@ def _make_approved_packet(
 
 class TestLoadApprovedCampaignPlans:
     def test_returns_only_approved_manual_campaign_plan_records(self) -> None:
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -613,7 +613,7 @@ class TestLoadApprovedCampaignPlans:
             assert packets[0].goal == "goal approved"
 
     def test_skips_packets_older_than_30_days(self) -> None:
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -637,7 +637,7 @@ class TestLoadApprovedCampaignPlans:
             assert packets == []
 
     def test_hydrates_actions_into_campaign_action_dataclasses(self) -> None:
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -696,7 +696,7 @@ class TestDispatchAction:
         action = self._make_action("archive", repo_name="my-repo")
         mock_client = MagicMock()
 
-        with patch("src.repo_improver.apply_metadata_updates") as mock_apply:
+        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
             mock_apply.return_value = [
                 {"repo": "my-repo", "actions": [{"type": "archived", "ok": True}]}
             ]
@@ -717,7 +717,7 @@ class TestDispatchAction:
         action = self._make_action("add_topics", target="python cli tool")
         mock_client = MagicMock()
 
-        with patch("src.repo_improver.apply_metadata_updates") as mock_apply:
+        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
             mock_apply.return_value = [
                 {"repo": "test-repo", "actions": [{"type": "topics", "ok": True}]}
             ]
@@ -734,7 +734,7 @@ class TestDispatchAction:
     def test_dry_run_does_not_call_executor(self) -> None:
         action = self._make_action("archive", repo_name="dry-repo")
 
-        with patch("src.repo_improver.apply_metadata_updates") as mock_apply:
+        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
             ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=True)
 
         mock_apply.assert_not_called()
@@ -744,7 +744,7 @@ class TestDispatchAction:
     def test_dry_run_pending_human_action_still_returns_false(self) -> None:
         """pending_human_action is always skipped — even in dry-run."""
         action = self._make_action("pending_human_action")
-        with patch("src.repo_improver.apply_metadata_updates") as mock_apply:
+        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
             ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=True)
         mock_apply.assert_not_called()
         assert ok is False
@@ -752,7 +752,7 @@ class TestDispatchAction:
     def test_apply_readme_calls_apply_readme_updates(self) -> None:
         action = self._make_action("apply_readme", target="# Hello\nThis is the readme.")
 
-        with patch("src.repo_improver.apply_readme_updates") as mock_apply:
+        with patch("github_repo_auditor.repo_improver.apply_readme_updates") as mock_apply:
             mock_apply.return_value = [{"repo": "test-repo", "ok": True}]
             ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=False)
 
@@ -770,15 +770,15 @@ class TestLedgerStateTransitions:
     def _write_approved_record(
         self, output_dir: Path, goal: str = "test goal"
     ) -> CampaignPlanPacket:
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.warehouse import save_approval_record
 
         packet, record = _make_approved_packet(goal)
         save_approval_record(output_dir, record)
         return packet
 
     def test_mark_campaign_applied_updates_status_to_applied(self) -> None:
-        from src.plan_campaign import _packet_record_id
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.plan_campaign import _packet_record_id
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -801,7 +801,7 @@ class TestLedgerStateTransitions:
             mark_campaign_applied(packet, output_dir)  # must not raise
 
     def test_record_campaign_apply_failure_writes_followup_event(self) -> None:
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -810,7 +810,7 @@ class TestLedgerStateTransitions:
             record_campaign_apply_failure(packet, "some error occurred", output_dir)
 
             # Record should still be approved-manual (not applied)
-            from src.plan_campaign import _packet_record_id
+            from github_repo_auditor.plan_campaign import _packet_record_id
 
             records = load_approval_records(output_dir, "", limit=50)
             record_id = _packet_record_id(packet)
@@ -831,8 +831,8 @@ class TestCampaignFromLedgerEndToEnd:
         actions: list[CampaignAction],
         goal: str = "e2e test goal",
     ) -> CampaignPlanPacket:
-        from src.plan_campaign import _goal_subject_key, _packet_record_id
-        from src.warehouse import save_approval_record
+        from github_repo_auditor.plan_campaign import _goal_subject_key, _packet_record_id
+        from github_repo_auditor.warehouse import save_approval_record
 
         packet = CampaignPlanPacket(
             goal=goal,
@@ -877,8 +877,8 @@ class TestCampaignFromLedgerEndToEnd:
 
     def test_packet_with_two_supported_and_one_unsupported_marks_applied(self) -> None:
         """2 archive/topics succeed + 1 add_codeowners (unsupported) → packet marked applied."""
-        from src.plan_campaign import _packet_record_id
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.plan_campaign import _packet_record_id
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -889,7 +889,7 @@ class TestCampaignFromLedgerEndToEnd:
             ]
             packet = self._write_packet_with_actions(output_dir, actions)
 
-            with patch("src.repo_improver.apply_metadata_updates") as mock_meta:
+            with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_meta:
                 mock_meta.return_value = [
                     {"repo": "repo-a", "actions": [{"type": "archived", "ok": True}]},
                 ]
@@ -933,8 +933,8 @@ class TestCampaignFromLedgerEndToEnd:
 
     def test_packet_with_supported_failure_stays_approved_manual(self) -> None:
         """When a supported action fails, record_campaign_apply_failure is called, packet stays approved-manual."""
-        from src.plan_campaign import _packet_record_id
-        from src.warehouse import load_approval_records
+        from github_repo_auditor.plan_campaign import _packet_record_id
+        from github_repo_auditor.warehouse import load_approval_records
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
@@ -943,7 +943,7 @@ class TestCampaignFromLedgerEndToEnd:
             ]
             packet = self._write_packet_with_actions(output_dir, actions, goal="failure e2e test")
 
-            with patch("src.repo_improver.apply_metadata_updates") as mock_meta:
+            with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_meta:
                 mock_meta.return_value = [
                     {"repo": "repo-a", "actions": [{"ok": False, "error": "API error"}]}
                 ]

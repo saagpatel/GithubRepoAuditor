@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.portfolio_truth_trends import (
+from github_repo_auditor.portfolio_truth_trends import (
     build_verdict_transition_ledger,
     render_movement_summary,
 )
-from src.weekly_command_center import (
+from github_repo_auditor.weekly_command_center import (
     build_weekly_command_center_digest,
     render_weekly_command_center_markdown,
 )

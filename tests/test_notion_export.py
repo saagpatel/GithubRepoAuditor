@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from src.notion_export import (
+from github_repo_auditor.notion_export import (
     _build_event_key,
     _find_biggest_drag,
     _lookup_project_mapping,
@@ -139,6 +139,28 @@ class TestProjectMappingLookup:
     def test_normalized_alias_match_resolves_spacing_and_case(self):
         mapping = {"MCP Audit": {"localProjectId": "mcp-id"}}
         assert _lookup_project_mapping("MCPAudit", mapping)["localProjectId"] == "mcp-id"
+
+
+def test_lookup_project_mapping_rejects_ambiguous_normalized_aliases() -> None:
+    mapping = {
+        "Foo Bar": {"localProjectId": "space"},
+        "Foo-Bar": {"localProjectId": "dash"},
+        "Foo_Bar": {"localProjectId": "underscore"},
+    }
+
+    assert _lookup_project_mapping("foo.bar", mapping) is None
+
+
+def test_lookup_project_mapping_accepts_aliases_for_the_same_page() -> None:
+    mapping = {
+        "GitHub Repo Auditor": {"localProjectId": "same-page", "sourceId": "one"},
+        "GithubRepoAuditor": {"localProjectId": "same-page", "sourceId": "two"},
+    }
+
+    resolved = _lookup_project_mapping("github repo auditor", mapping)
+
+    assert resolved is not None
+    assert resolved["localProjectId"] == "same-page"
 
 
 class TestBiggestDrag:

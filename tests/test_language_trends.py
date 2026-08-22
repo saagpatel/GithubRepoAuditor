@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.history import load_language_trends
+from github_repo_auditor.history import load_language_trends
 
 
 def _write_report(tmp_path: Path, name: str, audits: list[dict]) -> None:
