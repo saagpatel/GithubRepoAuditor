@@ -143,6 +143,7 @@ def _load_prior_security_alerts(
         and not str(
             (project.get("identity") or {}).get("project_key") or ""
         ).startswith("supp:")
+        and bool((project.get("identity") or {}).get("repo_full_name"))
         for project in projects
     )
     try:

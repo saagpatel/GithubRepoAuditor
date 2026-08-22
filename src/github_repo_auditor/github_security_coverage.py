@@ -453,6 +453,11 @@ def derive_default_attention_cohort(
             # Supplementary projects such as personal-ops are real portfolio
             # identities, but they do not have a GitHub repository to query.
             continue
+        if not repo_full_name:
+            # Active local-only projects remain in PortfolioTruth and its
+            # workspace security denominator, but they are not queryable by
+            # the GitHub provider until a canonical repository identity exists.
+            continue
         repos.append(_canonical_repo(repo_full_name))
     if len({repo.lower() for repo in repos}) != len(repos):
         raise SecurityCoverageError(

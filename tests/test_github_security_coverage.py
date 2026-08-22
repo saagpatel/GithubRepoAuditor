@@ -766,7 +766,7 @@ def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
         )
 
 
-def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
+def test_repo_less_non_supplementary_attention_identity_is_excluded() -> None:
     truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
     truth["projects"].append(
         {
@@ -775,10 +775,9 @@ def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
         }
     )
 
-    with pytest.raises(
-        SecurityCoverageError, match="invalid canonical repository name"
-    ):
-        derive_default_attention_cohort(truth)
+    assert derive_default_attention_cohort(
+        truth, expected_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    ) == derive_default_attention_cohort(_truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT))
 
 
 @pytest.mark.parametrize("attention_state", ("active-infra", "parked"))
