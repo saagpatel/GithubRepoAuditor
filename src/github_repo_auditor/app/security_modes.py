@@ -14,7 +14,7 @@ from github_repo_auditor.security_burndown import build_security_burndown, rende
 _SECURITY_GATE_OUTPUT_CONTRACT = "security_gate_cli_v2"
 _REDACTED = "<redacted>"
 _SAFE_GATE_MARKDOWN = {
-    "pass": """# Portfolio Security Gate
+    ("pass", "current"): """# Portfolio Security Gate
 
 Status: PASS
 Source freshness: current
@@ -23,28 +23,64 @@ All required-cohort repos are clear of open high-severity GitHub security alerts
 
 Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
 """,
-    "fail": """# Portfolio Security Gate
+    ("pass", "unchecked"): """# Portfolio Security Gate
+
+Status: PASS
+Source freshness: unchecked (no freshness limit enforced)
+
+All required-cohort repos are clear of open high-severity GitHub security alerts.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("fail", "current"): """# Portfolio Security Gate
 
 Status: FAIL
 Source freshness: current
 
-Open high/critical findings are present. Consult the local canonical report for repo-level detail.
+Open security findings are present. Consult the local canonical report for repo-level detail.
 
 Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
 """,
-    "stale": """# Portfolio Security Gate
+    ("fail", "unchecked"): """# Portfolio Security Gate
+
+Status: FAIL
+Source freshness: unchecked (no freshness limit enforced)
+
+Open security findings are present. Consult the local canonical report for repo-level detail.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("stale", "stale"): """# Portfolio Security Gate
 
 Status: STALE
 Source freshness: stale
+
+Portfolio truth exceeded the configured freshness threshold. Refresh the local source before acting on this gate.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("stale", "unavailable"): """# Portfolio Security Gate
+
+Status: STALE
+Source freshness: unavailable
 
 Portfolio truth freshness could not be verified. Refresh the local source before acting on this gate.
 
 Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
 """,
-    "unknown": """# Portfolio Security Gate
+    ("unknown", "current"): """# Portfolio Security Gate
 
 Status: UNKNOWN
-Source freshness: unavailable
+Source freshness: current
+
+Required-cohort security coverage is missing or incomplete. Do not treat the cohort as clear; consult the local canonical report.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("unknown", "unchecked"): """# Portfolio Security Gate
+
+Status: UNKNOWN
+Source freshness: unchecked (no freshness limit enforced)
 
 Required-cohort security coverage is missing or incomplete. Do not treat the cohort as clear; consult the local canonical report.
 
@@ -76,6 +112,8 @@ def _safe_count(value: Any) -> int:
 
 def _safe_freshness(report: Any) -> str:
     """Return a fixed freshness token without logging source timestamps/errors."""
+    if getattr(report, "max_age_hours", None) is None:
+        return "unchecked"
     if getattr(report, "freshness_error", None):
         return "unavailable"
     if getattr(report, "is_stale", False):
@@ -122,15 +160,17 @@ def _safe_security_gate_summary(report: Any) -> dict[str, Any]:
     }
 
 
-def _render_safe_security_gate_markdown(status: str) -> str:
-    """Return a fixed human-readable envelope selected by finite status."""
+def _render_safe_security_gate_markdown(status: str, freshness: str) -> str:
+    """Return a fixed human-readable envelope selected by finite tokens."""
     if status == "pass":
-        return _SAFE_GATE_MARKDOWN["pass"]
-    if status == "fail":
-        return _SAFE_GATE_MARKDOWN["fail"]
-    if status == "stale":
-        return _SAFE_GATE_MARKDOWN["stale"]
-    return _SAFE_GATE_MARKDOWN["unknown"]
+        key = ("pass", "current" if freshness == "current" else "unchecked")
+    elif status == "fail":
+        key = ("fail", "current" if freshness == "current" else "unchecked")
+    elif status == "stale":
+        key = ("stale", "stale" if freshness == "stale" else "unavailable")
+    else:
+        key = ("unknown", "current" if freshness == "current" else "unchecked")
+    return _SAFE_GATE_MARKDOWN[key]
 
 
 def run_security_burndown_mode(args: Any) -> None:
@@ -207,6 +247,10 @@ def run_security_gate_mode(args: Any) -> None:
     if getattr(args, "json", False):
         print(json.dumps(summary, indent=2, sort_keys=True))
     else:
-        print(_render_safe_security_gate_markdown(summary["status"]))
+        print(
+            _render_safe_security_gate_markdown(
+                summary["status"], summary["source_freshness"]
+            )
+        )
     if not report.passed:
         raise SystemExit(1)
