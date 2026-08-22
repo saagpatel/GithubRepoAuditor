@@ -1079,17 +1079,30 @@ repos:
     notes: Not a product repo; the product surface is portfolio-index. Keep this workspace out of default attention except when the site-rebuild campaign is actively being dispatched.
   portfolio-index:
     owner: d
-    purpose: public-safe static index for the Tier-0 public workshop and canonical portfolio front door
-    lifecycle_state: active
+    purpose: upstream content source, rollback source, and historical site implementation for SAFELIGHT
+    lifecycle_state: manual-only
     criticality: high
-    review_cadence: monthly
+    review_cadence: ad-hoc
     operating_path: maintain
     category: commercial
     tool_provenance: claude-code
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Tier-0 public workshop and canonical saagarpatel.dev product surface. Keep in default attention as the public front door for the core portfolio.
+    notes: Not the current production target. Remains an upstream content source for SAFELIGHT, a rollback source, and historical site implementation evidence. Keep outside default attention; touch intentionally only for source-content work, rollback, rollback-integrity verification, or migration or pinning of the upstream dependency. It is not a frozen archive while SAFELIGHT reads mutable portfolio-index HEAD.
+  safelight:
+    owner: d
+    purpose: canonical production website repository and publisher for saagarpatel.dev; current public site surface
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    operating_path: maintain
+    category: commercial
+    tool_provenance: unknown
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Canonical production website repository and publisher. SAFELIGHT currently ingests source content from mutable portfolio-index HEAD via scripts/ingest.mjs; it is not pinned. Production deployment is provider-verified separately and remains explicitly gated.
   rag-knowledge-base:
     owner: d
     lifecycle_state: manual-only
