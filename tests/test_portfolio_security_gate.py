@@ -266,6 +266,49 @@ def test_security_gate_cli_json_exits_zero_on_clear_snapshot(tmp_path, capsys) -
     assert payload["scanned_count"] == 1
 
 
+def test_security_gate_cli_json_redacts_provider_authored_repo_detail(
+    tmp_path, capsys
+) -> None:
+    project = _project("provider-authored opaque secret", high=1)
+    project["security"]["reason_code"] = "provider-authored opaque secret"
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"projects": [project]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=True))
+
+    assert exc.value.code == 1
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+    assert payload["status"] == "fail"
+    assert payload["total_open_high"] == 1
+    assert payload["flagged_repos"] == []
+    assert "provider-authored opaque secret" not in output
+    assert "generated_at" in payload
+    assert payload["generated_at"] == "<redacted>"
+
+
+def test_security_gate_cli_markdown_redacts_provider_authored_repo_detail(
+    tmp_path, capsys
+) -> None:
+    project = _project("provider-authored opaque secret", high=1)
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"projects": [project]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _run_security_gate_mode(SimpleNamespace(output_dir=str(tmp_path), json=False))
+
+    assert exc.value.code == 1
+    output = capsys.readouterr().out
+    assert "provider-authored opaque secret" not in output
+    assert "repo-level detail" in output
+    assert "Output policy: allowlisted aggregate summary" in output
+
+
 def test_security_gate_cli_exits_nonzero_on_stale_snapshot(tmp_path) -> None:
     (tmp_path / "portfolio-truth-latest.json").write_text(
         json.dumps(
