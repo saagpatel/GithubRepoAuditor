@@ -6,12 +6,171 @@ from pathlib import Path
 from typing import Any
 
 from github_repo_auditor.cli_output import print_info
-from github_repo_auditor.portfolio_security_gate import (
-    build_security_gate_report,
-    render_security_gate_markdown,
-)
+from github_repo_auditor.portfolio_security_gate import build_security_gate_report
 from github_repo_auditor.portfolio_truth_types import TRUTH_LATEST_FILENAME
 from github_repo_auditor.security_burndown import build_security_burndown, render_burndown_markdown
+
+
+_SECURITY_GATE_OUTPUT_CONTRACT = "security_gate_cli_v2"
+_REDACTED = "<redacted>"
+_SAFE_GATE_MARKDOWN = {
+    ("pass", "current"): """# Portfolio Security Gate
+
+Status: PASS
+Source freshness: current
+
+All required-cohort repos are clear of open high-severity GitHub security alerts.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("pass", "unchecked"): """# Portfolio Security Gate
+
+Status: PASS
+Source freshness: unchecked (no freshness limit enforced)
+
+All required-cohort repos are clear of open high-severity GitHub security alerts.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("fail", "current"): """# Portfolio Security Gate
+
+Status: FAIL
+Source freshness: current
+
+Open security findings are present. Consult the local canonical report for repo-level detail.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("fail", "unchecked"): """# Portfolio Security Gate
+
+Status: FAIL
+Source freshness: unchecked (no freshness limit enforced)
+
+Open security findings are present. Consult the local canonical report for repo-level detail.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("stale", "stale"): """# Portfolio Security Gate
+
+Status: STALE
+Source freshness: stale
+
+Portfolio truth exceeded the configured freshness threshold. Refresh the local source before acting on this gate.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("stale", "unavailable"): """# Portfolio Security Gate
+
+Status: STALE
+Source freshness: unavailable
+
+Portfolio truth freshness could not be verified. Refresh the local source before acting on this gate.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("unknown", "current"): """# Portfolio Security Gate
+
+Status: UNKNOWN
+Source freshness: current
+
+Required-cohort security coverage is missing or incomplete. Do not treat the cohort as clear; consult the local canonical report.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    ("unknown", "unchecked"): """# Portfolio Security Gate
+
+Status: UNKNOWN
+Source freshness: unchecked (no freshness limit enforced)
+
+Required-cohort security coverage is missing or incomplete. Do not treat the cohort as clear; consult the local canonical report.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+}
+
+
+def _safe_status(report: Any) -> str:
+    """Return a fixed status token rather than provider-authored text."""
+    status = getattr(report, "status", "")
+    if status == "pass":
+        return "pass"
+    if status == "fail":
+        return "fail"
+    if status == "stale":
+        return "stale"
+    return "unknown"
+
+
+def _safe_count(value: Any) -> int:
+    """Keep aggregate counts numeric and non-negative at the CLI boundary."""
+    try:
+        count = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return count if count >= 0 else 0
+
+
+def _safe_freshness(report: Any) -> str:
+    """Return a fixed freshness token without logging source timestamps/errors."""
+    if getattr(report, "max_age_hours", None) is None:
+        return "unchecked"
+    if getattr(report, "freshness_error", None):
+        return "unavailable"
+    if getattr(report, "is_stale", False):
+        return "stale"
+    return "current"
+
+
+def _safe_security_gate_summary(report: Any) -> dict[str, Any]:
+    """Build the privacy-safe CLI envelope.
+
+    The full report remains available to local callers and tests. CLI output is
+    intentionally limited to fixed status tokens and aggregate counts; repo
+    identities, reason codes, timestamps, and provider-authored text never cross
+    the terminal logging boundary.
+    """
+    return {
+        "contract_version": _SECURITY_GATE_OUTPUT_CONTRACT,
+        "status": _safe_status(report),
+        "passed": _safe_status(report) == "pass",
+        "scanned_count": _safe_count(getattr(report, "scanned_count", 0)),
+        "required_cohort_count": _safe_count(
+            getattr(report, "required_cohort_count", 0)
+        ),
+        "complete_count": _safe_count(getattr(report, "complete_count", 0)),
+        "partial_count": _safe_count(getattr(report, "partial_count", 0)),
+        "stale_count": _safe_count(getattr(report, "stale_count", 0)),
+        "unknown_count": _safe_count(getattr(report, "unknown_count", 0)),
+        "repos_with_open_high_critical": _safe_count(
+            getattr(report, "repos_with_open_high_critical", 0)
+        ),
+        "total_open_critical": _safe_count(
+            getattr(report, "total_open_critical", 0)
+        ),
+        "total_open_high": _safe_count(getattr(report, "total_open_high", 0)),
+        "total_open_secrets": _safe_count(
+            getattr(report, "total_open_secrets", 0)
+        ),
+        "source_freshness": _safe_freshness(report),
+        "generated_at": _REDACTED,
+        "freshness_error": None,
+        "flagged_repos": [],
+        "unadmitted_repos": [],
+        "redaction_policy": "allowlisted-aggregate-only",
+    }
+
+
+def _render_safe_security_gate_markdown(status: str, freshness: str) -> str:
+    """Return a fixed human-readable envelope selected by finite tokens."""
+    if status == "pass":
+        key = ("pass", "current" if freshness == "current" else "unchecked")
+    elif status == "fail":
+        key = ("fail", "current" if freshness == "current" else "unchecked")
+    elif status == "stale":
+        key = ("stale", "stale" if freshness == "stale" else "unavailable")
+    else:
+        key = ("unknown", "current" if freshness == "current" else "unchecked")
+    return _SAFE_GATE_MARKDOWN[key]
 
 
 def run_security_burndown_mode(args: Any) -> None:
@@ -84,13 +243,14 @@ def run_security_gate_mode(args: Any) -> None:
         portfolio_truth,
         max_age_hours=getattr(args, "max_age_hours", None),
     )
+    summary = _safe_security_gate_summary(report)
     if getattr(args, "json", False):
-        # Count-only alert summary; no secret values.
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(json.dumps(report.to_dict(), indent=2))
+        print(json.dumps(summary, indent=2, sort_keys=True))
     else:
-        # Count-only alert summary; no secret values.
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(render_security_gate_markdown(report))
+        print(
+            _render_safe_security_gate_markdown(
+                summary["status"], summary["source_freshness"]
+            )
+        )
     if not report.passed:
         raise SystemExit(1)
