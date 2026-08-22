@@ -114,6 +114,40 @@ def test_control_center_artifact_sanitizer_redacts_compound_sensitive_labels():
     }
 
 
+def test_control_center_markdown_projection_drops_unlabelled_free_text():
+    projection = artifacts._sanitized_snapshot_for_rendering(
+        {
+            "operator_summary": {"headline": "opaque-value"},
+            "operator_setup_health": {"status": "unexpected", "warnings": "secret"},
+            "operator_queue": [
+                {"lane": "urgent", "title": "opaque-value", "summary": "opaque-value"},
+                "not-a-queue-item",
+            ],
+            "operator_recent_changes": [{"summary": "opaque-value"}],
+        }
+    )
+
+    assert projection == {
+        "operator_summary": {"headline": "<redacted>"},
+        "operator_setup_health": {
+            "status": "unknown",
+            "blocking_errors": 0,
+            "warnings": 0,
+        },
+        "operator_queue": [
+            {
+                "lane": "urgent",
+                "repo": "",
+                "title": "<redacted>",
+                "summary": "<redacted>",
+                "lane_reason": "<redacted>",
+                "recommended_action": "<redacted>",
+            }
+        ],
+        "operator_recent_changes": [],
+    }
+
+
 def test_control_center_artifacts_reject_hyphenated_credential_alias(
     tmp_path, monkeypatch
 ):

@@ -24,6 +24,11 @@ _SENSITIVE_LABELLED_VALUE = re.compile(
     r"(?i)\b(?:[a-z0-9]+[-_])*(?:secret|token|password|credential)"
     r"(?:[-_][a-z0-9]+)+\b"
 )
+_SAFE_MARKDOWN_TEXT = "<redacted>"
+_SAFE_MARKDOWN_LANES = frozenset({"blocked", "urgent", "ready", "deferred"})
+_SAFE_MARKDOWN_STATUSES = frozenset(
+    {"ok", "ready", "current", "warning", "blocked", "error", "unknown"}
+)
 
 
 def should_print_control_center_item(item: dict) -> bool:
@@ -95,8 +100,48 @@ def _redact_sensitive_values(value: object) -> object:
 
 
 def _sanitized_snapshot_for_rendering(snapshot: dict) -> dict:
-    redacted = _redact_sensitive_values(snapshot)
-    return redacted if isinstance(redacted, dict) else {}
+    """Build a fail-closed projection for the persisted Markdown artifact.
+
+    Operator prose, identifiers, paths, and URLs may contain opaque secrets that
+    no pattern-based redactor can distinguish from ordinary text. Persist only
+    fixed explanatory text plus finite status/lane values and numeric counts.
+    """
+    raw_setup = snapshot.get("operator_setup_health")
+    setup = raw_setup if isinstance(raw_setup, dict) else {}
+    status = str(setup.get("status", "unknown")).strip().lower()
+    safe_status = status if status in _SAFE_MARKDOWN_STATUSES else "unknown"
+
+    def safe_count(value: object) -> int:
+        return value if isinstance(value, int) and value >= 0 else 0
+
+    raw_queue = snapshot.get("operator_queue")
+    safe_queue = []
+    if isinstance(raw_queue, list):
+        for item in raw_queue:
+            if not isinstance(item, dict):
+                continue
+            lane = str(item.get("lane", "deferred")).strip().lower()
+            safe_queue.append(
+                {
+                    "lane": lane if lane in _SAFE_MARKDOWN_LANES else "deferred",
+                    "repo": "",
+                    "title": _SAFE_MARKDOWN_TEXT,
+                    "summary": _SAFE_MARKDOWN_TEXT,
+                    "lane_reason": _SAFE_MARKDOWN_TEXT,
+                    "recommended_action": _SAFE_MARKDOWN_TEXT,
+                }
+            )
+
+    return {
+        "operator_summary": {"headline": _SAFE_MARKDOWN_TEXT},
+        "operator_setup_health": {
+            "status": safe_status,
+            "blocking_errors": safe_count(setup.get("blocking_errors")),
+            "warnings": safe_count(setup.get("warnings")),
+        },
+        "operator_queue": safe_queue,
+        "operator_recent_changes": [],
+    }
 
 
 def write_control_center_artifacts(
@@ -144,11 +189,11 @@ def write_control_center_artifacts(
     if contains_sensitive_data(markdown_snapshot):
         raise ValueError("control-center artifacts must not persist credential fields")
     rendered_markdown = render_control_center_markdown(
-        markdown_snapshot, username, generated_at.isoformat()
+        markdown_snapshot, "operator", generated_at.date().isoformat()
     )
     if contains_sensitive_data(rendered_markdown):
         raise ValueError("control-center artifacts must not persist credential fields")
-    safe_rendered_markdown = redact_sensitive_text(rendered_markdown)
+    safe_rendered_markdown = rendered_markdown
     if contains_sensitive_data(safe_rendered_markdown):
         raise ValueError("control-center artifacts must not persist credential fields")
     sanitized_weekly_digest = _redact_sensitive_values(weekly_digest)
