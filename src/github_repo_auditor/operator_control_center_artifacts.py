@@ -50,6 +50,43 @@ def filter_snapshot_for_default_view(snapshot: dict) -> dict:
     return snapshot
 
 
+def _looks_sensitive_key(key: str) -> bool:
+    lowered = str(key or "").strip().lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "secret",
+            "token",
+            "password",
+            "passwd",
+            "credential",
+            "api_key",
+            "apikey",
+            "private_key",
+            "access_key",
+        )
+    )
+
+
+def _redact_sensitive_values(value: object) -> object:
+    if isinstance(value, dict):
+        redacted: dict = {}
+        for k, v in value.items():
+            if _looks_sensitive_key(str(k)):
+                redacted[k] = "[REDACTED]"
+            else:
+                redacted[k] = _redact_sensitive_values(v)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive_values(item) for item in value]
+    return value
+
+
+def _sanitized_snapshot_for_rendering(snapshot: dict) -> dict:
+    redacted = _redact_sensitive_values(snapshot)
+    return redacted if isinstance(redacted, dict) else {}
+
+
 def write_control_center_artifacts(
     report_data: dict,
     snapshot: dict,
@@ -81,8 +118,11 @@ def write_control_center_artifacts(
     payload["weekly_command_center_digest_v1"] = weekly_digest
     if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
         raise ValueError("control-center artifacts must not persist credential fields")
+    markdown_snapshot = _sanitized_snapshot_for_rendering(snapshot)
+    if contains_sensitive_data(markdown_snapshot):
+        raise ValueError("control-center artifacts must not persist credential fields")
     rendered_markdown = render_control_center_markdown(
-        snapshot, username, generated_at.isoformat()
+        markdown_snapshot, username, generated_at.isoformat()
     )
     if contains_sensitive_data(rendered_markdown):
         raise ValueError("control-center artifacts must not persist credential fields")
