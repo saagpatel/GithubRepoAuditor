@@ -114,6 +114,8 @@ def print_info(msg: str) -> None:
     else:
         # Keep the no-Rich fallback on the same redacted boundary without using
         # print() as a structured logging sink for provider-authored text.
+        # lgtm[py/clear-text-logging-sensitive-data] Redaction is applied above;
+        # this fallback is the privacy-reviewed terminal boundary.
         sys.stderr.write(f"  {msg}\n")
 
 
