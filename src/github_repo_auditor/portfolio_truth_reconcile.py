@@ -292,6 +292,7 @@ def _derive_project_security_cohort(
     expected_count = sum(
         project.derived.attention_state in DEFAULT_ATTENTION_STATES
         and not project.identity.project_key.startswith("supp:")
+        and bool(project.identity.repo_full_name)
         for project in projects
     )
     try:
@@ -1023,6 +1024,7 @@ def _build_truth_project(
         not security.receipt_schema_version
         and attention_state in DEFAULT_ATTENTION_STATES
         and not identity.project_key.startswith("supp:")
+        and bool(identity.repo_full_name)
     ):
         security = replace(
             security,

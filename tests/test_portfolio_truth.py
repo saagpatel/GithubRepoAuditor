@@ -1049,8 +1049,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "total_open_secrets",
         "security_admission_schema_version",
     }
-    assert rollups["security"]["cohort_repository_count"] == 1
-    assert rollups["security"]["cohort_unknown_count"] == 1
+    assert rollups["security"]["cohort_repository_count"] == 0
+    assert rollups["security"]["cohort_unknown_count"] == 0
     assert rollups["security"]["cohort_complete_count"] == 0
     assert set(rollups["decision"]) == {
         "decision_needed_count",
@@ -2012,8 +2012,8 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     """Pin the operator's Tier 0 policy at generated-output level.
 
     personal-ops lives outside the audited Projects workspace, so portfolio truth
-    carries the nine repo-backed logical identities while the generated canonical
-    project registry carries personal-ops as its established supplementary identity.
+    carries the workspace's logical identities while the generated canonical project
+    registry carries personal-ops as its established supplementary identity.
     """
 
     workspace = tmp_path / "workspace"
@@ -2027,7 +2027,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "PortfolioCommandCenter": None,
         "operant-public": "saagpatel/operant",
         "AIGCCore": None,
-        "portfolio-index": None,
+        "safelight": None,
         "operator-os-explainer": None,
     }
     supporting_or_retired = (
@@ -2093,6 +2093,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "personal-ops": "active-infra",
         "saagpatel/operant": "active-infra",
         "AIGCCore": "active-infra",
+        "safelight": "active-product",
         "operator-os-explainer": "active-product",
     }
     for name in supporting_or_retired:
@@ -2106,14 +2107,25 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     assert registry_by_key["supp:personal-ops"]["lifecycle_state"] == "active"
     assert registry_by_key["supp:personal-ops"]["group_key"] == "operator_infra"
     coverage_by_source = {row["source"]: row for row in result.snapshot.coverage}
-    assert coverage_by_source["workspace"]["project_count"] == 15
-    assert coverage_by_source["git"]["project_count"] == 15
+    assert coverage_by_source["workspace"]["project_count"] == 16
+    assert coverage_by_source["git"]["project_count"] == 16
     assert coverage_by_source["supplementary_registry"]["project_count"] == 1
-    assert coverage_by_source["github_security"]["project_count"] == 15
-    assert coverage_by_source["github_security"]["unknown_count"] == 15
+    assert coverage_by_source["github_security"]["project_count"] == 16
+    assert coverage_by_source["github_security"]["unknown_count"] == 16
+    assert coverage_by_source["github_security"]["cohort_repository_count"] == 1
+    assert coverage_by_source["github_security"]["cohort_unknown_count"] == 1
     security_rollup = result.snapshot.to_dict()["rollups"]["security"]
-    assert security_rollup["unknown_count"] == 15
-    assert security_rollup["unavailable_count"] == 15
+    assert security_rollup["unknown_count"] == 16
+    assert security_rollup["unavailable_count"] == 16
+    safelight = by_display_name["safelight"]
+    assert safelight.identity.project_key == "safelight"
+    assert safelight.identity.repo_full_name == ""
+    assert safelight.derived.attention_state == "active-product"
+    assert safelight.security.coverage_state == "unknown"
+    assert safelight.security.cohort_member is False
+    assert safelight.security.cohort_policy == ""
+    assert by_display_name["portfolio-index"].identity.project_key == "portfolio-index"
+    assert by_display_name["portfolio-index"].derived.attention_state == "manual-only"
     assert result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
     personal_ops = by_display_name["personal-ops"]
     assert personal_ops.identity.project_key == "supp:personal-ops"
@@ -3075,6 +3087,21 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
         capture_output=True,
         check=True,
     )
+    local_only_path = portfolio_workspace / "SAFELIGHT"
+    local_only_path.mkdir()
+    _write(local_only_path / "README.md", "# SAFELIGHT\n\nLocal-only active product fixture.\n")
+    _set_mtime(local_only_path / "README.md", now.timestamp())
+    portfolio_catalog.write_text(
+        portfolio_catalog.read_text()
+        + """
+  SAFELIGHT:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: commercial
+"""
+    )
     observed_at = now.isoformat()
     security = {
         "d/Alpha": {
@@ -3095,25 +3122,30 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
                 "archived": False,
             },
             "providers": {
-                "dependabot": {
-                    "state": "observed",
-                    "observed_at": observed_at,
-                    "pagination_complete": True,
-                    "completed": True,
-                    "counts": {"critical": 0, "high": 2, "medium": 1, "low": 0},
-                },
-                "code_scanning": {
-                    "state": "observed",
-                    "observed_at": observed_at,
-                    "pagination_complete": True,
-                    "counts": {"critical": 0, "high": 0, "warning": 0, "note": 0},
-                },
-                "secret_scanning": {
-                    "state": "observed",
-                    "observed_at": observed_at,
-                    "pagination_complete": True,
-                    "counts": {"open": 0},
-                },
+                "dependabot": _provider_result(
+                    "dependabot",
+                    state="observed",
+                    observed_at=observed_at,
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"critical": 0, "high": 2, "medium": 1, "low": 0},
+                ),
+                "code_scanning": _provider_result(
+                    "code_scanning",
+                    state="observed",
+                    observed_at=observed_at,
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"critical": 0, "high": 0, "warning": 0, "note": 0},
+                ),
+                "secret_scanning": _provider_result(
+                    "secret_scanning",
+                    state="observed",
+                    observed_at=observed_at,
+                    http_status=200,
+                    pagination_complete=True,
+                    counts={"open": 0},
+                ),
             },
         }
     }
@@ -3146,6 +3178,11 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
         for project in truth["projects"]
         if project["identity"]["display_name"] == "Alpha"
     )
+    safelight = next(
+        project
+        for project in truth["projects"]
+        if project["identity"]["display_name"] == "SAFELIGHT"
+    )
     decision = next(
         item for item in build_decision_queue(truth) if item["project"] == "Alpha"
     )
@@ -3156,6 +3193,13 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
     assert alpha["security"]["dependabot_medium"] == 1
     assert decision["decision_type"] == "security follow-up"
     assert "critical=0, high=2" in decision["evidence"][0]
+    assert safelight["identity"]["repo_full_name"] == ""
+    assert safelight["derived"]["attention_state"] == "active-product"
+    assert safelight["security"]["coverage_state"] == "unknown"
+    assert safelight["security"]["cohort_member"] is False
+    assert safelight["security"]["cohort_policy"] == ""
+    assert truth["inputs"]["github_security"]["cohort_repository_count"] == 1
+    validate_truth_snapshot(result.snapshot)
 
     result.snapshot.inputs["github_security"].pop("content_sha256")
     with pytest.raises(ValueError, match="requires both receipt_id"):
@@ -3524,7 +3568,7 @@ def test_security_cohort_identity_rejects_expansion_and_contraction(
         )
 
 
-def test_security_cohort_identity_rejects_missing_repository_name() -> None:
+def test_security_cohort_identity_excludes_missing_repository_name() -> None:
     from types import SimpleNamespace
 
     from github_repo_auditor.portfolio_truth_reconcile import (
@@ -3536,11 +3580,10 @@ def test_security_cohort_identity_rejects_missing_repository_name() -> None:
         derived=SimpleNamespace(attention_state="active-infra"),
     )
 
-    with pytest.raises(ValueError, match="invalid canonical repository name"):
-        _validate_security_receipt_cohort_identity(
-            projects=[project],
-            security_alerts_by_name={},
-        )
+    _validate_security_receipt_cohort_identity(
+        projects=[project],
+        security_alerts_by_name={},
+    )
 
 
 def test_security_cohort_identity_rejects_receipt_self_promotion_without_prior(
@@ -4319,7 +4362,7 @@ def test_security_input_freshness_is_canonicalized_at_snapshot_clock(
         "age_hours": loaded_age,
         "producer_commit": "a" * 40,
         "cohort_policy": "portfolio-default-attention-v1",
-        "cohort_repository_count": 1,
+        "cohort_repository_count": 0,
         "path": "/evidence/github-security-coverage-latest.json",
     }
 
@@ -4596,13 +4639,14 @@ repos:
     assert infra.identity.has_git is True
     assert infra.identity.repo_full_name == ""
     assert infra.derived.attention_state == "active-infra"
-    assert infra.security.cohort_member is True
+    assert infra.security.cohort_member is False
+    assert infra.security.cohort_policy == ""
     assert infra.security.coverage_state == "unknown"
     security_coverage = next(
         row for row in result.snapshot.coverage if row["source"] == "github_security"
     )
-    assert security_coverage["cohort_repository_count"] == 1
-    assert security_coverage["cohort_unknown_count"] == 1
+    assert security_coverage["cohort_repository_count"] == 0
+    assert security_coverage["cohort_unknown_count"] == 0
 
 
 def test_substantive_readme_support_does_not_promote_non_infra_repo(
@@ -4933,9 +4977,9 @@ def test_portfolio_report_security_posture_not_run(
         include_notion=False,
     )
     markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
-    assert "Security evidence remains UNKNOWN for 1 repo(s)" in markdown
+    assert "Security overlay not run for this snapshot" in markdown
     assert "- Security posture: admitted `0`," in markdown
-    assert "unadmitted `1`" in markdown
+    assert "unadmitted `0`" in markdown
     validate_portfolio_report_markdown(markdown)
 
 
