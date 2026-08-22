@@ -12,7 +12,7 @@ Design notes
   exponentially on 5xx.  404/403 are treated as "not available" and
   return None without retry.
 * Cache integration reuses the same URL+params key scheme as
-  ``github_repo_auditor.cache.ResponseCache`` (SHA-256 hex prefix, file-backed).
+  ``github_repo_auditor.cache.ResponseCache`` (SHA-256 hex prefix, process-local).
 """
 
 from __future__ import annotations

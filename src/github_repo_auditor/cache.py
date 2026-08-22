@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import copy
 import hashlib
-import json
 import re
 import time
 from pathlib import Path
@@ -87,7 +87,14 @@ def _url_has_embedded_credentials(url: str) -> bool:
 
 
 class ResponseCache:
-    """File-based API response cache with TTL expiry."""
+    """Process-local API response cache with TTL expiry.
+
+    Response payloads can contain arbitrary repository-authored or provider-
+    returned text.  Keep them in memory for the lifetime of the caller instead
+    of persisting cleartext JSON under ``output/.cache``.  ``cache_dir`` remains
+    an accepted compatibility parameter for callers that previously supplied a
+    directory, but it is intentionally unused.
+    """
 
     def __init__(
         self,
@@ -96,29 +103,25 @@ class ResponseCache:
     ) -> None:
         self.cache_dir = cache_dir
         self.ttl = ttl
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._entries: dict[str, tuple[float, Any]] = {}
         self.hits = 0
         self.misses = 0
 
     def get(self, url: str, params: dict | None = None) -> object | None:
         """Return cached response data, or None if expired/missing."""
-        path = self._path(url, params)
-        if not path.is_file():
+        key = self._key(url, params)
+        entry = self._entries.get(key)
+        if entry is None:
             self.misses += 1
             return None
 
-        try:
-            data = json.loads(path.read_text())
-            cached_at = data.get("cached_at", 0)
-            if time.time() - cached_at > self.ttl:
-                path.unlink(missing_ok=True)
-                self.misses += 1
-                return None
-            self.hits += 1
-            return data["response"]
-        except (json.JSONDecodeError, KeyError, OSError):
+        cached_at, response = entry
+        if time.time() - cached_at > self.ttl:
+            self._entries.pop(key, None)
             self.misses += 1
             return None
+        self.hits += 1
+        return copy.deepcopy(response)
 
     def put(
         self,
@@ -126,7 +129,7 @@ class ResponseCache:
         params: dict | None,
         response: object,
     ) -> None:
-        """Store response data with current timestamp."""
+        """Store response data in memory with the current timestamp."""
         if (
             _url_has_sensitive_components(url)
             or _url_has_embedded_credentials(url)
@@ -135,19 +138,11 @@ class ResponseCache:
             or contains_sensitive_data(response)
         ):
             return
-        path = self._path(url, params)
-        entry = {
-            "url": url,
-            "params": params,
-            "response": response,
-            "cached_at": time.time(),
-        }
-        try:
-            # Credential-shaped data is rejected above.
-            # codeql[py/clear-text-storage-sensitive-data]
-            path.write_text(json.dumps(entry))
-        except OSError:
-            pass  # Cache write failure is non-fatal
+        # Keep arbitrary response payloads process-local.  They can include
+        # repository-authored text or provider fields that pattern matching
+        # cannot prove are non-sensitive, so no cleartext filesystem sink is
+        # permitted here.
+        self._entries[self._key(url, params)] = (time.time(), copy.deepcopy(response))
 
     def _key(self, url: str, params: dict | None) -> str:
         """SHA256 hash of URL + sorted params."""
@@ -157,4 +152,5 @@ class ResponseCache:
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def _path(self, url: str, params: dict | None) -> Path:
+        """Return the legacy cache path without creating or writing it."""
         return self.cache_dir / f"{self._key(url, params)}.json"
