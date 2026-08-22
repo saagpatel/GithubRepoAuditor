@@ -29,6 +29,7 @@ from github_repo_auditor.security_admission import derive_security_admission
 
 CONTRACT_VERSION = "decision_queue_v2"
 DIGEST_CONTRACT_VERSION = "portfolio_decision_digest_v2"
+CLI_AGGREGATE_CONTRACT_VERSION = "portfolio_decision_cli_aggregate_v1"
 ITEM_SCHEMA_VERSION = "portfolio_decision_item_v2"
 WITHHELD_SCHEMA_VERSION = "portfolio_decision_withheld_v2"
 KEY_SCHEMA_VERSION = "portfolio_decision_key_v1"
@@ -573,7 +574,7 @@ def _safe_cli_digest(digest: dict[str, Any]) -> dict[str, Any]:
     """
     summary = _mapping(digest.get("summary"))
     return {
-        "contract_version": DIGEST_CONTRACT_VERSION,
+        "contract_version": CLI_AGGREGATE_CONTRACT_VERSION,
         "source": dict(_SAFE_DIGEST_SOURCE),
         "decision_queue": [],
         "withheld_decisions": [],
