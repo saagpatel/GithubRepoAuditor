@@ -35,6 +35,15 @@ KEY_SCHEMA_VERSION = "portfolio_decision_key_v1"
 FINGERPRINT_SCHEMA_VERSION = "portfolio_decision_fingerprint_v1"
 READBACK_CONTRACT_VERSION = "portfolio_decision_readback_v1"
 MAX_DECISION_QUEUE_ITEMS = 5
+_REDACTED = "<redacted>"
+_SAFE_DIGEST_SOURCE = {
+    "schema_version": "PortfolioTruthV1",
+    "generated_at": _REDACTED,
+    "portfolio_truth_sha256": "0" * 64,
+    "portfolio_truth_receipt_id": None,
+    "github_security_receipt_id": None,
+    "github_security_produced_at": None,
+}
 
 # The security receipt is produced daily before the 02:00 portfolio job.  A
 # 36-hour window admits one missed daily projection without pretending that a
@@ -545,6 +554,52 @@ def summarize_decision_queue(
     }
 
 
+def _safe_count(value: Any) -> int:
+    """Keep CLI aggregate counts numeric and non-negative."""
+    try:
+        count = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return count if count >= 0 else 0
+
+
+def _safe_cli_digest(digest: dict[str, Any]) -> dict[str, Any]:
+    """Project the rich digest into a terminal-safe aggregate envelope.
+
+    ``build_decision_digest`` remains the rich local producer used by in-process
+    consumers. The command-line JSON surface is an advisory handoff and must
+    not serialize identities, paths, questions, receipt metadata, or arbitrary
+    fields from PortfolioTruth or a previous digest.
+    """
+    summary = _mapping(digest.get("summary"))
+    return {
+        "contract_version": DIGEST_CONTRACT_VERSION,
+        "source": dict(_SAFE_DIGEST_SOURCE),
+        "decision_queue": [],
+        "withheld_decisions": [],
+        "superseded_decisions": [],
+        "summary": {
+            "contract_version": CONTRACT_VERSION,
+            "decision_queue_count": _safe_count(
+                summary.get("decision_queue_count")
+            ),
+            "canonical_decision_count": _safe_count(
+                summary.get("canonical_decision_count")
+            ),
+            "withheld_decision_count": _safe_count(
+                summary.get("withheld_decision_count")
+            ),
+            "truncated_decision_count": _safe_count(
+                summary.get("truncated_decision_count")
+            ),
+            "decision_queue_type_counts": {},
+            "withheld_reason_counts": {},
+            "current_decision_keys": [],
+            "redaction_policy": "allowlisted-aggregate-only",
+        },
+    }
+
+
 def _generation_time(generation: dict[str, Any]) -> datetime | None:
     return _parse_datetime(
         _mapping(generation.get("github_security")).get("produced_at")
@@ -748,10 +803,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     digest = build_decision_digest(truth, previous_digest=previous)
     if args.format == "json":
-        # The digest contains aggregate finding counts and receipt metadata,
-        # never secret values; the regression test exercises that boundary.
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(json.dumps(digest, indent=2, sort_keys=True))
+        print(json.dumps(_safe_cli_digest(digest), indent=2, sort_keys=True))
     else:
         print(render_decision_digest_markdown(digest), end="")
     return 0

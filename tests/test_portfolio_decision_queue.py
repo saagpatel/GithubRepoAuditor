@@ -451,7 +451,12 @@ def test_cli_json_and_markdown_are_deterministic(
     second = capsys.readouterr().out
     assert first == second
     assert inert_secret_marker not in first
-    assert '"secret_scanning_open": 1' in first
+    safe_payload = json.loads(first)
+    assert safe_payload["decision_queue"] == []
+    assert safe_payload["summary"]["decision_queue_count"] == 1
+    assert safe_payload["summary"]["redaction_policy"] == (
+        "allowlisted-aggregate-only"
+    )
 
     previous = tmp_path / "previous.json"
     previous.write_text(first, encoding="utf-8")
@@ -471,6 +476,54 @@ def test_cli_json_and_markdown_are_deterministic(
     markdown = capsys.readouterr().out
     assert "## Portfolio Decision Digest — 2026-08-05" in markdown
     assert "**MCPAudit** [security follow-up]" in markdown
+
+
+def test_cli_json_redacts_previous_digest_fields(tmp_path: Path, capsys) -> None:
+    truth_path = tmp_path / "portfolio-truth.json"
+    truth_path.write_text(
+        json.dumps(
+            _truth(
+                [_project("MCPAudit", attention_state="decision-needed", security_risk=True)]
+            )
+        ),
+        encoding="utf-8",
+    )
+    sentinel = "OPAQUE_PREVIOUS_DIGEST_SECRET"
+    previous = tmp_path / "previous.json"
+    previous.write_text(
+        json.dumps(
+            {
+                "contract_version": DIGEST_CONTRACT_VERSION,
+                "decision_queue": [
+                    {
+                        "decision_key": sentinel,
+                        "decision_fingerprint": sentinel,
+                        "project": sentinel,
+                        "decision_type": sentinel,
+                        "source_generation": {"token": sentinel},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "--truth",
+                str(truth_path),
+                "--previous-digest",
+                str(previous),
+                "--format",
+                "json",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert sentinel not in output
+    assert json.loads(output)["decision_queue"] == []
 
 
 def test_absolute_cli_entrypoint_runs_from_arbitrary_cwd(tmp_path: Path) -> None:
@@ -518,6 +571,6 @@ def test_absolute_cli_entrypoint_runs_from_arbitrary_cwd(tmp_path: Path) -> None
     assert run.returncode == 0, run.stderr
     digest = json.loads(run.stdout)
     assert digest["contract_version"] == DIGEST_CONTRACT_VERSION
-    assert digest["decision_queue"][0]["evidence_reference"]["provider"] == (
-        "github_security_combined"
-    )
+    assert digest["decision_queue"] == []
+    assert digest["summary"]["decision_queue_count"] == 1
+    assert digest["source"]["generated_at"] == "<redacted>"

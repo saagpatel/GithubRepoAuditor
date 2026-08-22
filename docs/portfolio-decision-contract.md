@@ -40,3 +40,9 @@ python -m github_repo_auditor.portfolio_decision_queue \
   --previous-digest output/portfolio-decision-digest-latest.json \
   --format json
 ```
+
+The in-process `build_decision_digest` and Markdown renderer retain the rich
+producer-owned decision contract for local consumers. The command-line JSON
+surface is an advisory, allowlisted aggregate envelope: it preserves contract
+version and queue counts but redacts identities, paths, questions, receipt
+metadata, and prior-digest fields before terminal output.

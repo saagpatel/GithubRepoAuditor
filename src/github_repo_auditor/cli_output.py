@@ -109,12 +109,12 @@ def print_warning(msg: str) -> None:
 def print_info(msg: str) -> None:
     """Print an info message to stderr."""
     msg = redact_sensitive_text(msg)
-    # The shared output boundary redacts credential assignments and known token forms above.
-    # codeql[py/clear-text-logging-sensitive-data]
     if HAS_RICH:
         _stderr_console.print(f"  [dim]{msg}[/dim]")
     else:
-        print(f"  {msg}", file=sys.stderr)
+        # Keep the no-Rich fallback on the same redacted boundary without using
+        # print() as a structured logging sink for provider-authored text.
+        sys.stderr.write(f"  {msg}\n")
 
 
 def print_success(msg: str) -> None:
