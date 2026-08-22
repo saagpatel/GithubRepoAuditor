@@ -71,6 +71,52 @@ _PERSISTED_WEEKLY_DIGEST = {
     "top_repo_briefings": [],
     "report_only_guardrail": "This durable digest is an advisory, allowlisted summary only.",
 }
+_PERSISTED_WEEKLY_MARKDOWN = """# Weekly Command Center: operator
+
+- Generated: `<redacted>`
+- Contract: `weekly_command_center_digest_v2`
+- Authority Cap: `bounded-automation`
+- Headline: <redacted>
+- Decision: <redacted>
+- Why This Week: <redacted>
+- Next Step: <redacted>
+- Source Freshness: `unknown` — <redacted>
+- Decision Quality: `unknown` — <redacted>
+- Operating Paths: <redacted>
+- Portfolio Truth: 0 projects, 0 active registry entries, 0 default attention, 0 decision queue
+- Risk Posture: 0 elevated, 0 moderate, 0 baseline
+- Security Posture: 0 admitted, 0 with blocking GitHub security findings (0 critical, 0 high, 0 open secrets; 0 unadmitted)
+
+## Decision Queue
+
+- No portfolio decisions clear the current evidence bar.
+
+## Path Attention
+
+- No active path clarifications are currently surfaced.
+
+## Automation Candidates
+
+- No repos currently clear the automation trust bar.
+
+## Risk Posture
+
+- No elevated risk items are currently surfaced.
+
+## Security Posture
+
+- Security evidence is intentionally redacted in the durable handoff envelope.
+
+## Movement
+
+- <redacted>
+
+## Weekly Sections
+
+- No durable weekly sections are persisted.
+
+_Guardrail: This durable digest is an advisory, allowlisted summary only._
+"""
 
 
 def _safe_text(value: Any) -> str:
@@ -495,7 +541,7 @@ def write_weekly_command_center_artifacts(
     markdown_path = output_dir / f"weekly-command-center-{username}-{stamp}.md"
     persisted_digest = _PERSISTED_WEEKLY_DIGEST
     json_path.write_text(json.dumps(persisted_digest, indent=2))
-    markdown_path.write_text(render_weekly_command_center_markdown(persisted_digest))
+    markdown_path.write_text(_PERSISTED_WEEKLY_MARKDOWN)
     return json_path, markdown_path
 
 
