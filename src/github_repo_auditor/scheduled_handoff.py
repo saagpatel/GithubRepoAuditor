@@ -66,20 +66,45 @@ def _has_regressions(diff_data: dict) -> bool:
     return bool(regressions or downgrades)
 
 
+def _allowlisted_queue_urgency(queue_summary: dict) -> tuple[str, str] | None:
+    """Derive handoff urgency from the persisted finite lane counts."""
+    lane_counts = queue_summary.get("lane_counts") if isinstance(queue_summary, dict) else None
+    if not isinstance(lane_counts, dict):
+        return None
+
+    def count(lane: str) -> int:
+        value = lane_counts.get(lane, 0)
+        return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+    if count("blocked"):
+        return "blocked", "blocked-lane-count"
+    if count("urgent"):
+        return "urgent", "urgent-lane-count"
+    return "quiet", "allowlisted-lane-counts-quiet"
+
+
 def _issue_candidate(
     summary: dict,
     diff_data: dict,
     username: str,
     body_path: Path,
     *,
+    queue_summary: dict | None = None,
     issue_state: str = "absent",
     issue_number: str = "",
     issue_url: str = "",
 ) -> dict:
-    urgency = summary.get("urgency", "quiet")
+    derived_urgency = _allowlisted_queue_urgency(queue_summary or {})
+    urgency = derived_urgency[0] if derived_urgency else summary.get("urgency", "quiet")
+    if urgency not in {"blocked", "urgent", "quiet"}:
+        urgency = "quiet"
     regressions_detected = _has_regressions(diff_data)
     noisy = urgency in {"blocked", "urgent"} or regressions_detected
-    reason = summary.get("escalation_reason", "quiet")
+    reason = (
+        derived_urgency[1]
+        if derived_urgency
+        else summary.get("escalation_reason", "quiet")
+    )
     if regressions_detected:
         reason = "regressions-detected"
     action = "quiet"
@@ -2176,6 +2201,7 @@ def build_scheduled_handoff(
 
     diff_data = _load_json(_latest_artifact(output_dir, "audit-diff-*.json"))
     summary = control_center.get("operator_summary", {})
+    queue_summary = control_center.get("operator_queue_summary", {})
     username = control_center.get("username", "unknown")
     generated_at = control_center.get("generated_at", "")
     stamp = (generated_at or "unknown").split("T", 1)[0]
@@ -2186,6 +2212,7 @@ def build_scheduled_handoff(
         diff_data,
         username,
         markdown_path,
+        queue_summary=queue_summary,
         issue_state=issue_state,
         issue_number=issue_number,
         issue_url=issue_url,

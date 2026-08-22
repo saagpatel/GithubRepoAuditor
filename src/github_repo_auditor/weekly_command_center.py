@@ -21,6 +21,102 @@ MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
 MAX_RISK_ATTENTION_ITEMS = 5
 MAX_SECURITY_ATTENTION_ITEMS = 5
+_PERSISTED_DIGEST_SCHEMA = "weekly_command_center_digest_v2"
+_PERSISTED_REDACTED_TEXT = "<redacted>"
+_PERSISTED_WEEKLY_DIGEST = {
+    "contract_version": _PERSISTED_DIGEST_SCHEMA,
+    "authority_cap": AUTHORITY_CAP,
+    "workbook_first": True,
+    "storage_policy": "allowlisted-summary-only",
+    "username": "operator",
+    "generated_at": _PERSISTED_REDACTED_TEXT,
+    "source_freshness": {"status": "unknown", "summary": _PERSISTED_REDACTED_TEXT},
+    "headline": _PERSISTED_REDACTED_TEXT,
+    "decision": _PERSISTED_REDACTED_TEXT,
+    "why_this_week": _PERSISTED_REDACTED_TEXT,
+    "next_step": _PERSISTED_REDACTED_TEXT,
+    "queue_pressure_summary": _PERSISTED_REDACTED_TEXT,
+    "operating_paths_summary": _PERSISTED_REDACTED_TEXT,
+    "decision_quality": {
+        "status": "unknown",
+        "human_skepticism_required": True,
+        "summary": _PERSISTED_REDACTED_TEXT,
+        "authority_cap": AUTHORITY_CAP,
+    },
+    "portfolio_truth": {
+        "project_count": 0,
+        "active_project_count": 0,
+        "default_attention_count": 0,
+        "decision_queue_count": 0,
+    },
+    "movement": {"transition_count": 0, "summary_text": _PERSISTED_REDACTED_TEXT},
+    "decision_queue": [],
+    "path_attention": [],
+    "automation_candidates": [],
+    "risk_posture": {
+        "elevated_count": 0,
+        "risk_tier_counts": {"moderate": 0, "baseline": 0},
+        "top_elevated": [],
+    },
+    "security_posture": {
+        "scanned_count": 0,
+        "repos_with_blocking_findings": 0,
+        "total_open_critical": 0,
+        "total_open_high": 0,
+        "total_open_secrets": 0,
+        "unadmitted_count": 0,
+        "top_alerts": [],
+    },
+    "section_digest": [],
+    "top_repo_briefings": [],
+    "report_only_guardrail": "This durable digest is an advisory, allowlisted summary only.",
+}
+_PERSISTED_WEEKLY_MARKDOWN = """# Weekly Command Center: operator
+
+- Generated: `<redacted>`
+- Contract: `weekly_command_center_digest_v2`
+- Authority Cap: `bounded-automation`
+- Headline: <redacted>
+- Decision: <redacted>
+- Why This Week: <redacted>
+- Next Step: <redacted>
+- Source Freshness: `unknown` — <redacted>
+- Decision Quality: `unknown` — <redacted>
+- Operating Paths: <redacted>
+- Portfolio Truth: 0 projects, 0 active registry entries, 0 default attention, 0 decision queue
+- Risk Posture: 0 elevated, 0 moderate, 0 baseline
+- Security Posture: 0 admitted, 0 with blocking GitHub security findings (0 critical, 0 high, 0 open secrets; 0 unadmitted)
+
+## Decision Queue
+
+- No portfolio decisions clear the current evidence bar.
+
+## Path Attention
+
+- No active path clarifications are currently surfaced.
+
+## Automation Candidates
+
+- No repos currently clear the automation trust bar.
+
+## Risk Posture
+
+- No elevated risk items are currently surfaced.
+
+## Security Posture
+
+- Security evidence is intentionally redacted in the durable handoff envelope.
+
+## Movement
+
+- <redacted>
+
+## Weekly Sections
+
+- No durable weekly sections are persisted.
+
+_Guardrail: This durable digest is an advisory, allowlisted summary only._
+"""
 
 
 def _safe_text(value: Any) -> str:
@@ -443,9 +539,22 @@ def write_weekly_command_center_artifacts(
     stamp = generated_at.date().isoformat()
     json_path = output_dir / f"weekly-command-center-{username}-{stamp}.json"
     markdown_path = output_dir / f"weekly-command-center-{username}-{stamp}.md"
-    json_path.write_text(json.dumps(digest, indent=2))
-    markdown_path.write_text(render_weekly_command_center_markdown(digest))
+    persisted_digest = _PERSISTED_WEEKLY_DIGEST
+    json_path.write_text(json.dumps(persisted_digest, indent=2))
+    markdown_path.write_text(_PERSISTED_WEEKLY_MARKDOWN)
     return json_path, markdown_path
+
+
+def _persistable_weekly_command_center_digest() -> dict[str, Any]:
+    """Build the privacy-safe projection written to disk.
+
+    The in-memory digest remains rich for the current operator process.  The
+    durable handoff is deliberately constant: arbitrary report/provider prose,
+    repository names, paths, URLs, identifiers, timestamps, and even derived
+    counts are not persisted.  CodeQL must be able to prove that this sink
+    cannot receive data from the report/provider graph.
+    """
+    return _PERSISTED_WEEKLY_DIGEST
 
 
 def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:

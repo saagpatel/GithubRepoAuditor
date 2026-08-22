@@ -15,6 +15,7 @@ from github_repo_auditor.operator_control_center import (
     render_control_center_markdown,
 )
 from github_repo_auditor.weekly_command_center import (
+    _PERSISTED_WEEKLY_DIGEST,
     build_weekly_command_center_digest,
     load_latest_portfolio_truth,
     write_weekly_command_center_artifacts,
@@ -25,10 +26,9 @@ _SENSITIVE_LABELLED_VALUE = re.compile(
     r"(?:[-_][a-z0-9]+)+\b"
 )
 _SAFE_MARKDOWN_TEXT = "<redacted>"
-_SAFE_MARKDOWN_LANES = frozenset({"blocked", "urgent", "ready", "deferred"})
-_SAFE_MARKDOWN_STATUSES = frozenset(
-    {"ok", "ready", "current", "warning", "blocked", "error", "unknown"}
-)
+_PERSISTED_CONTROL_SCHEMA = "control_center_artifact_v2"
+_PERSISTED_REDACTED_TEXT = "<redacted>"
+_SAFE_PERSISTED_LANES = frozenset({"blocked", "urgent", "ready", "deferred"})
 
 
 def should_print_control_center_item(item: dict) -> bool:
@@ -108,8 +108,7 @@ def _sanitized_snapshot_for_rendering(snapshot: dict) -> dict:
     """
     raw_setup = snapshot.get("operator_setup_health")
     setup = raw_setup if isinstance(raw_setup, dict) else {}
-    status = str(setup.get("status", "unknown")).strip().lower()
-    safe_status = status if status in _SAFE_MARKDOWN_STATUSES else "unknown"
+    safe_status = _persisted_status(setup.get("status", "unknown"))
 
     def safe_count(value: object) -> int:
         return value if isinstance(value, int) and value >= 0 else 0
@@ -120,10 +119,10 @@ def _sanitized_snapshot_for_rendering(snapshot: dict) -> dict:
         for item in raw_queue:
             if not isinstance(item, dict):
                 continue
-            lane = str(item.get("lane", "deferred")).strip().lower()
+            lane = _persisted_lane(item.get("lane", "deferred"))
             safe_queue.append(
                 {
-                    "lane": lane if lane in _SAFE_MARKDOWN_LANES else "deferred",
+                    "lane": lane,
                     "repo": "",
                     "title": _SAFE_MARKDOWN_TEXT,
                     "summary": _SAFE_MARKDOWN_TEXT,
@@ -141,6 +140,97 @@ def _sanitized_snapshot_for_rendering(snapshot: dict) -> dict:
         },
         "operator_queue": safe_queue,
         "operator_recent_changes": [],
+    }
+
+
+def _persisted_count(value: object) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return max(0, min(value, 1_000_000))
+    return 0
+
+
+def _persisted_status(value: object) -> str:
+    candidate = str(value or "").strip().lower()
+    if candidate == "ok":
+        return "ok"
+    if candidate == "ready":
+        return "ready"
+    if candidate == "current":
+        return "current"
+    if candidate == "warning":
+        return "warning"
+    if candidate == "blocked":
+        return "blocked"
+    if candidate == "error":
+        return "error"
+    return "unknown"
+
+
+def _persisted_lane(value: object) -> str:
+    candidate = str(value or "").strip().lower()
+    if candidate == "blocked":
+        return "blocked"
+    if candidate == "urgent":
+        return "urgent"
+    if candidate == "ready":
+        return "ready"
+    return "deferred"
+
+
+def _persistable_control_center_payload(
+    snapshot: dict,
+    *,
+    username: str,
+    generated_at: datetime,
+) -> dict:
+    """Return the only projection permitted to cross the durable JSON sink.
+
+    Rich report and operator data remains available to the current process and
+    the in-memory return value.  Durable artifacts intentionally retain only
+    fixed labels, finite statuses, and bounded structural counts; arbitrary
+    prose, identifiers, paths, URLs, and provider-authored values are omitted.
+    """
+    setup = snapshot.get("operator_setup_health")
+    setup = setup if isinstance(setup, dict) else {}
+    queue = snapshot.get("operator_queue")
+    queue_items = queue if isinstance(queue, list) else []
+    lane_counts = {lane: 0 for lane in _SAFE_PERSISTED_LANES}
+    for item in queue_items:
+        if not isinstance(item, dict):
+            continue
+        lane = str(item.get("lane") or "").strip().lower()
+        if lane in lane_counts:
+            lane_counts[lane] += 1
+
+    recent_changes = snapshot.get("operator_recent_changes")
+    recent_change_count = len(recent_changes) if isinstance(recent_changes, list) else 0
+    return {
+        "contract_version": _PERSISTED_CONTROL_SCHEMA,
+        "storage_policy": "allowlisted-summary-only",
+        # Routing metadata is already present in the artifact filename; retain
+        # it so scheduled-handoff discovery remains compatible.
+        "username": username or "unknown",
+        "generated_at": generated_at.isoformat(),
+        "operator_summary": {
+            "headline": _PERSISTED_REDACTED_TEXT,
+            "queue_count": _persisted_count(len(queue_items)),
+        },
+        "operator_setup_health": {
+            "status": _persisted_status(setup.get("status")),
+            "blocking_errors": _persisted_count(setup.get("blocking_errors")),
+            "warnings": _persisted_count(setup.get("warnings")),
+        },
+        "operator_queue_summary": {
+            "count": _persisted_count(len(queue_items)),
+            "lane_counts": {
+                "blocked": _persisted_count(lane_counts["blocked"]),
+                "urgent": _persisted_count(lane_counts["urgent"]),
+                "ready": _persisted_count(lane_counts["ready"]),
+                "deferred": _persisted_count(lane_counts["deferred"]),
+            },
+        },
+        "operator_recent_changes_count": _persisted_count(recent_change_count),
+        "weekly_command_center_digest_v1": _PERSISTED_WEEKLY_DIGEST,
     }
 
 
@@ -211,8 +301,14 @@ def write_control_center_artifacts(
         "json_path": str(weekly_json),
         "markdown_path": str(weekly_md),
     }
-    # The payload is recursively sanitized and checked before persistence.
-    json_path.write_text(json.dumps(payload, indent=2))
+    # Persist only an explicit allowlisted projection.  The rich payload above
+    # remains an in-memory compatibility return for the current operator run.
+    persisted_payload = _persistable_control_center_payload(
+        snapshot,
+        username=username,
+        generated_at=generated_at,
+    )
+    json_path.write_text(json.dumps(persisted_payload, indent=2, sort_keys=True))
     # The exact rendered value is redacted and rechecked immediately before persistence.
     md_path.write_text(safe_rendered_markdown)
     return json_path, md_path, weekly_json, weekly_md, payload
