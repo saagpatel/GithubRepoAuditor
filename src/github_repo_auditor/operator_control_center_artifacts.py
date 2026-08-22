@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
 from github_repo_auditor.cache import contains_sensitive_data
+from github_repo_auditor.cli_output import redact_sensitive_text
 from github_repo_auditor.operator_artifact_paths import control_center_paths
 from github_repo_auditor.operator_control_center import (
     control_center_artifact_payload,
@@ -16,6 +18,11 @@ from github_repo_auditor.weekly_command_center import (
     build_weekly_command_center_digest,
     load_latest_portfolio_truth,
     write_weekly_command_center_artifacts,
+)
+
+_SENSITIVE_LABELLED_VALUE = re.compile(
+    r"(?i)\b(?:[a-z0-9]+[-_])*(?:secret|token|password|credential)"
+    r"(?:[-_][a-z0-9]+)+\b"
 )
 
 
@@ -79,6 +86,11 @@ def _redact_sensitive_values(value: object) -> object:
         return redacted
     if isinstance(value, list):
         return [_redact_sensitive_values(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_sensitive_values(item) for item in value)
+    if isinstance(value, str):
+        redacted_text = redact_sensitive_text(value)
+        return _SENSITIVE_LABELLED_VALUE.sub("<redacted>", redacted_text)
     return value
 
 
@@ -114,11 +126,21 @@ def write_control_center_artifacts(
         report_reference=report_reference,
         generated_at=generated_at.isoformat(),
     )
-    payload = control_center_artifact_payload(report_data, snapshot)
-    payload["weekly_command_center_digest_v1"] = weekly_digest
-    if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
+    if contains_sensitive_data(weekly_digest):
         raise ValueError("control-center artifacts must not persist credential fields")
     markdown_snapshot = _sanitized_snapshot_for_rendering(snapshot)
+    sanitized_report_data = _redact_sensitive_values(report_data)
+    if not isinstance(sanitized_report_data, dict):
+        raise ValueError("control-center artifacts must not persist credential fields")
+    payload = control_center_artifact_payload(sanitized_report_data, markdown_snapshot)
+    sanitized_weekly_digest_for_payload = _redact_sensitive_values(weekly_digest)
+    payload["weekly_command_center_digest_v1"] = sanitized_weekly_digest_for_payload
+    sanitized_payload = _redact_sensitive_values(payload)
+    if not isinstance(sanitized_payload, dict):
+        raise ValueError("control-center artifacts must not persist credential fields")
+    payload = sanitized_payload
+    if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
+        raise ValueError("control-center artifacts must not persist credential fields")
     if contains_sensitive_data(markdown_snapshot):
         raise ValueError("control-center artifacts must not persist credential fields")
     rendered_markdown = render_control_center_markdown(
@@ -126,20 +148,26 @@ def write_control_center_artifacts(
     )
     if contains_sensitive_data(rendered_markdown):
         raise ValueError("control-center artifacts must not persist credential fields")
+    safe_rendered_markdown = redact_sensitive_text(rendered_markdown)
+    if contains_sensitive_data(safe_rendered_markdown):
+        raise ValueError("control-center artifacts must not persist credential fields")
+    sanitized_weekly_digest = _redact_sensitive_values(weekly_digest)
+    if not isinstance(sanitized_weekly_digest, dict):
+        raise ValueError("control-center artifacts must not persist credential fields")
+    if contains_sensitive_data(sanitized_weekly_digest):
+        raise ValueError("control-center artifacts must not persist credential fields")
     weekly_json, weekly_md = write_weekly_command_center_artifacts(
         output_dir,
         username=username,
         generated_at=generated_at,
-        digest=weekly_digest,
+        digest=sanitized_weekly_digest,
     )
     payload["weekly_command_center_reference"] = {
         "json_path": str(weekly_json),
         "markdown_path": str(weekly_md),
     }
-    # Credential-shaped data is rejected above.
-    # codeql[py/clear-text-storage-sensitive-data]
+    # The payload is recursively sanitized and checked before persistence.
     json_path.write_text(json.dumps(payload, indent=2))
-    # The exact rendered value is rejected above if it contains credential data.
-    # lgtm[py/clear-text-storage-sensitive-data]
-    md_path.write_text(rendered_markdown)
+    # The exact rendered value is redacted and rechecked immediately before persistence.
+    md_path.write_text(safe_rendered_markdown)
     return json_path, md_path, weekly_json, weekly_md, payload

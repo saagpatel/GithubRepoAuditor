@@ -66,6 +66,54 @@ def test_control_center_artifacts_reject_credential_value_before_any_write(
     assert weekly_writes == []
 
 
+def test_control_center_artifacts_redact_opaque_sensitive_free_text_before_writing(
+    tmp_path, monkeypatch
+):
+    json_path, md_path, weekly_writes = _stub_artifact_dependencies(
+        tmp_path,
+        monkeypatch,
+        weekly_digest={"status": "current"},
+    )
+    weekly_digests = []
+
+    def write_weekly(*_args, **kwargs):
+        weekly_writes.append(True)
+        weekly_digests.append(kwargs["digest"])
+        return tmp_path / "weekly.json", tmp_path / "weekly.md"
+
+    monkeypatch.setattr(artifacts, "write_weekly_command_center_artifacts", write_weekly)
+
+    result = artifacts.write_control_center_artifacts(
+        {},
+        {"operator_summary": {"headline": "opaque-secret-value"}},
+        tmp_path,
+        username="user",
+        generated_at=datetime.now(timezone.utc),
+        report_reference="report",
+    )
+
+    assert result[0:2] == (json_path, md_path)
+    assert "opaque-secret-value" not in json_path.read_text()
+    assert "opaque-secret-value" not in md_path.read_text()
+    assert "opaque-secret-value" not in str(weekly_digests[0])
+    assert "<redacted>" in md_path.read_text()
+    assert weekly_writes == [True]
+
+
+def test_control_center_artifact_sanitizer_preserves_ordinary_security_text():
+    value = {"headline": "secret scanning is enabled; token budget is healthy"}
+
+    assert artifacts._redact_sensitive_values(value) == value
+
+
+def test_control_center_artifact_sanitizer_redacts_compound_sensitive_labels():
+    value = {"headline": "secret_scanning_value and api-token-prod"}
+
+    assert artifacts._redact_sensitive_values(value) == {
+        "headline": "<redacted> and <redacted>"
+    }
+
+
 def test_control_center_artifacts_reject_hyphenated_credential_alias(
     tmp_path, monkeypatch
 ):
