@@ -23,12 +23,6 @@ MAX_RISK_ATTENTION_ITEMS = 5
 MAX_SECURITY_ATTENTION_ITEMS = 5
 _PERSISTED_DIGEST_SCHEMA = "weekly_command_center_digest_v2"
 _PERSISTED_REDACTED_TEXT = "<redacted>"
-_PERSISTED_SOURCE_STATUSES = frozenset(
-    {"current", "portfolio-truth-newer", "unknown-report-age"}
-)
-_PERSISTED_DECISION_STATUSES = frozenset(
-    {"ready", "watch", "blocked", "insufficient-data", "unknown"}
-)
 
 
 def _safe_text(value: Any) -> str:
@@ -459,68 +453,26 @@ def write_weekly_command_center_artifacts(
     return json_path, markdown_path
 
 
-def _persisted_count(value: Any) -> int:
-    """Return a bounded structural count for the durable handoff artifact."""
-    if isinstance(value, int) and not isinstance(value, bool):
-        return max(0, min(value, 1_000_000))
-    return 0
-
-
-def _persisted_enum(value: Any, allowed: frozenset[str], default: str) -> str:
-    candidate = _safe_text(value).lower()
-    if candidate == "current" and candidate in allowed:
-        return "current"
-    if candidate == "portfolio-truth-newer" and candidate in allowed:
-        return "portfolio-truth-newer"
-    if candidate == "unknown-report-age" and candidate in allowed:
-        return "unknown-report-age"
-    if candidate == "ready" and candidate in allowed:
-        return "ready"
-    if candidate == "watch" and candidate in allowed:
-        return "watch"
-    if candidate == "blocked" and candidate in allowed:
-        return "blocked"
-    if candidate == "insufficient-data" and candidate in allowed:
-        return "insufficient-data"
-    if candidate == "unknown" and candidate in allowed:
-        return "unknown"
-    return default
-
-
 def _persistable_weekly_command_center_digest(
     digest: dict[str, Any], *, username: str = "", generated_at: str = ""
 ) -> dict[str, Any]:
     """Build the privacy-safe projection written to disk.
 
     The in-memory digest remains rich for the current operator process.  The
-    durable handoff is deliberately smaller: arbitrary report/provider prose,
-    repository names, paths, URLs, and identifiers are not persisted.  Only
-    fixed contract values, finite statuses, and bounded structural counts are
-    retained for continuity.
+    durable handoff is deliberately constant: arbitrary report/provider prose,
+    repository names, paths, URLs, identifiers, timestamps, and even derived
+    counts are not persisted.  CodeQL must be able to prove that this sink
+    cannot receive data from the report/provider graph.
     """
-    freshness = _mapping(digest.get("source_freshness"))
-    decision_quality = _mapping(digest.get("decision_quality"))
-    portfolio_truth = _mapping(digest.get("portfolio_truth"))
-    risk_posture = _mapping(digest.get("risk_posture"))
-    security_posture = _mapping(digest.get("security_posture"))
-    risk_tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
-
-    source_status = _persisted_enum(
-        freshness.get("status"), _PERSISTED_SOURCE_STATUSES, "unknown-report-age"
-    )
-    decision_status = _persisted_enum(
-        decision_quality.get("status"), _PERSISTED_DECISION_STATUSES, "unknown"
-    )
-
     return {
         "contract_version": _PERSISTED_DIGEST_SCHEMA,
         "authority_cap": AUTHORITY_CAP,
         "workbook_first": True,
         "storage_policy": "allowlisted-summary-only",
-        "username": username or "unknown",
-        "generated_at": generated_at or _PERSISTED_REDACTED_TEXT,
+        "username": "operator",
+        "generated_at": _PERSISTED_REDACTED_TEXT,
         "source_freshness": {
-            "status": source_status,
+            "status": "unknown",
             "summary": _PERSISTED_REDACTED_TEXT,
         },
         "headline": _PERSISTED_REDACTED_TEXT,
@@ -530,56 +482,39 @@ def _persistable_weekly_command_center_digest(
         "queue_pressure_summary": _PERSISTED_REDACTED_TEXT,
         "operating_paths_summary": _PERSISTED_REDACTED_TEXT,
         "decision_quality": {
-            "status": decision_status,
+            "status": "unknown",
             "human_skepticism_required": True,
             "summary": _PERSISTED_REDACTED_TEXT,
             "authority_cap": AUTHORITY_CAP,
         },
         "portfolio_truth": {
-            "project_count": _persisted_count(portfolio_truth.get("project_count")),
-            "active_project_count": _persisted_count(
-                portfolio_truth.get("active_project_count")
-            ),
-            "default_attention_count": _persisted_count(
-                portfolio_truth.get("default_attention_count")
-            ),
-            "decision_queue_count": _persisted_count(
-                portfolio_truth.get("decision_queue_count")
-            ),
+            "project_count": 0,
+            "active_project_count": 0,
+            "default_attention_count": 0,
+            "decision_queue_count": 0,
         },
         "movement": {
-            "transition_count": _persisted_count(
-                len(digest.get("movement", {}).get("transitions", []))
-                if isinstance(digest.get("movement"), dict)
-                and isinstance(digest.get("movement", {}).get("transitions"), list)
-                else 0
-            ),
+            "transition_count": 0,
             "summary_text": _PERSISTED_REDACTED_TEXT,
         },
         "decision_queue": [],
         "path_attention": [],
         "automation_candidates": [],
         "risk_posture": {
-            "elevated_count": _persisted_count(risk_posture.get("elevated_count")),
+            "elevated_count": 0,
             "risk_tier_counts": {
-                "moderate": _persisted_count(risk_tier_counts.get("moderate")),
-                "baseline": _persisted_count(risk_tier_counts.get("baseline")),
+                "moderate": 0,
+                "baseline": 0,
             },
             "top_elevated": [],
         },
         "security_posture": {
-            "scanned_count": _persisted_count(security_posture.get("scanned_count")),
-            "repos_with_blocking_findings": _persisted_count(
-                security_posture.get("repos_with_blocking_findings")
-            ),
-            "total_open_critical": _persisted_count(
-                security_posture.get("total_open_critical")
-            ),
-            "total_open_high": _persisted_count(security_posture.get("total_open_high")),
-            "total_open_secrets": _persisted_count(
-                security_posture.get("total_open_secrets")
-            ),
-            "unadmitted_count": _persisted_count(security_posture.get("unadmitted_count")),
+            "scanned_count": 0,
+            "repos_with_blocking_findings": 0,
+            "total_open_critical": 0,
+            "total_open_high": 0,
+            "total_open_secrets": 0,
+            "unadmitted_count": 0,
             "top_alerts": [],
         },
         "section_digest": [],
