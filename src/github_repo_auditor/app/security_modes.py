@@ -13,6 +13,44 @@ from github_repo_auditor.security_burndown import build_security_burndown, rende
 
 _SECURITY_GATE_OUTPUT_CONTRACT = "security_gate_cli_v2"
 _REDACTED = "<redacted>"
+_SAFE_GATE_MARKDOWN = {
+    "pass": """# Portfolio Security Gate
+
+Status: PASS
+Source freshness: current
+
+All required-cohort repos are clear of open high-severity GitHub security alerts.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    "fail": """# Portfolio Security Gate
+
+Status: FAIL
+Source freshness: current
+
+Open high/critical findings are present. Consult the local canonical report for repo-level detail.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    "stale": """# Portfolio Security Gate
+
+Status: STALE
+Source freshness: stale
+
+Portfolio truth freshness could not be verified. Refresh the local source before acting on this gate.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+    "unknown": """# Portfolio Security Gate
+
+Status: UNKNOWN
+Source freshness: unavailable
+
+Required-cohort security coverage is missing or incomplete. Do not treat the cohort as clear; consult the local canonical report.
+
+Output policy: allowlisted aggregate summary; repo identities and reason codes redacted.
+""",
+}
 
 
 def _safe_status(report: Any) -> str:
@@ -84,45 +122,15 @@ def _safe_security_gate_summary(report: Any) -> dict[str, Any]:
     }
 
 
-def _render_safe_security_gate_markdown(summary: dict[str, Any]) -> str:
-    """Render the privacy-safe human-readable CLI envelope."""
-    lines = [
-        "# Portfolio Security Gate",
-        "",
-        (
-            f"Status: {summary['status'].upper()} | scanned {summary['scanned_count']} | "
-            f"required cohort {summary['required_cohort_count']} | "
-            "repos with open high/critical "
-            f"{summary['repos_with_open_high_critical']} | "
-            f"critical {summary['total_open_critical']} | "
-            f"high {summary['total_open_high']} | "
-            f"secrets {summary['total_open_secrets']}"
-        ),
-        f"Source freshness: {summary['source_freshness']}",
-        "",
-    ]
-    if summary["status"] == "unknown":
-        lines.append(
-            "Required-cohort security coverage is missing or incomplete. "
-            "Do not treat the cohort as clear; consult the local canonical report."
-        )
-    elif summary["status"] == "stale":
-        lines.append(
-            "Portfolio truth freshness could not be verified. "
-            "Refresh the local source before acting on this gate."
-        )
-    elif summary["passed"]:
-        lines.append(
-            "All required-cohort repos are clear of open high-severity GitHub "
-            "security alerts."
-        )
-    else:
-        lines.append(
-            "Open high/critical findings are present. "
-            "Consult the local canonical report for repo-level detail."
-        )
-    lines.append("\nOutput policy: allowlisted aggregate summary; repo identities and reason codes redacted.")
-    return "\n".join(lines)
+def _render_safe_security_gate_markdown(status: str) -> str:
+    """Return a fixed human-readable envelope selected by finite status."""
+    if status == "pass":
+        return _SAFE_GATE_MARKDOWN["pass"]
+    if status == "fail":
+        return _SAFE_GATE_MARKDOWN["fail"]
+    if status == "stale":
+        return _SAFE_GATE_MARKDOWN["stale"]
+    return _SAFE_GATE_MARKDOWN["unknown"]
 
 
 def run_security_burndown_mode(args: Any) -> None:
@@ -199,6 +207,6 @@ def run_security_gate_mode(args: Any) -> None:
     if getattr(args, "json", False):
         print(json.dumps(summary, indent=2, sort_keys=True))
     else:
-        print(_render_safe_security_gate_markdown(summary))
+        print(_render_safe_security_gate_markdown(summary["status"]))
     if not report.passed:
         raise SystemExit(1)
