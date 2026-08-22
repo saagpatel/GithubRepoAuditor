@@ -99,7 +99,7 @@ def write_control_center_artifacts(
     # Credential-shaped data is rejected above.
     # codeql[py/clear-text-storage-sensitive-data]
     json_path.write_text(json.dumps(payload, indent=2))
-    # Credential-shaped data is rejected above.
-    # codeql[py/clear-text-storage-sensitive-data]
+    # The exact rendered value is rejected above if it contains credential data.
+    # lgtm[py/clear-text-storage-sensitive-data]
     md_path.write_text(rendered_markdown)
     return json_path, md_path, weekly_json, weekly_md, payload
