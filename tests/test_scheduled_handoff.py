@@ -635,6 +635,27 @@ def test_build_scheduled_handoff_closes_open_issue_when_run_turns_quiet(tmp_path
     assert result["issue_candidate"]["issue_number"] == "42"
 
 
+def test_build_scheduled_handoff_derives_urgency_from_allowlisted_lane_counts(tmp_path):
+    payload = {
+        "username": "testuser",
+        "generated_at": "2026-04-07T12:00:00+00:00",
+        "operator_summary": {"urgency": "quiet", "escalation_reason": "quiet"},
+        "operator_queue_summary": {
+            "count": 1,
+            "lane_counts": {"blocked": 1, "urgent": 0, "ready": 0, "deferred": 0},
+        },
+    }
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(
+        json.dumps(payload)
+    )
+
+    result = build_scheduled_handoff(tmp_path, issue_state="open", issue_number="42")
+
+    assert result["issue_candidate"]["action"] == "update"
+    assert result["issue_candidate"]["severity"] == "blocked"
+    assert result["issue_candidate"]["reason"] == "blocked-lane-count"
+
+
 def test_build_scheduled_handoff_reopens_closed_canonical_issue_for_new_noise(tmp_path):
     (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(
         json.dumps(_control_center_payload())
