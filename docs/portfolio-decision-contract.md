@@ -30,9 +30,9 @@ decision closes only when a newer complete GitHub security receipt establishes
 authoritative absence across all three providers. Bridge `SHIPPED` is supporting
 evidence only and is explicitly barred from satisfying the readback contract.
 
-The machine-readable shape is
-`config/portfolio-decision-digest-v2.schema.json`. Generate JSON and Markdown
-from the same PortfolioTruth generation:
+The producer-owned machine-readable shape is
+`config/portfolio-decision-digest-v2.schema.json`. Generate the advisory
+terminal aggregate and Markdown from the same PortfolioTruth generation:
 
 ```bash
 python -m github_repo_auditor.portfolio_decision_queue \
@@ -40,3 +40,13 @@ python -m github_repo_auditor.portfolio_decision_queue \
   --previous-digest output/portfolio-decision-digest-latest.json \
   --format json
 ```
+
+The in-process `build_decision_digest` and Markdown renderer retain the rich
+producer-owned decision contract for local consumers. The command-line JSON
+surface is the distinct `portfolio_decision_cli_aggregate_v1` advisory,
+allowlisted aggregate envelope: it preserves contract version and queue counts
+but redacts identities, paths, questions, receipt metadata, and prior-digest
+fields before terminal output. It is not a reusable prior digest. The
+`--previous-digest` input must remain a producer-owned
+`portfolio_decision_digest_v2` artifact so supersession and authoritative
+closure history are preserved.

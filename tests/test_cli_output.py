@@ -102,7 +102,7 @@ class TestHelpers:
 
         captured = capsys.readouterr()
         assert "secret_" not in captured.err
-        assert "<redacted>" in captured.err
+        assert captured.err == "  [info unavailable without rich]\n"
 
     def test_print_status_no_crash(self, capsys):
         print_status("Testing status")
