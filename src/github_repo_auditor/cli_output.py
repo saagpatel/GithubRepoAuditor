@@ -1,7 +1,9 @@
-"""Rich CLI output helpers with graceful fallback to plain print.
+"""Rich CLI output helpers with a privacy-preserving fallback.
 
-All terminal output goes through this module. If rich is not installed,
-everything degrades to plain text — the tool stays usable.
+All terminal output goes through this module. Rich is a runtime dependency;
+when it is unavailable, status and warning helpers degrade to plain text while
+the provider-authored info channel emits a fixed placeholder instead of
+writing untrusted text to a raw terminal sink.
 """
 from __future__ import annotations
 
@@ -112,11 +114,9 @@ def print_info(msg: str) -> None:
     if HAS_RICH:
         _stderr_console.print(f"  [dim]{msg}[/dim]")
     else:
-        # Keep the no-Rich fallback on the same redacted boundary without using
-        # print() as a structured logging sink for provider-authored text.
-        # lgtm[py/clear-text-logging-sensitive-data] Redaction is applied above;
-        # this fallback is the privacy-reviewed terminal boundary.
-        sys.stderr.write(f"  {msg}\n")
+        # Rich is required for the detailed info channel. Do not send
+        # provider-authored text to a raw terminal sink when it is unavailable.
+        sys.stderr.write("  [info unavailable without rich]\n")
 
 
 def print_success(msg: str) -> None:
