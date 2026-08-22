@@ -445,17 +445,13 @@ def write_weekly_command_center_artifacts(
     stamp = generated_at.date().isoformat()
     json_path = output_dir / f"weekly-command-center-{username}-{stamp}.json"
     markdown_path = output_dir / f"weekly-command-center-{username}-{stamp}.md"
-    persisted_digest = _persistable_weekly_command_center_digest(
-        digest, username=username, generated_at=generated_at.isoformat()
-    )
+    persisted_digest = _persistable_weekly_command_center_digest()
     json_path.write_text(json.dumps(persisted_digest, indent=2))
     markdown_path.write_text(render_weekly_command_center_markdown(persisted_digest))
     return json_path, markdown_path
 
 
-def _persistable_weekly_command_center_digest(
-    digest: dict[str, Any], *, username: str = "", generated_at: str = ""
-) -> dict[str, Any]:
+def _persistable_weekly_command_center_digest() -> dict[str, Any]:
     """Build the privacy-safe projection written to disk.
 
     The in-memory digest remains rich for the current operator process.  The

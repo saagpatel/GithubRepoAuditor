@@ -179,7 +179,6 @@ def _persisted_lane(value: object) -> str:
 
 def _persistable_control_center_payload(
     snapshot: dict,
-    weekly_digest: dict,
     *,
     username: str,
     generated_at: datetime,
@@ -231,11 +230,7 @@ def _persistable_control_center_payload(
             },
         },
         "operator_recent_changes_count": _persisted_count(recent_change_count),
-        "weekly_command_center_digest_v1": _persistable_weekly_command_center_digest(
-            weekly_digest,
-            username=username,
-            generated_at=generated_at.isoformat(),
-        ),
+        "weekly_command_center_digest_v1": _persistable_weekly_command_center_digest(),
     }
 
 
@@ -310,7 +305,6 @@ def write_control_center_artifacts(
     # remains an in-memory compatibility return for the current operator run.
     persisted_payload = _persistable_control_center_payload(
         snapshot,
-        sanitized_weekly_digest,
         username=username,
         generated_at=generated_at,
     )

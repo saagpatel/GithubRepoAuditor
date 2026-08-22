@@ -377,7 +377,7 @@ def test_weekly_command_center_disk_projection_drops_opaque_values(tmp_path):
         digest=digest,
     )
 
-    assert _persistable_weekly_command_center_digest(digest)["contract_version"] == (
+    assert _persistable_weekly_command_center_digest()["contract_version"] == (
         "weekly_command_center_digest_v2"
     )
     assert "opaque" not in json_path.read_text()
