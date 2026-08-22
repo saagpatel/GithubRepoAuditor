@@ -21,6 +21,14 @@ MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
 MAX_RISK_ATTENTION_ITEMS = 5
 MAX_SECURITY_ATTENTION_ITEMS = 5
+_PERSISTED_DIGEST_SCHEMA = "weekly_command_center_digest_v2"
+_PERSISTED_REDACTED_TEXT = "<redacted>"
+_PERSISTED_SOURCE_STATUSES = frozenset(
+    {"current", "portfolio-truth-newer", "unknown-report-age"}
+)
+_PERSISTED_DECISION_STATUSES = frozenset(
+    {"ready", "watch", "blocked", "insufficient-data", "unknown"}
+)
 
 
 def _safe_text(value: Any) -> str:
@@ -443,9 +451,143 @@ def write_weekly_command_center_artifacts(
     stamp = generated_at.date().isoformat()
     json_path = output_dir / f"weekly-command-center-{username}-{stamp}.json"
     markdown_path = output_dir / f"weekly-command-center-{username}-{stamp}.md"
-    json_path.write_text(json.dumps(digest, indent=2))
-    markdown_path.write_text(render_weekly_command_center_markdown(digest))
+    persisted_digest = _persistable_weekly_command_center_digest(
+        digest, username=username, generated_at=generated_at.isoformat()
+    )
+    json_path.write_text(json.dumps(persisted_digest, indent=2))
+    markdown_path.write_text(render_weekly_command_center_markdown(persisted_digest))
     return json_path, markdown_path
+
+
+def _persisted_count(value: Any) -> int:
+    """Return a bounded structural count for the durable handoff artifact."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return max(0, min(value, 1_000_000))
+    return 0
+
+
+def _persisted_enum(value: Any, allowed: frozenset[str], default: str) -> str:
+    candidate = _safe_text(value).lower()
+    if candidate == "current" and candidate in allowed:
+        return "current"
+    if candidate == "portfolio-truth-newer" and candidate in allowed:
+        return "portfolio-truth-newer"
+    if candidate == "unknown-report-age" and candidate in allowed:
+        return "unknown-report-age"
+    if candidate == "ready" and candidate in allowed:
+        return "ready"
+    if candidate == "watch" and candidate in allowed:
+        return "watch"
+    if candidate == "blocked" and candidate in allowed:
+        return "blocked"
+    if candidate == "insufficient-data" and candidate in allowed:
+        return "insufficient-data"
+    if candidate == "unknown" and candidate in allowed:
+        return "unknown"
+    return default
+
+
+def _persistable_weekly_command_center_digest(
+    digest: dict[str, Any], *, username: str = "", generated_at: str = ""
+) -> dict[str, Any]:
+    """Build the privacy-safe projection written to disk.
+
+    The in-memory digest remains rich for the current operator process.  The
+    durable handoff is deliberately smaller: arbitrary report/provider prose,
+    repository names, paths, URLs, and identifiers are not persisted.  Only
+    fixed contract values, finite statuses, and bounded structural counts are
+    retained for continuity.
+    """
+    freshness = _mapping(digest.get("source_freshness"))
+    decision_quality = _mapping(digest.get("decision_quality"))
+    portfolio_truth = _mapping(digest.get("portfolio_truth"))
+    risk_posture = _mapping(digest.get("risk_posture"))
+    security_posture = _mapping(digest.get("security_posture"))
+    risk_tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
+
+    source_status = _persisted_enum(
+        freshness.get("status"), _PERSISTED_SOURCE_STATUSES, "unknown-report-age"
+    )
+    decision_status = _persisted_enum(
+        decision_quality.get("status"), _PERSISTED_DECISION_STATUSES, "unknown"
+    )
+
+    return {
+        "contract_version": _PERSISTED_DIGEST_SCHEMA,
+        "authority_cap": AUTHORITY_CAP,
+        "workbook_first": True,
+        "storage_policy": "allowlisted-summary-only",
+        "username": username or "unknown",
+        "generated_at": generated_at or _PERSISTED_REDACTED_TEXT,
+        "source_freshness": {
+            "status": source_status,
+            "summary": _PERSISTED_REDACTED_TEXT,
+        },
+        "headline": _PERSISTED_REDACTED_TEXT,
+        "decision": _PERSISTED_REDACTED_TEXT,
+        "why_this_week": _PERSISTED_REDACTED_TEXT,
+        "next_step": _PERSISTED_REDACTED_TEXT,
+        "queue_pressure_summary": _PERSISTED_REDACTED_TEXT,
+        "operating_paths_summary": _PERSISTED_REDACTED_TEXT,
+        "decision_quality": {
+            "status": decision_status,
+            "human_skepticism_required": True,
+            "summary": _PERSISTED_REDACTED_TEXT,
+            "authority_cap": AUTHORITY_CAP,
+        },
+        "portfolio_truth": {
+            "project_count": _persisted_count(portfolio_truth.get("project_count")),
+            "active_project_count": _persisted_count(
+                portfolio_truth.get("active_project_count")
+            ),
+            "default_attention_count": _persisted_count(
+                portfolio_truth.get("default_attention_count")
+            ),
+            "decision_queue_count": _persisted_count(
+                portfolio_truth.get("decision_queue_count")
+            ),
+        },
+        "movement": {
+            "transition_count": _persisted_count(
+                len(digest.get("movement", {}).get("transitions", []))
+                if isinstance(digest.get("movement"), dict)
+                and isinstance(digest.get("movement", {}).get("transitions"), list)
+                else 0
+            ),
+            "summary_text": _PERSISTED_REDACTED_TEXT,
+        },
+        "decision_queue": [],
+        "path_attention": [],
+        "automation_candidates": [],
+        "risk_posture": {
+            "elevated_count": _persisted_count(risk_posture.get("elevated_count")),
+            "risk_tier_counts": {
+                "moderate": _persisted_count(risk_tier_counts.get("moderate")),
+                "baseline": _persisted_count(risk_tier_counts.get("baseline")),
+            },
+            "top_elevated": [],
+        },
+        "security_posture": {
+            "scanned_count": _persisted_count(security_posture.get("scanned_count")),
+            "repos_with_blocking_findings": _persisted_count(
+                security_posture.get("repos_with_blocking_findings")
+            ),
+            "total_open_critical": _persisted_count(
+                security_posture.get("total_open_critical")
+            ),
+            "total_open_high": _persisted_count(security_posture.get("total_open_high")),
+            "total_open_secrets": _persisted_count(
+                security_posture.get("total_open_secrets")
+            ),
+            "unadmitted_count": _persisted_count(security_posture.get("unadmitted_count")),
+            "top_alerts": [],
+        },
+        "section_digest": [],
+        "top_repo_briefings": [],
+        "report_only_guardrail": (
+            "This durable digest is an advisory, allowlisted summary only."
+        ),
+    }
 
 
 def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
