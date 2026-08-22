@@ -15,9 +15,9 @@ from github_repo_auditor.operator_control_center import (
     render_control_center_markdown,
 )
 from github_repo_auditor.weekly_command_center import (
+    _PERSISTED_WEEKLY_DIGEST,
     build_weekly_command_center_digest,
     load_latest_portfolio_truth,
-    _persistable_weekly_command_center_digest,
     write_weekly_command_center_artifacts,
 )
 
@@ -230,7 +230,7 @@ def _persistable_control_center_payload(
             },
         },
         "operator_recent_changes_count": _persisted_count(recent_change_count),
-        "weekly_command_center_digest_v1": _persistable_weekly_command_center_digest(),
+        "weekly_command_center_digest_v1": _PERSISTED_WEEKLY_DIGEST,
     }
 
 

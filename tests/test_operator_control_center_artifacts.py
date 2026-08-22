@@ -6,7 +6,7 @@ import pytest
 
 from github_repo_auditor import operator_control_center_artifacts as artifacts
 from github_repo_auditor.weekly_command_center import (
-    _persistable_weekly_command_center_digest,
+    _PERSISTED_WEEKLY_DIGEST,
     write_weekly_command_center_artifacts,
 )
 from github_repo_auditor.scheduled_handoff import build_scheduled_handoff
@@ -377,7 +377,7 @@ def test_weekly_command_center_disk_projection_drops_opaque_values(tmp_path):
         digest=digest,
     )
 
-    assert _persistable_weekly_command_center_digest()["contract_version"] == (
+    assert _PERSISTED_WEEKLY_DIGEST["contract_version"] == (
         "weekly_command_center_digest_v2"
     )
     assert "opaque" not in json_path.read_text()

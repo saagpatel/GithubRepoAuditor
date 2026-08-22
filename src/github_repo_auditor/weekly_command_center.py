@@ -23,6 +23,54 @@ MAX_RISK_ATTENTION_ITEMS = 5
 MAX_SECURITY_ATTENTION_ITEMS = 5
 _PERSISTED_DIGEST_SCHEMA = "weekly_command_center_digest_v2"
 _PERSISTED_REDACTED_TEXT = "<redacted>"
+_PERSISTED_WEEKLY_DIGEST = {
+    "contract_version": _PERSISTED_DIGEST_SCHEMA,
+    "authority_cap": AUTHORITY_CAP,
+    "workbook_first": True,
+    "storage_policy": "allowlisted-summary-only",
+    "username": "operator",
+    "generated_at": _PERSISTED_REDACTED_TEXT,
+    "source_freshness": {"status": "unknown", "summary": _PERSISTED_REDACTED_TEXT},
+    "headline": _PERSISTED_REDACTED_TEXT,
+    "decision": _PERSISTED_REDACTED_TEXT,
+    "why_this_week": _PERSISTED_REDACTED_TEXT,
+    "next_step": _PERSISTED_REDACTED_TEXT,
+    "queue_pressure_summary": _PERSISTED_REDACTED_TEXT,
+    "operating_paths_summary": _PERSISTED_REDACTED_TEXT,
+    "decision_quality": {
+        "status": "unknown",
+        "human_skepticism_required": True,
+        "summary": _PERSISTED_REDACTED_TEXT,
+        "authority_cap": AUTHORITY_CAP,
+    },
+    "portfolio_truth": {
+        "project_count": 0,
+        "active_project_count": 0,
+        "default_attention_count": 0,
+        "decision_queue_count": 0,
+    },
+    "movement": {"transition_count": 0, "summary_text": _PERSISTED_REDACTED_TEXT},
+    "decision_queue": [],
+    "path_attention": [],
+    "automation_candidates": [],
+    "risk_posture": {
+        "elevated_count": 0,
+        "risk_tier_counts": {"moderate": 0, "baseline": 0},
+        "top_elevated": [],
+    },
+    "security_posture": {
+        "scanned_count": 0,
+        "repos_with_blocking_findings": 0,
+        "total_open_critical": 0,
+        "total_open_high": 0,
+        "total_open_secrets": 0,
+        "unadmitted_count": 0,
+        "top_alerts": [],
+    },
+    "section_digest": [],
+    "top_repo_briefings": [],
+    "report_only_guardrail": "This durable digest is an advisory, allowlisted summary only.",
+}
 
 
 def _safe_text(value: Any) -> str:
@@ -445,7 +493,7 @@ def write_weekly_command_center_artifacts(
     stamp = generated_at.date().isoformat()
     json_path = output_dir / f"weekly-command-center-{username}-{stamp}.json"
     markdown_path = output_dir / f"weekly-command-center-{username}-{stamp}.md"
-    persisted_digest = _persistable_weekly_command_center_digest()
+    persisted_digest = _PERSISTED_WEEKLY_DIGEST
     json_path.write_text(json.dumps(persisted_digest, indent=2))
     markdown_path.write_text(render_weekly_command_center_markdown(persisted_digest))
     return json_path, markdown_path
@@ -460,65 +508,7 @@ def _persistable_weekly_command_center_digest() -> dict[str, Any]:
     counts are not persisted.  CodeQL must be able to prove that this sink
     cannot receive data from the report/provider graph.
     """
-    return {
-        "contract_version": _PERSISTED_DIGEST_SCHEMA,
-        "authority_cap": AUTHORITY_CAP,
-        "workbook_first": True,
-        "storage_policy": "allowlisted-summary-only",
-        "username": "operator",
-        "generated_at": _PERSISTED_REDACTED_TEXT,
-        "source_freshness": {
-            "status": "unknown",
-            "summary": _PERSISTED_REDACTED_TEXT,
-        },
-        "headline": _PERSISTED_REDACTED_TEXT,
-        "decision": _PERSISTED_REDACTED_TEXT,
-        "why_this_week": _PERSISTED_REDACTED_TEXT,
-        "next_step": _PERSISTED_REDACTED_TEXT,
-        "queue_pressure_summary": _PERSISTED_REDACTED_TEXT,
-        "operating_paths_summary": _PERSISTED_REDACTED_TEXT,
-        "decision_quality": {
-            "status": "unknown",
-            "human_skepticism_required": True,
-            "summary": _PERSISTED_REDACTED_TEXT,
-            "authority_cap": AUTHORITY_CAP,
-        },
-        "portfolio_truth": {
-            "project_count": 0,
-            "active_project_count": 0,
-            "default_attention_count": 0,
-            "decision_queue_count": 0,
-        },
-        "movement": {
-            "transition_count": 0,
-            "summary_text": _PERSISTED_REDACTED_TEXT,
-        },
-        "decision_queue": [],
-        "path_attention": [],
-        "automation_candidates": [],
-        "risk_posture": {
-            "elevated_count": 0,
-            "risk_tier_counts": {
-                "moderate": 0,
-                "baseline": 0,
-            },
-            "top_elevated": [],
-        },
-        "security_posture": {
-            "scanned_count": 0,
-            "repos_with_blocking_findings": 0,
-            "total_open_critical": 0,
-            "total_open_high": 0,
-            "total_open_secrets": 0,
-            "unadmitted_count": 0,
-            "top_alerts": [],
-        },
-        "section_digest": [],
-        "top_repo_briefings": [],
-        "report_only_guardrail": (
-            "This durable digest is an advisory, allowlisted summary only."
-        ),
-    }
+    return _PERSISTED_WEEKLY_DIGEST
 
 
 def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
