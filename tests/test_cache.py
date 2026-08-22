@@ -32,11 +32,8 @@ class TestResponseCache:
 
         cache.put(url, None, {"data": True})
 
-        # Manually backdate the cache entry
-        path = cache._path(url, None)
-        entry = json.loads(path.read_text())
-        entry["cached_at"] = time.time() - 10  # 10 seconds ago, TTL is 1s
-        path.write_text(json.dumps(entry))
+        # Manually backdate the process-local entry.
+        cache._entries[cache._key(url, None)] = (time.time() - 10, {"data": True})
 
         result = cache.get(url, None)
         assert result is None
@@ -65,7 +62,7 @@ class TestResponseCache:
             {"name": "repo", "nested": {"client_secret": "secret-value"}},
         )
 
-        assert not cache._path(url, {"access_token": "secret-param", "per_page": "10"}).exists()
+        assert cache.get(url, {"access_token": "secret-param", "per_page": "10"}) is None
 
     def test_put_skips_embedded_url_credentials(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -73,7 +70,7 @@ class TestResponseCache:
 
         cache.put(url, None, {"status": "ok"})
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_skips_hyphenated_credential_alias(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -81,7 +78,7 @@ class TestResponseCache:
 
         cache.put(url, None, {"access-token": "opaque-value"})
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     @pytest.mark.parametrize("alias", ["auth-token", "refresh_token", "x-api-key"])
     def test_put_skips_additional_credential_aliases(self, tmp_path, alias):
@@ -90,7 +87,7 @@ class TestResponseCache:
 
         cache.put(url, None, {alias: "opaque-value"})
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_skips_sensitive_url_fragment(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -98,7 +95,7 @@ class TestResponseCache:
 
         cache.put(url, None, {"status": "ok"})
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_skips_additional_provider_token_family(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -106,7 +103,7 @@ class TestResponseCache:
 
         cache.put(url, None, {"note": "secret_" + ("a" * 40)})
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_skips_credential_shaped_value_under_benign_key(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -115,7 +112,7 @@ class TestResponseCache:
 
         cache.put(url, None, response)
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_skips_credential_inside_serialized_payload(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -124,7 +121,7 @@ class TestResponseCache:
 
         cache.put(url, None, response)
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_skips_private_key_material_under_benign_key(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -133,7 +130,7 @@ class TestResponseCache:
 
         cache.put(url, None, response)
 
-        assert not cache._path(url, None).exists()
+        assert cache.get(url, None) is None
 
     def test_put_preserves_noncredential_secret_scanning_shape(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
@@ -144,7 +141,17 @@ class TestResponseCache:
 
         assert cache.get(url, None) == response
 
-    def test_cache_creates_dir(self, tmp_path):
+    def test_cache_does_not_create_disk_directory(self, tmp_path):
         cache_dir = tmp_path / "deep" / "nested" / "cache"
         ResponseCache(cache_dir=cache_dir, ttl=3600)
-        assert cache_dir.exists()
+        assert not cache_dir.exists()
+
+    def test_cache_never_writes_response_payload_to_disk(self, tmp_path):
+        cache_dir = tmp_path / "cache"
+        cache = ResponseCache(cache_dir=cache_dir, ttl=3600)
+        url = "https://api.github.com/repos/user/repo/contents/README.md"
+
+        cache.put(url, None, {"content": "repository-authored text"})
+
+        assert cache.get(url, None) == {"content": "repository-authored text"}
+        assert not cache_dir.exists()
