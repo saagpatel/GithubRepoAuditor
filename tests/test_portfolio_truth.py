@@ -2037,6 +2037,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "cross-system-smoke",
         "continuity",
         "ApplyKit",
+        "portfolio-index",
     )
 
     for name, remote in {
@@ -2092,7 +2093,6 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "personal-ops": "active-infra",
         "saagpatel/operant": "active-infra",
         "AIGCCore": "active-infra",
-        "portfolio-index": "active-product",
         "operator-os-explainer": "active-product",
     }
     for name in supporting_or_retired:
@@ -2145,7 +2145,6 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
         "MCPAudit": "saagpatel/MCPAudit",
         "operant-public": "saagpatel/operant",
         "operator-os-explainer": "saagpatel/operator-os-explainer",
-        "portfolio-index": "saagpatel/portfolio-index",
         "PortfolioCommandCenter": "saagpatel/PortfolioCommandCenter",
         "proof-pr": "saagpatel/proof-pr",
     }
@@ -2211,7 +2210,7 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
     for name in ("agent-permission-diff-bot", "proof-pr"):
         assert by_display_name[name].derived.attention_state == "decision-needed"
     assert derive_default_attention_cohort(
-        result.snapshot.to_dict(), expected_count=11
+        result.snapshot.to_dict(), expected_count=10
     ) == tuple(sorted(expected_repositories.values(), key=str.lower))
 
 

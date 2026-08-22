@@ -229,7 +229,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "personal-ops": "infrastructure",
         "saagpatel/operant": "infrastructure",
         "AIGCCore": "infrastructure",
-        "portfolio-index": "commercial",
+        "safelight": "commercial",
         "operator-os-explainer": "commercial",
     }
     for repo_name, category in tier_zero.items():
@@ -237,6 +237,11 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         assert entry["lifecycle_state"] == "active"
         assert entry["operating_path"] == "maintain"
         assert entry["category"] == category
+
+    portfolio_index = catalog["repos"]["portfolio-index"]
+    assert portfolio_index["lifecycle_state"] == "manual-only"
+    assert portfolio_index["operating_path"] == "maintain"
+    assert portfolio_index["category"] == "commercial"
 
     # OPERANT has one logical identity with two catalog lookup keys: the canonical
     # GitHub full name and the local checkout basename. Normalize that alias before
@@ -270,6 +275,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "continuity",
         "cross-provider-egress-guard",
         "cost-tracker",
+        "portfolio-index",
         "portfolio-health",
         "portfolio-mcp",
         "Lazarus",
