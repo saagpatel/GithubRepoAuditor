@@ -1,6 +1,6 @@
 # audit serve — Local Web UI
 
-`audit serve` starts a local FastAPI + HTMX web interface over your latest audit output.
+`audit serve` starts a local FastAPI + progressively enhanced web interface over your latest audit output.
 It is a read-mostly operator tool: you can browse portfolio state, per-repo history, run
 history, and the approval queue, and you can trigger new audit runs through a form.
 It binds to `127.0.0.1` only and requires no authentication — treat it as a local-only
@@ -63,9 +63,11 @@ audit serve --output-dir output/demo
 
 ### `GET /`
 
-Portfolio dashboard. Reads `output/portfolio-truth-latest.json` (if present) and renders
-a summary: top-5 risk repos, top-5 completeness-gap repos, tier distribution, and an
-HTMX auto-refresh indicator.
+Portfolio dashboard. Reads the current `PortfolioTruthV1` `projects` schema (and the
+legacy flat `repos` shape) from `output/portfolio-truth-latest.json`, then renders the
+highest observed risk and lowest observed readiness projects. Missing scores are shown
+as unavailable rather than converted to zero. The page identifies missing, malformed,
+partial, stale, unknown, and unavailable evidence states explicitly.
 
 If `portfolio-truth-latest.json` is absent, the page shows a prompt to run
 `audit report <username> --portfolio-truth` first.
@@ -97,8 +99,14 @@ at `GET /runs/new/stream/{run_id}`.
 
 ### `POST /approvals/{id}/approve` and `POST /approvals/{id}/reject`
 
-HTMX endpoints for the approval queue. Record a local approval or rejection intent.
+Progressively enhanced endpoints for the approval queue. Record a local approval or rejection intent.
 These are intent-log only — they do not call `--writeback-apply`.
+
+### `GET /runs/new/status/{run_id}` and `POST /runs/new/cancel/{run_id}`
+
+Recover the bounded in-memory output and terminal state of a disconnected local run, or
+request termination of one known running child process. The browser stores only the
+opaque run ID in tab-scoped session storage; no token or provider credential is stored.
 
 ## Subprocess safety
 
@@ -106,11 +114,21 @@ All flags accepted through the `/runs/new` form are validated against a strict a
 (`SAFE_FLAG_NAMES` in `src/github_repo_auditor/serve/runner.py`). Any flag name not in the allowlist is
 rejected before the subprocess is spawned.
 
+Only valueless boolean flags are rendered as checkboxes. Value-taking flags such as
+`--output-dir`, `--excel-mode`, and `--portfolio-profile` are not exposed as checkboxes.
+The child always receives the server-configured absolute output directory, and form data
+cannot override it.
+
 Flag values are additionally checked against a shell-metacharacter blocklist. The
 characters `;`, `|`, `&`, `$`, `` ` ``, `\`, `<`, `>`, and `!` are never permitted in
 any flag value. The subprocess is always spawned with `shell=False`.
 
 These two controls together prevent shell-injection from the web form.
+
+The interaction script is served from the installed package at `/static/audit.js`; the
+local approval, initiative, refresh, and run controls do not depend on a public CDN.
+Run output is polled non-blockingly and streamed before process completion, with explicit
+completed, failed, cancelled, disconnected, and recovered states.
 
 ## Known limitations
 

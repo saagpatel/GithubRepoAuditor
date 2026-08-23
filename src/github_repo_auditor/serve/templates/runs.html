@@ -7,6 +7,7 @@
 </div>
 
 {% if rows %}
+<div class="table-scroll" tabindex="0" role="region" aria-label="Audit run history">
 <table>
   <thead>
     <tr>
@@ -23,14 +24,15 @@
     <tr>
       <td><code>{{ r.run_id[:12] }}</code></td>
       <td>{{ r.username }}</td>
-      <td>{{ r.generated_at[:19].replace("T", " ") }}</td>
+      <td><time datetime="{{ r.generated_at }}">{{ r.generated_at[:19].replace("T", " ") }}</time></td>
       <td><span class="badge">{{ r.run_mode }}</span></td>
       <td>{{ r.repos_audited }} / {{ r.total_repos }}</td>
-      <td class="score">{{ "%.1f"|format(r.average_score|float) }}</td>
+      <td class="score">{% if r.average_score is not none %}{{ "%.1f"|format(r.average_score|float) }}{% else %}Unavailable{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 <div class="pagination">
   {% if page > 1 %}
@@ -42,6 +44,8 @@
   {% endif %}
 </div>
 {% else %}
-<p class="empty">No runs found. The warehouse may not exist yet.</p>
+<p class="state-banner state-banner--{{ data_state }}" role="{% if data_state == 'unavailable' %}alert{% else %}status{% endif %}">
+  <strong>Run history: {{ data_state|title }}.</strong> {{ data_message }}
+</p>
 {% endif %}
 {% endblock %}

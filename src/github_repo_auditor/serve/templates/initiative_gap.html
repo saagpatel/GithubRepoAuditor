@@ -1,4 +1,4 @@
-<div class="gap-detail">
+<div class="gap-detail" role="status" tabindex="-1">
   <strong>{{ repo_name }}</strong>: {{ current_tier_name }} → {{ target_tier_name }}
   {% if missing_requirements %}
   <ul class="gap-list">
@@ -12,6 +12,6 @@
     {% endfor %}
   </ul>
   {% else %}
-  <span style="color: var(--approved, #198754); margin-left: 0.5em;">✓ All requirements met</span>
+  <span style="color: var(--approved, #198754); margin-inline-start: 0.5em;">✓ All requirements met</span>
   {% endif %}
 </div>

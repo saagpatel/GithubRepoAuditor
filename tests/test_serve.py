@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 import sys
 import time
@@ -22,7 +23,11 @@ pytest.importorskip("jinja2", reason="[serve] extra not installed")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from github_repo_auditor.serve.app import create_app  # noqa: E402
-from github_repo_auditor.serve.runner import SAFE_FLAG_NAMES, validate_flags, validate_username  # noqa: E402
+from github_repo_auditor.serve.runner import (  # noqa: E402
+    SAFE_FLAG_NAMES,
+    validate_flags,
+    validate_username,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -95,11 +100,33 @@ def output_dir(tmp_path: Path) -> Path:
     )
     conn.execute(
         "INSERT INTO audit_runs VALUES (?,?,?,?,?,?,?,?,?,?)",
-        ("run-001", "testuser", "2026-01-01T00:00:00", "1", "default", "full", None, 2, 2, 67.5),
+        (
+            "run-001",
+            "testuser",
+            "2026-01-01T00:00:00",
+            "1",
+            "default",
+            "full",
+            None,
+            2,
+            2,
+            67.5,
+        ),
     )
     conn.execute(
         "INSERT INTO audit_runs VALUES (?,?,?,?,?,?,?,?,?,?)",
-        ("run-002", "testuser", "2026-01-02T00:00:00", "1", "default", "full", None, 2, 2, 70.0),
+        (
+            "run-002",
+            "testuser",
+            "2026-01-02T00:00:00",
+            "1",
+            "default",
+            "full",
+            None,
+            2,
+            2,
+            70.0,
+        ),
     )
     conn.execute(
         "INSERT INTO repo_snapshots VALUES (?,?,?,?,?)",
@@ -143,6 +170,59 @@ class TestIndexRoute:
         resp = client.get("/")
         assert "text/html" in resp.headers["content-type"]
 
+    def test_current_portfolio_truth_projects_schema_is_rendered(
+        self, tmp_path: Path
+    ) -> None:
+        output = tmp_path / "output"
+        output.mkdir()
+        shutil.copyfile(
+            Path("fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json"),
+            output / "portfolio-truth-latest.json",
+        )
+
+        resp = TestClient(create_app(output_dir=output)).get("/")
+
+        assert resp.status_code == 200
+        assert "4 repos" in resp.text
+        assert "Quartz Signal" in resp.text
+        assert "Data status: Partial" in resp.text
+        assert "1 scanned of 3 in cohort" in resp.text
+
+    def test_missing_scores_are_not_fabricated_as_zero(self, tmp_path: Path) -> None:
+        output = tmp_path / "output"
+        output.mkdir()
+        (output / "portfolio-truth-latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": "2026-08-23T00:00:00Z",
+                    "repos": [
+                        {"name": "unknown-scores"},
+                        {"name": "observed", "risk_score": 8, "completeness_score": 72},
+                    ],
+                }
+            )
+        )
+
+        resp = TestClient(create_app(output_dir=output)).get("/")
+
+        assert resp.status_code == 200
+        assert "unknown-scores" not in resp.text
+        assert "8.0" in resp.text
+        assert "72.0" in resp.text
+        assert "0.0" not in resp.text
+
+    def test_malformed_truth_is_distinct_from_empty(self, tmp_path: Path) -> None:
+        output = tmp_path / "output"
+        output.mkdir()
+        (output / "portfolio-truth-latest.json").write_text("{not-json")
+
+        resp = TestClient(create_app(output_dir=output)).get("/")
+
+        assert resp.status_code == 200
+        assert "Data status: Malformed" in resp.text
+        assert "malformed; no scores are shown" in resp.text
+        assert "loaded successfully but contains no projects" not in resp.text
+
 
 class TestRepoDetailRoute:
     def test_known_repo_returns_200(self, client: TestClient) -> None:
@@ -162,7 +242,12 @@ class TestRepoDetailRoute:
         assert resp.status_code == 404
 
     def test_known_repo_reads_production_warehouse_schema(self, tmp_path: Path) -> None:
-        from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+        from github_repo_auditor.models import (
+            AnalyzerResult,
+            AuditReport,
+            RepoAudit,
+            RepoMetadata,
+        )
         from github_repo_auditor.warehouse import write_warehouse_snapshot
 
         od = tmp_path / "output"
@@ -236,6 +321,21 @@ class TestRepoDetailRoute:
         assert "55.0" in resp.text
         assert "testing" in resp.text
 
+    def test_corrupt_warehouse_is_unavailable_not_missing(self, tmp_path: Path) -> None:
+        output = tmp_path / "output"
+        output.mkdir()
+        (output / "portfolio-truth-latest.json").write_text(
+            json.dumps({"repos": [{"name": "repo-alpha"}]})
+        )
+        (output / "portfolio-warehouse.db").write_text("not a sqlite database")
+
+        resp = TestClient(create_app(output_dir=output)).get("/repos/repo-alpha")
+
+        assert resp.status_code == 200
+        assert "History is unavailable, not empty" in resp.text
+        assert "Dimension scores could not be read" in resp.text
+        assert "No portfolio warehouse exists" not in resp.text
+
 
 class TestRunsRoute:
     def test_returns_200(self, client: TestClient) -> None:
@@ -258,6 +358,60 @@ class TestRunsRoute:
         c = TestClient(app)
         resp = c.get("/runs")
         assert resp.status_code == 200
+        assert "Run history: Missing" in resp.text
+
+    def test_corrupt_warehouse_is_unavailable_not_missing(self, tmp_path: Path) -> None:
+        output = tmp_path / "output"
+        output.mkdir()
+        (output / "portfolio-warehouse.db").write_text("not a sqlite database")
+
+        resp = TestClient(create_app(output_dir=output)).get("/runs")
+
+        assert resp.status_code == 200
+        assert "Run history: Unavailable" in resp.text
+        assert "Run history: Missing" not in resp.text
+
+    def test_missing_auxiliary_scores_are_not_rendered_as_zero(
+        self, tmp_path: Path
+    ) -> None:
+        output = tmp_path / "output"
+        output.mkdir()
+        (output / "portfolio-truth-latest.json").write_text(
+            json.dumps({"repos": [{"name": "repo-alpha"}]})
+        )
+        conn = sqlite3.connect(str(output / "portfolio-warehouse.db"))
+        conn.executescript(
+            """
+            CREATE TABLE audit_runs (
+                run_id TEXT, username TEXT, generated_at TEXT, run_mode TEXT,
+                total_repos INTEGER, repos_audited INTEGER, average_score REAL
+            );
+            CREATE TABLE repo_snapshots (
+                run_id TEXT, repo_name TEXT, total_score REAL,
+                completeness_score REAL, risk_score REAL
+            );
+            CREATE TABLE dimension_scores (
+                run_id TEXT, repo_name TEXT, dimension TEXT, score REAL, weight REAL
+            );
+            INSERT INTO audit_runs VALUES
+                ('run-null', 'user', '2026-08-23T00:00:00Z', 'full', 1, 1, NULL);
+            INSERT INTO repo_snapshots VALUES
+                ('run-null', 'repo-alpha', NULL, NULL, NULL);
+            INSERT INTO dimension_scores VALUES
+                ('run-null', 'repo-alpha', 'testing', NULL, 1.0);
+            """
+        )
+        conn.commit()
+        conn.close()
+        app = create_app(output_dir=output)
+
+        runs = TestClient(app).get("/runs")
+        repo = TestClient(app).get("/repos/repo-alpha")
+
+        assert "Unavailable" in runs.text
+        assert "0.0" not in runs.text
+        assert repo.text.count("Unavailable") >= 2
+        assert "0.0" not in repo.text
 
 
 class TestApprovalsRoute:
@@ -276,7 +430,10 @@ class TestApprovalsRoute:
                 "approval_state": "not-applicable",
             },
         ]
-        with patch("github_repo_auditor.warehouse.load_approval_records", return_value=fake_records):
+        with patch(
+            "github_repo_auditor.warehouse.load_approval_records",
+            return_value=fake_records,
+        ):
             resp = client.get("/approvals")
         assert resp.status_code == 200
         assert "appr-001" in resp.text
@@ -289,6 +446,7 @@ class TestApprovalsRoute:
         c = TestClient(app)
         resp = c.get("/approvals")
         assert resp.status_code == 200
+        assert "Approval data: Empty" in resp.text
 
 
 class TestNewRunRoute:
@@ -296,6 +454,24 @@ class TestNewRunRoute:
         resp = client.get("/runs/new")
         assert resp.status_code == 200
         assert "username" in resp.text.lower()
+        assert 'name="flags"' in resp.text
+        assert "--output-dir" not in resp.text
+        assert "--excel-mode" not in resp.text
+
+    def test_repeated_checkbox_flags_are_forwarded(self, client: TestClient) -> None:
+        with patch(
+            "github_repo_auditor.serve.routes.spawn_run", return_value="abc123"
+        ) as spawn:
+            resp = client.post(
+                "/runs/new",
+                data={"username": "testuser", "flags": ["portfolio-truth", "html"]},
+            )
+
+        assert resp.status_code == 200
+        assert spawn.call_args.kwargs["flags"] == {
+            "portfolio-truth": True,
+            "html": True,
+        }
 
     def test_post_valid_flags_returns_run_id(self, client: TestClient) -> None:
         with patch("github_repo_auditor.serve.routes.spawn_run", return_value="abc123"):
@@ -327,10 +503,15 @@ class TestNewRunRoute:
         resp = client.post("/runs/new", data={"flags": ""})
         assert resp.status_code == 422
 
-    def test_post_rejects_shell_metacharacters_in_username(self, client: TestClient) -> None:
+    def test_post_rejects_shell_metacharacters_in_username(
+        self, client: TestClient
+    ) -> None:
         resp = client.post(
             "/runs/new",
-            data={"username": "octo; touch /tmp/audit-test", "flags": "--portfolio-truth"},
+            data={
+                "username": "octo; touch /tmp/audit-test",
+                "flags": "--portfolio-truth",
+            },
         )
         assert resp.status_code == 422
 
@@ -419,7 +600,9 @@ class TestDraftReadmeApprovals:
         assert "repo-with-readme" in resp.text
         assert "repo-no-readme" in resp.text
 
-    def test_draft_diff_returns_200_with_proposed_readme(self, output_dir: Path) -> None:
+    def test_draft_diff_returns_200_with_proposed_readme(
+        self, output_dir: Path
+    ) -> None:
         id1, _id2 = _seed_draft_readme_records(output_dir)
         app = create_app(output_dir=output_dir)
         c = TestClient(app, raise_server_exceptions=True)
@@ -455,7 +638,9 @@ class TestDraftReadmeApprovals:
         resp = c.get("/approvals/nonexistent-record-id/draft-diff")
         assert resp.status_code == 404
 
-    def test_draft_diff_partial_has_no_html_or_body_tags(self, output_dir: Path) -> None:
+    def test_draft_diff_partial_has_no_html_or_body_tags(
+        self, output_dir: Path
+    ) -> None:
         """The partial must be HTMX-injectable: no <html> or <body> wrapper."""
         id1, _id2 = _seed_draft_readme_records(output_dir)
         app = create_app(output_dir=output_dir)
@@ -466,7 +651,9 @@ class TestDraftReadmeApprovals:
         assert "<html" not in body
         assert "<body" not in body
 
-    def test_approvals_shows_view_diff_button_for_draft_readme(self, output_dir: Path) -> None:
+    def test_approvals_shows_view_diff_button_for_draft_readme(
+        self, output_dir: Path
+    ) -> None:
         id1, _id2 = _seed_draft_readme_records(output_dir)
         app = create_app(output_dir=output_dir)
         c = TestClient(app, raise_server_exceptions=True)
@@ -536,16 +723,130 @@ class TestStreamRoute:
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers["content-type"]
 
+    def test_run_session_exposes_output_before_completion_and_cancels(
+        self, output_dir: Path
+    ) -> None:
+        from github_repo_auditor.serve.runner import RunSession
+
+        session = RunSession("fixture-run", "testuser", [], output_dir)
+        session.cmd = (
+            sys.executable,
+            "-c",
+            "import time; print('first', flush=True); time.sleep(5)",
+        )
+        session.start()
+
+        deadline = time.monotonic() + 2
+        lines: list[str] = []
+        cursor = 0
+        while not lines and time.monotonic() < deadline:
+            lines, cursor, truncated = session.read(after=cursor)
+            time.sleep(0.01)
+
+        assert lines == ["first"]
+        assert truncated is False
+        assert session.done is False
+        assert session.cancel() is True
+
+        deadline = time.monotonic() + 5
+        while not session.done and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert session.done is True
+        assert session.status == "cancelled"
+
+    def test_status_and_cancel_unknown_run_are_explicit(
+        self, client: TestClient
+    ) -> None:
+        assert client.get("/runs/new/status/not-known").status_code == 404
+        assert client.post("/runs/new/cancel/not-known").status_code == 404
+
+    def test_value_taking_flag_cannot_be_submitted_as_checkbox(
+        self, client: TestClient
+    ) -> None:
+        resp = client.post(
+            "/runs/new",
+            data={"username": "octo-org", "flags": "excel-mode"},
+        )
+
+        assert resp.status_code == 422
+        assert "not available as a local run option" in resp.json()["detail"]
+
+    def test_run_control_is_scoped_to_server_output_root(
+        self, tmp_path: Path
+    ) -> None:
+        from github_repo_auditor.serve import runner as runner_mod
+        from github_repo_auditor.serve.runner import spawn_run
+
+        first_output = tmp_path / "first"
+        second_output = tmp_path / "second"
+        first_output.mkdir()
+        second_output.mkdir()
+        with patch.object(runner_mod.RunSession, "start"):
+            run_id = spawn_run("octo-org", {}, first_output)
+
+        owner = TestClient(create_app(output_dir=first_output))
+        other = TestClient(create_app(output_dir=second_output))
+
+        assert owner.get(f"/runs/new/status/{run_id}").status_code == 200
+        assert other.get(f"/runs/new/status/{run_id}").status_code == 404
+        assert other.get(f"/runs/new/stream/{run_id}").status_code == 404
+        assert other.post(f"/runs/new/cancel/{run_id}").status_code == 404
+
+    def test_bounded_output_recovery_reports_truncation(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        from github_repo_auditor.serve import runner as runner_mod
+        from github_repo_auditor.serve.runner import RunSession
+
+        session = RunSession("long-run", "octo-org", [], output_dir)
+        for index in range(205):
+            session._lines.append((index, f"line {index}"))
+            session._next_line = index + 1
+        runner_mod._registry[session.run_id] = session
+
+        status = client.get(f"/runs/new/status/{session.run_id}")
+        script = client.get("/static/audit.js")
+
+        assert status.status_code == 200
+        assert status.json()["truncated"] is True
+        assert status.json()["lines"][0] == "line 5"
+        assert "Earlier output was truncated from the bounded buffer" in script.text
+
+
+class TestLocalInteractionRuntime:
+    def test_base_uses_only_local_interaction_script(self, client: TestClient) -> None:
+        resp = client.get("/")
+
+        assert 'src="/static/audit.js"' in resp.text
+        assert "unpkg.com" not in resp.text
+        assert "hx-" not in resp.text
+
+    def test_action_fragments_are_announced_and_focusable(self) -> None:
+        from github_repo_auditor.serve.routes import (
+            _render_action_row,
+            _render_section_card,
+        )
+
+        action = _render_action_row("packet", 0, {"state": "approved"})
+        section = _render_section_card("section", {"state": "rejected"})
+
+        assert "Approved" in action
+        assert "section-card--rejected" in section
+        assert "data-audit-form" not in action
+        assert "data-audit-form" not in section
+
 
 class TestRunnerCommandBoundary:
-    def test_form_values_are_not_embedded_in_worker_command(self, output_dir: Path) -> None:
+    def test_form_values_are_not_embedded_in_worker_command(
+        self, output_dir: Path
+    ) -> None:
         from github_repo_auditor.serve import runner as runner_mod
         from github_repo_auditor.serve.runner import spawn_run
 
         with patch.object(runner_mod.RunSession, "start"):
             run_id = spawn_run(
                 username="octo-org",
-                flags={"output-dir": "user-controlled-output"},
+                flags={"portfolio-truth": True},
                 output_dir=output_dir,
             )
 
@@ -557,9 +858,21 @@ class TestRunnerCommandBoundary:
             "github_repo_auditor.serve.worker",
         )
         assert "octo-org" not in session.cmd
-        assert "user-controlled-output" not in session.cmd
+        assert str(output_dir) not in session.cmd
 
-    def test_worker_passes_payload_to_cli_inside_child_process(self, monkeypatch) -> None:
+    def test_form_cannot_override_server_output_dir(self, output_dir: Path) -> None:
+        from github_repo_auditor.serve.runner import spawn_run
+
+        with pytest.raises(ValueError, match="controlled by the local server"):
+            spawn_run(
+                username="octo-org",
+                flags={"output-dir": "user-controlled-output"},
+                output_dir=output_dir,
+            )
+
+    def test_worker_passes_payload_to_cli_inside_child_process(
+        self, monkeypatch
+    ) -> None:
         from io import StringIO
 
         import github_repo_auditor.cli as cli
@@ -572,22 +885,25 @@ class TestRunnerCommandBoundary:
                 json.dumps(
                     {
                         "username": "octo-org",
-                        "flag_args": ["--portfolio-truth", "--output-dir", "safe-output"],
+                        "flag_args": ["--portfolio-truth"],
+                        "output_dir": "/safe-output",
                     }
                 )
             ),
         )
         captured: dict[str, list[str]] = {}
-        monkeypatch.setattr(cli, "main", lambda: captured.setdefault("argv", list(sys.argv)))
+        monkeypatch.setattr(
+            cli, "main", lambda: captured.setdefault("argv", list(sys.argv))
+        )
 
         worker.main()
 
         assert captured["argv"] == [
             "audit",
             "octo-org",
-            "--portfolio-truth",
             "--output-dir",
-            "safe-output",
+            "/safe-output",
+            "--portfolio-truth",
         ]
 
 
@@ -704,7 +1020,9 @@ class TestHtmxFragmentEscaping:
         assert "&lt;h1&gt;bad&lt;/h1&gt;" in html
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
-    def test_campaign_action_error_hides_exception_details(self, client: TestClient) -> None:
+    def test_campaign_action_error_hides_exception_details(
+        self, client: TestClient
+    ) -> None:
         with patch(
             "github_repo_auditor.plan_campaign.approve_action",
             side_effect=ValueError("internal stack trace /tmp/private.py:99"),
@@ -740,7 +1058,9 @@ class TestCLIServeFlag:
 
         parser = build_parser()
         # --serve must be a recognised flag (parse with a dummy username)
-        args = parser.parse_args(["dummyuser", "--serve", "--port", "9999", "--host", "0.0.0.0"])
+        args = parser.parse_args(
+            ["dummyuser", "--serve", "--port", "9999", "--host", "0.0.0.0"]
+        )
         assert args.serve is True
         assert args.port == 9999
         assert args.host == "0.0.0.0"
@@ -820,7 +1140,9 @@ class TestCampaignPlanApprovals:
         assert resp.status_code == 200
         assert record_id[:12] in resp.text or "campaign-plan" in resp.text
 
-    def test_campaign_plan_partial_returns_200_with_goal(self, output_dir: Path) -> None:
+    def test_campaign_plan_partial_returns_200_with_goal(
+        self, output_dir: Path
+    ) -> None:
         """GET /approvals/{id}/campaign-plan → 200, contains goal text and action row."""
         record_id = _seed_campaign_plan_record(output_dir)
         app = create_app(output_dir=output_dir)
@@ -830,7 +1152,9 @@ class TestCampaignPlanApprovals:
         assert "add CI to all repos" in resp.text
         assert "my-repo" in resp.text
 
-    def test_campaign_plan_non_campaign_plan_returns_404(self, output_dir: Path) -> None:
+    def test_campaign_plan_non_campaign_plan_returns_404(
+        self, output_dir: Path
+    ) -> None:
         """A draft-readme record requested via /campaign-plan → 404."""
         _id1, _id2 = _seed_draft_readme_records(output_dir)
         app = create_app(output_dir=output_dir)
@@ -838,14 +1162,18 @@ class TestCampaignPlanApprovals:
         resp = c.get(f"/approvals/{_id1}/campaign-plan")
         assert resp.status_code == 404
 
-    def test_campaign_plan_nonexistent_record_returns_404(self, output_dir: Path) -> None:
+    def test_campaign_plan_nonexistent_record_returns_404(
+        self, output_dir: Path
+    ) -> None:
         """GET /approvals/nonexistent/campaign-plan → 404."""
         app = create_app(output_dir=output_dir)
         c = TestClient(app, raise_server_exceptions=True)
         resp = c.get("/approvals/nonexistent-campaign-id/campaign-plan")
         assert resp.status_code == 404
 
-    def test_campaign_plan_partial_has_no_html_or_body_tags(self, output_dir: Path) -> None:
+    def test_campaign_plan_partial_has_no_html_or_body_tags(
+        self, output_dir: Path
+    ) -> None:
         """The partial must be HTMX-injectable: no <html> or <body> wrapper."""
         record_id = _seed_campaign_plan_record(output_dir)
         app = create_app(output_dir=output_dir)
@@ -856,7 +1184,9 @@ class TestCampaignPlanApprovals:
         assert "<html" not in body
         assert "<body" not in body
 
-    def test_campaign_plan_pending_rows_have_de_emphasis_class(self, output_dir: Path) -> None:
+    def test_campaign_plan_pending_rows_have_de_emphasis_class(
+        self, output_dir: Path
+    ) -> None:
         """Pending-human-action rows render with the de-emphasis CSS class."""
         record_id = _seed_campaign_plan_record(output_dir)
         app = create_app(output_dir=output_dir)

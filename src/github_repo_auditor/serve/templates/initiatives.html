@@ -18,8 +18,8 @@
     background: var(--accent, #0d6efd);
     border-radius: 4px;
   }
-  .gap-list { margin: 0.4rem 0 0 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--muted, #6c757d); }
-  .approx-hint { color: #888; font-size: 0.85em; margin-left: 0.25rem; }
+  .gap-list { margin: 0.4rem 0 0 0; padding-inline-start: 1.2rem; font-size: 0.85rem; color: var(--muted, #5c636a); }
+  .approx-hint { color: #5c636a; font-size: 0.85em; margin-inline-start: 0.25rem; }
 </style>
 
 <div class="page-header">
@@ -33,11 +33,18 @@
   </p>
 </div>
 
+{% if data_state != 'available' %}
+<p class="state-banner state-banner--{{ data_state }}" role="{% if data_state in ['malformed', 'unavailable'] %}alert{% else %}status{% endif %}">
+  <strong>Portfolio context: {{ data_state|title }}.</strong> {{ data_message }}
+</p>
+{% endif %}
+
 {% if not rows %}
 <p class="empty">No open initiatives. Set one with:<br>
   <code>python3 -m github_repo_auditor.cli --set-initiative &lt;repo&gt; --target-tier 3 --deadline 2026-12-31</code>
 </p>
 {% else %}
+<div class="table-scroll" tabindex="0" role="region" aria-label="Open initiatives">
 <table>
   <thead>
     <tr>
@@ -53,13 +60,16 @@
   <tbody>
     {% for row in rows %}
     <tr>
-      <td><strong>{{ row.repo_name }}</strong></td>
+      <td><strong><bdi>{{ row.repo_name }}</bdi></strong></td>
       <td><span class="badge badge-tier">{{ row.current_tier_name }}</span></td>
       <td><span class="badge badge-tier">{{ row.target_tier_name }}</span></td>
       <td>
-        <div class="progress-track" title="{{ row.progress_pct }}%">
+        <div class="progress-track" role="progressbar"
+          aria-label="{{ row.repo_name }} maturity progress from {{ row.current_tier_name }} to {{ row.target_tier_name }}"
+          aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ row.progress_pct }}">
           <div class="progress-fill" style="width: {{ row.progress_pct }}%;"></div>
         </div>
+        <span class="visually-hidden">{{ row.progress_pct }} percent</span>
       </td>
       <td>{{ row.deadline or "—" }}</td>
       <td>
@@ -72,10 +82,11 @@
         <span class="badge {{ status_class }}">{{ row.status }}</span>
       </td>
       <td class="action-cell">
-        <button class="btn btn-sm btn-secondary"
-          hx-get="/initiatives/{{ row.repo_name }}/gap?target={{ row.target_tier }}"
-          hx-target="#gap-{{ loop.index }}"
-          hx-swap="innerHTML">View gap</button>
+        <a class="btn btn-sm btn-secondary"
+          href="/initiatives/{{ row.repo_name|urlencode }}/gap?target={{ row.target_tier }}"
+          data-audit-get="/initiatives/{{ row.repo_name|urlencode }}/gap?target={{ row.target_tier }}"
+          data-audit-target="#gap-{{ loop.index }}"
+          data-audit-success="Initiative gap loaded.">View gap</a>
       </td>
     </tr>
     <tr>
@@ -86,5 +97,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}

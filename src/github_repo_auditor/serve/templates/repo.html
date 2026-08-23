@@ -4,13 +4,17 @@
 {% if error %}
 <div class="page-header">
   <h1>Repo Not Found</h1>
-  <p class="meta error-text">{{ error }}</p>
+  <p class="meta error-text" role="alert">{{ error }}</p>
 </div>
-<p>The portfolio truth snapshot doesn't contain <code>{{ name }}</code>. Run <code>audit report {{ name }} --portfolio-truth</code> to populate it.</p>
+{% if data_state in ['missing', 'malformed', 'unavailable'] %}
+<p>{{ data_message }} Resolve that snapshot state before interpreting this as an absent repository.</p>
+{% else %}
+<p>The loaded portfolio truth snapshot does not contain <code>{{ name }}</code>.</p>
+{% endif %}
 <p><a href="/">&larr; Dashboard</a></p>
 {% else %}
 <div class="page-header">
-  <h1>{{ repo.name }}</h1>
+  <h1><bdi>{{ repo.name }}</bdi></h1>
   <p class="meta">
     {% if repo.language %}<span class="badge">{{ repo.language }}</span>{% endif %}
     {% if repo.tier %}<span class="badge badge-tier">Tier {{ repo.tier }}</span>{% endif %}
@@ -20,21 +24,32 @@
 <div class="grid-2">
   <section>
     <h2>Scores</h2>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Repository scores">
     <table>
       <tbody>
-        <tr><td>Total Score</td><td class="score">{{ "%.1f"|format(repo.total_score|default(repo.score)|float) }}</td></tr>
-        <tr><td>Risk Score</td><td class="score score-risk">{{ "%.1f"|format(repo.risk_score|default(repo.risk)|float) }}</td></tr>
-        <tr><td>Completeness</td><td class="score">{{ "%.1f"|format(repo.completeness_score|default(repo.completeness)|float) }}</td></tr>
+        {% if repo.canonical_project %}
+        <tr><th scope="row">Maturity</th><td class="score">{{ repo.maturity_label }}</td></tr>
+        <tr><th scope="row">Risk</th><td class="score score-risk">{{ repo.risk_label }}</td></tr>
+        <tr><th scope="row">Attention</th><td>{{ repo.attention_state }}</td></tr>
+        <tr><th scope="row">Activity</th><td>{{ repo.activity_status }}</td></tr>
+        <tr><th scope="row">Security coverage</th><td>{{ repo.security_coverage_state }}</td></tr>
+        {% else %}
+        <tr><th scope="row">Total Score</th><td class="score">{% if repo.total_score is not none %}{{ "%.1f"|format(repo.total_score) }}{% else %}Unavailable{% endif %}</td></tr>
+        <tr><th scope="row">Risk Score</th><td class="score score-risk">{{ repo.risk_label }}</td></tr>
+        <tr><th scope="row">Completeness</th><td class="score">{{ repo.readiness_label }}</td></tr>
         {% if repo.interest_score is defined %}
-        <tr><td>Interest Score</td><td class="score">{{ "%.1f"|format(repo.interest_score|float) }}</td></tr>
+        <tr><th scope="row">Interest Score</th><td class="score">{% if repo.interest_score is not none %}{{ "%.1f"|format(repo.interest_score|float) }}{% else %}Unavailable{% endif %}</td></tr>
+        {% endif %}
         {% endif %}
       </tbody>
     </table>
+    </div>
   </section>
 
   <section>
     <h2>Run History (last 5)</h2>
     {% if history %}
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Repository run history">
     <table>
       <thead>
         <tr><th>Run</th><th>Date</th><th>Score</th></tr>
@@ -44,13 +59,18 @@
         <tr>
           <td><code>{{ h.run_id[:8] }}</code></td>
           <td>{{ h.generated_at[:10] }}</td>
-          <td class="score">{{ "%.1f"|format(h.total_score|float) }}</td>
+          <td class="score">{% if h.total_score is not none %}{{ "%.1f"|format(h.total_score|float) }}{% else %}Unavailable{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
+    {% elif history_state == 'unavailable' %}
+    <p class="state-message state-message--error" role="alert">Warehouse history could not be read. History is unavailable, not empty.</p>
+    {% elif history_state == 'missing' %}
+    <p class="state-message">No portfolio warehouse exists for optional run history.</p>
     {% else %}
-    <p class="empty">No warehouse history found for this repo.</p>
+    <p class="empty">The warehouse is readable and contains no history for this repo.</p>
     {% endif %}
   </section>
 </div>
@@ -58,6 +78,7 @@
 {% if dimension_scores %}
 <section>
   <h2>Dimension Scores</h2>
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Dimension scores">
   <table>
     <thead>
       <tr><th>Dimension</th><th>Score</th><th>Weight</th></tr>
@@ -66,12 +87,28 @@
       {% for d in dimension_scores %}
       <tr>
         <td>{{ d.dimension }}</td>
-        <td class="score">{{ "%.1f"|format(d.score|float) }}</td>
+        <td class="score">{% if d.score is not none %}{{ "%.1f"|format(d.score|float) }}{% else %}Unavailable{% endif %}</td>
         <td>{{ d.weight }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+</section>
+{% elif dimension_state == 'unavailable' %}
+<section>
+  <h2>Dimension Scores</h2>
+  <p class="state-message state-message--error" role="alert">Dimension scores could not be read. They are unavailable, not empty.</p>
+</section>
+{% elif dimension_state == 'missing' %}
+<section>
+  <h2>Dimension Scores</h2>
+  <p class="state-message">No portfolio warehouse exists for optional dimension scores.</p>
+</section>
+{% else %}
+<section>
+  <h2>Dimension Scores</h2>
+  <p class="empty">The warehouse is readable and contains no dimension scores for this repo.</p>
 </section>
 {% endif %}
 

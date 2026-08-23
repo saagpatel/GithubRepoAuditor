@@ -3,14 +3,10 @@
 {% block content %}
 <div class="page-header">
   <h1>Start New Audit Run</h1>
+  <p class="meta">Runs write only to this server's configured output directory.</p>
 </div>
 
-<form
-  hx-post="/runs/new"
-  hx-target="#run-result"
-  hx-swap="innerHTML"
-  class="run-form"
->
+<form action="/runs/new" method="post" data-audit-run-form class="run-form">
   <div class="form-group">
     <label for="username">GitHub Username</label>
     <input
@@ -18,67 +14,36 @@
       id="username"
       name="username"
       placeholder="e.g. torvalds"
+      autocomplete="off"
       required
       class="form-input"
     >
   </div>
 
-  <div class="form-group">
-    <label>Flags (select any)</label>
+  <fieldset class="form-group">
+    <legend>Optional report outputs</legend>
     <div class="flag-grid">
       {% for flag in safe_flags %}
       <label class="flag-label">
-        <input type="checkbox" name="flag_{{ flag }}" value="{{ flag }}"> --{{ flag }}
+        <input type="checkbox" name="flags" value="{{ flag }}"> --{{ flag }}
       </label>
       {% endfor %}
     </div>
-    <input type="hidden" name="flags" id="flags-hidden">
-  </div>
+    <p class="field-hint">Flags that require a value are not offered as checkboxes.</p>
+  </fieldset>
 
-  <button type="submit" class="btn" onclick="collectFlags(event)">Start Run</button>
+  <button type="submit" class="btn" id="start-run">Start Run</button>
 </form>
 
-<div id="run-result"></div>
+<div id="run-result" class="run-result" role="status" aria-live="polite" tabindex="-1"></div>
 
-<div id="stream-panel" style="display:none">
-  <h2>Live Output</h2>
-  <pre id="stream-output" class="stream-box"></pre>
-</div>
-
-<script>
-function collectFlags(e) {
-  const checks = document.querySelectorAll('input[type=checkbox]:checked');
-  const vals = Array.from(checks).map(c => '--' + c.value).join(' ');
-  document.getElementById('flags-hidden').value = vals;
-}
-
-document.body.addEventListener('htmx:afterRequest', function(evt) {
-  const detail = evt.detail;
-  if (detail.requestConfig && detail.requestConfig.path === '/runs/new' && detail.successful) {
-    try {
-      const data = JSON.parse(detail.xhr.responseText);
-      if (data.run_id) {
-        startStream(data.run_id);
-      }
-    } catch(e) { /* not JSON — template response on validation error */ }
-  }
-});
-
-function startStream(runId) {
-  const panel = document.getElementById('stream-panel');
-  const box = document.getElementById('stream-output');
-  panel.style.display = '';
-  box.textContent = '';
-
-  const es = new EventSource('/runs/new/stream/' + runId);
-  es.onmessage = function(e) {
-    box.textContent += e.data + '\n';
-    box.scrollTop = box.scrollHeight;
-    if (e.data.startsWith('[DONE')) {
-      es.close();
-    }
-  };
-  es.onerror = function() { es.close(); };
-}
-</script>
+<section id="stream-panel" class="stream-panel" hidden aria-labelledby="stream-heading">
+  <h2 id="stream-heading">Run output</h2>
+  <p id="run-status" role="status" aria-live="polite">Waiting to start.</p>
+  <div class="run-controls">
+    <button type="button" class="btn btn-reject" id="cancel-run">Cancel run</button>
+    <button type="button" class="btn btn-secondary" id="resume-run" hidden>Resume stream</button>
+  </div>
+  <pre id="stream-output" class="stream-box" aria-label="Audit run output" aria-live="off" tabindex="0"></pre>
+</section>
 {% endblock %}

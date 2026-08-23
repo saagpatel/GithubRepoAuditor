@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Draft Sections — {{ repo_name }}{% endblock %}
 {% block content %}
-<div class="draft-sections-container">
+<div class="draft-sections-container" data-audit-count-scope="sections">
   <div class="draft-sections__header">
     <h1 class="draft-sections__title">README sections — <code>{{ repo_name }}</code></h1>
     <p class="draft-sections__packet-id">Packet: <code>{{ packet_id }}</code></p>
   </div>
 
   <p class="draft-sections__counter" id="section-counts">
-    <span class="badge badge-approved">{{ approved_count }} approved</span>
+    <span class="badge badge-approved"><span data-audit-count="approved">{{ approved_count }}</span> approved</span>
     &middot;
-    <span class="badge badge-rejected">{{ rejected_count }} rejected</span>
+    <span class="badge badge-rejected"><span data-audit-count="rejected">{{ rejected_count }}</span> rejected</span>
     &middot;
-    <span class="badge badge-pending">{{ pending_count }} pending</span>
+    <span class="badge badge-pending"><span data-audit-count="pending">{{ pending_count }}</span> pending</span>
     &middot;
     {{ total }} total
   </p>
@@ -39,14 +39,18 @@
       <pre class="section-card__body">{{ section.section_body }}</pre>
       <div class="section-card__actions">
         {% if state == "pending" %}
-        <button class="btn-approve"
-          hx-post="/approvals/sections/{{ record_id }}/approve"
-          hx-target="closest .section-card"
-          hx-swap="outerHTML">&#10003; Approve</button>
-        <button class="btn-reject"
-          hx-post="/approvals/sections/{{ record_id }}/reject"
-          hx-target="closest .section-card"
-          hx-swap="outerHTML">&#10007; Reject</button>
+        <form class="inline-form" method="post" action="/approvals/sections/{{ record_id }}/approve"
+          data-audit-form data-audit-target="closest .section-card" data-audit-swap="outerHTML"
+          data-audit-decision="approved" data-audit-success="README section approved."
+          data-audit-confirm="Approve README section {{ section.section_heading or '(intro)' }}?">
+          <button class="btn-approve" type="submit" aria-label="Approve README section {{ section.section_heading or '(intro)' }}">&#10003; Approve</button>
+        </form>
+        <form class="inline-form" method="post" action="/approvals/sections/{{ record_id }}/reject"
+          data-audit-form data-audit-target="closest .section-card" data-audit-swap="outerHTML"
+          data-audit-decision="rejected" data-audit-success="README section rejected."
+          data-audit-confirm="Reject README section {{ section.section_heading or '(intro)' }}?">
+          <button class="btn-reject" type="submit" aria-label="Reject README section {{ section.section_heading or '(intro)' }}">&#10007; Reject</button>
+        </form>
         {% endif %}
       </div>
     </div>

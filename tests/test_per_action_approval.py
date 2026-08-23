@@ -570,6 +570,33 @@ class TestPerActionRoutes:
         assert resp.status_code == 200
         assert "approved" in resp.text.lower() or "&#10003;" in resp.text
 
+    def test_approve_readback_failure_never_claims_terminal_state(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from github_repo_auditor import warehouse
+
+        output_dir = self._make_output_dir(tmp_path)
+        record_id = _seed_cp_record_for_routes(output_dir)
+        real_load = warehouse.load_approval_records
+        calls = 0
+
+        def fail_second_read(*args: object, **kwargs: object) -> list[dict]:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("private ledger path")
+            return real_load(*args, **kwargs)
+
+        monkeypatch.setattr(warehouse, "load_approval_records", fail_second_read)
+        c = TestClient(create_app(output_dir=output_dir), raise_server_exceptions=True)
+
+        resp = c.post(f"/approvals/{record_id}/actions/0/approve")
+
+        assert resp.status_code == 503
+        assert "Decision verification failed" in resp.text
+        assert "Approved" not in resp.text
+        assert "private ledger path" not in resp.text
+
     def test_approve_action_persists_state(self, tmp_path: Path) -> None:
         from github_repo_auditor.warehouse import load_approval_records
 

@@ -467,6 +467,35 @@ class TestDraftSectionsRoutes:
             assert resp.status_code == 200
             assert "Approved" in resp.text
 
+    def test_approve_readback_failure_never_claims_terminal_state(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from github_repo_auditor import warehouse
+
+        packet = _make_packet()
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            record_ids = _seed_sections(output_dir, packet)
+            real_load = warehouse.load_approval_records
+            calls = 0
+
+            def fail_second_read(*args: object, **kwargs: object) -> list[dict]:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("private ledger path")
+                return real_load(*args, **kwargs)
+
+            monkeypatch.setattr(warehouse, "load_approval_records", fail_second_read)
+            client = self._client(output_dir)
+
+            resp = client.post(f"/approvals/sections/{record_ids[0]}/approve")
+
+            assert resp.status_code == 503
+            assert "Decision verification failed" in resp.text
+            assert "Approved" not in resp.text
+            assert "private ledger path" not in resp.text
+
     def test_post_approve_section_404_for_nonexistent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)

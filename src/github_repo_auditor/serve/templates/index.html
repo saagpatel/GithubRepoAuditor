@@ -5,57 +5,71 @@
   <h1>Portfolio Dashboard</h1>
   <p class="meta">
     {{ total }} repos &middot; last snapshot: <code>{{ generated_at }}</code>
-    <button
+    <a
+      href="/"
       class="btn btn-sm"
-      hx-get="/"
-      hx-target="#dashboard-body"
-      hx-swap="innerHTML"
-    >Refresh</button>
+      data-audit-get="/"
+      data-audit-target="#dashboard-body"
+      data-audit-select="#dashboard-body"
+      data-audit-success="Dashboard refreshed."
+    >Refresh</a>
   </p>
 </div>
 
 <div id="dashboard-body">
+  <div class="state-banner state-banner--{{ data_state }}" role="{% if data_state in ['malformed', 'unavailable'] %}alert{% else %}status{% endif %}">
+    <strong>Data status: {{ data_state|replace('-', ' ')|title }}.</strong>
+    {{ data_message }}
+    {% if coverage.scanned is not none %}
+      Security evidence: {{ coverage.scanned }} scanned of {{ coverage.cohort }} in cohort;
+      {{ coverage.partial }} partial, {{ coverage.stale }} stale,
+      {{ coverage.unknown }} unknown, {{ coverage.unavailable }} unavailable.
+    {% endif %}
+  </div>
   <div class="grid-2">
     <section>
-      <h2>Top 5 by Risk</h2>
+      <h2>Highest observed risk</h2>
       {% if top_risk %}
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Highest observed risk projects">
       <table>
         <thead>
-          <tr><th>Repo</th><th>Risk Score</th></tr>
+          <tr><th scope="col">Repo</th><th scope="col">Risk</th></tr>
         </thead>
         <tbody>
           {% for r in top_risk %}
           <tr>
-            <td><a href="/repos/{{ r.name }}">{{ r.name }}</a></td>
-            <td class="score score-risk">{{ "%.1f"|format(r.risk_score|default(r.risk)|float) }}</td>
+            <td><a href="/repos/{{ r.name|urlencode }}"><bdi>{{ r.name }}</bdi></a></td>
+            <td class="score score-risk">{{ r.risk_label }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      </div>
       {% else %}
-      <p class="empty">No data — run <code>audit &lt;username&gt; --portfolio-truth</code> first.</p>
+      <p class="empty">No ranked risk evidence is available. Missing values are not treated as zero.</p>
       {% endif %}
     </section>
 
     <section>
-      <h2>Top 5 by Gap (low completeness)</h2>
+      <h2>Lowest observed readiness</h2>
       {% if top_gap %}
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Lowest observed readiness projects">
       <table>
         <thead>
-          <tr><th>Repo</th><th>Completeness</th></tr>
+          <tr><th scope="col">Repo</th><th scope="col">Readiness</th></tr>
         </thead>
         <tbody>
           {% for r in top_gap %}
-          {% set comp = r.completeness_score|default(r.completeness)|float %}
           <tr>
-            <td><a href="/repos/{{ r.name }}">{{ r.name }}</a></td>
-            <td class="score score-gap">{{ "%.1f"|format(comp) }}</td>
+            <td><a href="/repos/{{ r.name|urlencode }}"><bdi>{{ r.name }}</bdi></a></td>
+            <td class="score score-gap">{{ r.readiness_label }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      </div>
       {% else %}
-      <p class="empty">No data — run <code>audit &lt;username&gt; --portfolio-truth</code> first.</p>
+      <p class="empty">No ranked readiness evidence is available. Missing values are not treated as zero.</p>
       {% endif %}
     </section>
   </div>

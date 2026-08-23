@@ -9,7 +9,7 @@ import sys
 import threading
 import uuid
 from collections import deque
-from collections.abc import Generator  # noqa: F401  (used in type annotation)
+from collections.abc import Generator
 from pathlib import Path
 
 # ── Allowlist of safe audit flags that can be passed via the web UI ──────────
@@ -30,6 +30,22 @@ SAFE_FLAG_NAMES: frozenset[str] = frozenset(
     }
 )
 
+# Only flags that are valid without a value belong in the checkbox UI. The
+# broader allowlist remains available to validated programmatic callers.
+SAFE_BOOLEAN_FLAG_NAMES: frozenset[str] = frozenset(
+    {
+        "portfolio-truth",
+        "portfolio-context-recovery",
+        "control-center",
+        "briefing",
+        "approval-center",
+        "doctor",
+        "html",
+        "pdf",
+        "review-pack",
+    }
+)
+
 # Shell metacharacters that must never appear in flag values
 _SHELL_METACHAR = set(";|&$`\\<>!")
 
@@ -44,18 +60,31 @@ _MAX_LINES = 200
 class RunSession:
     """Holds state for one spawned audit subprocess."""
 
-    def __init__(self, run_id: str, username: str, flag_args: list[str]) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        username: str,
+        flag_args: list[str],
+        output_dir: Path,
+    ) -> None:
         self.run_id = run_id
+        self.output_dir = output_dir.resolve()
         # Keep the OS command line constant. Form-derived values are supplied
         # to the worker over stdin and become parser arguments only inside the
         # child process; they never participate in process creation.
         self.cmd = (sys.executable, "-m", "github_repo_auditor.serve.worker")
-        self._request = {"username": username, "flag_args": flag_args}
-        self._lines: deque[str] = deque(maxlen=_MAX_LINES)
+        self._request = {
+            "username": username,
+            "flag_args": flag_args,
+            "output_dir": str(self.output_dir),
+        }
+        self._lines: deque[tuple[int, str]] = deque(maxlen=_MAX_LINES)
+        self._next_line = 0
         self._lock = threading.Lock()
         self._done = threading.Event()
         self._return_code: int | None = None
         self._proc: subprocess.Popen[str] | None = None
+        self._cancel_requested = False
 
     # ── internal ─────────────────────────────────────────────────────────────
 
@@ -64,7 +93,8 @@ class RunSession:
         for raw in self._proc.stdout:  # type: ignore[union-attr]
             line = raw.rstrip("\n")
             with self._lock:
-                self._lines.append(line)
+                self._lines.append((self._next_line, line))
+                self._next_line += 1
         self._proc.wait()
         self._return_code = self._proc.returncode
         self._done.set()
@@ -72,31 +102,88 @@ class RunSession:
     # ── public ────────────────────────────────────────────────────────────────
 
     def start(self) -> None:
-        self._proc = subprocess.Popen(
-            self.cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            shell=False,  # never shell=True
-        )
+        try:
+            self._proc = subprocess.Popen(
+                self.cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                shell=False,  # never shell=True
+            )
+        except OSError:
+            with self._lock:
+                self._lines.append(
+                    (self._next_line, "Unable to start the local audit process.")
+                )
+                self._next_line += 1
+            self._return_code = 127
+            self._done.set()
+            return
         assert self._proc.stdin is not None
-        self._proc.stdin.write(json.dumps(self._request))
-        self._proc.stdin.close()
         t = threading.Thread(target=self._stream, daemon=True)
         t.start()
+        try:
+            self._proc.stdin.write(json.dumps(self._request))
+            self._proc.stdin.close()
+        except OSError:
+            with self._lock:
+                self._lines.append(
+                    (self._next_line, "Unable to send the local audit request.")
+                )
+                self._next_line += 1
+            try:
+                self._proc.stdin.close()
+            except OSError:
+                pass
+
+    def read(self, after: int = 0) -> tuple[list[str], int, bool]:
+        """Return buffered lines at or after cursor *after* without blocking.
+
+        The returned cursor is suitable for the next call. ``truncated`` is
+        true when the requested cursor predates the bounded in-memory buffer.
+        """
+        with self._lock:
+            snapshot = list(self._lines)
+            next_line = self._next_line
+        oldest = snapshot[0][0] if snapshot else next_line
+        truncated = after < oldest
+        effective_after = max(after, oldest)
+        return (
+            [line for index, line in snapshot if index >= effective_after],
+            next_line,
+            truncated,
+        )
 
     def tail(self, after: int = 0) -> Generator[str, None, None]:
-        """Yield all buffered lines from position *after*, then any new ones."""
-        sent = after
-        while True:
-            with self._lock:
-                snapshot = list(self._lines)
-            for line in snapshot[sent:]:
-                sent += 1
-                yield line
-            if self._done.is_set():
-                break
+        """Yield the currently buffered lines without waiting for completion."""
+        lines, _cursor, _truncated = self.read(after=after)
+        yield from lines
+
+    def cancel(self) -> bool:
+        """Request termination of a running child process.
+
+        Returns ``True`` only when a live process received the request. A
+        short background grace period avoids blocking the request handler.
+        """
+        proc = self._proc
+        if proc is None or self._done.is_set() or proc.poll() is not None:
+            return False
+        self._cancel_requested = True
+        proc.terminate()
+
+        def _enforce() -> None:
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+        threading.Thread(target=_enforce, daemon=True).start()
+        return True
+
+    def belongs_to(self, output_dir: Path) -> bool:
+        """Return whether this run belongs to one configured server root."""
+        return self.output_dir == output_dir.resolve()
 
     @property
     def done(self) -> bool:
@@ -105,6 +192,14 @@ class RunSession:
     @property
     def return_code(self) -> int | None:
         return self._return_code
+
+    @property
+    def status(self) -> str:
+        if not self.done:
+            return "running"
+        if self._cancel_requested:
+            return "cancelled"
+        return "succeeded" if self.return_code == 0 else "failed"
 
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -131,7 +226,9 @@ def validate_flags(flags: dict[str, str | bool]) -> list[str]:
             val_str = str(value)
             bad = _SHELL_METACHAR.intersection(val_str)
             if bad:
-                raise ValueError(f"Flag '--{norm}' value contains disallowed character(s): {bad}")
+                raise ValueError(
+                    f"Flag '--{norm}' value contains disallowed character(s): {bad}"
+                )
             args.extend([f"--{norm}", val_str])
     return args
 
@@ -149,9 +246,16 @@ def validate_username(username: str) -> str:
 def spawn_run(username: str, flags: dict[str, str | bool], output_dir: Path) -> str:
     """Validate flags, spawn audit subprocess, register session.  Returns run_id."""
     safe_username = validate_username(username)
+    if any(name.replace("_", "-").lstrip("-") == "output-dir" for name in flags):
+        raise ValueError("Flag '--output-dir' is controlled by the local server")
     flag_args = validate_flags(flags)
     run_id = uuid.uuid4().hex
-    session = RunSession(run_id=run_id, username=safe_username, flag_args=flag_args)
+    session = RunSession(
+        run_id=run_id,
+        username=safe_username,
+        flag_args=flag_args,
+        output_dir=output_dir,
+    )
     with _registry_lock:
         _registry[run_id] = session
     session.start()
