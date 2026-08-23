@@ -745,7 +745,7 @@ def _remote_graphql_response(count: int) -> _Response:
 
 
 def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
-    assert DEFAULT_EXPECTED_GITHUB_COHORT_COUNT == 12
+    assert DEFAULT_EXPECTED_GITHUB_COHORT_COUNT == 11
     truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
     truth["projects"].append(
         {
@@ -760,7 +760,7 @@ def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
 
     assert len(cohort) == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     assert "owner/parked" not in cohort
-    with pytest.raises(SecurityCoverageError, match="expected 12, observed 13"):
+    with pytest.raises(SecurityCoverageError, match="expected 11, observed 12"):
         derive_default_attention_cohort(
             _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT + 1)
         )
@@ -952,6 +952,38 @@ def test_current_eleven_repository_cut_binds_remote_branch_and_head() -> None:
         and len(repository["repository"]["head_sha"]) == 40
         for repository in receipt["repositories"].values()
     )
+
+
+def test_codeql_missing_workflow_permissions_alert_counts_as_high() -> None:
+    workflow_permissions_alert = {
+        "rule": {
+            "id": "actions/missing-workflow-permissions",
+            "name": "Workflow does not contain permissions",
+            "security_severity_level": "high",
+            "severity": "warning",
+        }
+    }
+    session = _Session(
+        [
+            _Response(),  # dependabot
+            _Response(200, [workflow_permissions_alert]),
+            _Response(),  # secret scanning
+            _remote_graphql_response(1),
+        ]
+    )
+
+    receipt = _collect(session=session, cohort_count=1)
+    loaded = validate_security_coverage_receipt(
+        receipt,
+        expected_cohort_count=1,
+        now=NOW,
+    )
+
+    code_scanning = loaded.entries_by_full_name["owner/repo-00"]["providers"][
+        "code_scanning"
+    ]
+    assert code_scanning["counts"]["high"] == 1
+    assert code_scanning["zero_findings"] is False
 
 
 @pytest.mark.parametrize(
