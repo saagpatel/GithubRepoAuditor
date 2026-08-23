@@ -31,9 +31,10 @@ REMOTE_REPOSITORY_SOURCE = "github-graphql-default-branch-head-v1"
 DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
-# Owner-confirmed 2026-08-21 after agent-session-replay legitimately entered
-# decision-needed while remaining on its active finish path.
-DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 12
+# Source-matched 2026-08-23 default-attention cut contains 11 repo-backed
+# projects; local-only/default-attention identities remain outside the GitHub
+# provider denominator until they have a canonical repository identity.
+DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 11
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
 ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
 ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"

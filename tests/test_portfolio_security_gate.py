@@ -194,6 +194,24 @@ def test_security_gate_fails_on_each_non_dependabot_provider(
     assert report.total_open_secrets == expected_secrets
 
 
+def test_security_gate_fails_on_workflow_permission_codeql_high_fixture() -> None:
+    report = build_security_gate_report(
+        {
+            "projects": [
+                _project(
+                    "GithubRepoAuditor",
+                    code_high=1,
+                    risk_tier="elevated",
+                )
+            ]
+        }
+    )
+
+    assert report.status == "fail"
+    assert report.total_open_high == 1
+    assert [item.repo for item in report.flagged_repos] == ["GithubRepoAuditor"]
+
+
 def test_security_gate_treats_missing_overlay_as_unknown_not_pass() -> None:
     report = build_security_gate_report(
         {
