@@ -134,6 +134,23 @@ class TestInitiativesSuggestionsGet:
         assert resp.status_code == 200
         assert "No suggestions" in resp.text or "empty" in resp.text.lower()
 
+    def test_provider_failure_is_explicit_without_leaking_details(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        truth = _make_portfolio_truth([_bronze_repo("MyRepo")])
+        (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+
+        with patch(
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
+            side_effect=RuntimeError("provider secret at /tmp/private-provider.log"),
+        ):
+            resp = client.get("/initiatives/suggestions")
+
+        assert resp.status_code == 200
+        assert "ranking provider failed" in resp.text
+        assert "No initiative state changed" in resp.text
+        assert "private-provider" not in resp.text
+
     def test_target_query_param_passed_to_generate(
         self, output_dir: Path, client: TestClient
     ) -> None:
@@ -172,13 +189,45 @@ class TestInitiativesSuggestionsGet:
         (output_dir / "portfolio-truth-latest.json").write_text("not valid json{{{")
         resp = client.get("/initiatives/suggestions")
         assert resp.status_code == 200
-        assert "Failed to read portfolio-truth" in resp.text
+        assert "portfolio truth snapshot is unreadable or malformed" in resp.text
+        assert "No suggestions were generated" in resp.text
+
+    @pytest.mark.parametrize("payload", [[], "text", 7])
+    def test_non_object_truth_root_is_explicitly_malformed(
+        self, output_dir: Path, client: TestClient, payload: object
+    ) -> None:
+        (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(payload))
+
+        resp = client.get("/initiatives/suggestions")
+
+        assert resp.status_code == 200
+        assert "unreadable or malformed" in resp.text
+        assert "No suggestions were generated" in resp.text
 
 
 # ── POST /initiatives/accept ─────────────────────────────────────────────────
 
 
 class TestInitiativesAcceptPost:
+    @pytest.mark.parametrize("payload", [[], "text", 7])
+    def test_non_object_truth_root_does_not_mutate_initiatives(
+        self, output_dir: Path, client: TestClient, payload: object
+    ) -> None:
+        (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(payload))
+
+        resp = client.post(
+            "/initiatives/accept",
+            data={
+                "repo_name": "TargetRepo",
+                "target_tier": "2",
+                "deadline": _future_deadline(),
+            },
+        )
+
+        assert resp.status_code == 400
+        assert "failed to read portfolio truth" in resp.text
+        assert not (output_dir / "initiatives.json").exists()
+
     def test_happy_path_returns_accepted_fragment(
         self, output_dir: Path, client: TestClient
     ) -> None:

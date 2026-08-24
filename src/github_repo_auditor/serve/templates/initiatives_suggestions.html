@@ -79,7 +79,7 @@
 </div>
 
 {% if error %}
-<div class="empty-state error-text">{{ error }}</div>
+<div class="empty-state error-text" role="alert">{{ error }}</div>
 {% elif not suggestions %}
 <div class="empty-state">
   No suggestions: all repos either already qualify for their next tier or have too many missing requirements.
@@ -88,7 +88,7 @@
 
 {% for s in suggestions %}
 <div class="suggestion-card" id="suggestion-{{ loop.index }}">
-  <h3>{{ s.repo_name }}</h3>
+  <h3><bdi>{{ s.repo_name }}</bdi></h3>
   <p class="meta">
     <span class="badge badge-tier">{{ s.current_tier_name }}</span>
     →
@@ -105,9 +105,12 @@
 
   <div class="card-actions">
     <form
-      hx-post="/initiatives/accept"
-      hx-target="#suggestion-{{ loop.index }}"
-      hx-swap="outerHTML"
+      method="post"
+      action="/initiatives/accept"
+      data-audit-form
+      data-audit-target="#suggestion-{{ loop.index }}"
+      data-audit-swap="outerHTML"
+      data-audit-success="Initiative accepted."
       class="accept-form"
     >
       <input type="hidden" name="repo_name" value="{{ s.repo_name }}">
@@ -115,18 +118,21 @@
       <label>
         Deadline: <input type="date" name="deadline" value="{{ s.default_deadline }}" required>
       </label>
-      <button type="submit" class="btn btn-sm">Accept</button>
+      <button type="submit" class="btn btn-sm" aria-label="Accept initiative for {{ s.repo_name }}">Accept</button>
     </form>
 
     <form
-      hx-post="/initiatives/suggestions/dismiss"
-      hx-target="#suggestion-{{ loop.index }}"
-      hx-swap="outerHTML"
-      hx-confirm="Dismiss {{ s.repo_name }} from future suggestions?"
+      method="post"
+      action="/initiatives/suggestions/dismiss"
+      data-audit-form
+      data-audit-target="#suggestion-{{ loop.index }}"
+      data-audit-swap="outerHTML"
+      data-audit-confirm="Dismiss {{ s.repo_name }} from future suggestions?"
+      data-audit-success="Suggestion dismissed."
       class="dismiss-form"
     >
       <input type="hidden" name="repo_name" value="{{ s.repo_name }}">
-      <button type="submit" class="btn-secondary">Dismiss</button>
+      <button type="submit" class="btn-secondary" aria-label="Dismiss initiative suggestion for {{ s.repo_name }}">Dismiss</button>
     </form>
   </div>
 </div>

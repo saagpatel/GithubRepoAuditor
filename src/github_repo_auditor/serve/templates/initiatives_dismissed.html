@@ -18,6 +18,7 @@
   No dismissed suggestions. Use <code>audit triage --dismiss-suggestion REPO</code> or the Dismiss button on <a href="/initiatives/suggestions">/initiatives/suggestions</a>.
 </div>
 {% else %}
+<div class="table-scroll" tabindex="0" role="region" aria-label="Dismissed suggestions">
 <table>
   <thead>
     <tr>
@@ -37,20 +38,24 @@
       <td>{{ row.reason or '—' }}</td>
       <td>
         <form
-          hx-post="/initiatives/dismissed/undo"
-          hx-target="#dismissed-{{ loop.index }}"
-          hx-swap="outerHTML"
-          hx-confirm="Restore {{ row.repo_name }} to the suggestion pool?"
+          method="post"
+          action="/initiatives/dismissed/undo"
+          data-audit-form
+          data-audit-target="#dismissed-{{ loop.index }}"
+          data-audit-swap="outerHTML"
+          data-audit-confirm="Restore {{ row.repo_name }} to the suggestion pool?"
+          data-audit-success="Suggestion restored."
           class="undo-form"
         >
           <input type="hidden" name="repo_name" value="{{ row.repo_name }}">
-          <button type="submit" class="btn-secondary">Undo</button>
+          <button type="submit" class="btn-secondary" aria-label="Restore {{ row.repo_name }} to suggestions">Undo</button>
         </form>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 
 <p>

@@ -10,6 +10,7 @@
 {% set seen_section_packets = namespace(ids=[]) %}
 
 {% if records %}
+<div class="table-scroll" tabindex="0" role="region" aria-label="Approval records">
 <table>
   <thead>
     <tr>
@@ -51,33 +52,33 @@
       </td>
       <td class="action-cell">
         {% if r.approval_subject_type == "draft-readme" %}
-        <button
+        <a
           class="btn btn-sm btn-secondary"
-          hx-get="/approvals/{{ r.approval_id }}/draft-diff"
-          hx-target="#diff-{{ loop.index }}"
-          hx-swap="innerHTML"
-        >View diff</button>
+          href="/approvals/{{ r.approval_id }}/draft-diff"
+          data-audit-get="/approvals/{{ r.approval_id }}/draft-diff"
+          data-audit-target="#diff-{{ loop.index }}"
+          data-audit-success="Draft diff loaded."
+        >View diff</a>
         {% endif %}
         {% if r.approval_subject_type == "campaign-plan" %}
-        <button
+        <a
           class="btn btn-sm btn-secondary"
-          hx-get="/approvals/{{ r.approval_id }}/campaign-plan"
-          hx-target="#plan-{{ loop.index }}"
-          hx-swap="innerHTML"
-        >View plan</button>
+          href="/approvals/{{ r.approval_id }}/campaign-plan"
+          data-audit-get="/approvals/{{ r.approval_id }}/campaign-plan"
+          data-audit-target="#plan-{{ loop.index }}"
+          data-audit-success="Campaign plan loaded."
+        >View plan</a>
         {% endif %}
-        <button
-          class="btn btn-sm btn-approve"
-          hx-post="/approvals/{{ r.approval_id }}/approve"
-          hx-target="closest td"
-          hx-swap="innerHTML"
-        >Approve</button>
-        <button
-          class="btn btn-sm btn-reject"
-          hx-post="/approvals/{{ r.approval_id }}/reject"
-          hx-target="closest td"
-          hx-swap="innerHTML"
-        >Reject</button>
+        <form method="post" action="/approvals/{{ r.approval_id }}/approve" class="inline-form"
+          data-audit-form data-audit-target="closest td" data-audit-success="Approval intent recorded."
+          data-audit-confirm="Record approval intent for {{ r.subject_key or r.scope or r.approval_id }}?">
+          <button class="btn btn-sm btn-approve" type="submit" aria-label="Approve {{ r.subject_key or r.scope or r.approval_id }}">Approve</button>
+        </form>
+        <form method="post" action="/approvals/{{ r.approval_id }}/reject" class="inline-form"
+          data-audit-form data-audit-target="closest td" data-audit-success="Rejection intent recorded."
+          data-audit-confirm="Record rejection intent for {{ r.subject_key or r.scope or r.approval_id }}?">
+          <button class="btn btn-sm btn-reject" type="submit" aria-label="Reject {{ r.subject_key or r.scope or r.approval_id }}">Reject</button>
+        </form>
       </td>
     </tr>
     {% if r.approval_subject_type == "draft-readme" %}
@@ -98,7 +99,10 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
-<p class="empty">No approval records found in the warehouse.</p>
+<p class="state-banner state-banner--{{ data_state }}" role="{% if data_state == 'unavailable' %}alert{% else %}status{% endif %}">
+  <strong>Approval data: {{ data_state|title }}.</strong> {{ data_message }}
+</p>
 {% endif %}
 {% endblock %}

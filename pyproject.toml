@@ -99,6 +99,7 @@ include = ["github_repo_auditor*"]
     "*.j2",
     "assets/excel/*.xlsx",
     "serve/static/*.css",
+    "serve/static/*.js",
     "serve/templates/*.html",
 ]
 

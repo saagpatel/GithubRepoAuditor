@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Audit Serve{% endblock %}</title>
   <link rel="stylesheet" href="/static/audit.css">
   <link rel="icon" href="data:,">
-  <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
+  <script src="/static/audit.js" defer></script>
 </head>
 <body>
-  <nav class="navbar">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <nav class="navbar" aria-label="Primary">
     <a href="/" class="nav-brand">audit serve</a>
     <ul class="nav-links">
       <li><a href="/">Dashboard</a></li>
@@ -21,8 +22,9 @@
       <li><a href="/runs/new">New Run</a></li>
     </ul>
   </nav>
-  <main class="container">
+  <main class="container" id="main-content" tabindex="-1">
     {% block content %}{% endblock %}
   </main>
+  <div id="audit-live-region" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>
