@@ -31,22 +31,34 @@ authoritative absence across all three providers. Bridge `SHIPPED` is supporting
 evidence only and is explicitly barred from satisfying the readback contract.
 
 The producer-owned machine-readable shape is
-`config/portfolio-decision-digest-v2.schema.json`. Generate the advisory
-terminal aggregate and Markdown from the same PortfolioTruth generation:
+`config/portfolio-decision-digest-v2.schema.json`. Generate the rich local
+artifact only through an explicit custody path:
 
 ```bash
 python -m github_repo_auditor.portfolio_decision_queue \
   --truth output/portfolio-truth-latest.json \
   --previous-digest output/portfolio-decision-digest-latest.json \
+  --format digest-json \
+  --output output/portfolio-decision-digest-next.json
+```
+
+`--format digest-json` never writes the rich contract to stdout and requires
+`--output`. After validating the new file, a consumer may publish it atomically
+to its canonical local destination. Generate the distinct terminal-safe
+aggregate separately when an advisory count-only handoff is needed:
+
+```bash
+python -m github_repo_auditor.portfolio_decision_queue \
+  --truth output/portfolio-truth-latest.json \
   --format json
 ```
 
-The in-process `build_decision_digest` and Markdown renderer retain the rich
-producer-owned decision contract for local consumers. The command-line JSON
-surface is the distinct `portfolio_decision_cli_aggregate_v1` advisory,
-allowlisted aggregate envelope: it preserves contract version and queue counts
-but redacts identities, paths, questions, receipt metadata, and prior-digest
-fields before terminal output. It is not a reusable prior digest. The
-`--previous-digest` input must remain a producer-owned
+The in-process `build_decision_digest`, explicit `digest-json` file output, and
+Markdown renderer retain the rich producer-owned decision contract for local
+consumers. The stdout `json` surface is the distinct
+`portfolio_decision_cli_aggregate_v1` advisory, allowlisted aggregate envelope:
+it preserves contract version and queue counts but redacts identities, paths,
+questions, receipt metadata, and prior-digest fields before terminal output. It
+is not a reusable prior digest. The `--previous-digest` input must remain a producer-owned
 `portfolio_decision_digest_v2` artifact so supersession and authoritative
 closure history are preserved.
