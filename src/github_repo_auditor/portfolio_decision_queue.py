@@ -794,6 +794,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--truth", type=Path, required=True)
     parser.add_argument("--previous-digest", type=Path)
     parser.add_argument(
+        "--output",
+        type=Path,
+        help="explicit local custody path required for the rich digest-json format",
+    )
+    parser.add_argument(
         "--format",
         choices=("json", "digest-json", "markdown"),
         default="markdown",
@@ -803,6 +808,11 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+
+    if args.format == "digest-json" and args.output is None:
+        parser.error("--output is required with --format digest-json")
+    if args.format != "digest-json" and args.output is not None:
+        parser.error("--output is only valid with --format digest-json")
 
     truth = _load_object(args.truth, label="portfolio truth")
     previous = (
@@ -814,7 +824,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.format == "json":
         print(json.dumps(_safe_cli_digest(digest), indent=2, sort_keys=True))
     elif args.format == "digest-json":
-        print(json.dumps(digest, indent=2, sort_keys=True))
+        args.output.write_text(
+            json.dumps(digest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     else:
         print(render_decision_digest_markdown(digest), end="")
     return 0

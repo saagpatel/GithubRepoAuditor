@@ -565,6 +565,7 @@ def test_explicit_digest_json_emits_the_rich_producer_contract(
         encoding="utf-8",
     )
 
+    output_path = tmp_path / "portfolio-decision-digest.json"
     assert (
         main(
             [
@@ -572,16 +573,34 @@ def test_explicit_digest_json_emits_the_rich_producer_contract(
                 str(truth_path),
                 "--format",
                 "digest-json",
+                "--output",
+                str(output_path),
             ]
         )
         == 0
     )
-    digest = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    digest = json.loads(output_path.read_text(encoding="utf-8"))
 
     assert digest["contract_version"] == DIGEST_CONTRACT_VERSION
     assert digest["summary"]["contract_version"] == CONTRACT_VERSION
     assert digest["source"]["generated_at"] == GENERATED_AT
     assert digest["decision_queue"][0]["schema_version"] == "portfolio_decision_item_v2"
+
+
+def test_digest_json_requires_an_explicit_local_output_path(
+    tmp_path: Path, capsys
+) -> None:
+    truth_path = tmp_path / "portfolio-truth.json"
+    truth_path.write_text(json.dumps(_truth([])), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["--truth", str(truth_path), "--format", "digest-json"])
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "--output is required with --format digest-json" in captured.err
 
 
 def test_absolute_cli_entrypoint_runs_from_arbitrary_cwd(tmp_path: Path) -> None:
