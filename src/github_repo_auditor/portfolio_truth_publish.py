@@ -19,7 +19,11 @@ from github_repo_auditor.github_security_coverage import (
     derive_default_attention_cohort,
     verified_security_coverage_receipt_binding,
 )
+from github_repo_auditor.portfolio_cohort_plan_contract import (
+    COHORT_TRANSITION_PROTOCOL,
+)
 from github_repo_auditor.portfolio_truth_reconcile import (
+    CohortTransitionOutcome,
     build_portfolio_truth_snapshot,
     load_prior_notion_context,
 )
@@ -64,12 +68,18 @@ class PortfolioTruthPublishResult:
     discarded_checkout_count: int = 0
 
 
+PORTFOLIO_COHORT_TRANSITION_FILENAME = "portfolio-cohort-transition-latest.json"
+PORTFOLIO_COHORT_TRANSITION_SCHEMA_VERSION = "PortfolioCohortTransitionOutcomeV1"
+
+
 @dataclass(frozen=True)
 class _PriorSecurityEvidence:
     path: Path
     content_sha256: str | None
     alerts_by_full_name: dict[str, dict]
     final_cohort_repositories: tuple[str, ...] | None
+    generated_at: datetime | None = None
+    prior_security_metadata: dict[str, object] | None = None
 
 
 class PortfolioTruthPublishError(RuntimeError):
@@ -108,7 +118,37 @@ def _load_prior_security_alerts(
     current_security_metadata: dict[str, object],
     security_max_age_hours: int,
 ) -> _PriorSecurityEvidence:
-    """Load validated prior receipt and final-cohort evidence."""
+    """Load prior evidence and refuse a truth newer than the receipt using it."""
+    evidence = load_prior_security_evidence(
+        latest_path,
+        security_max_age_hours=security_max_age_hours,
+    )
+    if evidence.generated_at is None:
+        return evidence
+    current_produced_at = _parse_bound_datetime(
+        current_security_metadata.get("produced_at"),
+        field="Current security receipt produced_at",
+    )
+    if evidence.generated_at > current_produced_at and not _is_same_bound_security_receipt(
+        evidence.prior_security_metadata or {},
+        current_security_metadata,
+    ):
+        raise PortfolioTruthPublishError(
+            "Prior PortfolioTruth was generated after the current security receipt."
+        )
+    return evidence
+
+
+def load_prior_security_evidence(
+    latest_path: Path,
+    *,
+    security_max_age_hours: int,
+) -> _PriorSecurityEvidence:
+    """Load validated prior receipt and final-cohort evidence.
+
+    Shared by publication and by the cohort planner so both bind to the same
+    prior published cohort and the same prior security evidence.
+    """
     try:
         content = latest_path.read_bytes()
     except FileNotFoundError:
@@ -176,17 +216,6 @@ def _load_prior_security_alerts(
         canonical.get("generated_at"),
         field="Prior PortfolioTruth generated_at",
     )
-    current_produced_at = _parse_bound_datetime(
-        current_security_metadata.get("produced_at"),
-        field="Current security receipt produced_at",
-    )
-    if prior_generated_at > current_produced_at and not _is_same_bound_security_receipt(
-        prior_security_metadata,
-        current_security_metadata,
-    ):
-        raise PortfolioTruthPublishError(
-            "Prior PortfolioTruth was generated after the current security receipt."
-        )
 
     alerts: dict[str, dict] = {}
     for project in receipt_projects:
@@ -213,6 +242,8 @@ def _load_prior_security_alerts(
         content_sha256=hashlib.sha256(content).hexdigest(),
         alerts_by_full_name=alerts,
         final_cohort_repositories=final_cohort_repositories,
+        generated_at=prior_generated_at,
+        prior_security_metadata=dict(prior_security_metadata),
     )
 
 
@@ -317,6 +348,10 @@ def publish_portfolio_truth(
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, object] | None = None,
     security_receipt_binding: SecurityCoverageReceiptBinding | None = None,
+    security_cohort_required: tuple[str, ...] | None = None,
+    security_cohort_outgoing: tuple[str, ...] | None = None,
+    security_cohort_transition: dict[str, object] | None = None,
+    require_cohort_transition: bool = False,
     repo_status_by_name: dict[str, dict] | None = None,
     producer_evidence: ProducerEvidence | None = None,
     producer_repo_root: Path | None = None,
@@ -373,6 +408,10 @@ def publish_portfolio_truth(
             security_alerts_by_name=security_alerts_by_name,
             security_coverage_metadata=security_coverage_metadata,
             security_receipt_binding=security_receipt_binding,
+            security_cohort_required=security_cohort_required,
+            security_cohort_outgoing=security_cohort_outgoing,
+            security_cohort_transition=security_cohort_transition,
+            require_cohort_transition=require_cohort_transition,
             repo_status_by_name=repo_status_by_name,
             producer_evidence=producer_evidence,
             producer_repo_root=producer_repo_root,
@@ -396,6 +435,10 @@ def _publish_portfolio_truth_locked(
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, object] | None = None,
     security_receipt_binding: SecurityCoverageReceiptBinding | None = None,
+    security_cohort_required: tuple[str, ...] | None = None,
+    security_cohort_outgoing: tuple[str, ...] | None = None,
+    security_cohort_transition: dict[str, object] | None = None,
+    require_cohort_transition: bool = False,
     repo_status_by_name: dict[str, dict] | None = None,
     producer_evidence: ProducerEvidence | None = None,
     producer_repo_root: Path | None = None,
@@ -434,15 +477,15 @@ def _publish_portfolio_truth_locked(
     )
     latest_path = truth_latest_path(output_dir)
     project_registry_path = output_dir / "project-registry.json"
-    _recover_interrupted_publication(
-        output_dir,
-        allowed_targets={
-            latest_path,
-            registry_output,
-            portfolio_report_output,
-            project_registry_path,
-        },
-    )
+    cohort_transition_path = output_dir / PORTFOLIO_COHORT_TRANSITION_FILENAME
+    allowed_targets = {
+        latest_path,
+        registry_output,
+        portfolio_report_output,
+        project_registry_path,
+        cohort_transition_path,
+    }
+    _recover_interrupted_publication(output_dir, allowed_targets=allowed_targets)
     notion_context_fallback = (
         load_prior_notion_context(latest_path) if allow_empty_notion else None
     )
@@ -457,6 +500,20 @@ def _publish_portfolio_truth_locked(
         and security_alerts_by_name is not None
         else None
     )
+    if (
+        prior_security_evidence is not None
+        and security_cohort_transition is not None
+    ):
+        declared_prior_truth_sha256 = security_cohort_transition.get(
+            "prior_truth_sha256"
+        )
+        if declared_prior_truth_sha256 != prior_security_evidence.content_sha256:
+            raise PortfolioTruthPublishError(
+                "Security receipt is bound to a different prior PortfolioTruth than "
+                "the one authorizing this publication: "
+                f"receipt={declared_prior_truth_sha256!r}; "
+                f"observed={prior_security_evidence.content_sha256!r}."
+            )
     build_result = build_portfolio_truth_snapshot(
         workspace_root=workspace_root,
         catalog_path=catalog_path,
@@ -477,6 +534,10 @@ def _publish_portfolio_truth_locked(
             if prior_security_evidence is not None
             else None
         ),
+        security_cohort_required=security_cohort_required,
+        security_cohort_outgoing=security_cohort_outgoing,
+        security_cohort_transition=security_cohort_transition,
+        require_cohort_transition=require_cohort_transition,
         repo_status_by_name=repo_status_by_name,
         producer=producer_evidence.to_dict() if producer_evidence else {},
         prior_notion_generated_at=prior_notion_generated_at,
@@ -534,6 +595,19 @@ def _publish_portfolio_truth_locked(
         latest_path: True,
         project_registry_path: True,
     }
+    if build_result.cohort_transition is not None:
+        targets[cohort_transition_path] = _build_cohort_transition_json(
+            build_result.cohort_transition,
+            generated_at=build_result.snapshot.generated_at,
+            producer=build_result.snapshot.producer,
+            security_coverage_metadata=security_coverage_metadata,
+            prior_truth_sha256=(
+                prior_security_evidence.content_sha256
+                if prior_security_evidence is not None
+                else None
+            ),
+        )
+        changed[cohort_transition_path] = True
     temp_files = {path: _stage_text(path, content) for path, content in targets.items()}
     backups = {
         path: (_stage_bytes(path, path.read_bytes()) if path.exists() else None)
@@ -571,15 +645,7 @@ def _publish_portfolio_truth_locked(
                 staged.replace(path)
                 _fsync_directory(path.parent)
     except BaseException as exc:
-        _recover_interrupted_publication(
-            output_dir,
-            allowed_targets={
-                latest_path,
-                registry_output,
-                portfolio_report_output,
-                project_registry_path,
-            },
-        )
+        _recover_interrupted_publication(output_dir, allowed_targets=allowed_targets)
         if isinstance(exc, (SecurityCoverageError, ValueError)):
             raise PortfolioTruthPublishError(str(exc)) from exc
         raise
@@ -602,6 +668,40 @@ def _publish_portfolio_truth_locked(
         ),
         discarded_checkout_count=int(collision_summary["discarded_checkout_count"]),
     )
+
+
+def _build_cohort_transition_json(
+    outcome: CohortTransitionOutcome,
+    *,
+    generated_at: datetime,
+    producer: dict[str, object],
+    security_coverage_metadata: dict[str, object] | None,
+    prior_truth_sha256: str | None,
+) -> str:
+    """Render the inspectable producer-side transition outcome record.
+
+    This is producer evidence, not portfolio state: it carries no project data,
+    lands inside the same publication transaction as the truth it describes, and
+    needs no PortfolioTruth schema-version bump.
+    """
+    metadata = dict(security_coverage_metadata or {})
+    payload = {
+        "schema_version": PORTFOLIO_COHORT_TRANSITION_SCHEMA_VERSION,
+        "protocol": outcome.protocol or COHORT_TRANSITION_PROTOCOL,
+        "generated_at": generated_at.isoformat(),
+        "producer": {
+            "commit": producer.get("commit"),
+            "repository": producer.get("repository"),
+        },
+        "security_receipt": {
+            "receipt_id": metadata.get("receipt_id"),
+            "content_sha256": metadata.get("content_sha256"),
+            "produced_at": metadata.get("produced_at"),
+        },
+        "prior_truth_sha256": prior_truth_sha256,
+        "transition": outcome.to_dict(),
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
 def _validate_security_receipt_binding(
