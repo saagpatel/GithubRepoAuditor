@@ -793,7 +793,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--truth", type=Path, required=True)
     parser.add_argument("--previous-digest", type=Path)
-    parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    parser.add_argument(
+        "--format",
+        choices=("json", "digest-json", "markdown"),
+        default="markdown",
+        help=(
+            "json emits the terminal-safe aggregate; digest-json emits the "
+            "producer-owned rich digest for an explicit local custody path"
+        ),
+    )
     args = parser.parse_args(argv)
 
     truth = _load_object(args.truth, label="portfolio truth")
@@ -805,6 +813,8 @@ def main(argv: list[str] | None = None) -> int:
     digest = build_decision_digest(truth, previous_digest=previous)
     if args.format == "json":
         print(json.dumps(_safe_cli_digest(digest), indent=2, sort_keys=True))
+    elif args.format == "digest-json":
+        print(json.dumps(digest, indent=2, sort_keys=True))
     else:
         print(render_decision_digest_markdown(digest), end="")
     return 0
