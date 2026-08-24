@@ -8,6 +8,7 @@ from typing import Any
 from github_repo_auditor.cli_output import print_info
 from github_repo_auditor.github_security_coverage import (
     DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    DEFAULT_MAX_COHORT_SIZE,
     SecurityCoverageError,
     SecurityCoverageReceiptBinding,
 )
@@ -74,6 +75,25 @@ def run_portfolio_truth_mode(args: Any) -> None:
     security_alerts_by_name: dict[str, dict] | None = None
     security_coverage_metadata: dict[str, object] | None = None
     security_receipt_binding: SecurityCoverageReceiptBinding | None = None
+    security_cohort_required: tuple[str, ...] | None = None
+    security_cohort_outgoing: tuple[str, ...] | None = None
+    security_cohort_transition: dict[str, object] | None = None
+    require_cohort_transition = bool(
+        getattr(args, "portfolio_truth_require_cohort_transition", False)
+    )
+    declared_max_cohort_size = getattr(
+        args, "portfolio_truth_security_max_cohort_size", None
+    )
+    bounded_cohort = require_cohort_transition or declared_max_cohort_size is not None
+    max_cohort_size = (
+        (
+            declared_max_cohort_size
+            if declared_max_cohort_size is not None
+            else DEFAULT_MAX_COHORT_SIZE
+        )
+        if bounded_cohort
+        else None
+    )
     if getattr(args, "portfolio_truth_include_security", False):
         evaluation_at = datetime.now(timezone.utc)
         receipt_path_value = getattr(args, "portfolio_truth_security_receipt", None)
@@ -81,14 +101,20 @@ def run_portfolio_truth_mode(args: Any) -> None:
             output_dir=output_dir,
             receipt_path=Path(receipt_path_value) if receipt_path_value else None,
             max_age_hours=getattr(args, "portfolio_truth_security_max_age_hours", 24),
-            expected_cohort_count=getattr(
-                args,
-                "portfolio_truth_security_cohort_count",
-                DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+            expected_cohort_count=(
+                None
+                if bounded_cohort
+                else getattr(
+                    args,
+                    "portfolio_truth_security_cohort_count",
+                    DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+                )
             ),
             expected_producer_commit=(
                 producer_evidence.commit if producer_evidence is not None else None
             ),
+            max_cohort_size=max_cohort_size,
+            require_cohort_transition=require_cohort_transition,
             now=evaluation_at,
         )
         if loaded_security is not None:
@@ -100,6 +126,15 @@ def run_portfolio_truth_mode(args: Any) -> None:
                         f"Canonical PortfolioTruth security publication refused: {exc}"
                     ) from exc
             security_alerts_by_name = loaded_security.entries_by_full_name
+            # getattr keeps a legacy or stubbed coverage payload readable; the
+            # canonical loader always carries these three.
+            security_cohort_required = getattr(
+                loaded_security, "required_repositories", None
+            )
+            security_cohort_outgoing = getattr(
+                loaded_security, "outgoing_repositories", None
+            )
+            security_cohort_transition = getattr(loaded_security, "transition", None)
             security_coverage_metadata = {
                 "source_id": "github-security-coverage-receipt",
                 "schema_version": loaded_security.schema_version,
@@ -121,6 +156,15 @@ def run_portfolio_truth_mode(args: Any) -> None:
             raise SystemExit(
                 "Canonical PortfolioTruth security publication requires a valid "
                 "identity-bound GitHub security receipt."
+            )
+        if (
+            require_cohort_transition
+            and loaded_security is not None
+            and not getattr(loaded_security, "has_cohort_transition", False)
+        ):
+            raise SystemExit(
+                "Canonical PortfolioTruth publication requires a cohort-transition "
+                "receipt; the collector wrote a legacy-shaped receipt."
             )
     repo_status_by_name = load_live_repo_status_by_name(
         username=args.username,
@@ -152,6 +196,10 @@ def run_portfolio_truth_mode(args: Any) -> None:
             security_alerts_by_name=security_alerts_by_name,
             security_coverage_metadata=security_coverage_metadata,
             security_receipt_binding=security_receipt_binding,
+            security_cohort_required=security_cohort_required,
+            security_cohort_outgoing=security_cohort_outgoing,
+            security_cohort_transition=security_cohort_transition,
+            require_cohort_transition=require_cohort_transition,
             repo_status_by_name=repo_status_by_name,
             producer_evidence=producer_evidence,
             producer_repo_root=producer_repo_root,

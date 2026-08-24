@@ -305,8 +305,12 @@ class TestHelpFlagCounts:
     def test_report_help_flag_count(self):
         text = _help_text("report")
         count = _count_flags_in_help(text)
-        assert count <= 45, (
-            f"audit report --help shows {count} non-global flags (limit 45, including the explicit security receipt path, freshness, cohort-count, and opt-in controls).\n"
+        assert count <= 47, (
+            f"audit report --help shows {count} non-global flags (limit 47, raised for the "
+            "bounded cohort-transition controls --portfolio-truth-security-max-cohort-size "
+            "and --portfolio-truth-require-cohort-transition; the legacy "
+            "--portfolio-truth-security-cohort-count alias is deliberately retained for one "
+            "release so a stale deployed wrapper cannot hard-error on an unknown argument).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 
