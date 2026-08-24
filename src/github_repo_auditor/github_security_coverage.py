@@ -23,6 +23,14 @@ from typing import Any, Iterator
 
 import requests
 
+from github_repo_auditor.portfolio_cohort_plan_contract import (
+    COHORT_TRANSITION_PROTOCOL,
+    CohortPlan,
+    CohortPlanError,
+    derive_transition_kind,
+    validate_cohort_plan,
+)
+
 GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION = "GitHubSecurityCoverageReceiptV1"
 GITHUB_SECURITY_RECEIPT_FILENAME = "github-security-coverage-latest.json"
 GITHUB_API_VERSION = "2026-03-10"
@@ -35,6 +43,18 @@ DEFAULT_ATTENTION_STATES = frozenset(
 # projects; local-only/default-attention identities remain outside the GitHub
 # provider denominator until they have a canonical repository identity.
 DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 11
+# Fail-closed policy bounds for the governed cohort-transition protocol. These
+# are defined exactly once, here, in the runtime contract that owns the receipt.
+# Every other surface (GHRA CLI flags, the collector and producer wrappers)
+# propagates them rather than restating the number; the four-literal
+# synchronization problem that produced the transition deadlock is the reason.
+#
+# max size ~= double the current estate: it never fires on ordinary growth but
+# does fire on a catalog or discovery fault.
+DEFAULT_MAX_COHORT_SIZE = 24
+# max churn: one project's lifecycle change is 1 (or 2 for a swap); 3 leaves
+# headroom for a coordinated pair while a mass reclassification exceeds it.
+DEFAULT_MAX_COHORT_DELTA = 3
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
 ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
 ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"
@@ -128,15 +148,11 @@ _REMOTE_REASON_DOMAINS = {
             "github_graphql_authentication_missing",
         }
     ),
-    "forbidden": frozenset(
-        {"github_forbidden", "github_graphql_forbidden"}
-    ),
+    "forbidden": frozenset({"github_forbidden", "github_graphql_forbidden"}),
     "not_found": frozenset(
         {"github_graphql_repository_not_found", "repository_not_returned"}
     ),
-    "rate_limited": frozenset(
-        {"github_graphql_rate_limited", "github_rate_limit"}
-    ),
+    "rate_limited": frozenset({"github_graphql_rate_limited", "github_rate_limit"}),
     "transient_error": frozenset({"network_error"}),
     "malformed": frozenset(
         {
@@ -178,9 +194,7 @@ def _valid_git_ref_name(value: Any, *, branch: bool = False) -> bool:
     ):
         return False
     return all(
-        component
-        and not component.startswith(".")
-        and not component.endswith(".lock")
+        component and not component.startswith(".") and not component.endswith(".lock")
         for component in value.split("/")
     )
 
@@ -191,6 +205,7 @@ def _valid_git_branch(value: Any) -> bool:
 
 def _valid_git_upstream(value: Any) -> bool:
     return _valid_git_ref_name(value, branch=True)
+
 
 _ENDPOINTS = {
     "dependabot": "dependabot/alerts",
@@ -228,6 +243,8 @@ class SecurityCoverageReceiptBinding:
     max_age_hours: int
     expected_cohort_count: int
     expected_producer_commit: str | None
+    max_cohort_size: int | None = None
+    require_cohort_transition: bool = False
 
 
 @dataclass(frozen=True)
@@ -246,6 +263,16 @@ class LoadedSecurityCoverage:
     max_age_hours: int = 24
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     expected_producer_commit: str | None = None
+    max_cohort_size: int | None = None
+    require_cohort_transition: bool = False
+    required_repositories: tuple[str, ...] | None = None
+    outgoing_repositories: tuple[str, ...] | None = None
+    transition: dict[str, Any] | None = None
+
+    @property
+    def has_cohort_transition(self) -> bool:
+        """True when the collector wrote a transition-protocol receipt."""
+        return self.transition is not None
 
     def binding(self) -> SecurityCoverageReceiptBinding:
         """Return the strict byte binding used by canonical publication.
@@ -274,6 +301,8 @@ class LoadedSecurityCoverage:
             max_age_hours=self.max_age_hours,
             expected_cohort_count=self.expected_cohort_count,
             expected_producer_commit=self.expected_producer_commit,
+            max_cohort_size=self.max_cohort_size,
+            require_cohort_transition=self.require_cohort_transition,
         )
 
 
@@ -289,6 +318,7 @@ class SecurityCoverageReceiptWriter:
 
     path: Path
     expected_cohort_count: int
+    max_cohort_size: int | None = None
 
     def load_prior(self) -> dict[str, Any] | None:
         return _load_json_object(self.path) if self.path.is_file() else None
@@ -298,6 +328,7 @@ class SecurityCoverageReceiptWriter:
             payload,
             self.path,
             expected_cohort_count=self.expected_cohort_count,
+            max_cohort_size=self.max_cohort_size,
         )
 
 
@@ -412,6 +443,7 @@ def security_coverage_receipt_writer(
     path: Path,
     *,
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    max_cohort_size: int | None = None,
 ) -> Iterator[SecurityCoverageReceiptWriter]:
     """Hold exclusive writer intent across collection and receipt replacement."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -419,6 +451,7 @@ def security_coverage_receipt_writer(
         yield SecurityCoverageReceiptWriter(
             path=path,
             expected_cohort_count=expected_cohort_count,
+            max_cohort_size=max_cohort_size,
         )
 
 
@@ -542,23 +575,29 @@ def _validate_provider_reason_domain(
     elif state == "rate_limited":
         valid = reason == "github_rate_limit"
     elif state == "transient_error":
-        valid = reason == "network_error" if http_status is None else (
-            http_status >= 500 and reason == f"github_http_{http_status}"
+        valid = (
+            reason == "network_error"
+            if http_status is None
+            else (http_status >= 500 and reason == f"github_http_{http_status}")
         )
     elif state == "malformed":
         valid = (
-            http_status == 200
-            and reason == "non_list_or_invalid_alert_payload"
-            and conditional_result == "malformed"
-        ) or (
-            http_status == 304
-            and reason == "conditional_response_without_observed_prior"
-            and conditional_result == "invalid_prior"
-        ) or (
-            http_status is not None
-            and http_status < 500
-            and http_status not in {200, 304, 401, 403, 404, 410, 429}
-            and reason == f"unexpected_http_{http_status}"
+            (
+                http_status == 200
+                and reason == "non_list_or_invalid_alert_payload"
+                and conditional_result == "malformed"
+            )
+            or (
+                http_status == 304
+                and reason == "conditional_response_without_observed_prior"
+                and conditional_result == "invalid_prior"
+            )
+            or (
+                http_status is not None
+                and http_status < 500
+                and http_status not in {200, 304, 401, 403, 404, 410, 429}
+                and reason == f"unexpected_http_{http_status}"
+            )
         )
     if not valid:
         raise SecurityCoverageError(
@@ -579,8 +618,7 @@ def _validate_provider_conditional_domain(
     valid = False
     if state in {"observed", "stale"}:
         valid = (
-            http_status == 200
-            and result == ("modified" if requested else "not_used")
+            http_status == 200 and result == ("modified" if requested else "not_used")
         ) or (http_status == 304 and requested and result == "not_modified")
     elif state == "not_requested":
         incomplete_reasons = {
@@ -592,20 +630,20 @@ def _validate_provider_conditional_domain(
             reason in incomplete_reasons and result == "incomplete"
         )
     elif state == "credential_unavailable":
-        valid = (
-            http_status is None and not requested and result == "not_used"
-        ) or (http_status == 401 and result == "failed")
+        valid = (http_status is None and not requested and result == "not_used") or (
+            http_status == 401 and result == "failed"
+        )
     elif state == "feature_unavailable" and reason == ELIGIBILITY_REASON:
         valid = not requested and result == "not_used"
     elif state == "malformed":
         valid = (
-            http_status == 200 and result == "malformed"
-        ) or (
-            http_status == 304 and requested and result == "invalid_prior"
-        ) or (
-            reason is not None
-            and reason.startswith("unexpected_http_")
-            and result == "failed"
+            (http_status == 200 and result == "malformed")
+            or (http_status == 304 and requested and result == "invalid_prior")
+            or (
+                reason is not None
+                and reason.startswith("unexpected_http_")
+                and result == "failed"
+            )
         )
     elif state in {
         "forbidden",
@@ -633,8 +671,7 @@ def _validate_remote_reason_domain(state: str, reason: Any) -> None:
         valid = valid or (
             match is not None
             and int(match.group(1)) < 500
-            and int(match.group(1))
-            not in {200, 304, 401, 403, 404, 410, 429}
+            and int(match.group(1)) not in {200, 304, 401, 403, 404, 410, 429}
         )
     if not valid:
         raise SecurityCoverageError(
@@ -686,9 +723,7 @@ def _validate_normalized_remote_repository(value: dict[str, Any]) -> None:
                 "repository.default_branch is invalid when observed"
             )
         if not _valid_git_oid(head_sha):
-            raise SecurityCoverageError(
-                "repository.head_sha is invalid when observed"
-            )
+            raise SecurityCoverageError("repository.head_sha is invalid when observed")
         if not isinstance(archived, bool):
             raise SecurityCoverageError(
                 "repository.archived must be boolean when observed"
@@ -703,9 +738,7 @@ def _validate_normalized_remote_repository(value: dict[str, Any]) -> None:
                 "partial repository observation cannot claim branch or head"
             )
     elif state == "stale" and observed_at is None:
-        raise SecurityCoverageError(
-            "repository.observed_at is required when stale"
-        )
+        raise SecurityCoverageError("repository.observed_at is required when stale")
     elif any(item is not None for item in (default_branch, head_sha, archived)):
         raise SecurityCoverageError(
             "unobserved repository state cannot claim remote values"
@@ -729,11 +762,7 @@ def _provider_result(
 ) -> dict[str, Any]:
     if state not in PROVIDER_STATES:
         raise SecurityCoverageError(f"invalid provider state: {state}")
-    completed = (
-        state == "observed"
-        and pagination_complete
-        and isinstance(counts, dict)
-    )
+    completed = state == "observed" and pagination_complete and isinstance(counts, dict)
     result = {
         "state": state,
         "reason_code": _provider_reason_code(state),
@@ -820,9 +849,7 @@ def validate_normalized_security_provider(
         or not isinstance(conditional.get("requested"), bool)
         or conditional.get("result") not in PROVIDER_CONDITIONAL_RESULTS
     ):
-        raise SecurityCoverageError(
-            f"{provider}.conditional metadata is invalid"
-        )
+        raise SecurityCoverageError(f"{provider}.conditional metadata is invalid")
 
     observed_at_value = value.get("observed_at")
     observed_at = None
@@ -835,9 +862,10 @@ def validate_normalized_security_provider(
             raise SecurityCoverageError(
                 f"{provider}.observed_at is later than receipt produced_at"
             )
-        if current is not None and (
-            current - observed_at
-        ).total_seconds() / 3600 < -0.05:
+        if (
+            current is not None
+            and (current - observed_at).total_seconds() / 3600 < -0.05
+        ):
             raise SecurityCoverageError(f"{provider}.observed_at is future-dated")
     elif state != "not_requested":
         raise SecurityCoverageError(f"{provider}.observed_at is required for {state}")
@@ -862,8 +890,10 @@ def validate_normalized_security_provider(
             raise SecurityCoverageError(
                 f"{provider}.observed is older than the configured freshness window"
             )
-        if state == "stale" and not receipt_is_stale and (
-            provider_age_hours is None or provider_age_hours <= max_age_hours
+        if (
+            state == "stale"
+            and not receipt_is_stale
+            and (provider_age_hours is None or provider_age_hours <= max_age_hours)
         ):
             raise SecurityCoverageError(
                 f"{provider}.stale is not justified by receipt or provider age"
@@ -902,22 +932,18 @@ def validate_normalized_security_provider(
                 f"{provider}.{field_name} must be a string or null"
             )
     if not isinstance(value.get("pagination_complete"), bool):
-        raise SecurityCoverageError(
-            f"{provider}.pagination_complete must be boolean"
-        )
+        raise SecurityCoverageError(f"{provider}.pagination_complete must be boolean")
     if not isinstance(value.get("completed"), bool):
         raise SecurityCoverageError(f"{provider}.completed must be boolean")
 
     if state in {"observed", "stale"}:
         if http_status not in {200, 304}:
-            raise SecurityCoverageError(
-                f"{provider}.{state} requires HTTP 200 or 304"
-            )
-        expected_classification = (
-            "success" if http_status == 200 else "not_modified"
-        )
-        expected_result = "not_modified" if http_status == 304 else (
-            "modified" if conditional["requested"] else "not_used"
+            raise SecurityCoverageError(f"{provider}.{state} requires HTTP 200 or 304")
+        expected_classification = "success" if http_status == 200 else "not_modified"
+        expected_result = (
+            "not_modified"
+            if http_status == 304
+            else ("modified" if conditional["requested"] else "not_used")
         )
         if value.get("http_classification") != expected_classification:
             raise SecurityCoverageError(
@@ -982,12 +1008,8 @@ def validate_normalized_security_provider(
     elif state == "gone" and http_status != 410:
         raise SecurityCoverageError(f"{provider}.gone requires HTTP 410")
     elif state == "rate_limited" and http_status not in {403, 429}:
-        raise SecurityCoverageError(
-            f"{provider}.rate_limited requires HTTP 403 or 429"
-        )
-    elif state == "transient_error" and not (
-        http_status is None or http_status >= 500
-    ):
+        raise SecurityCoverageError(f"{provider}.rate_limited requires HTTP 403 or 429")
+    elif state == "transient_error" and not (http_status is None or http_status >= 500):
         raise SecurityCoverageError(
             f"{provider}.transient_error requires a network failure or HTTP 5xx"
         )
@@ -1015,9 +1037,7 @@ def validate_normalized_security_provider(
             not isinstance(counts, dict)
             or set(counts) != set(_COUNT_KEYS[provider])
             or any(
-                not isinstance(count, int)
-                or isinstance(count, bool)
-                or count < 0
+                not isinstance(count, int) or isinstance(count, bool) or count < 0
                 for count in counts.values()
             )
         ):
@@ -1025,19 +1045,18 @@ def validate_normalized_security_provider(
                 f"{provider}.counts are invalid for an observed result"
             )
         if value.get("completed") is not True:
-            raise SecurityCoverageError(
-                f"{provider}.observed must be completed"
-            )
+            raise SecurityCoverageError(f"{provider}.observed must be completed")
         if value.get("zero_findings") is not (sum(counts.values()) == 0):
             raise SecurityCoverageError(
                 f"{provider}.zero_findings does not match observed counts"
             )
     else:
         if counts is not None:
-            raise SecurityCoverageError(
-                f"{provider}.{state} must clear counts"
-            )
-        if value.get("completed") is not False or value.get("zero_findings") is not None:
+            raise SecurityCoverageError(f"{provider}.{state} must clear counts")
+        if (
+            value.get("completed") is not False
+            or value.get("zero_findings") is not None
+        ):
             raise SecurityCoverageError(
                 f"{provider}.{state} cannot claim a completed observation"
             )
@@ -1501,8 +1520,7 @@ def _fetch_provider(
                     conditional_request=bool(prior_etag),
                     conditional_result="failed",
                 ),
-                state in {"credential_unavailable", "rate_limited"}
-                or reserve_reached,
+                state in {"credential_unavailable", "rate_limited"} or reserve_reached,
             )
         try:
             page = response.json()
@@ -1686,9 +1704,7 @@ def _collect_remote_repository_observations(
             budget.stop_reason = "authentication_missing"
         elif reserve_reached:
             budget.stop_reason = "quota_reserve"
-        remote_state = (
-            state if state in REMOTE_REPOSITORY_STATES else "malformed"
-        )
+        remote_state = state if state in REMOTE_REPOSITORY_STATES else "malformed"
         return _remote_failure_results(
             cohort,
             state=remote_state,
@@ -1782,7 +1798,11 @@ def collect_security_coverage(
     portfolio_truth: dict[str, Any],
     *,
     token: str | None,
-    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_cohort_count: int | None = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    cohort_plan: CohortPlan | None = None,
+    max_cohort_size: int | None = None,
+    max_cohort_delta: int | None = None,
+    truth_sha256: str | None = None,
     base_request_limit: int = DEFAULT_BASE_REQUEST_LIMIT,
     total_request_limit: int = DEFAULT_TOTAL_REQUEST_LIMIT,
     quota_reserve: int = DEFAULT_QUOTA_RESERVE,
@@ -1792,35 +1812,22 @@ def collect_security_coverage(
     producer_commit: str | None = None,
     api_base_url: str | None = None,
 ) -> dict[str, Any]:
-    """Collect the bounded default-attention cohort into a provenance receipt."""
+    """Collect the bounded default-attention cohort into a provenance receipt.
+
+    Without a plan this is the legacy path: the cohort is derived from the
+    published truth and its size is asserted against ``expected_cohort_count``.
+
+    With a plan the cohort is the transition *union* — the prospective cohort
+    the producer will recompute, plus the prior published members leaving it —
+    and the exact-count tripwire is replaced by the two policy bounds.
+    """
     if (
         not 0 < base_request_limit <= DEFAULT_BASE_REQUEST_LIMIT
         or not base_request_limit <= total_request_limit <= DEFAULT_TOTAL_REQUEST_LIMIT
         or quota_reserve < 0
     ):
         raise SecurityCoverageError("request budget limits exceed the bounded contract")
-    if prior_receipt is not None:
-        prior_expected_count = _mapping(prior_receipt.get("cohort")).get(
-            "expected_count"
-        )
-        if not isinstance(prior_expected_count, int):
-            raise SecurityCoverageError(
-                "prior receipt cohort expected_count is invalid"
-            )
-        validate_security_coverage_receipt(
-            prior_receipt,
-            max_age_hours=24 * 365,
-            expected_cohort_count=prior_expected_count,
-            now=now,
-        )
-        if prior_expected_count != expected_cohort_count:
-            # A valid receipt for the previous bounded cohort cannot safely
-            # supply conditional-request or eligibility hints for the new one.
-            # Ignore it so the policy transition can produce fresh evidence.
-            prior_receipt = None
-    cohort = derive_default_attention_cohort(
-        portfolio_truth, expected_count=expected_cohort_count
-    )
+
     commit = producer_commit
     if not commit:
         try:
@@ -1838,6 +1845,88 @@ def collect_security_coverage(
         raise SecurityCoverageError(
             "producer commit is invalid; refusing an unproven receipt"
         )
+
+    transition_block: dict[str, Any] | None = None
+    required_repositories: tuple[str, ...] | None = None
+    outgoing_repositories: tuple[str, ...] | None = None
+    if cohort_plan is not None:
+        if expected_cohort_count is not None:
+            raise SecurityCoverageError(
+                "a cohort plan and an exact expected cohort count are mutually "
+                "exclusive; the plan supplies the collection membership"
+            )
+        if cohort_plan.producer_commit != commit:
+            raise SecurityCoverageError(
+                "cohort plan producer commit does not match the collecting "
+                f"checkout: plan={cohort_plan.producer_commit}; observed={commit}"
+            )
+        if truth_sha256 is not None and cohort_plan.prior_truth_sha256 != truth_sha256:
+            raise SecurityCoverageError(
+                "cohort plan is not bound to the published truth being read: "
+                f"plan={cohort_plan.prior_truth_sha256}; observed={truth_sha256}"
+            )
+        size_bound = (
+            max_cohort_size if max_cohort_size is not None else DEFAULT_MAX_COHORT_SIZE
+        )
+        delta_bound = (
+            max_cohort_delta
+            if max_cohort_delta is not None
+            else DEFAULT_MAX_COHORT_DELTA
+        )
+        if size_bound <= 0 or delta_bound < 0:
+            raise SecurityCoverageError("cohort policy bounds must be positive")
+        cohort = cohort_plan.collection_repositories
+        if len(cohort) > size_bound:
+            raise SecurityCoverageError(
+                "cohort collection exceeds the bounded contract: "
+                f"observed {len(cohort)}, max {size_bound}"
+            )
+        if cohort_plan.delta_size > delta_bound:
+            raise SecurityCoverageError(
+                "cohort membership churn exceeds the bounded contract: "
+                f"observed {cohort_plan.delta_size}, max {delta_bound}"
+            )
+        required_repositories = cohort_plan.required_repositories
+        outgoing_repositories = cohort_plan.outgoing_repositories
+        transition_block = {
+            "protocol": COHORT_TRANSITION_PROTOCOL,
+            "kind": cohort_plan.transition_kind,
+            "incoming": list(cohort_plan.incoming_repositories),
+            "outgoing": list(cohort_plan.outgoing_repositories),
+            "plan_id": cohort_plan.plan_id,
+            "prior_truth_sha256": cohort_plan.prior_truth_sha256,
+        }
+        expected_count = len(cohort)
+    else:
+        if expected_cohort_count is None:
+            raise SecurityCoverageError(
+                "collection requires either a cohort plan or an exact expected "
+                "cohort count"
+            )
+        cohort = derive_default_attention_cohort(
+            portfolio_truth, expected_count=expected_cohort_count
+        )
+        expected_count = expected_cohort_count
+
+    if prior_receipt is not None:
+        prior_expected_count = _mapping(prior_receipt.get("cohort")).get(
+            "expected_count"
+        )
+        if not isinstance(prior_expected_count, int):
+            raise SecurityCoverageError("prior receipt cohort expected_count is invalid")
+        validate_security_coverage_receipt(
+            prior_receipt,
+            max_age_hours=24 * 365,
+            expected_cohort_count=prior_expected_count,
+            now=now,
+        )
+        if prior_expected_count != expected_count or set(
+            _mapping(prior_receipt.get("cohort")).get("repositories") or ()
+        ) != set(cohort):
+            # A valid receipt for the previous bounded cohort cannot safely
+            # supply conditional-request or eligibility hints for the new one.
+            # Ignore it so the policy transition can produce fresh evidence.
+            prior_receipt = None
 
     collected_at = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     now_iso = collected_at.isoformat()
@@ -1884,8 +1973,7 @@ def collect_security_coverage(
                 halted_state = (
                     "credential_unavailable"
                     if not token
-                    or _mapping(eligibility).get("state")
-                    == "credential_unavailable"
+                    or _mapping(eligibility).get("state") == "credential_unavailable"
                     or budget.stop_reason == "authentication_missing"
                     else "not_requested"
                 )
@@ -1893,9 +1981,7 @@ def collect_security_coverage(
                     provider,
                     state=halted_state,
                     observed_at=(
-                        now_iso
-                        if halted_state == "credential_unavailable"
-                        else None
+                        now_iso if halted_state == "credential_unavailable" else None
                     ),
                     reason=(
                         "github_authentication_missing"
@@ -1961,12 +2047,13 @@ def collect_security_coverage(
         },
         "github_api_version": GITHUB_API_VERSION,
         "eligibility": eligibility,
-        "cohort": {
-            "policy": DEFAULT_COHORT_POLICY,
-            "expected_count": expected_cohort_count,
-            "repository_count": len(cohort),
-            "repositories": list(cohort),
-        },
+        "cohort": _build_receipt_cohort_block(
+            cohort=cohort,
+            expected_count=expected_count,
+            required_repositories=required_repositories,
+            outgoing_repositories=outgoing_repositories,
+            transition=transition_block,
+        ),
         "request_budget": {
             "base_limit": base_request_limit,
             "total_limit": total_request_limit,
@@ -1977,6 +2064,40 @@ def collect_security_coverage(
         },
         "repositories": repositories,
     }
+
+
+def _build_receipt_cohort_block(
+    *,
+    cohort: tuple[str, ...],
+    expected_count: int,
+    required_repositories: tuple[str, ...] | None,
+    outgoing_repositories: tuple[str, ...] | None,
+    transition: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Assemble the receipt cohort block.
+
+    `repositories`/`repository_count` remain the *collected* set and
+    `expected_count` keeps its legacy meaning — the size of that collected set —
+    so every existing internal-consistency check and the published truth's
+    `inputs.github_security.cohort_repository_count` binding are untouched. The
+    transition fields are strictly additive.
+    """
+    block: dict[str, Any] = {
+        "policy": DEFAULT_COHORT_POLICY,
+        "expected_count": expected_count,
+        "repository_count": len(cohort),
+        "repositories": list(cohort),
+    }
+    if transition is None:
+        return block
+    required = tuple(required_repositories or ())
+    outgoing = tuple(outgoing_repositories or ())
+    block["required_repositories"] = list(required)
+    block["required_count"] = len(required)
+    block["outgoing_repositories"] = list(outgoing)
+    block["outgoing_count"] = len(outgoing)
+    block["transition"] = dict(transition)
+    return block
 
 
 def _validate_eligibility(
@@ -2123,7 +2244,10 @@ def _validate_provider(
     raw_state = state
     declared_reason_code = data.get("reason_code")
     expected_raw_reason_code = _provider_reason_code(raw_state)
-    if declared_reason_code is not None and declared_reason_code != expected_raw_reason_code:
+    if (
+        declared_reason_code is not None
+        and declared_reason_code != expected_raw_reason_code
+    ):
         raise SecurityCoverageError(f"{provider}.reason_code does not match state")
     counts = data.get("counts")
     raw_completed = False
@@ -2131,9 +2255,10 @@ def _validate_provider(
     http_status = data.get("http_status")
     http_classification = data.get("http_classification")
     conditional = _mapping(data.get("conditional"))
-    if not isinstance(conditional.get("requested"), bool) or conditional.get(
-        "result"
-    ) not in PROVIDER_CONDITIONAL_RESULTS:
+    if (
+        not isinstance(conditional.get("requested"), bool)
+        or conditional.get("result") not in PROVIDER_CONDITIONAL_RESULTS
+    ):
         raise SecurityCoverageError(f"{provider}.conditional metadata is invalid")
     if http_status is not None and (
         not isinstance(http_status, int) or isinstance(http_status, bool)
@@ -2291,9 +2416,8 @@ def _validate_remote_repository(
             f"repository observation state is invalid: {state!r}"
         )
     declared_reason_code = data.get("reason_code")
-    if (
-        declared_reason_code is not None
-        and declared_reason_code != _remote_reason_code(state)
+    if declared_reason_code is not None and declared_reason_code != _remote_reason_code(
+        state
     ):
         raise SecurityCoverageError(
             "repository observation reason_code does not match state"
@@ -2327,17 +2451,13 @@ def _validate_remote_repository(
                 "repository.default_branch is invalid when observed"
             )
         if not _valid_git_oid(head_sha):
-            raise SecurityCoverageError(
-                "repository.head_sha is invalid when observed"
-            )
+            raise SecurityCoverageError("repository.head_sha is invalid when observed")
         if not isinstance(archived, bool):
             raise SecurityCoverageError(
                 "repository.archived must be boolean when observed"
             )
         if data.get("reason") is not None:
-            raise SecurityCoverageError(
-                "repository.reason must be null when observed"
-            )
+            raise SecurityCoverageError("repository.reason must be null when observed")
     elif state == "partial":
         if observed_at is None or not isinstance(archived, bool):
             raise SecurityCoverageError(
@@ -2348,9 +2468,7 @@ def _validate_remote_repository(
                 "partial repository observation cannot claim branch or head"
             )
     elif state == "stale" and observed_at is None:
-        raise SecurityCoverageError(
-            "repository.observed_at is required when stale"
-        )
+        raise SecurityCoverageError("repository.observed_at is required when stale")
     elif any(value is not None for value in (default_branch, head_sha, archived)):
         raise SecurityCoverageError(
             "unobserved repository state cannot claim remote values"
@@ -2382,8 +2500,10 @@ def validate_security_coverage_receipt(
     payload: Any,
     *,
     max_age_hours: int = 24,
-    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_cohort_count: int | None = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     expected_producer_commit: str | None = None,
+    max_cohort_size: int | None = None,
+    require_cohort_transition: bool = False,
     now: datetime | None = None,
     source_path: str = "",
     content_sha256: str | None = None,
@@ -2455,14 +2575,31 @@ def validate_security_coverage_receipt(
     canonical_cohort = tuple(_canonical_repo(repo) for repo in repositories_list)
     if len({repo.lower() for repo in canonical_cohort}) != len(canonical_cohort):
         raise SecurityCoverageError("cohort contains duplicate repositories")
-    if (
-        repository_count != len(canonical_cohort)
-        or expected_count != repository_count
-        or repository_count != expected_cohort_count
-    ):
+    if repository_count != len(canonical_cohort) or expected_count != repository_count:
+        raise SecurityCoverageError("cohort count contract mismatch")
+    if max_cohort_size is not None:
+        # Bounded policy mode: exact membership is enforced downstream by the
+        # producer's set equality against its own recomputed candidate cohort.
+        if max_cohort_size <= 0:
+            raise SecurityCoverageError("max_cohort_size must be positive")
+        if repository_count > max_cohort_size:
+            raise SecurityCoverageError(
+                "cohort exceeds the bounded contract: "
+                f"observed {repository_count}, max {max_cohort_size}"
+            )
+    elif expected_cohort_count is not None and repository_count != expected_cohort_count:
         raise SecurityCoverageError("cohort count contract mismatch")
     if canonical_cohort != tuple(sorted(canonical_cohort, key=str.lower)):
         raise SecurityCoverageError("cohort repositories must be canonically sorted")
+    (
+        required_repositories,
+        outgoing_repositories,
+        transition,
+    ) = _validate_receipt_cohort_transition(
+        cohort,
+        canonical_cohort=canonical_cohort,
+        require_cohort_transition=require_cohort_transition,
+    )
     eligibility = _validate_eligibility(
         payload.get("eligibility"),
         produced_at=produced_at,
@@ -2542,17 +2679,128 @@ def validate_security_coverage_receipt(
         receipt_id=receipt_id,
         content_sha256=content_sha256,
         max_age_hours=max_age_hours,
-        expected_cohort_count=expected_cohort_count,
+        expected_cohort_count=(
+            expected_cohort_count
+            if expected_cohort_count is not None
+            else repository_count
+        ),
         expected_producer_commit=expected_producer_commit,
+        max_cohort_size=max_cohort_size,
+        require_cohort_transition=require_cohort_transition,
+        required_repositories=required_repositories,
+        outgoing_repositories=outgoing_repositories,
+        transition=transition,
     )
+
+
+def _validate_receipt_cohort_transition(
+    cohort: dict[str, Any],
+    *,
+    canonical_cohort: tuple[str, ...],
+    require_cohort_transition: bool,
+) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None, dict[str, Any] | None]:
+    """Validate the additive transition block, or admit a legacy receipt.
+
+    Every declared count is checked against its own named set. A receipt with no
+    transition block is legacy-shaped and returns `(None, None, None)`, which the
+    producer treats as `required = collected`, `outgoing = empty`.
+    """
+    declared = any(
+        key in cohort
+        for key in ("required_repositories", "outgoing_repositories", "transition")
+    )
+    if not declared:
+        if require_cohort_transition:
+            raise SecurityCoverageError(
+                "security coverage receipt predates the cohort-transition protocol "
+                f"({COHORT_TRANSITION_PROTOCOL}); it declares no transition block"
+            )
+        return None, None, None
+
+    def _named_set(key: str) -> tuple[str, ...]:
+        value = cohort.get(key)
+        if not isinstance(value, list):
+            raise SecurityCoverageError(f"cohort {key} must be a list")
+        repositories = tuple(_canonical_repo(repo) for repo in value)
+        if len({repo.lower() for repo in repositories}) != len(repositories):
+            raise SecurityCoverageError(f"cohort {key} contains duplicate repositories")
+        if repositories != tuple(sorted(repositories, key=str.lower)):
+            raise SecurityCoverageError(f"cohort {key} must be canonically sorted")
+        return repositories
+
+    required = _named_set("required_repositories")
+    outgoing = _named_set("outgoing_repositories")
+    for key, named in (
+        ("required_count", required),
+        ("outgoing_count", outgoing),
+    ):
+        count = cohort.get(key)
+        if not isinstance(count, int) or isinstance(count, bool):
+            raise SecurityCoverageError(f"cohort {key} is required")
+        if count != len(named):
+            raise SecurityCoverageError(
+                f"cohort {key} does not match its named set: "
+                f"declared {count}, observed {len(named)}"
+            )
+    if set(required) & set(outgoing):
+        raise SecurityCoverageError(
+            "cohort required and outgoing sets must be disjoint"
+        )
+    if set(required) | set(outgoing) != set(canonical_cohort):
+        raise SecurityCoverageError(
+            "cohort collection is not partitioned into required and outgoing"
+        )
+
+    transition = cohort.get("transition")
+    if not isinstance(transition, dict):
+        raise SecurityCoverageError("cohort transition block must be an object")
+    if transition.get("protocol") != COHORT_TRANSITION_PROTOCOL:
+        raise SecurityCoverageError(
+            f"unexpected cohort transition protocol: {transition.get('protocol')!r}"
+        )
+    incoming_value = transition.get("incoming")
+    outgoing_value = transition.get("outgoing")
+    if not isinstance(incoming_value, list) or not isinstance(outgoing_value, list):
+        raise SecurityCoverageError(
+            "cohort transition incoming and outgoing must be lists"
+        )
+    incoming = tuple(_canonical_repo(repo) for repo in incoming_value)
+    transition_outgoing = tuple(_canonical_repo(repo) for repo in outgoing_value)
+    if set(transition_outgoing) != set(outgoing):
+        raise SecurityCoverageError(
+            "cohort transition outgoing does not match the outgoing set"
+        )
+    if set(incoming) - set(required):
+        raise SecurityCoverageError(
+            "cohort transition incoming declares repositories outside the "
+            "required set"
+        )
+    kind = transition.get("kind")
+    if kind != derive_transition_kind(incoming, transition_outgoing):
+        raise SecurityCoverageError(
+            f"cohort transition kind does not match its membership delta: {kind!r}"
+        )
+    plan_id = transition.get("plan_id")
+    if not isinstance(plan_id, str) or not _RECEIPT_ID_RE.fullmatch(plan_id):
+        raise SecurityCoverageError("cohort transition plan_id must be a sha256 identity")
+    prior_truth_sha256 = transition.get("prior_truth_sha256")
+    if not isinstance(prior_truth_sha256, str) or not _SHA256_RE.fullmatch(
+        prior_truth_sha256
+    ):
+        raise SecurityCoverageError(
+            "cohort transition prior_truth_sha256 must be a sha256 digest"
+        )
+    return required, outgoing, dict(transition)
 
 
 def load_security_coverage_receipt(
     path: Path,
     *,
     max_age_hours: int = 24,
-    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_cohort_count: int | None = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     expected_producer_commit: str | None = None,
+    max_cohort_size: int | None = None,
+    require_cohort_transition: bool = False,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage:
     return _load_security_coverage_receipt_unlocked(
@@ -2560,6 +2808,8 @@ def load_security_coverage_receipt(
         max_age_hours=max_age_hours,
         expected_cohort_count=expected_cohort_count,
         expected_producer_commit=expected_producer_commit,
+        max_cohort_size=max_cohort_size,
+        require_cohort_transition=require_cohort_transition,
         now=now,
     )
 
@@ -2568,9 +2818,11 @@ def _load_security_coverage_receipt_unlocked(
     path: Path,
     *,
     max_age_hours: int,
-    expected_cohort_count: int,
+    expected_cohort_count: int | None,
     expected_producer_commit: str | None,
     now: datetime | None,
+    max_cohort_size: int | None = None,
+    require_cohort_transition: bool = False,
 ) -> LoadedSecurityCoverage:
     try:
         raw_bytes = path.read_bytes()
@@ -2588,6 +2840,8 @@ def _load_security_coverage_receipt_unlocked(
         max_age_hours=max_age_hours,
         expected_cohort_count=expected_cohort_count,
         expected_producer_commit=expected_producer_commit,
+        max_cohort_size=max_cohort_size,
+        require_cohort_transition=require_cohort_transition,
         now=now,
         source_path=str(path),
         content_sha256=hashlib.sha256(raw_bytes).hexdigest(),
@@ -2604,8 +2858,14 @@ def verified_security_coverage_receipt_binding(
         loaded = _load_security_coverage_receipt_unlocked(
             path,
             max_age_hours=binding.max_age_hours,
-            expected_cohort_count=binding.expected_cohort_count,
+            expected_cohort_count=(
+                None
+                if binding.max_cohort_size is not None
+                else binding.expected_cohort_count
+            ),
             expected_producer_commit=binding.expected_producer_commit,
+            max_cohort_size=binding.max_cohort_size,
+            require_cohort_transition=binding.require_cohort_transition,
             now=None,
         )
         if loaded.receipt_id != binding.receipt_id:
@@ -2627,7 +2887,8 @@ def write_security_coverage_receipt(
     payload: dict[str, Any],
     path: Path,
     *,
-    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_cohort_count: int | None = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    max_cohort_size: int | None = None,
 ) -> LoadedSecurityCoverage:
     """Atomically write a validated, identity-bound receipt payload."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2636,6 +2897,7 @@ def write_security_coverage_receipt(
             payload,
             path,
             expected_cohort_count=expected_cohort_count,
+            max_cohort_size=max_cohort_size,
         )
 
 
@@ -2643,7 +2905,8 @@ def _write_security_coverage_receipt_unlocked(
     payload: dict[str, Any],
     path: Path,
     *,
-    expected_cohort_count: int,
+    expected_cohort_count: int | None,
+    max_cohort_size: int | None = None,
 ) -> LoadedSecurityCoverage:
     """Write a receipt while the caller already holds exclusive writer intent."""
     bound_payload = _with_receipt_id(payload)
@@ -2655,6 +2918,7 @@ def _write_security_coverage_receipt_unlocked(
         bound_payload,
         max_age_hours=24 * 365,
         expected_cohort_count=expected_cohort_count,
+        max_cohort_size=max_cohort_size,
         source_path=str(path),
         content_sha256=content_sha256,
     )
@@ -2720,7 +2984,47 @@ def main() -> None:
     parser.add_argument(
         "--expected-cohort-count",
         type=int,
-        default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        default=None,
+        help=(
+            "Legacy exact cohort size. Mutually exclusive with the bounded "
+            "cohort-transition mode; defaults to "
+            f"{DEFAULT_EXPECTED_GITHUB_COHORT_COUNT} when no bounded flag is used"
+        ),
+    )
+    parser.add_argument(
+        "--cohort-plan",
+        type=Path,
+        default=None,
+        help=(
+            "PortfolioCohortPlanV1 selecting the transition collection set "
+            "(prospective union prior published)"
+        ),
+    )
+    parser.add_argument(
+        "--max-cohort-size",
+        type=int,
+        default=None,
+        help=(
+            "Override the fail-closed cohort size bound "
+            f"(default: {DEFAULT_MAX_COHORT_SIZE})"
+        ),
+    )
+    parser.add_argument(
+        "--max-cohort-delta",
+        type=int,
+        default=None,
+        help=(
+            "Override the fail-closed cohort churn bound "
+            f"(default: {DEFAULT_MAX_COHORT_DELTA})"
+        ),
+    )
+    parser.add_argument(
+        "--require-cohort-transition",
+        action="store_true",
+        help=(
+            "Refuse a legacy-shaped receipt that carries no "
+            f"{COHORT_TRANSITION_PROTOCOL} transition block"
+        ),
     )
     parser.add_argument(
         "--expected-producer-commit",
@@ -2736,13 +3040,45 @@ def main() -> None:
     parser.add_argument("--quota-reserve", type=int, default=DEFAULT_QUOTA_RESERVE)
     args = parser.parse_args()
 
+    bounded = (
+        args.cohort_plan is not None
+        or args.require_cohort_transition
+        or args.max_cohort_size is not None
+        or args.max_cohort_delta is not None
+    )
+    if bounded and args.expected_cohort_count is not None:
+        raise SystemExit(
+            "--expected-cohort-count is mutually exclusive with the bounded "
+            "cohort-transition flags"
+        )
+    expected_cohort_count = (
+        None
+        if bounded
+        else (
+            args.expected_cohort_count
+            if args.expected_cohort_count is not None
+            else DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+        )
+    )
+    max_cohort_size = (
+        (
+            args.max_cohort_size
+            if args.max_cohort_size is not None
+            else DEFAULT_MAX_COHORT_SIZE
+        )
+        if bounded
+        else None
+    )
+
     try:
         if args.validate_only:
             loaded = load_security_coverage_receipt(
                 args.output,
                 max_age_hours=args.max_age_hours,
-                expected_cohort_count=args.expected_cohort_count,
+                expected_cohort_count=expected_cohort_count,
                 expected_producer_commit=args.expected_producer_commit,
+                max_cohort_size=max_cohort_size,
+                require_cohort_transition=args.require_cohort_transition,
             )
             print(
                 json.dumps(
@@ -2752,6 +3088,21 @@ def main() -> None:
                         "receipt_state": loaded.receipt_state,
                         "age_hours": loaded.age_hours,
                         "cohort_count": len(loaded.cohort_repositories),
+                        "required_count": (
+                            len(loaded.required_repositories)
+                            if loaded.required_repositories is not None
+                            else None
+                        ),
+                        "outgoing_count": (
+                            len(loaded.outgoing_repositories)
+                            if loaded.outgoing_repositories is not None
+                            else None
+                        ),
+                        "transition_kind": (
+                            (loaded.transition or {}).get("kind")
+                            if loaded.transition is not None
+                            else None
+                        ),
                         "receipt_id": loaded.receipt_id,
                         "content_sha256": loaded.content_sha256,
                     },
@@ -2759,23 +3110,36 @@ def main() -> None:
                 )
             )
             return
+        plan: CohortPlan | None = None
+        truth_sha256: str | None = None
+        if args.cohort_plan is not None:
+            try:
+                plan = validate_cohort_plan(_load_json_object(args.cohort_plan))
+            except CohortPlanError as exc:
+                raise SecurityCoverageError(str(exc)) from exc
+            truth_sha256 = hashlib.sha256(args.truth.read_bytes()).hexdigest()
         with security_coverage_receipt_writer(
             args.output,
-            expected_cohort_count=args.expected_cohort_count,
+            expected_cohort_count=expected_cohort_count,
+            max_cohort_size=max_cohort_size,
         ) as writer:
             truth = _load_json_object(args.truth)
             prior = writer.load_prior()
             receipt = collect_security_coverage(
                 truth,
                 token=os.environ.get("GITHUB_TOKEN"),
-                expected_cohort_count=args.expected_cohort_count,
+                expected_cohort_count=expected_cohort_count,
+                cohort_plan=plan,
+                max_cohort_size=args.max_cohort_size,
+                max_cohort_delta=args.max_cohort_delta,
+                truth_sha256=truth_sha256,
                 base_request_limit=args.base_request_limit,
                 total_request_limit=args.total_request_limit,
                 quota_reserve=args.quota_reserve,
                 prior_receipt=prior,
             )
             written = writer.write(receipt)
-    except SecurityCoverageError as exc:
+    except (SecurityCoverageError, OSError) as exc:
         raise SystemExit(str(exc)) from exc
     print(
         json.dumps(
@@ -2783,6 +3147,9 @@ def main() -> None:
                 "state": "written",
                 "path": str(args.output),
                 "cohort_count": receipt["cohort"]["repository_count"],
+                "required_count": receipt["cohort"].get("required_count"),
+                "outgoing_count": receipt["cohort"].get("outgoing_count"),
+                "transition": receipt["cohort"].get("transition"),
                 "request_budget": receipt["request_budget"],
                 "receipt_id": written.receipt_id,
                 "content_sha256": written.content_sha256,

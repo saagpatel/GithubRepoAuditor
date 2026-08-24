@@ -56,7 +56,10 @@ from github_repo_auditor.app.portfolio_analysis import (
 )
 from github_repo_auditor.app.improvement_application import _run_apply_improvements_mode
 from github_repo_auditor.app.semantic_search import run_semantic_search_mode
-from github_repo_auditor.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+from github_repo_auditor.github_security_coverage import (
+    DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    DEFAULT_MAX_COHORT_SIZE,
+)
 
 
 # Emitted at most once per process when legacy flat invocation is used.
@@ -515,8 +518,29 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
         metavar="COUNT",
         help=(
-            "Expected security cohort size; must match the receipt collection "
-            f"contract (default: {DEFAULT_EXPECTED_GITHUB_COHORT_COUNT})"
+            "Deprecated legacy exact security cohort size, retained for one "
+            "release so a stale deployed wrapper cannot hard-error on an unknown "
+            "argument. Ignored in bounded cohort-transition mode (default: "
+            f"{DEFAULT_EXPECTED_GITHUB_COHORT_COUNT})"
+        ),
+    )
+    p.add_argument(
+        "--portfolio-truth-security-max-cohort-size",
+        type=int,
+        default=None,
+        metavar="COUNT",
+        help=(
+            "Fail-closed upper bound on collected security cohort size; selects "
+            "bounded cohort-transition mode (default: "
+            f"{DEFAULT_MAX_COHORT_SIZE})"
+        ),
+    )
+    p.add_argument(
+        "--portfolio-truth-require-cohort-transition",
+        action="store_true",
+        help=(
+            "Refuse a legacy-shaped security receipt that carries no cohort "
+            "transition block; selects bounded cohort-transition mode"
         ),
     )
     p.add_argument(
@@ -821,8 +845,29 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
         metavar="COUNT",
         help=(
-            "Expected security cohort size; must match the receipt collection "
-            f"contract (default: {DEFAULT_EXPECTED_GITHUB_COHORT_COUNT})"
+            "Deprecated legacy exact security cohort size, retained for one "
+            "release so a stale deployed wrapper cannot hard-error on an unknown "
+            "argument. Ignored in bounded cohort-transition mode (default: "
+            f"{DEFAULT_EXPECTED_GITHUB_COHORT_COUNT})"
+        ),
+    )
+    parser.add_argument(
+        "--portfolio-truth-security-max-cohort-size",
+        type=int,
+        default=None,
+        metavar="COUNT",
+        help=(
+            "Fail-closed upper bound on collected security cohort size; selects "
+            "bounded cohort-transition mode (default: "
+            f"{DEFAULT_MAX_COHORT_SIZE})"
+        ),
+    )
+    parser.add_argument(
+        "--portfolio-truth-require-cohort-transition",
+        action="store_true",
+        help=(
+            "Refuse a legacy-shaped security receipt that carries no cohort "
+            "transition block; selects bounded cohort-transition mode"
         ),
     )
     parser.add_argument(

@@ -13,6 +13,10 @@ from github_repo_auditor.github_security_coverage import (
     SecurityCoverageError,
     derive_default_attention_cohort,
 )
+from github_repo_auditor.portfolio_cohort_plan_contract import (
+    COHORT_TRANSITION_PROTOCOL,
+    derive_transition_kind,
+)
 from github_repo_auditor.portfolio_catalog import (
     catalog_entry_for_repo,
     group_entry_for_path,
@@ -188,107 +192,71 @@ def _catalog_supported_context_quality(
 
 
 @dataclass(frozen=True)
+class CohortTransitionOutcome:
+    """Planned and actual outcome of one governed cohort transition.
+
+    ``protocol`` is ``None`` for a legacy receipt that carries no transition
+    block; those runs reproduce the pre-transition semantics exactly.
+    """
+
+    protocol: str | None
+    kind: str
+    plan_id: str | None
+    prior_truth_sha256: str | None
+    required: tuple[str, ...]
+    outgoing: tuple[str, ...]
+    collection: tuple[str, ...]
+    planned_incoming: tuple[str, ...]
+    planned_outgoing: tuple[str, ...]
+    departed: tuple[str, ...]
+    retained_due_security: tuple[str, ...]
+    final: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the inspectable transition record carried by producer evidence."""
+        return {
+            "protocol": self.protocol,
+            "kind": self.kind,
+            "plan_id": self.plan_id,
+            "prior_truth_sha256": self.prior_truth_sha256,
+            "required_count": len(self.required),
+            "required_repositories": list(self.required),
+            "outgoing_count": len(self.outgoing),
+            "outgoing_repositories": list(self.outgoing),
+            "collection_count": len(self.collection),
+            "collection_repositories": list(self.collection),
+            "planned_incoming_count": len(self.planned_incoming),
+            "planned_incoming": list(self.planned_incoming),
+            "planned_outgoing_count": len(self.planned_outgoing),
+            "planned_outgoing": list(self.planned_outgoing),
+            "departed_count": len(self.departed),
+            "departed_repositories": list(self.departed),
+            "retained_due_security_count": len(self.retained_due_security),
+            "retained_due_security": list(self.retained_due_security),
+            "final_count": len(self.final),
+            "final_repositories": list(self.final),
+        }
+
+
+@dataclass(frozen=True)
 class PortfolioTruthBuildResult:
     snapshot: PortfolioTruthSnapshot
     catalog_data: dict[str, Any]
     legacy_rows: dict[str, dict[str, str]]
+    cohort_transition: CohortTransitionOutcome | None = None
 
 
-def _validate_security_receipt_cohort_identity(
+def _cohort_repositories_for(
+    projects: list[PortfolioTruthProject],
     *,
-    projects: list[PortfolioTruthProject],
-    security_alerts_by_name: dict[str, dict],
-    candidate_projects: list[PortfolioTruthProject] | None = None,
-    prior_security_alerts_by_name: dict[str, dict] | None = None,
-) -> None:
-    """Bind receipt membership to attention derived before the new receipt."""
-    if candidate_projects is None:
-        candidate_projects = projects
-    prior_security_alerts_by_name = prior_security_alerts_by_name or {}
-    receipt_repositories = tuple(sorted(security_alerts_by_name, key=str.lower))
-    try:
-        candidate_repositories = derive_default_attention_cohort(
-            {
-                "projects": [
-                    {
-                        "identity": {
-                            "project_key": project.identity.project_key,
-                            "repo_full_name": project.identity.repo_full_name,
-                        },
-                        "derived": {
-                            "attention_state": project.derived.attention_state,
-                        },
-                    }
-                    for project in candidate_projects
-                ]
-            },
-            expected_count=len(receipt_repositories),
-        )
-    except SecurityCoverageError as exc:
-        raise ValueError(
-            "PortfolioTruth GitHub security receipt cohort cannot match freshly "
-            f"derived default attention: {exc}."
-        ) from exc
-
-    receipt_only = sorted(
-        set(receipt_repositories) - set(candidate_repositories),
-        key=str.lower,
-    )
-    derived_only = sorted(
-        set(candidate_repositories) - set(receipt_repositories),
-        key=str.lower,
-    )
-    if receipt_only or derived_only:
-        raise ValueError(
-            "PortfolioTruth GitHub security receipt cohort differs from freshly "
-            "derived pre-security default attention: "
-            f"receipt_only={receipt_only}; derived_only={derived_only}."
-        )
-
-    final_repositories = _derive_project_security_cohort(projects)
-    final_only = sorted(
-        set(final_repositories) - set(receipt_repositories),
-        key=str.lower,
-    )
-    if final_only:
-        raise ValueError(
-            "PortfolioTruth post-receipt attention contains repositories outside "
-            f"the collected security cohort: {final_only}."
-        )
-
-    departed = sorted(
-        set(receipt_repositories) - set(final_repositories),
-        key=str.lower,
-    )
-
-    def final_project_is_archived(repository: str) -> bool:
-        matches = [
-            project
-            for project in projects
-            if project.identity.repo_full_name == repository
-        ]
-        return len(matches) == 1 and matches[0].derived.archived is True
-
-    unresolved_departures = [
-        repository
-        for repository in departed
-        if not _is_verified_security_cohort_departure(
-            prior_security_alerts_by_name.get(repository),
-            security_alerts_by_name.get(repository),
-            final_project_archived=final_project_is_archived(repository),
-        )
-    ]
-    if unresolved_departures:
-        raise ValueError(
-            "PortfolioTruth receipt members left default attention without fresh "
-            "observed Dependabot resolution or repository archive evidence: "
-            f"{unresolved_departures}."
-        )
-
-
-def _derive_project_security_cohort(
-    projects: list[PortfolioTruthProject],
+    label: str,
 ) -> tuple[str, ...]:
+    """Derive a repo-backed default-attention cohort that sizes itself.
+
+    The single membership authority stays :func:`derive_default_attention_cohort`.
+    Passing the observed size means this helper never doubles as a size tripwire;
+    membership is compared as an exact set by the callers that need it.
+    """
     expected_count = sum(
         project.derived.attention_state in DEFAULT_ATTENTION_STATES
         and not project.identity.project_key.startswith("supp:")
@@ -314,9 +282,292 @@ def _derive_project_security_cohort(
             expected_count=expected_count,
         )
     except SecurityCoverageError as exc:
+        raise ValueError(f"PortfolioTruth {label} is invalid: {exc}.") from exc
+
+
+def _validate_security_receipt_cohort_identity(
+    *,
+    projects: list[PortfolioTruthProject],
+    security_alerts_by_name: dict[str, dict],
+    candidate_projects: list[PortfolioTruthProject] | None = None,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
+    required_repositories: tuple[str, ...] | None = None,
+    outgoing_repositories: tuple[str, ...] | None = None,
+    transition: dict[str, Any] | None = None,
+    require_cohort_transition: bool = False,
+) -> CohortTransitionOutcome:
+    """Bind receipt membership to attention derived before the new receipt.
+
+    Rules, in order:
+
+    * R1 ``receipt == required union outgoing``
+    * R2 ``required intersect outgoing == empty``
+    * R3 ``candidate == required`` (exact set equality; the fail-closed control
+      is re-pointed, never relaxed)
+    * R4 ``outgoing intersect candidate == empty``
+    * R5 ``final subset of receipt``
+    * R6 every departure carries positive evidence
+
+    A receipt without a transition block falls back to ``required = receipt``
+    and ``outgoing = ()``, which reproduces the pre-transition semantics
+    verbatim, size tripwire included.
+    """
+    if candidate_projects is None:
+        candidate_projects = projects
+    prior_security_alerts_by_name = prior_security_alerts_by_name or {}
+    receipt_repositories = tuple(sorted(security_alerts_by_name, key=str.lower))
+
+    transition_declared = (
+        required_repositories is not None
+        or outgoing_repositories is not None
+        or transition is not None
+    )
+    if require_cohort_transition and not transition_declared:
         raise ValueError(
-            f"PortfolioTruth post-receipt security cohort is invalid: {exc}."
-        ) from exc
+            "PortfolioTruth requires a cohort-transition receipt "
+            f"({COHORT_TRANSITION_PROTOCOL}); the collector wrote a legacy "
+            "receipt with no transition block and therefore predates the "
+            "transition protocol."
+        )
+
+    transition_block = dict(transition or {})
+    if transition_declared:
+        required = tuple(sorted(required_repositories or (), key=str.lower))
+        outgoing = tuple(sorted(outgoing_repositories or (), key=str.lower))
+    else:
+        required = receipt_repositories
+        outgoing = ()
+
+    # R2 — the partition halves must be disjoint.
+    overlap = sorted(set(required) & set(outgoing), key=str.lower)
+    if overlap:
+        raise ValueError(
+            "PortfolioTruth security receipt declares repositories as both "
+            f"required and outgoing: {overlap}."
+        )
+
+    # R1 — the collected set is exactly the declared partition.
+    if set(receipt_repositories) != set(required) | set(outgoing):
+        undeclared = sorted(
+            set(receipt_repositories) - set(required) - set(outgoing),
+            key=str.lower,
+        )
+        uncollected = sorted(
+            (set(required) | set(outgoing)) - set(receipt_repositories),
+            key=str.lower,
+        )
+        raise ValueError(
+            "PortfolioTruth security receipt cohort membership is not "
+            "partitioned into required and outgoing: "
+            f"undeclared={undeclared}; uncollected={uncollected}."
+        )
+
+    if transition_declared:
+        candidate_repositories = _cohort_repositories_for(
+            candidate_projects,
+            label="pre-security candidate cohort",
+        )
+    else:
+        # Legacy compatibility: the historical size tripwire fires first and
+        # keeps its exact wording so a legacy-shaped receipt behaves identically.
+        try:
+            candidate_repositories = derive_default_attention_cohort(
+                {
+                    "projects": [
+                        {
+                            "identity": {
+                                "project_key": project.identity.project_key,
+                                "repo_full_name": project.identity.repo_full_name,
+                            },
+                            "derived": {
+                                "attention_state": project.derived.attention_state,
+                            },
+                        }
+                        for project in candidate_projects
+                    ]
+                },
+                expected_count=len(receipt_repositories),
+            )
+        except SecurityCoverageError as exc:
+            raise ValueError(
+                "PortfolioTruth GitHub security receipt cohort cannot match freshly "
+                f"derived default attention: {exc}."
+            ) from exc
+
+    # R4 — a declared departure may not still be in derived default attention.
+    still_attended = sorted(
+        set(outgoing) & set(candidate_repositories), key=str.lower
+    )
+    if still_attended:
+        raise ValueError(
+            "PortfolioTruth security receipt declares outgoing repositories that "
+            f"are still in derived default attention: {still_attended}."
+        )
+
+    # R3 — exact set equality between required and the recomputed candidate.
+    receipt_only = sorted(set(required) - set(candidate_repositories), key=str.lower)
+    derived_only = sorted(set(candidate_repositories) - set(required), key=str.lower)
+    if receipt_only or derived_only:
+        raise ValueError(
+            "PortfolioTruth GitHub security receipt cohort differs from freshly "
+            "derived pre-security default attention: "
+            f"receipt_only={receipt_only}; derived_only={derived_only}."
+        )
+
+    final_repositories = _cohort_repositories_for(
+        projects,
+        label="post-receipt security cohort",
+    )
+
+    # R5 — published attention may never exceed collected evidence.
+    final_only = sorted(
+        set(final_repositories) - set(receipt_repositories),
+        key=str.lower,
+    )
+    if final_only:
+        raise ValueError(
+            "PortfolioTruth post-receipt attention contains repositories outside "
+            f"the collected security cohort: {final_only}."
+        )
+
+    departed = tuple(
+        sorted(set(receipt_repositories) - set(final_repositories), key=str.lower)
+    )
+
+    def final_project_is_archived(repository: str) -> bool:
+        matches = [
+            project
+            for project in projects
+            if project.identity.repo_full_name == repository
+        ]
+        return len(matches) == 1 and matches[0].derived.archived is True
+
+    # R6 — every departure carries positive evidence.
+    non_collectable = [
+        repository
+        for repository in departed
+        if repository in set(outgoing)
+        and _is_non_collectable_departure(security_alerts_by_name.get(repository))
+    ]
+    if non_collectable:
+        raise ValueError(
+            "PortfolioTruth cannot admit a declared cohort departure whose GitHub "
+            "evidence is non-collectable; the observed-non-existence departure "
+            "branch is deliberately deferred out of "
+            f"{COHORT_TRANSITION_PROTOCOL} slice 1: {non_collectable}."
+        )
+    unresolved_departures = [
+        repository
+        for repository in departed
+        if not _is_verified_security_cohort_departure(
+            prior_security_alerts_by_name.get(repository),
+            security_alerts_by_name.get(repository),
+            final_project_archived=final_project_is_archived(repository),
+            declared_outgoing=repository in set(outgoing),
+        )
+    ]
+    if unresolved_departures:
+        raise ValueError(
+            "PortfolioTruth receipt members left default attention without fresh "
+            "observed Dependabot resolution, repository archive, or declared "
+            f"source-departure evidence: {unresolved_departures}."
+        )
+
+    # An outgoing member whose fresh evidence keeps it in default attention is a
+    # valid outcome: security evidence outranks lifecycle classification (I5).
+    retained_due_security = tuple(
+        repository
+        for repository in outgoing
+        if repository in set(final_repositories)
+    )
+
+    planned_incoming = tuple(
+        sorted(
+            (
+                str(item)
+                for item in (transition_block.get("incoming") or ())
+                if isinstance(item, str)
+            ),
+            key=str.lower,
+        )
+    )
+    planned_outgoing = tuple(
+        sorted(
+            (
+                str(item)
+                for item in (transition_block.get("outgoing") or ())
+                if isinstance(item, str)
+            ),
+            key=str.lower,
+        )
+    )
+    if transition_declared:
+        if set(planned_outgoing) != set(outgoing):
+            raise ValueError(
+                "PortfolioTruth security receipt transition block disagrees with "
+                f"its outgoing set: transition={list(planned_outgoing)}; "
+                f"cohort={list(outgoing)}."
+            )
+        if set(planned_incoming) - set(required):
+            raise ValueError(
+                "PortfolioTruth security receipt declares incoming repositories "
+                "that are absent from the required set: "
+                f"{sorted(set(planned_incoming) - set(required), key=str.lower)}."
+            )
+        declared_kind = str(transition_block.get("kind") or "")
+        derived_kind = derive_transition_kind(planned_incoming, planned_outgoing)
+        if declared_kind != derived_kind:
+            raise ValueError(
+                "PortfolioTruth security receipt transition kind does not match "
+                f"its membership delta: declared={declared_kind!r}; "
+                f"derived={derived_kind!r}."
+            )
+        protocol = str(transition_block.get("protocol") or "") or None
+        kind = derived_kind
+    else:
+        protocol = None
+        kind = "legacy"
+
+    return CohortTransitionOutcome(
+        protocol=protocol,
+        kind=kind,
+        plan_id=(
+            str(transition_block.get("plan_id"))
+            if transition_block.get("plan_id")
+            else None
+        ),
+        prior_truth_sha256=(
+            str(transition_block.get("prior_truth_sha256"))
+            if transition_block.get("prior_truth_sha256")
+            else None
+        ),
+        required=required,
+        outgoing=outgoing,
+        collection=receipt_repositories,
+        planned_incoming=planned_incoming,
+        planned_outgoing=planned_outgoing,
+        departed=departed,
+        retained_due_security=retained_due_security,
+        final=final_repositories,
+    )
+
+
+def _derive_project_security_cohort(
+    projects: list[PortfolioTruthProject],
+) -> tuple[str, ...]:
+    return _cohort_repositories_for(projects, label="post-receipt security cohort")
+
+
+def _is_non_collectable_departure(current_entry: dict[str, Any] | None) -> bool:
+    """True when a declared departure cannot be observed on GitHub at all."""
+    current = dict(current_entry or {})
+    dependabot = dict((current.get("providers") or {}).get("dependabot") or {})
+    repository = dict(current.get("repository") or {})
+    absent_states = {"not_found", "gone"}
+    return (
+        dependabot.get("state") in absent_states
+        or repository.get("state") in absent_states
+    )
 
 
 def _is_verified_security_cohort_departure(
@@ -324,6 +575,7 @@ def _is_verified_security_cohort_departure(
     current_entry: dict[str, Any] | None,
     *,
     final_project_archived: bool,
+    declared_outgoing: bool = False,
 ) -> bool:
     prior = dict(prior_entry or {})
     current = dict(current_entry or {})
@@ -332,6 +584,12 @@ def _is_verified_security_cohort_departure(
     current_repository = dict(current.get("repository") or {})
     prior_counts = dict(prior_dependabot.get("counts") or {})
     current_counts = dict(current_dependabot.get("counts") or {})
+    current_clean = (
+        current.get("receipt_state") == "fresh"
+        and current_dependabot.get("state") == "observed"
+        and current_counts.get("high") == 0
+        and current_counts.get("critical") == 0
+    )
     observed_resolution = (
         prior_dependabot.get("state") == "observed"
         and sum(
@@ -343,10 +601,7 @@ def _is_verified_security_cohort_departure(
             if isinstance(value, int) and not isinstance(value, bool)
         )
         > 0
-        and current.get("receipt_state") == "fresh"
-        and current_dependabot.get("state") == "observed"
-        and current_counts.get("high") == 0
-        and current_counts.get("critical") == 0
+        and current_clean
     )
     observed_archive = (
         final_project_archived
@@ -354,8 +609,11 @@ def _is_verified_security_cohort_departure(
         and current_repository.get("state") == "observed"
         and current_repository.get("archived") is True
     )
-    return observed_resolution or observed_archive
-
+    # Declared source departure mirrors observed_resolution's provider selection:
+    # Dependabot only, because code scanning and secret scanning are structurally
+    # feature_unavailable on this account's private repositories.
+    declared_source_departure = declared_outgoing and current_clean
+    return observed_resolution or observed_archive or declared_source_departure
 
 def _candidate_prior_security_alerts(
     prior_security_alerts_by_name: dict[str, dict],
@@ -380,7 +638,60 @@ def _candidate_prior_security_alerts(
     return candidate_alerts
 
 
-def build_portfolio_truth_snapshot(
+@dataclass(frozen=True)
+class MaterializationContext:
+    """Source materialization shared by the producer and the cohort planner.
+
+    Both callers must derive candidate attention from one implementation or the
+    two derivations drift, which is the failure this contract exists to prevent.
+    """
+
+    workspace_root: Path
+    now: datetime
+    catalog_data: dict[str, Any]
+    legacy_rows: dict[str, dict[str, str]]
+    notion_context: dict[str, dict[str, str]]
+    notion_source_mode: str
+    notion_observed_at: str | None
+    notion_context_carried_forward: bool
+    workspace_projects: list[dict[str, Any]]
+    exclusion_counts: dict[str, int]
+    checkout_collisions: list[dict[str, Any]]
+    release_count_by_name: dict[str, int] | None
+    degraded_dimensions_by_name: dict[str, list[str]] | None
+
+    def materialize_projects(
+        self,
+        security_lookup: dict[str, dict] | None,
+        *,
+        repo_status_lookup: dict[str, dict] | None,
+    ) -> list[PortfolioTruthProject]:
+        return [
+            _build_truth_project(
+                raw_project,
+                catalog_data=self.catalog_data,
+                legacy_rows=self.legacy_rows,
+                notion_context=self.notion_context,
+                now=self.now,
+                workspace_root=self.workspace_root,
+                release_count_by_name=self.release_count_by_name,
+                degraded_dimensions_by_name=self.degraded_dimensions_by_name,
+                security_alerts_by_name=security_lookup,
+                repo_status_by_name=repo_status_lookup,
+            )
+            for raw_project in self.workspace_projects
+        ]
+
+
+@dataclass(frozen=True)
+class CandidateCohort:
+    """Attention derived from current source *before* the new receipt applies."""
+
+    projects: list[PortfolioTruthProject]
+    repositories: tuple[str, ...]
+
+
+def build_materialization_context(
     *,
     workspace_root: Path,
     catalog_path: Path | None = None,
@@ -390,14 +701,9 @@ def build_portfolio_truth_snapshot(
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     degraded_dimensions_by_name: dict[str, list[str]] | None = None,
-    security_alerts_by_name: dict[str, dict] | None = None,
-    security_coverage_metadata: dict[str, Any] | None = None,
-    prior_security_alerts_by_name: dict[str, dict] | None = None,
-    prior_security_cohort_repositories: tuple[str, ...] | None = None,
-    repo_status_by_name: dict[str, dict] | None = None,
-    producer: dict[str, Any] | None = None,
     prior_notion_generated_at: str | None = None,
-) -> PortfolioTruthBuildResult:
+) -> MaterializationContext:
+    """Load catalog, registry, Notion context, and workspace discovery once."""
     now = now or datetime.now(timezone.utc)
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
@@ -435,61 +741,129 @@ def build_portfolio_truth_snapshot(
             now=now,
         ),
     )
+    return MaterializationContext(
+        workspace_root=workspace_root,
+        now=now,
+        catalog_data=catalog_data,
+        legacy_rows=legacy_rows,
+        notion_context=notion_context,
+        notion_source_mode=notion_source_mode,
+        notion_observed_at=notion_observed_at,
+        notion_context_carried_forward=notion_context_carried_forward,
+        workspace_projects=workspace_projects,
+        exclusion_counts=exclusion_counts,
+        checkout_collisions=checkout_collisions,
+        release_count_by_name=release_count_by_name,
+        degraded_dimensions_by_name=degraded_dimensions_by_name,
+    )
 
-    def materialize_projects(
-        security_lookup: dict[str, dict] | None,
-        *,
-        repo_status_lookup: dict[str, dict] | None,
-    ) -> list[PortfolioTruthProject]:
-        return [
-            _build_truth_project(
-                raw_project,
-                catalog_data=catalog_data,
-                legacy_rows=legacy_rows,
-                notion_context=notion_context,
-                now=now,
-                workspace_root=workspace_root,
-                release_count_by_name=release_count_by_name,
-                degraded_dimensions_by_name=degraded_dimensions_by_name,
-                security_alerts_by_name=security_lookup,
-                repo_status_by_name=repo_status_lookup,
-            )
-            for raw_project in workspace_projects
-        ]
 
-    prior_security_alerts = prior_security_alerts_by_name or {}
+def derive_candidate_cohort(
+    context: MaterializationContext,
+    *,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
+    prior_security_cohort_repositories: tuple[str, ...] | None = None,
+    repo_status_by_name: dict[str, dict] | None = None,
+) -> CandidateCohort:
+    """Derive default attention from current source using *prior* evidence.
+
+    This is the sole candidate-cohort implementation. `build_portfolio_truth_snapshot`
+    and `portfolio_cohort_plan` both call it, so the producer's reconcile and the
+    collector's plan can never disagree by construction.
+    """
     candidate_prior_security_alerts = _candidate_prior_security_alerts(
-        prior_security_alerts,
+        prior_security_alerts_by_name or {},
         prior_security_cohort_repositories,
     )
+    # Current status may only expand candidate membership. A fresh GitHub
+    # unarchive therefore forces receipt coverage, while archive status is
+    # applied only to the final projects and must be corroborated by the
+    # receipt before it can authorize a departure.
     candidate_repo_status_by_name = {
         name: status
         for name, status in (repo_status_by_name or {}).items()
         if status.get("source") == "github_api" and status.get("archived") is False
     }
-    candidate_projects = (
-        materialize_projects(
-            candidate_prior_security_alerts,
-            # Current status may only expand candidate membership. A fresh GitHub
-            # unarchive therefore forces receipt coverage, while archive status is
-            # applied only to the final projects and must be corroborated by the
-            # receipt before it can authorize a departure.
-            repo_status_lookup=candidate_repo_status_by_name,
+    projects = context.materialize_projects(
+        candidate_prior_security_alerts,
+        repo_status_lookup=candidate_repo_status_by_name,
+    )
+    return CandidateCohort(
+        projects=projects,
+        repositories=_cohort_repositories_for(
+            projects,
+            label="pre-security candidate cohort",
+        ),
+    )
+
+
+def build_portfolio_truth_snapshot(
+    *,
+    workspace_root: Path,
+    catalog_path: Path | None = None,
+    legacy_registry_path: Path | None = None,
+    include_notion: bool = True,
+    notion_context_fallback: dict[str, dict[str, str]] | None = None,
+    now: datetime | None = None,
+    release_count_by_name: dict[str, int] | None = None,
+    degraded_dimensions_by_name: dict[str, list[str]] | None = None,
+    security_alerts_by_name: dict[str, dict] | None = None,
+    security_coverage_metadata: dict[str, Any] | None = None,
+    prior_security_alerts_by_name: dict[str, dict] | None = None,
+    prior_security_cohort_repositories: tuple[str, ...] | None = None,
+    security_cohort_required: tuple[str, ...] | None = None,
+    security_cohort_outgoing: tuple[str, ...] | None = None,
+    security_cohort_transition: dict[str, Any] | None = None,
+    require_cohort_transition: bool = False,
+    repo_status_by_name: dict[str, dict] | None = None,
+    producer: dict[str, Any] | None = None,
+    prior_notion_generated_at: str | None = None,
+) -> PortfolioTruthBuildResult:
+    context = build_materialization_context(
+        workspace_root=workspace_root,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=include_notion,
+        notion_context_fallback=notion_context_fallback,
+        now=now,
+        release_count_by_name=release_count_by_name,
+        degraded_dimensions_by_name=degraded_dimensions_by_name,
+        prior_notion_generated_at=prior_notion_generated_at,
+    )
+    now = context.now
+    catalog_data = context.catalog_data
+    legacy_rows = context.legacy_rows
+    notion_context = context.notion_context
+
+    prior_security_alerts = prior_security_alerts_by_name or {}
+    reconcile_receipt = (
+        security_coverage_metadata is not None and security_alerts_by_name is not None
+    )
+    candidate = (
+        derive_candidate_cohort(
+            context,
+            prior_security_alerts_by_name=prior_security_alerts,
+            prior_security_cohort_repositories=prior_security_cohort_repositories,
+            repo_status_by_name=repo_status_by_name,
         )
-        if security_coverage_metadata is not None
-        and security_alerts_by_name is not None
+        if reconcile_receipt
         else None
     )
-    projects = materialize_projects(
+    projects = context.materialize_projects(
         security_alerts_by_name,
         repo_status_lookup=repo_status_by_name,
     )
-    if security_coverage_metadata is not None and security_alerts_by_name is not None:
-        _validate_security_receipt_cohort_identity(
+    cohort_transition: CohortTransitionOutcome | None = None
+    if reconcile_receipt:
+        cohort_transition = _validate_security_receipt_cohort_identity(
             projects=projects,
-            candidate_projects=candidate_projects,
+            candidate_projects=candidate.projects if candidate else None,
             security_alerts_by_name=security_alerts_by_name,
             prior_security_alerts_by_name=prior_security_alerts,
+            required_repositories=security_cohort_required,
+            outgoing_repositories=security_cohort_outgoing,
+            transition=security_cohort_transition,
+            require_cohort_transition=require_cohort_transition,
         )
     projects.sort(
         key=lambda item: (
@@ -505,8 +879,8 @@ def build_portfolio_truth_snapshot(
         catalog_warnings=list(catalog_data.get("warnings") or []),
         legacy_registry_rows=len(legacy_rows),
         notion_context_rows=len(notion_context),
-        notion_context_carried_forward=notion_context_carried_forward,
-        checkout_collisions=checkout_collisions,
+        notion_context_carried_forward=context.notion_context_carried_forward,
+        checkout_collisions=context.checkout_collisions,
     )
     warnings = build_warnings(
         catalog_errors=source_summary["catalog_errors"],
@@ -534,23 +908,25 @@ def build_portfolio_truth_snapshot(
             now=now,
             include_notion=include_notion,
             notion_context_rows=len(notion_context),
-            notion_context_carried_forward=notion_context_carried_forward,
+            notion_context_carried_forward=context.notion_context_carried_forward,
             prior_notion_generated_at=prior_notion_generated_at,
-            notion_source_mode=notion_source_mode,
-            notion_observed_at=notion_observed_at,
+            notion_source_mode=context.notion_source_mode,
+            notion_observed_at=context.notion_observed_at,
             security_coverage_metadata=security_coverage_metadata,
         ),
         coverage=build_coverage_envelope(
             projects=projects,
-            notion_context_carried_forward=notion_context_carried_forward,
+            notion_context_carried_forward=context.notion_context_carried_forward,
             notion_context_rows=len(notion_context),
         ),
-        exclusions=build_exclusions(exclusion_counts),
+        exclusions=build_exclusions(context.exclusion_counts),
     )
     return PortfolioTruthBuildResult(
-        snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
+        snapshot=snapshot,
+        catalog_data=catalog_data,
+        legacy_rows=legacy_rows,
+        cohort_transition=cohort_transition,
     )
-
 
 def _cataloged_supplementary_projects(
     *, catalog_data: dict[str, Any], now: datetime
