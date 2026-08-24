@@ -10,6 +10,7 @@ import pytest
 
 from github_repo_auditor.portfolio_decision_queue import (
     CLI_AGGREGATE_CONTRACT_VERSION,
+    CONTRACT_VERSION,
     DIGEST_CONTRACT_VERSION,
     SECURITY_DECISION_VALIDITY_HOURS,
     build_decision_digest,
@@ -542,6 +543,64 @@ def test_cli_json_redacts_previous_digest_fields(tmp_path: Path, capsys) -> None
     output = capsys.readouterr().out
     assert sentinel not in output
     assert json.loads(output)["decision_queue"] == []
+
+
+def test_explicit_digest_json_emits_the_rich_producer_contract(
+    tmp_path: Path, capsys
+) -> None:
+    truth_path = tmp_path / "portfolio-truth.json"
+    truth_path.write_text(
+        json.dumps(
+            _truth(
+                [
+                    _project(
+                        "MCPAudit",
+                        attention_state="decision-needed",
+                        security_risk=True,
+                        code_scanning_high=1,
+                    )
+                ]
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    output_path = tmp_path / "portfolio-decision-digest.json"
+    assert (
+        main(
+            [
+                "--truth",
+                str(truth_path),
+                "--format",
+                "digest-json",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    digest = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert digest["contract_version"] == DIGEST_CONTRACT_VERSION
+    assert digest["summary"]["contract_version"] == CONTRACT_VERSION
+    assert digest["source"]["generated_at"] == GENERATED_AT
+    assert digest["decision_queue"][0]["schema_version"] == "portfolio_decision_item_v2"
+
+
+def test_digest_json_requires_an_explicit_local_output_path(
+    tmp_path: Path, capsys
+) -> None:
+    truth_path = tmp_path / "portfolio-truth.json"
+    truth_path.write_text(json.dumps(_truth([])), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["--truth", str(truth_path), "--format", "digest-json"])
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "--output is required with --format digest-json" in captured.err
 
 
 def test_absolute_cli_entrypoint_runs_from_arbitrary_cwd(tmp_path: Path) -> None:
