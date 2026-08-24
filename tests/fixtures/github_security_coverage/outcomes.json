@@ -3,6 +3,82 @@
     "reason_code": "authentication_missing",
     "state": "credential_unavailable"
   },
+  "code_scanning_findings": {
+    "counts": {
+      "critical": 1,
+      "high": 1,
+      "note": 1,
+      "warning": 1
+    },
+    "payload": [
+      {
+        "rule": {
+          "id": "critical-test-rule",
+          "security_severity_level": "critical"
+        }
+      },
+      {
+        "rule": {
+          "id": "error-test-rule",
+          "severity": "error"
+        }
+      },
+      {
+        "rule": {
+          "id": "warning-test-rule",
+          "severity": "warning"
+        }
+      },
+      {
+        "rule": {
+          "id": "note-test-rule",
+          "severity": "note"
+        }
+      }
+    ],
+    "reason_code": "observed",
+    "zero_findings": false
+  },
+  "known_vulnerable_dependencies": {
+    "counts": {
+      "critical": 0,
+      "high": 1,
+      "low": 0,
+      "medium": 1
+    },
+    "payload": [
+      {
+        "security_advisory": {
+          "ghsa_id": "GHSA-test-high",
+          "severity": "high"
+        },
+        "security_vulnerability": {
+          "package": {
+            "ecosystem": "npm",
+            "name": "extract-zip"
+          },
+          "vulnerable_version_range": "<2.0.1"
+        }
+      },
+      {
+        "security_vulnerability": {
+          "package": {
+            "ecosystem": "pip",
+            "name": "jinja2"
+          },
+          "severity": "medium",
+          "vulnerable_version_range": "<3.1.6"
+        }
+      }
+    ],
+    "reason_code": "observed",
+    "zero_findings": false
+  },
+  "missing_provider_state": {
+    "message": "Not Found",
+    "reason_code": "endpoint_unsupported",
+    "status_code": 404
+  },
   "partial_coverage": {
     "message": "Resource not accessible by integration",
     "reason_code": "forbidden",
@@ -16,6 +92,11 @@
     "payload": [],
     "reason_code": "observed",
     "zero_findings": true
+  },
+  "workflow_permission_error": {
+    "message": "Resource not accessible by integration",
+    "reason_code": "forbidden",
+    "status_code": 403
   },
   "malformed_provider_data": {
     "payload": {

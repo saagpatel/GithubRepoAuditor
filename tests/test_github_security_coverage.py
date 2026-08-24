@@ -1473,6 +1473,68 @@ def test_successful_empty_provider_response_is_explicit_completed_zero() -> None
     }
 
 
+def test_known_vulnerable_dependency_survives_partial_provider_coverage() -> None:
+    dependabot_outcome = OUTCOME_FIXTURES["known_vulnerable_dependencies"]
+    workflow_outcome = OUTCOME_FIXTURES["workflow_permission_error"]
+    missing_outcome = OUTCOME_FIXTURES["missing_provider_state"]
+    session = _Session(
+        [
+            _Response(200, dependabot_outcome["payload"]),
+            _Response(
+                workflow_outcome["status_code"],
+                {"message": workflow_outcome["message"]},
+            ),
+            _Response(
+                missing_outcome["status_code"],
+                {"message": missing_outcome["message"]},
+            ),
+        ]
+    )
+
+    receipt = _collect(session=session)
+    providers = receipt["repositories"]["owner/repo-00"]["providers"]
+
+    assert providers["dependabot"]["state"] == "observed"
+    assert providers["dependabot"]["reason_code"] == dependabot_outcome["reason_code"]
+    assert providers["dependabot"]["completed"] is True
+    assert providers["dependabot"]["zero_findings"] is (
+        dependabot_outcome["zero_findings"]
+    )
+    assert providers["dependabot"]["counts"] == dependabot_outcome["counts"]
+    assert providers["code_scanning"]["state"] == "forbidden"
+    assert providers["code_scanning"]["reason_code"] == workflow_outcome["reason_code"]
+    assert providers["code_scanning"]["completed"] is False
+    assert providers["code_scanning"]["zero_findings"] is None
+    assert providers["code_scanning"]["counts"] is None
+    assert providers["secret_scanning"]["state"] == "not_found"
+    assert (
+        providers["secret_scanning"]["reason_code"]
+        == missing_outcome["reason_code"]
+    )
+    assert providers["secret_scanning"]["completed"] is False
+    assert providers["secret_scanning"]["zero_findings"] is None
+    assert providers["secret_scanning"]["counts"] is None
+
+
+def test_code_scanning_findings_are_counted_as_findings_not_zero() -> None:
+    outcome = OUTCOME_FIXTURES["code_scanning_findings"]
+    session = _Session(
+        [
+            _Response(200, OUTCOME_FIXTURES["successful_zero_findings"]["payload"]),
+            _Response(200, outcome["payload"]),
+        ]
+    )
+
+    receipt = _collect(session=session)
+    provider = receipt["repositories"]["owner/repo-00"]["providers"]["code_scanning"]
+
+    assert provider["state"] == "observed"
+    assert provider["reason_code"] == outcome["reason_code"]
+    assert provider["completed"] is True
+    assert provider["zero_findings"] is outcome["zero_findings"]
+    assert provider["counts"] == outcome["counts"]
+
+
 def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
     tmp_path: Path,
 ) -> None:
