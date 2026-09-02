@@ -566,18 +566,8 @@ def _publish_portfolio_truth_locked(
         build_result.snapshot, latest_name
     )
 
-    with tempfile.NamedTemporaryFile(
-        "w", delete=False, dir=output_dir, suffix=".registry-check.md"
-    ) as handle:
-        temp_registry_path = Path(handle.name)
-    try:
-        validate_registry_markdown(
-            registry_markdown, build_result.snapshot, temp_registry_path
-        )
-        validate_portfolio_report_markdown(report_markdown)
-    finally:
-        if temp_registry_path.exists():
-            temp_registry_path.unlink()
+    validate_registry_markdown(registry_markdown, build_result.snapshot)
+    validate_portfolio_report_markdown(report_markdown)
 
     targets = {
         snapshot_path: snapshot_json,
