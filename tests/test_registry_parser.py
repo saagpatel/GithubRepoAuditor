@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from github_repo_auditor.models import RepoAudit, RepoMetadata
-from github_repo_auditor.registry_parser import _normalize, parse_registry, reconcile
+from github_repo_auditor.registry_parser import (
+    _normalize,
+    parse_registry,
+    parse_registry_markdown,
+    reconcile,
+)
 
 
 def _make_audit(name: str, tier: str = "functional", score: float = 0.6) -> RepoAudit:
@@ -47,7 +52,7 @@ class TestNormalize:
 class TestParseRegistry:
     def test_parses_simple_table(self, tmp_path):
         registry = tmp_path / "registry.md"
-        registry.write_text(
+        markdown = (
             "# Projects\n\n"
             "| Project | Status | Notes |\n"
             "|---------|--------|-------|\n"
@@ -55,8 +60,10 @@ class TestParseRegistry:
             "| Beta | parked | Stale |\n"
             "| Gamma | archived | Legacy |\n"
         )
+        registry.write_text(markdown)
         result = parse_registry(registry)
         assert result == {"Alpha": "active", "Beta": "parked", "Gamma": "archived"}
+        assert parse_registry_markdown(markdown) == result
 
     def test_skips_invalid_status(self, tmp_path):
         registry = tmp_path / "registry.md"

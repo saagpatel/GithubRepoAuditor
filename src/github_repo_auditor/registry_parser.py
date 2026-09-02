@@ -28,13 +28,12 @@ def _normalize(name: str) -> str:
     return n
 
 
-def parse_registry(path: Path) -> dict[str, str]:
-    """Parse project-registry.md into {project_name: status} mapping.
+def parse_registry_markdown(content: str) -> dict[str, str]:
+    """Parse registry markdown into {project_name: status} mapping.
 
     Handles variable-column markdown tables across multiple sections.
     Column 1 is always Project, Column 2 is always Status.
     """
-    content = path.read_text(errors="replace")
     projects: dict[str, str] = {}
 
     for line in content.splitlines():
@@ -74,6 +73,11 @@ def parse_registry(path: Path) -> dict[str, str]:
         projects[name] = status
 
     return projects
+
+
+def parse_registry(path: Path) -> dict[str, str]:
+    """Parse project-registry.md into {project_name: status} mapping."""
+    return parse_registry_markdown(path.read_text(errors="replace"))
 
 
 @dataclass

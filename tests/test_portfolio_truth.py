@@ -57,6 +57,7 @@ from github_repo_auditor.portfolio_truth_validate import (
     _same_repository_path,
     canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
+    validate_registry_markdown,
     validate_truth_snapshot,
 )
 from github_repo_auditor.project_registry import build_project_registry
@@ -4764,6 +4765,26 @@ def test_rendered_registry_round_trips_through_parser(
     assert parsed["Alpha"] in {"active", "recent", "parked", "archived"}
     assert "## Portfolio Summary" in markdown
     assert "## Cowork Task Notes" in markdown
+
+
+def test_registry_validation_does_not_write_temp_markdown(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    markdown = render_registry_markdown(result.snapshot)
+    temp_path = tmp_path / "registry-check.md"
+
+    validate_registry_markdown(markdown, result.snapshot, temp_path)
+
+    assert not temp_path.exists()
 
 
 def test_registry_render_surfaces_security_and_round_trips(

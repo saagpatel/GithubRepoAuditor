@@ -65,7 +65,7 @@ from github_repo_auditor.portfolio_truth_types import (
     SecurityFields,
 )
 from github_repo_auditor.producer_preflight import ProducerEvidence
-from github_repo_auditor.registry_parser import _normalize, parse_registry
+from github_repo_auditor.registry_parser import _normalize, parse_registry_markdown
 from github_repo_auditor.security_admission import derive_security_admission
 
 
@@ -2323,14 +2323,9 @@ def validate_publish_targets(
 
 
 def validate_registry_markdown(
-    markdown: str, snapshot: PortfolioTruthSnapshot, temp_path: Path
+    markdown: str, snapshot: PortfolioTruthSnapshot, temp_path: Path | None = None
 ) -> None:
-    temp_path.write_text(markdown)
-    try:
-        parsed = parse_registry(temp_path)
-    finally:
-        if temp_path.exists():
-            temp_path.unlink()
+    parsed = parse_registry_markdown(markdown)
     expected_labels = registry_project_labels(snapshot.projects).values()
     expected = {_normalize(label.strip()) for label in expected_labels}
     parsed_names = {_normalize(name) for name in parsed}
