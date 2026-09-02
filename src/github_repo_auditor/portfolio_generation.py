@@ -106,6 +106,17 @@ def _parse_instant(value: object, *, field: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def _terminal_observed_in_order(
+    terminal_observed: datetime, produced_at: datetime, now: datetime
+) -> bool:
+    """A terminal receipt may not be observed before the receipt it attests, nor
+    in the future. Terminal receipts carry a whole-second observed_at while
+    security receipts carry microseconds, so a terminal written in the same
+    second as the receipt (the normal case for a fast collector) compares at
+    second granularity; anything a full second earlier is still refused."""
+    return produced_at.replace(microsecond=0) <= terminal_observed <= now.astimezone(UTC)
+
+
 def _instant_text(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
@@ -322,7 +333,7 @@ def load_security_binding(
     terminal_observed = _parse_instant(
         terminal.get("observed_at"), field="security terminal observed_at"
     )
-    if terminal_observed < produced_at or terminal_observed > now.astimezone(UTC):
+    if not _terminal_observed_in_order(terminal_observed, produced_at, now):
         raise PortfolioGenerationError("security terminal observation time is invalid")
     evidence = destination.get("evidence")
     if not isinstance(evidence, dict):
