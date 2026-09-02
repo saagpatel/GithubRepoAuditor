@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from github_repo_auditor.portfolio_generation import (
+    _terminal_observed_in_order,
     ArtifactInput,
     PortfolioGenerationError,
     ProducerBinding,
@@ -275,3 +276,19 @@ class PortfolioGenerationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TerminalObservationOrderTests(unittest.TestCase):
+    def test_same_second_terminal_is_accepted_and_earlier_second_is_refused(self) -> None:
+        from datetime import UTC, datetime
+
+        produced = datetime(2026, 9, 2, 12, 8, 8, 576236, tzinfo=UTC)
+        now = datetime(2026, 9, 2, 12, 10, 0, tzinfo=UTC)
+        same_second = datetime(2026, 9, 2, 12, 8, 8, tzinfo=UTC)
+        earlier = datetime(2026, 9, 2, 12, 8, 7, tzinfo=UTC)
+        later = datetime(2026, 9, 2, 12, 8, 9, tzinfo=UTC)
+        future = datetime(2026, 9, 2, 12, 11, 0, tzinfo=UTC)
+        self.assertTrue(_terminal_observed_in_order(same_second, produced, now))
+        self.assertTrue(_terminal_observed_in_order(later, produced, now))
+        self.assertFalse(_terminal_observed_in_order(earlier, produced, now))
+        self.assertFalse(_terminal_observed_in_order(future, produced, now))
