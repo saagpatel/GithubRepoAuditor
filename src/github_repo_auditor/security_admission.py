@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Mapping
+
+from github_repo_auditor.timestamps import parse_utc_timestamp
 
 
 SECURITY_ADMISSION_SCHEMA_VERSION = "SecurityAdmissionV1"
@@ -31,17 +33,7 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-def _parse_datetime(value: Any) -> datetime | None:
-    text = _text(value)
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return None
-    return parsed.astimezone(timezone.utc)
+_parse_datetime = parse_utc_timestamp
 
 
 def _reason_provider(provider: str, suffix: str) -> str:
