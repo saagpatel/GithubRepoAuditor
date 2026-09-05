@@ -97,13 +97,19 @@ def test_publication_runtime_files_preserve_clean_producer(tmp_path: Path) -> No
     output.mkdir()
     (output / "pcc-auditor-run.log").write_text("running\n")
     with _portfolio_truth_publication_lock(output / "portfolio-truth-latest.json"):
-        staged = _stage_text(output / "portfolio-truth-latest.json", "{}\n")
-        backup = _stage_bytes(output / "project-registry.json", b"{}\n")
+        targets = [
+            output / "portfolio-truth-latest.json",
+            output / "project-registry.json",
+            output / "portfolio-truth-latest.md",
+            repo / "project-registry.md",
+            repo / "PORTFOLIO-AUDIT-REPORT.md",
+        ]
+        staged = [_stage_text(target, "{}\n") for target in targets]
+        backups = [_stage_bytes(target, b"{}\n") for target in targets]
         verify_evidence_still_current(repo, result.evidence)
     verify_evidence_still_current(repo, result.evidence)
     assert (output / ".portfolio-truth-latest.json.lock").is_file()
-    assert staged.is_file()
-    assert backup.is_file()
+    assert all(path.is_file() for path in staged + backups)
 
     (output / "unexpected-source.py").write_text("changed = True\n")
     with pytest.raises(ValueError, match="worktree"):
