@@ -16,6 +16,9 @@ output/.github-security-coverage-latest.json.lock
 output/.portfolio-truth-latest.json.lock
 # Local run output written by PortfolioCommandCenter before truth publication.
 output/pcc-auditor-run.log
+# Staging and rollback copies of the generated JSON artifacts above.
+output/tmp*.json.tmp
+output/tmp*.json.bak
 # Generated private portfolio dumps written to the repo ROOT (chmod 600). The
 # output/*.md rule above does not cover root-level files, so name them explicitly
 # to keep a stray `git add -A` from committing private portfolio data.

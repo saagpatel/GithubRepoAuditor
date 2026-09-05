@@ -73,6 +73,8 @@ def test_canonical_producer_fails_dirty_worktree(tmp_path: Path) -> None:
 def test_publication_runtime_files_preserve_clean_producer(tmp_path: Path) -> None:
     from github_repo_auditor.portfolio_truth_publish import (
         _portfolio_truth_publication_lock,
+        _stage_bytes,
+        _stage_text,
     )
 
     repo, _ = _repo(tmp_path)
@@ -95,9 +97,13 @@ def test_publication_runtime_files_preserve_clean_producer(tmp_path: Path) -> No
     output.mkdir()
     (output / "pcc-auditor-run.log").write_text("running\n")
     with _portfolio_truth_publication_lock(output / "portfolio-truth-latest.json"):
+        staged = _stage_text(output / "portfolio-truth-latest.json", "{}\n")
+        backup = _stage_bytes(output / "project-registry.json", b"{}\n")
         verify_evidence_still_current(repo, result.evidence)
     verify_evidence_still_current(repo, result.evidence)
     assert (output / ".portfolio-truth-latest.json.lock").is_file()
+    assert staged.is_file()
+    assert backup.is_file()
 
     (output / "unexpected-source.py").write_text("changed = True\n")
     with pytest.raises(ValueError, match="worktree"):
