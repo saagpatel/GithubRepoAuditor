@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from github_repo_auditor.portfolio_truth_trends import (
 )
 from github_repo_auditor.report_enrichment import build_weekly_review_pack
 from github_repo_auditor.security_admission import derive_security_admission
+from github_repo_auditor.timestamps import parse_utc_timestamp
 
 CONTRACT_VERSION = "weekly_command_center_digest_v1"
 AUTHORITY_CAP = "bounded-automation"
@@ -131,17 +133,11 @@ def _mapping(value: Any) -> dict[str, Any]:
     return {}
 
 
-def _parse_datetime(value: Any) -> datetime | None:
-    text = _safe_text(value)
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+_parse_datetime = partial(
+    parse_utc_timestamp,
+    naive="assume_utc",
+    coerce=True,
+)
 
 
 def _source_freshness(

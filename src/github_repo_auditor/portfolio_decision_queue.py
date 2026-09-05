@@ -15,6 +15,7 @@ import hashlib
 import json
 import sys
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from github_repo_auditor.security_admission import derive_security_admission
+from github_repo_auditor.timestamps import parse_utc_timestamp
 
 CONTRACT_VERSION = "decision_queue_v2"
 DIGEST_CONTRACT_VERSION = "portfolio_decision_digest_v2"
@@ -78,17 +80,7 @@ def _sha256_identity(value: Any) -> str:
     return SHA256_ID_PREFIX + hashlib.sha256(_canonical_bytes(value)).hexdigest()
 
 
-def _parse_datetime(value: Any) -> datetime | None:
-    text = _text(value)
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+_parse_datetime = partial(parse_utc_timestamp, naive="assume_utc")
 
 
 def _iso(value: datetime) -> str:

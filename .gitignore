@@ -12,6 +12,10 @@ output/badges/
 output/.badge-gist-id
 # Stable flock inode used to serialize security coverage receipt readers/writers.
 output/.github-security-coverage-latest.json.lock
+# Stable flock inode used to serialize portfolio truth publishers.
+output/.portfolio-truth-latest.json.lock
+# Local run output written by PortfolioCommandCenter before truth publication.
+output/pcc-auditor-run.log
 # Generated private portfolio dumps written to the repo ROOT (chmod 600). The
 # output/*.md rule above does not cover root-level files, so name them explicitly
 # to keep a stray `git add -A` from committing private portfolio data.
