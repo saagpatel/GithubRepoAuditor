@@ -70,6 +70,40 @@ def test_canonical_producer_fails_dirty_worktree(tmp_path: Path) -> None:
     assert result.checks["worktree_clean"] == "fail"
 
 
+def test_publication_runtime_files_preserve_clean_producer(tmp_path: Path) -> None:
+    from github_repo_auditor.portfolio_truth_publish import (
+        _portfolio_truth_publication_lock,
+    )
+
+    repo, _ = _repo(tmp_path)
+    _git(repo, "config", "core.excludesFile", "/dev/null")
+    (repo / ".gitignore").write_bytes(
+        (Path(__file__).resolve().parents[1] / ".gitignore").read_bytes()
+    )
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-m", "producer ignore rules")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    result = inspect_canonical_producer(
+        repo_root=repo,
+        expected_repository="saagpatel/GithubRepoAuditor",
+        expected_ref="refs/remotes/origin/main",
+        checkout_role="portfolio-command-center",
+    )
+    assert result.state == "pass"
+    assert result.evidence is not None
+    output = repo / "output"
+    output.mkdir()
+    (output / "pcc-auditor-run.log").write_text("running\n")
+    with _portfolio_truth_publication_lock(output / "portfolio-truth-latest.json"):
+        verify_evidence_still_current(repo, result.evidence)
+    verify_evidence_still_current(repo, result.evidence)
+    assert (output / ".portfolio-truth-latest.json.lock").is_file()
+
+    (output / "unexpected-source.py").write_text("changed = True\n")
+    with pytest.raises(ValueError, match="worktree"):
+        verify_evidence_still_current(repo, result.evidence)
+
+
 def test_canonical_producer_missing_ref_is_unknown(tmp_path: Path) -> None:
     repo, _ = _repo(tmp_path)
     result = inspect_canonical_producer(
