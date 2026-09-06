@@ -1502,7 +1502,7 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Tier-0 Operator OS project. The live checkout is outside the Projects workspace and is represented in generated registry output as supp:personal-ops.
+    notes: Tier-0 Operator OS project. The live checkout is ~/Projects/personal-ops, tracked by the normal scan as saagpatel/personal-ops and keyed personal-ops in generated registry output. It was represented as supp:personal-ops while it sat outside the workspace; that supplementary enrollment was retired once the auditor picked the repo up directly.
   # --- 2026-07-17 Portfolio Tribunal: contracts for previously uncataloged KEEP repos ---
   Temper:
     owner: d
