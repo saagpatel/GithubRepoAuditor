@@ -1,5 +1,5 @@
 {
-	"_comment": "Operator-editable enrollment for the canonical project registry. 'overrides' pins hard normalization failures (drifted identifier -> canonical project_key). 'supplementary' enrolls real operator-OS projects the auditor does not track as git repos. 'memory_meta' maps ~/.claude memory note-slugs to their parent project (or '' for pure meta-notes). 'notion_projection_policy_schema_version', 'notion_title_aliases', 'notion_projection_only_rows', and 'notion_truth_shadow_rows' explain Local Portfolio projection differences that are not distinct GithubRepoAuditor truth projects. Consumed by src/github_repo_auditor/project_registry.py and cross-system smoke checks; falls back to built-in defaults if this file is absent.",
+	"_comment": "Operator-editable enrollment for the canonical project registry. 'overrides' pins hard normalization failures (drifted identifier -> canonical project_key), and settles collisions where two projects share a normalized form: a Notion binding on such a form is refused unless an override names the owner, so an entry that looks like a self-map ('ReturnRadar' -> 'ReturnRadar') is the operator deciding which of the colliding projects owns that Notion row. 'supplementary' enrolls real operator-OS projects the auditor does not track as git repos. 'memory_meta' maps ~/.claude memory note-slugs to their parent project (or '' for pure meta-notes). 'notion_projection_policy_schema_version', 'notion_title_aliases', 'notion_projection_only_rows', and 'notion_truth_shadow_rows' explain Local Portfolio projection differences that are not distinct GithubRepoAuditor truth projects. Consumed by src/github_repo_auditor/project_registry.py and cross-system smoke checks; falls back to built-in defaults if this file is absent.",
 	"overrides": {
 		"jcc": "JobCommandCenter",
 		"jsm_export": "JSMTicketAnalyticsExport",
@@ -11,7 +11,9 @@
 		"operant-mcp": "operant-public",
 		"portfolio-code-health": "portfolio-health",
 		"screenshotselect": "ScreenshottoDataSelect",
-		"interruptionresume": "Interruption Resume Studio"
+		"interruptionresume": "Interruption Resume Studio",
+		"ReturnRadar": "ReturnRadar",
+		"cross-provider-egress-guard": "cross-provider-egress-guard"
 	},
 	"supplementary": [
 		{
@@ -21,14 +23,6 @@
 			"group_key": "operator_infra",
 			"lifecycle_state": "manual-only",
 			"note": "Machine-wide Claude Code harness operating surface under ~/.claude; tracked as shipped/monitor-only, not a standalone repo."
-		},
-		{
-			"canonical_key": "supp:personal-ops",
-			"display_name": "personal-ops",
-			"repo_full_name": null,
-			"group_key": "operator_infra",
-			"lifecycle_state": "active",
-			"note": "Local operator control plane (127.0.0.1:46210). Most active project in bridge-db yet absent from auditor portfolio-truth."
 		},
 		{
 			"canonical_key": "operator-scripts",
@@ -48,8 +42,8 @@
 		}
 	],
 	"memory_meta": {
-		"personal_ops_codebase": "supp:personal-ops",
-		"personal_ops_vision": "supp:personal-ops",
+		"personal_ops_codebase": "personal-ops",
+		"personal_ops_vision": "personal-ops",
 		"github_repo_auditor_future_arcs": "GithubRepoAuditor",
 		"skill_library_port_2026-05": "",
 		"skill_eval_harness_2026-05": ""
