@@ -161,6 +161,9 @@ def test_resolve_hard_normalization_failures_via_override():
 
 
 def test_configured_shipped_mappings_cover_operator_os_and_claude_harness():
+    # Page ids are no longer a function of config: they come from the verified
+    # live snapshot, so what the shipped configuration still has to guarantee is
+    # that both identities resolve from the spellings shipped events arrive under.
     snapshot = _snapshot(
         _ident(
             "operator-os-explainer",
@@ -170,20 +173,15 @@ def test_configured_shipped_mappings_cover_operator_os_and_claude_harness():
     )
     registry = build_project_registry(
         snapshot,
-        notion_project_map_path=Path("config/notion-project-map.json"),
         overrides_config_path=Path("config/project-registry-overrides.json"),
     )
     index = build_index(registry)
-    by_key = {entry["canonical_key"]: entry for entry in registry["entries"]}
 
     assert resolve("claude-harness-modernization", index)["canonical_key"] == (
         "supp:claude-code-harness"
     )
-    assert by_key["supp:claude-code-harness"]["notion_local_page_id"] == (
-        "362c21f1-caf0-81bd-8c6e-dd3acaebc34b"
-    )
-    assert by_key["operator-os-explainer"]["notion_local_page_id"] == (
-        "39dc21f1-caf0-8142-8718-e1454dea1198"
+    assert resolve("operator-os-explainer", index)["canonical_key"] == (
+        "operator-os-explainer"
     )
 
 
@@ -237,7 +235,6 @@ def test_build_degrades_gracefully_without_external_sources():
         SNAPSHOT,
         bridge_db_path=None,
         notion_snapshot_path=None,
-        notion_project_map_path=None,
         memory_dir=None,
         overrides_config_path=None,
     )
@@ -249,26 +246,13 @@ def test_build_degrades_gracefully_without_external_sources():
 
 def test_build_attaches_external_sources(tmp_path: Path):
     bridge = _bridge_db(tmp_path, ["MCPAudit", "PortfolioCommandCenter", "weekly-review"])
-    snap = tmp_path / "snapshot.json"
-    snap.write_text(
-        json.dumps(
-            {
-                "projects": [
-                    {"title": "MCP Audit"},
-                    {"title": "DesktopPEt-ready"},
-                    {"title": "app"},
-                ]
-            }
-        )
-    )
-    page_map = tmp_path / "notion-project-map.json"
-    page_map.write_text(
-        json.dumps(
-            {
-                "MCP Audit": {"localProjectId": "page-mcp"},
-                "DesktopPEt": {"localProjectId": "page-desktop"},
-            }
-        )
+    snap = _pid_snapshot(
+        tmp_path,
+        [
+            {"title": "MCP Audit", "page_id": "page-mcp"},
+            {"title": "DesktopPEt-ready", "page_id": "page-desktop"},
+            {"title": "app", "page_id": "page-app-shell"},
+        ],
     )
     memdir = tmp_path / "memory"
     memdir.mkdir()
@@ -278,7 +262,6 @@ def test_build_attaches_external_sources(tmp_path: Path):
         SNAPSHOT,
         bridge_db_path=bridge,
         notion_snapshot_path=snap,
-        notion_project_map_path=page_map,
         memory_dir=memdir,
         overrides_config_path=None,
     )
@@ -384,7 +367,6 @@ def test_page_ids_come_from_the_live_snapshot_without_a_static_map(tmp_path: Pat
     registry = build_project_registry(
         SNAPSHOT,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=None,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
@@ -402,7 +384,6 @@ def test_snapshot_row_without_a_page_id_yields_no_page_id(tmp_path: Path):
     registry = build_project_registry(
         SNAPSHOT,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=None,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
@@ -411,46 +392,33 @@ def test_snapshot_row_without_a_page_id_yields_no_page_id(tmp_path: Path):
     assert by_key["Fun:GamePrjs/DesktopPEt"]["notion_local_page_id"] is None
 
 
-def test_static_map_fills_only_what_the_snapshot_left_absent(tmp_path: Path):
+def test_the_verified_snapshot_is_the_only_page_id_source(tmp_path: Path):
+    # The registry used to fall back to a hand-maintained static map, which is
+    # how a stale id could outlive the row it named. That file now serves only
+    # notion_export's repo-name keyspace, and the registry does not read it, so
+    # a row the snapshot left without an id simply has none.
     snap = _pid_snapshot(
         tmp_path,
         [{"title": "MCP Audit", "page_id": "live-mcp"}, {"title": "DesktopPEt-ready"}],
     )
-    page_map = tmp_path / "notion-project-map.json"
-    page_map.write_text(json.dumps({"DesktopPEt": {"localProjectId": "map-desktop"}}))
     registry = build_project_registry(
         SNAPSHOT,
         notion_snapshot_path=snap,
-        notion_project_map_path=page_map,
         overrides_config_path=None,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
     assert by_key["MCPAudit"]["notion_local_page_id"] == "live-mcp"
-    assert by_key["Fun:GamePrjs/DesktopPEt"]["notion_local_page_id"] == "map-desktop"
-    assert registry["warnings"]["notion_page_id_conflicts"] == []
+    assert by_key["Fun:GamePrjs/DesktopPEt"]["notion_local_page_id"] is None
 
 
-def test_stale_static_map_loses_to_the_snapshot_and_is_reported(tmp_path: Path):
-    snap = _pid_snapshot(tmp_path, [{"title": "MCP Audit", "page_id": "live-mcp"}])
-    page_map = tmp_path / "notion-project-map.json"
-    page_map.write_text(json.dumps({"MCP Audit": {"localProjectId": "stale-mcp"}}))
-    registry = build_project_registry(
-        SNAPSHOT,
-        notion_snapshot_path=snap,
-        notion_project_map_path=page_map,
-        overrides_config_path=None,
-    )
-    by_key = {e["canonical_key"]: e for e in registry["entries"]}
-    assert by_key["MCPAudit"]["notion_local_page_id"] == "live-mcp"
-    assert registry["warnings"]["notion_page_id_conflicts"] == [
-        {
-            "canonical_key": "MCPAudit",
-            "map_name": "MCP Audit",
-            "static_map_page_id": "stale-mcp",
-            "snapshot_page_id": "live-mcp",
-            "resolution": "snapshot",
-        }
-    ]
+def test_build_project_registry_takes_no_static_page_id_map():
+    # A caller that still passes the retired map must fail loudly rather than
+    # have its argument silently ignored: a quietly dropped id source is exactly
+    # the failure mode this split removes.
+    import inspect
+
+    params = inspect.signature(build_project_registry).parameters
+    assert "notion_project_map_path" not in params
 
 
 # --- Ambiguous Notion bindings are refused, not resolved by entry order -----
@@ -471,7 +439,6 @@ def test_ambiguous_notion_title_binds_to_nothing(tmp_path: Path):
     registry = build_project_registry(
         COLLIDING,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=None,
     )
     for entry in registry["entries"]:
@@ -484,7 +451,6 @@ def test_refused_notion_title_is_reported_with_its_candidates(tmp_path: Path):
     registry = build_project_registry(
         COLLIDING,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=None,
     )
     ambiguous = registry["unmatched"]["notion_local_ambiguous"]
@@ -492,20 +458,6 @@ def test_refused_notion_title_is_reported_with_its_candidates(tmp_path: Path):
     assert ambiguous[0]["candidates"] == ["VanityPRJs/Conductor", "conductor"]
     # A refused binding is not the same condition as an unrecognized row.
     assert registry["unmatched"]["notion_local"] == []
-
-
-def test_ambiguous_static_map_entry_is_refused_too(tmp_path: Path):
-    page_map = tmp_path / "notion-project-map.json"
-    page_map.write_text(json.dumps({"Conductor": {"localProjectId": "page-app"}}))
-    registry = build_project_registry(
-        COLLIDING,
-        notion_snapshot_path=None,
-        notion_project_map_path=page_map,
-        overrides_config_path=None,
-    )
-    for entry in registry["entries"]:
-        assert entry["notion_local_page_id"] is None
-    assert registry["unmatched"]["notion_pageid_map"] == ["Conductor"]
 
 
 def test_explicit_override_still_binds_an_otherwise_ambiguous_title(
@@ -519,7 +471,6 @@ def test_explicit_override_still_binds_an_otherwise_ambiguous_title(
     registry = build_project_registry(
         COLLIDING,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=overrides,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
@@ -537,32 +488,10 @@ def test_unambiguous_titles_are_unaffected_by_the_refusal(tmp_path: Path):
     registry = build_project_registry(
         COLLIDING,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=None,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
     assert by_key["MCPAudit"]["notion_local_page_id"] == "page-mcp"
-
-
-def test_two_map_names_for_one_entry_are_not_a_conflict(tmp_path: Path):
-    # Regression: aliasing several static-map names onto one project is normal
-    # enrollment, not a snapshot-versus-map disagreement.
-    page_map = tmp_path / "notion-project-map.json"
-    page_map.write_text(
-        json.dumps(
-            {
-                "MCP Audit": {"localProjectId": "map-a"},
-                "MCPAudit": {"localProjectId": "map-b"},
-            }
-        )
-    )
-    registry = build_project_registry(
-        SNAPSHOT,
-        notion_snapshot_path=None,
-        notion_project_map_path=page_map,
-        overrides_config_path=None,
-    )
-    assert registry["warnings"]["notion_page_id_conflicts"] == []
 
 
 def test_personal_ops_has_one_identity_not_a_supplementary_duplicate():
@@ -597,24 +526,21 @@ def test_configured_overrides_settle_the_private_public_collisions():
 
 def test_unverified_snapshot_page_ids_are_refused(tmp_path: Path):
     # A page id is a Notion write target. A snapshot missing its receipts -
-    # stale, truncated, or hand-edited - must not be able to redirect one, so
-    # the static map stays the only source when verification fails.
+    # stale, truncated, or hand-edited - must not be able to redirect one. With
+    # no static fallback left, refusing verification means no id at all, which
+    # is the safe direction: no target beats the wrong target.
     snap = _pid_snapshot(
         tmp_path, [{"title": "MCP Audit", "page_id": "untrusted-mcp"}], verified=False
     )
-    page_map = tmp_path / "notion-project-map.json"
-    page_map.write_text(json.dumps({"MCP Audit": {"localProjectId": "map-mcp"}}))
     registry = build_project_registry(
         SNAPSHOT,
         notion_snapshot_path=snap,
-        notion_project_map_path=page_map,
         overrides_config_path=None,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
     # The title still binds: a wrong title costs enrichment, not a bad write.
     assert by_key["MCPAudit"]["notion_local_title"] == "MCP Audit"
-    assert by_key["MCPAudit"]["notion_local_page_id"] == "map-mcp"
-    assert registry["warnings"]["notion_page_id_conflicts"] == []
+    assert by_key["MCPAudit"]["notion_local_page_id"] is None
 
 
 def test_tampered_snapshot_digest_refuses_page_ids(tmp_path: Path):
@@ -625,7 +551,6 @@ def test_tampered_snapshot_digest_refuses_page_ids(tmp_path: Path):
     registry = build_project_registry(
         SNAPSHOT,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=None,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
@@ -646,7 +571,6 @@ def test_title_aliases_point_from_the_notion_title_to_the_registry_key(tmp_path:
     registry = build_project_registry(
         SNAPSHOT,
         notion_snapshot_path=snap,
-        notion_project_map_path=None,
         overrides_config_path=overrides,
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
@@ -667,3 +591,18 @@ def test_configured_kbfreshness_alias_resolves_the_snapshot_title():
     )
     assert aliases.get("KBFreshnessDetector") == "KBFreshness"
     assert "KBFreshness" not in aliases
+
+
+def test_registry_schema_version_pins_the_published_shape():
+    # The version is what a downstream reader gates on, so removing an output
+    # bucket has to move it. 1.1 dropped the two buckets that reported on the
+    # retired static page-id map.
+    registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
+    assert registry["schema_version"] == "1.1"
+    assert set(registry["unmatched"]) == {
+        "bridge",
+        "memory",
+        "notion_local",
+        "notion_local_ambiguous",
+    }
+    assert set(registry["warnings"]) == {"normalized_key_collisions"}
