@@ -830,54 +830,75 @@ def _notion_snapshot_path_from_environment() -> Path | None:
     return Path(configured).expanduser()
 
 
-def _load_verified_notion_snapshot_context(
+def verified_notion_snapshot(
     snapshot_path: Path,
-) -> tuple[dict[str, dict[str, str]], str | None]:
+) -> tuple[list[Any], datetime] | None:
+    """Return a Notion snapshot's projects only if the whole receipt verifies.
+
+    The single verification contract for the live snapshot: schema version,
+    declared-versus-actual project count, a verified live-read receipt whose
+    page count matches, a verified attention-authority receipt, a parseable
+    ``generated_at`` inside the freshness window, and a content digest recomputed
+    over the projects. Returns ``None`` when any of those fails, so a stale,
+    truncated, or hand-edited snapshot is never treated as authoritative.
+
+    Callers that only enrich descriptive text may read the file directly; anything
+    deriving a write target (a Notion page id) must come through here.
+    """
     try:
         payload = json.loads(snapshot_path.read_text())
     except (OSError, json.JSONDecodeError):
-        return {}, None
+        return None
     if not isinstance(payload, dict):
-        return {}, None
+        return None
     if payload.get("schema_version") != "2.0.0":
-        return {}, None
+        return None
     projects = payload.get("projects")
     if (
         not isinstance(projects, list)
         or payload.get("project_count") != len(projects)
         or not projects
     ):
-        return {}, None
+        return None
     live_receipt = payload.get("live_read_receipt")
     if (
         not isinstance(live_receipt, dict)
         or live_receipt.get("state") != "verified"
         or live_receipt.get("page_count") != len(projects)
     ):
-        return {}, None
+        return None
     authority_receipt = payload.get("attention_authority_receipt")
     if (
         not isinstance(authority_receipt, dict)
         or authority_receipt.get("state") != "verified"
     ):
-        return {}, None
+        return None
     try:
         generated_at = datetime.fromisoformat(
             str(payload.get("generated_at", "")).replace("Z", "+00:00")
         )
     except ValueError:
-        return {}, None
+        return None
     age_hours = (
         datetime.now(timezone.utc) - generated_at.astimezone(timezone.utc)
     ).total_seconds() / 3600
     if age_hours < -(5 / 60) or age_hours > MAX_NOTION_SNAPSHOT_AGE_HOURS:
-        return {}, None
+        return None
     content_bytes = json.dumps(
         projects, separators=(",", ":"), ensure_ascii=False
     ).encode()
     if hashlib.sha256(content_bytes).hexdigest() != payload.get("content_sha256"):
-        return {}, None
+        return None
+    return projects, generated_at
 
+
+def _load_verified_notion_snapshot_context(
+    snapshot_path: Path,
+) -> tuple[dict[str, dict[str, str]], str | None]:
+    verified = verified_notion_snapshot(snapshot_path)
+    if verified is None:
+        return {}, None
+    projects, generated_at = verified
     context: dict[str, dict[str, str]] = {}
     for project in projects:
         if not isinstance(project, dict):

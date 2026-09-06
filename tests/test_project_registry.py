@@ -339,9 +339,37 @@ def test_scoring_pageids_attach_to_matching_entries():
 # no reachable Notion target. The snapshot producer now emits page_id per row.
 
 
-def _pid_snapshot(tmp_path: Path, rows: list[dict]) -> Path:
+def _pid_snapshot(tmp_path: Path, rows: list[dict], *, verified: bool = True) -> Path:
+    """Write a snapshot that passes the full verification contract by default.
+
+    Page ids are only honoured from a verified snapshot, so a fixture that skips
+    the receipts is testing the refusal path, not the happy one.
+    """
+    import hashlib
+    from datetime import datetime, timezone
+
     path = tmp_path / "snapshot.json"
-    path.write_text(json.dumps({"schema_version": "2.0.0", "projects": rows}))
+    if not verified:
+        path.write_text(json.dumps({"schema_version": "2.0.0", "projects": rows}))
+        return path
+    content_sha256 = hashlib.sha256(
+        json.dumps(rows, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "2.0.0",
+                "generated_at": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "project_count": len(rows),
+                "live_read_receipt": {"state": "verified", "page_count": len(rows)},
+                "attention_authority_receipt": {"state": "verified"},
+                "content_sha256": content_sha256,
+                "projects": rows,
+            }
+        )
+    )
     return path
 
 
@@ -565,3 +593,40 @@ def test_configured_overrides_settle_the_private_public_collisions():
     # conductor is deliberately absent: its two identities are unrelated projects
     # and the Notion row belongs to neither by name alone.
     assert "conductor" not in {key.lower() for key in overrides}
+
+
+def test_unverified_snapshot_page_ids_are_refused(tmp_path: Path):
+    # A page id is a Notion write target. A snapshot missing its receipts -
+    # stale, truncated, or hand-edited - must not be able to redirect one, so
+    # the static map stays the only source when verification fails.
+    snap = _pid_snapshot(
+        tmp_path, [{"title": "MCP Audit", "page_id": "untrusted-mcp"}], verified=False
+    )
+    page_map = tmp_path / "notion-project-map.json"
+    page_map.write_text(json.dumps({"MCP Audit": {"localProjectId": "map-mcp"}}))
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=page_map,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    # The title still binds: a wrong title costs enrichment, not a bad write.
+    assert by_key["MCPAudit"]["notion_local_title"] == "MCP Audit"
+    assert by_key["MCPAudit"]["notion_local_page_id"] == "map-mcp"
+    assert registry["warnings"]["notion_page_id_conflicts"] == []
+
+
+def test_tampered_snapshot_digest_refuses_page_ids(tmp_path: Path):
+    snap = _pid_snapshot(tmp_path, [{"title": "MCP Audit", "page_id": "live-mcp"}])
+    payload = json.loads(snap.read_text())
+    payload["projects"][0]["page_id"] = "swapped-after-signing"
+    snap.write_text(json.dumps(payload))
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_page_id"] is None

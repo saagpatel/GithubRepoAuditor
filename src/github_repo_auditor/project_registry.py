@@ -297,6 +297,14 @@ def _read_notion_projects(
     row the producer could not give an id for. A missing id is always reported
     as absent and never reconstructed from the title or any other field: an
     invented page id would create a false mapping in a receipts system.
+
+    Page ids are accepted only from a snapshot that passes the full verification
+    contract - schema, declared-versus-actual counts, live-read and
+    attention-authority receipts, freshness, and content digest. A page id is a
+    Notion *write* target, so a stale or hand-edited snapshot must not be able to
+    redirect one; when verification fails the ids are dropped and the static map
+    stays the only source. Titles keep the unverified read they have always had,
+    because a wrong title costs enrichment rather than a misdirected write.
     """
     if notion_snapshot_path is None or not notion_snapshot_path.exists():
         return []
@@ -304,6 +312,11 @@ def _read_notion_projects(
         data = json.loads(notion_snapshot_path.read_text())
     except (json.JSONDecodeError, OSError):
         return []
+    # Local import: portfolio_truth_sources reaches the catalog and context
+    # machinery, which sits on the other side of this module in the import graph.
+    from github_repo_auditor.portfolio_truth_sources import verified_notion_snapshot
+
+    ids_are_trustworthy = verified_notion_snapshot(notion_snapshot_path) is not None
     rows: list[tuple[str, str | None]] = []
     for project in data.get("projects", []):
         if not isinstance(project, dict):
@@ -311,7 +324,7 @@ def _read_notion_projects(
         title = project.get("title")
         if not title:
             continue
-        page_id = project.get("page_id")
+        page_id = project.get("page_id") if ids_are_trustworthy else None
         page_id = page_id.strip() if isinstance(page_id, str) and page_id.strip() else None
         rows.append((title, page_id))
     return rows
