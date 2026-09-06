@@ -550,3 +550,18 @@ def test_personal_ops_has_one_identity_not_a_supplementary_duplicate():
     assert [s["canonical_key"] for s in supplementary if "personal-ops" in s["canonical_key"]] == []
     # Memory notes must point at the surviving identity, not the retired key.
     assert "supp:personal-ops" not in memory_meta.values()
+
+
+def test_configured_overrides_settle_the_private_public_collisions():
+    # ReturnRadar and cross-provider-egress-guard each exist twice: a private
+    # working repo and a public release repo, colliding on one normalized form.
+    # The operator settled both in favour of the private repo, so the Notion
+    # binding must follow that decision rather than entry order.
+    from github_repo_auditor.project_registry import load_overrides_config
+
+    overrides, *_ = load_overrides_config(Path("config/project-registry-overrides.json"))
+    assert overrides["ReturnRadar"] == "ReturnRadar"
+    assert overrides["cross-provider-egress-guard"] == "cross-provider-egress-guard"
+    # conductor is deliberately absent: its two identities are unrelated projects
+    # and the Notion row belongs to neither by name alone.
+    assert "conductor" not in {key.lower() for key in overrides}
