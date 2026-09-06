@@ -55,7 +55,7 @@ def _make_report(**overrides) -> dict:
 def _write_map(tmp_path, mapping):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    (config_dir / "notion-project-map.json").write_text(json.dumps(mapping))
+    (config_dir / "notion-repo-map.json").write_text(json.dumps(mapping))
     return config_dir
 
 
@@ -212,3 +212,21 @@ class TestExportNotionEvents:
         result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
         assert result["event_count"] == 0
         assert len(result["unmapped"]) == 2
+
+
+class TestShippedRepoMap:
+    """The map's one remaining consumer, pinned to the file it actually reads."""
+
+    def test_shipped_config_loads_under_the_repo_name_keyspace(self):
+        # The registry used to read the same file under a title/slug keyspace and
+        # now takes page ids from the live Notion snapshot instead. Renaming the
+        # file is what keeps the two keyspaces from being confused again, so the
+        # name is part of the contract, not an implementation detail.
+        from pathlib import Path
+
+        from github_repo_auditor.notion_export import _load_project_map
+
+        mapping = _load_project_map(Path("config"))
+        assert mapping, "config/notion-repo-map.json must ship with the package"
+        assert mapping["GithubRepoAuditor"]["localProjectId"]
+        assert not Path("config/notion-project-map.json").exists()

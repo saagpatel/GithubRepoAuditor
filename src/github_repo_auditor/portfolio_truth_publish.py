@@ -324,7 +324,6 @@ def _build_project_registry_json(snapshot, *, include_notion: bool) -> str:
         snapshot.to_dict(),
         bridge_db_path=sources["bridge_db"],
         notion_snapshot_path=sources["notion_snapshot"],
-        notion_project_map_path=_CONFIG_DIR / "notion-project-map.json",
         memory_dir=sources["memory_dir"],
         scoring_pageids=scoring_pageids,
         overrides_config_path=overrides_config_path,

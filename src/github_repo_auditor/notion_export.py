@@ -146,8 +146,13 @@ def _build_raw_excerpt(
 
 
 def _load_project_map(config_dir: Path) -> dict[str, dict]:
-    """Load repo name → Notion project mapping."""
-    path = config_dir / "notion-project-map.json"
+    """Load repo name → Notion project mapping.
+
+    Keyed by GitHub repo name, which is the only keyspace this map now serves.
+    The project registry takes page ids from the live Notion snapshot instead,
+    so nothing else reads this file.
+    """
+    path = config_dir / "notion-repo-map.json"
     if not path.is_file():
         return {}
     try:

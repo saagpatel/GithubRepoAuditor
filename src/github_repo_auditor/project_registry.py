@@ -330,20 +330,6 @@ def _read_notion_projects(
     return rows
 
 
-def _read_notion_pageids(notion_project_map_path: Path | None) -> dict[str, str]:
-    if notion_project_map_path is None or not notion_project_map_path.exists():
-        return {}
-    try:
-        data = json.loads(notion_project_map_path.read_text())
-        return {
-            name: entry["localProjectId"]
-            for name, entry in data.items()
-            if isinstance(entry, dict) and entry.get("localProjectId")
-        }
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
 def _read_memory_slugs(memory_dir: Path | None) -> list[str]:
     if memory_dir is None or not memory_dir.exists():
         return []
@@ -450,7 +436,6 @@ def build_project_registry(
     *,
     bridge_db_path: Path | None = None,
     notion_snapshot_path: Path | None = None,
-    notion_project_map_path: Path | None = None,
     memory_dir: Path | None = None,
     scoring_pageids: dict[str, str] | None = None,
     overrides_config_path: Path | None = None,
@@ -557,21 +542,15 @@ def build_project_registry(
     notion_orphans: list[str] = []
     notion_ambiguous: list[dict[str, object]] = []
     notion_projection_only: list[dict[str, str]] = []
-    # Ids the live snapshot supplied, by canonical key. Tracked separately from
-    # the entry field because several static-map names can resolve to one entry,
-    # and a second name filling an id the first one set is ordinary aliasing, not
-    # a snapshot-versus-map disagreement.
-    snapshot_sourced_page_ids: dict[str, str] = {}
+    # The verified live snapshot is the only source of a row's page id. The
+    # hand-maintained static map that used to fill the gaps now serves only
+    # notion_export's repo-name keyspace and is not read here.
     for title, page_id in _read_notion_projects(notion_snapshot_path):
         entry = resolve_entry(title, refuse_ambiguous=True)
         if entry is not None:
             entry.notion_local_title = title
-            # The live snapshot is the authority for a row's page id when it
-            # carries one. The static map below fills only what the snapshot
-            # left absent.
             if page_id:
                 entry.notion_local_page_id = page_id
-                snapshot_sourced_page_ids[entry.canonical_key] = page_id
             entry.add_alias(f"notion:{title}")
         elif normalize(title) in collision_norms:
             notion_ambiguous.append(
@@ -601,32 +580,6 @@ def build_project_registry(
             )
         else:
             notion_orphans.append(title)
-
-    # The static map is now a fallback for rows the live snapshot did not supply
-    # an id for, not the primary source. Where both carry an id and they differ,
-    # the live snapshot wins and the disagreement is surfaced: silently keeping
-    # either one would hide a stale hand-maintained mapping.
-    pageid_unmatched: list[str] = []
-    pageid_conflicts: list[dict[str, str]] = []
-    for name, page_id in _read_notion_pageids(notion_project_map_path).items():
-        entry = resolve_entry(name, refuse_ambiguous=True)
-        if entry is None:
-            pageid_unmatched.append(name)
-            continue
-        from_snapshot = snapshot_sourced_page_ids.get(entry.canonical_key)
-        if from_snapshot is None:
-            entry.notion_local_page_id = page_id
-        elif from_snapshot != page_id:
-            pageid_conflicts.append(
-                {
-                    "canonical_key": entry.canonical_key,
-                    "map_name": name,
-                    "static_map_page_id": page_id,
-                    "snapshot_page_id": from_snapshot,
-                    "resolution": "snapshot",
-                }
-            )
-        entry.add_alias(f"notionmap:{name}")
 
     for project_name, page_id in (scoring_pageids or {}).items():
         entry = resolve_entry(project_name)
@@ -698,13 +651,9 @@ def build_project_registry(
             "notion_local_ambiguous": sorted(
                 notion_ambiguous, key=lambda row: str(row["title"])
             ),
-            "notion_pageid_map": sorted(pageid_unmatched),
         },
         "warnings": {
             "normalized_key_collisions": collisions,
-            "notion_page_id_conflicts": sorted(
-                pageid_conflicts, key=lambda row: row["canonical_key"]
-            ),
         },
     }
 
