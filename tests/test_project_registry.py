@@ -630,3 +630,40 @@ def test_tampered_snapshot_digest_refuses_page_ids(tmp_path: Path):
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
     assert by_key["MCPAudit"]["notion_local_page_id"] is None
+
+
+def test_title_aliases_point_from_the_notion_title_to_the_registry_key(tmp_path: Path):
+    # Direction matters and is easy to get backwards. The alias is consulted for
+    # a raw string that failed to resolve, and the string that fails is the
+    # Notion row title, so the alias key must be the title and the value the
+    # registry key. Reversed, the snapshot row stays an orphan and the project
+    # never receives its page id.
+    snap = _pid_snapshot(tmp_path, [{"title": "MCP Audit Detector", "page_id": "live-mcp"}])
+    overrides = tmp_path / "overrides.json"
+    overrides.write_text(
+        json.dumps({"notion_title_aliases": {"MCP Audit Detector": "MCPAudit"}})
+    )
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=overrides,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_title"] == "MCP Audit Detector"
+    assert by_key["MCPAudit"]["notion_local_page_id"] == "live-mcp"
+    assert registry["unmatched"]["notion_local"] == []
+
+
+def test_configured_kbfreshness_alias_resolves_the_snapshot_title():
+    # Regression: this alias was written KBFreshness -> KBFreshnessDetector,
+    # which is the reverse of what the resolver consults. The snapshot row
+    # "KBFreshnessDetector" sat unmatched and the project's page id had to come
+    # from the static map instead of the live snapshot.
+    from github_repo_auditor.project_registry import load_overrides_config
+
+    *_, aliases, _, _ = load_overrides_config(
+        Path("config/project-registry-overrides.json")
+    )
+    assert aliases.get("KBFreshnessDetector") == "KBFreshness"
+    assert "KBFreshness" not in aliases
