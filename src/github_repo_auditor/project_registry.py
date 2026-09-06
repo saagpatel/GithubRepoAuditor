@@ -25,7 +25,11 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0"
+# 1.1 dropped `unmatched.notion_pageid_map` and `warnings.notion_page_id_conflicts`
+# when the static page-id map stopped feeding the registry. A reader gating on
+# 1.0 would otherwise accept the new document as the old contract and then fail
+# reaching for keys that are no longer emitted.
+SCHEMA_VERSION = "1.1"
 NOTION_PROJECTION_POLICY_SCHEMA_VERSION = "notion_projection_policy.v2"
 IDENTITY_ALIAS_MAP_DEPRECATES_AFTER = "2026-09-30"
 

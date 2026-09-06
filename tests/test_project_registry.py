@@ -591,3 +591,18 @@ def test_configured_kbfreshness_alias_resolves_the_snapshot_title():
     )
     assert aliases.get("KBFreshnessDetector") == "KBFreshness"
     assert "KBFreshness" not in aliases
+
+
+def test_registry_schema_version_pins_the_published_shape():
+    # The version is what a downstream reader gates on, so removing an output
+    # bucket has to move it. 1.1 dropped the two buckets that reported on the
+    # retired static page-id map.
+    registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
+    assert registry["schema_version"] == "1.1"
+    assert set(registry["unmatched"]) == {
+        "bridge",
+        "memory",
+        "notion_local",
+        "notion_local_ambiguous",
+    }
+    assert set(registry["warnings"]) == {"normalized_key_collisions"}
