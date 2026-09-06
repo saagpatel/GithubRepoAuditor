@@ -287,14 +287,34 @@ def _read_bridge_names(bridge_db_path: Path | None) -> list[str]:
         return []
 
 
-def _read_notion_titles(notion_snapshot_path: Path | None) -> list[str]:
+def _read_notion_projects(
+    notion_snapshot_path: Path | None,
+) -> list[tuple[str, str | None]]:
+    """Read ``(title, page_id)`` for every row of the live Notion snapshot.
+
+    ``page_id`` is ``None`` for a snapshot written before the producer emitted
+    the field (schema 2.0.0 is additive, so both shapes are valid) and for any
+    row the producer could not give an id for. A missing id is always reported
+    as absent and never reconstructed from the title or any other field: an
+    invented page id would create a false mapping in a receipts system.
+    """
     if notion_snapshot_path is None or not notion_snapshot_path.exists():
         return []
     try:
         data = json.loads(notion_snapshot_path.read_text())
-        return [p["title"] for p in data.get("projects", []) if p.get("title")]
-    except (json.JSONDecodeError, OSError, KeyError):
+    except (json.JSONDecodeError, OSError):
         return []
+    rows: list[tuple[str, str | None]] = []
+    for project in data.get("projects", []):
+        if not isinstance(project, dict):
+            continue
+        title = project.get("title")
+        if not title:
+            continue
+        page_id = project.get("page_id")
+        page_id = page_id.strip() if isinstance(page_id, str) and page_id.strip() else None
+        rows.append((title, page_id))
+    return rows
 
 
 def _read_notion_pageids(notion_project_map_path: Path | None) -> dict[str, str]:
@@ -489,7 +509,15 @@ def build_project_registry(
         normalize(raw): raw for raw in notion_projection_only_rows
     }
 
-    def resolve_entry_direct(raw: str) -> _Entry | None:
+    # Normalized forms two or more distinct projects share. The index keeps the
+    # first and shadows the rest, so an implicit lookup on one of these forms
+    # returns a stable but arbitrary winner. Harmless for a name we merely fail
+    # to enrich; not harmless for a Notion binding, where the losing project
+    # inherits the winner's page and any shipped event for it would sync into
+    # another project's row. Notion joins therefore refuse these forms outright.
+    collision_norms = {collision["normalized_form"] for collision in collisions}
+
+    def resolve_entry_direct(raw: str, *, refuse_ambiguous: bool = False) -> _Entry | None:
         norm = normalize(raw)
         if not norm:
             return None
@@ -497,24 +525,58 @@ def build_project_registry(
             target = by_key.get(override_norm[norm])
             if target is not None:
                 return target
+        if refuse_ambiguous and norm in collision_norms:
+            # An explicit operator override above still binds; only the implicit
+            # index lookup is refused, so a collision stays resolvable by decision
+            # rather than by entry order.
+            return None
         return index.get(norm)
 
-    def resolve_entry(raw: str) -> _Entry | None:
-        entry = resolve_entry_direct(raw)
+    def resolve_entry(raw: str, *, refuse_ambiguous: bool = False) -> _Entry | None:
+        entry = resolve_entry_direct(raw, refuse_ambiguous=refuse_ambiguous)
         if entry is not None:
             return entry
         alias_target = title_alias_norm.get(normalize(raw))
         if alias_target:
-            return resolve_entry_direct(alias_target)
+            return resolve_entry_direct(alias_target, refuse_ambiguous=refuse_ambiguous)
         return None
 
     notion_orphans: list[str] = []
+    notion_ambiguous: list[dict[str, object]] = []
     notion_projection_only: list[dict[str, str]] = []
-    for title in _read_notion_titles(notion_snapshot_path):
-        entry = resolve_entry(title)
+    # Ids the live snapshot supplied, by canonical key. Tracked separately from
+    # the entry field because several static-map names can resolve to one entry,
+    # and a second name filling an id the first one set is ordinary aliasing, not
+    # a snapshot-versus-map disagreement.
+    snapshot_sourced_page_ids: dict[str, str] = {}
+    for title, page_id in _read_notion_projects(notion_snapshot_path):
+        entry = resolve_entry(title, refuse_ambiguous=True)
         if entry is not None:
             entry.notion_local_title = title
+            # The live snapshot is the authority for a row's page id when it
+            # carries one. The static map below fills only what the snapshot
+            # left absent.
+            if page_id:
+                entry.notion_local_page_id = page_id
+                snapshot_sourced_page_ids[entry.canonical_key] = page_id
             entry.add_alias(f"notion:{title}")
+        elif normalize(title) in collision_norms:
+            notion_ambiguous.append(
+                {
+                    "title": title,
+                    "normalized_form": normalize(title),
+                    "candidates": sorted(
+                        e.canonical_key
+                        for e in entries
+                        if normalize(title) in e.matchset
+                    ),
+                    "reason": (
+                        "Two or more distinct projects share this normalized form, so no "
+                        "Notion binding can be established by name alone. Resolve the "
+                        "identity first, then bind it with an explicit override."
+                    ),
+                }
+            )
         elif normalize(title) in projection_only_norm:
             notion_projection_only.append(
                 {
@@ -527,14 +589,31 @@ def build_project_registry(
         else:
             notion_orphans.append(title)
 
+    # The static map is now a fallback for rows the live snapshot did not supply
+    # an id for, not the primary source. Where both carry an id and they differ,
+    # the live snapshot wins and the disagreement is surfaced: silently keeping
+    # either one would hide a stale hand-maintained mapping.
     pageid_unmatched: list[str] = []
+    pageid_conflicts: list[dict[str, str]] = []
     for name, page_id in _read_notion_pageids(notion_project_map_path).items():
-        entry = resolve_entry(name)
-        if entry is not None:
-            entry.notion_local_page_id = page_id
-            entry.add_alias(f"notionmap:{name}")
-        else:
+        entry = resolve_entry(name, refuse_ambiguous=True)
+        if entry is None:
             pageid_unmatched.append(name)
+            continue
+        from_snapshot = snapshot_sourced_page_ids.get(entry.canonical_key)
+        if from_snapshot is None:
+            entry.notion_local_page_id = page_id
+        elif from_snapshot != page_id:
+            pageid_conflicts.append(
+                {
+                    "canonical_key": entry.canonical_key,
+                    "map_name": name,
+                    "static_map_page_id": page_id,
+                    "snapshot_page_id": from_snapshot,
+                    "resolution": "snapshot",
+                }
+            )
+        entry.add_alias(f"notionmap:{name}")
 
     for project_name, page_id in (scoring_pageids or {}).items():
         entry = resolve_entry(project_name)
@@ -599,10 +678,21 @@ def build_project_registry(
         "unmatched": {
             "bridge": sorted(bridge_orphans),
             "memory": memory_orphans,
+            # A row we refused to bind because its name is ambiguous is a
+            # different condition from one we have simply never seen, and the two
+            # need different operator responses, so they stay separate buckets.
             "notion_local": sorted(notion_orphans),
+            "notion_local_ambiguous": sorted(
+                notion_ambiguous, key=lambda row: str(row["title"])
+            ),
             "notion_pageid_map": sorted(pageid_unmatched),
         },
-        "warnings": {"normalized_key_collisions": collisions},
+        "warnings": {
+            "normalized_key_collisions": collisions,
+            "notion_page_id_conflicts": sorted(
+                pageid_conflicts, key=lambda row: row["canonical_key"]
+            ),
+        },
     }
 
 

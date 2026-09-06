@@ -330,3 +330,208 @@ def test_scoring_pageids_attach_to_matching_entries():
     )
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
     assert by_key["MCPAudit"]["notion_scoring_page_id"] == "page-123"
+
+
+# --- Notion page ids sourced from the live snapshot -------------------------
+#
+# Titles always scaled with the live snapshot while page ids came only from a
+# hand-maintained static map, so a project could carry a known Notion title and
+# no reachable Notion target. The snapshot producer now emits page_id per row.
+
+
+def _pid_snapshot(tmp_path: Path, rows: list[dict]) -> Path:
+    path = tmp_path / "snapshot.json"
+    path.write_text(json.dumps({"schema_version": "2.0.0", "projects": rows}))
+    return path
+
+
+def test_page_ids_come_from_the_live_snapshot_without_a_static_map(tmp_path: Path):
+    snap = _pid_snapshot(
+        tmp_path,
+        [
+            {"title": "MCP Audit", "page_id": "live-mcp"},
+            {"title": "DesktopPEt-ready", "page_id": "live-desktop"},
+        ],
+    )
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_page_id"] == "live-mcp"
+    assert by_key["Fun:GamePrjs/DesktopPEt"]["notion_local_page_id"] == "live-desktop"
+
+
+def test_snapshot_row_without_a_page_id_yields_no_page_id(tmp_path: Path):
+    # Never reconstructed from the title or any neighbouring row: an invented
+    # page id would be a false mapping in a receipts system.
+    snap = _pid_snapshot(
+        tmp_path,
+        [{"title": "MCP Audit"}, {"title": "DesktopPEt-ready", "page_id": "  "}],
+    )
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_title"] == "MCP Audit"
+    assert by_key["MCPAudit"]["notion_local_page_id"] is None
+    assert by_key["Fun:GamePrjs/DesktopPEt"]["notion_local_page_id"] is None
+
+
+def test_static_map_fills_only_what_the_snapshot_left_absent(tmp_path: Path):
+    snap = _pid_snapshot(
+        tmp_path,
+        [{"title": "MCP Audit", "page_id": "live-mcp"}, {"title": "DesktopPEt-ready"}],
+    )
+    page_map = tmp_path / "notion-project-map.json"
+    page_map.write_text(json.dumps({"DesktopPEt": {"localProjectId": "map-desktop"}}))
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=page_map,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_page_id"] == "live-mcp"
+    assert by_key["Fun:GamePrjs/DesktopPEt"]["notion_local_page_id"] == "map-desktop"
+    assert registry["warnings"]["notion_page_id_conflicts"] == []
+
+
+def test_stale_static_map_loses_to_the_snapshot_and_is_reported(tmp_path: Path):
+    snap = _pid_snapshot(tmp_path, [{"title": "MCP Audit", "page_id": "live-mcp"}])
+    page_map = tmp_path / "notion-project-map.json"
+    page_map.write_text(json.dumps({"MCP Audit": {"localProjectId": "stale-mcp"}}))
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=snap,
+        notion_project_map_path=page_map,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_page_id"] == "live-mcp"
+    assert registry["warnings"]["notion_page_id_conflicts"] == [
+        {
+            "canonical_key": "MCPAudit",
+            "map_name": "MCP Audit",
+            "static_map_page_id": "stale-mcp",
+            "snapshot_page_id": "live-mcp",
+            "resolution": "snapshot",
+        }
+    ]
+
+
+# --- Ambiguous Notion bindings are refused, not resolved by entry order -----
+
+
+COLLIDING = _snapshot(
+    _ident("conductor", "conductor"),
+    _ident("VanityPRJs/Conductor", "Conductor", "saagpatel/Conductor"),
+    _ident("MCPAudit", "MCPAudit", "saagpatel/MCPAudit"),
+)
+
+
+def test_ambiguous_notion_title_binds_to_nothing(tmp_path: Path):
+    # Two distinct projects normalize to "conductor". Binding the Notion row to
+    # whichever the index happened to keep would give one project the other's
+    # page, and any shipped event for it would sync into the wrong row.
+    snap = _pid_snapshot(tmp_path, [{"title": "Conductor", "page_id": "page-app"}])
+    registry = build_project_registry(
+        COLLIDING,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=None,
+    )
+    for entry in registry["entries"]:
+        assert entry["notion_local_title"] is None
+        assert entry["notion_local_page_id"] is None
+
+
+def test_refused_notion_title_is_reported_with_its_candidates(tmp_path: Path):
+    snap = _pid_snapshot(tmp_path, [{"title": "Conductor", "page_id": "page-app"}])
+    registry = build_project_registry(
+        COLLIDING,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=None,
+    )
+    ambiguous = registry["unmatched"]["notion_local_ambiguous"]
+    assert [row["title"] for row in ambiguous] == ["Conductor"]
+    assert ambiguous[0]["candidates"] == ["VanityPRJs/Conductor", "conductor"]
+    # A refused binding is not the same condition as an unrecognized row.
+    assert registry["unmatched"]["notion_local"] == []
+
+
+def test_ambiguous_static_map_entry_is_refused_too(tmp_path: Path):
+    page_map = tmp_path / "notion-project-map.json"
+    page_map.write_text(json.dumps({"Conductor": {"localProjectId": "page-app"}}))
+    registry = build_project_registry(
+        COLLIDING,
+        notion_snapshot_path=None,
+        notion_project_map_path=page_map,
+        overrides_config_path=None,
+    )
+    for entry in registry["entries"]:
+        assert entry["notion_local_page_id"] is None
+    assert registry["unmatched"]["notion_pageid_map"] == ["Conductor"]
+
+
+def test_explicit_override_still_binds_an_otherwise_ambiguous_title(
+    tmp_path: Path,
+):
+    # The refusal blocks resolution by entry order, not resolution by decision:
+    # once the operator says which project the row is, the binding must work.
+    snap = _pid_snapshot(tmp_path, [{"title": "Conductor", "page_id": "page-app"}])
+    overrides = tmp_path / "overrides.json"
+    overrides.write_text(json.dumps({"overrides": {"Conductor": "VanityPRJs/Conductor"}}))
+    registry = build_project_registry(
+        COLLIDING,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=overrides,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["VanityPRJs/Conductor"]["notion_local_title"] == "Conductor"
+    assert by_key["VanityPRJs/Conductor"]["notion_local_page_id"] == "page-app"
+    assert by_key["conductor"]["notion_local_page_id"] is None
+    assert registry["unmatched"]["notion_local_ambiguous"] == []
+
+
+def test_unambiguous_titles_are_unaffected_by_the_refusal(tmp_path: Path):
+    snap = _pid_snapshot(
+        tmp_path,
+        [{"title": "Conductor", "page_id": "page-app"}, {"title": "MCPAudit", "page_id": "page-mcp"}],
+    )
+    registry = build_project_registry(
+        COLLIDING,
+        notion_snapshot_path=snap,
+        notion_project_map_path=None,
+        overrides_config_path=None,
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["MCPAudit"]["notion_local_page_id"] == "page-mcp"
+
+
+def test_two_map_names_for_one_entry_are_not_a_conflict(tmp_path: Path):
+    # Regression: aliasing several static-map names onto one project is normal
+    # enrollment, not a snapshot-versus-map disagreement.
+    page_map = tmp_path / "notion-project-map.json"
+    page_map.write_text(
+        json.dumps(
+            {
+                "MCP Audit": {"localProjectId": "map-a"},
+                "MCPAudit": {"localProjectId": "map-b"},
+            }
+        )
+    )
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=None,
+        notion_project_map_path=page_map,
+        overrides_config_path=None,
+    )
+    assert registry["warnings"]["notion_page_id_conflicts"] == []
