@@ -23,14 +23,6 @@
 			"note": "Machine-wide Claude Code harness operating surface under ~/.claude; tracked as shipped/monitor-only, not a standalone repo."
 		},
 		{
-			"canonical_key": "supp:personal-ops",
-			"display_name": "personal-ops",
-			"repo_full_name": null,
-			"group_key": "operator_infra",
-			"lifecycle_state": "active",
-			"note": "Local operator control plane (127.0.0.1:46210). Most active project in bridge-db yet absent from auditor portfolio-truth."
-		},
-		{
 			"canonical_key": "operator-scripts",
 			"display_name": "operator-scripts",
 			"repo_full_name": "saagpatel/operator-scripts",
@@ -48,8 +40,8 @@
 		}
 	],
 	"memory_meta": {
-		"personal_ops_codebase": "supp:personal-ops",
-		"personal_ops_vision": "supp:personal-ops",
+		"personal_ops_codebase": "personal-ops",
+		"personal_ops_vision": "personal-ops",
 		"github_repo_auditor_future_arcs": "GithubRepoAuditor",
 		"skill_library_port_2026-05": "",
 		"skill_eval_harness_2026-05": ""

@@ -483,16 +483,20 @@ def test_identity_resolution_known_aliases_pass(tmp_path: Path) -> None:
 
 
 def test_identity_resolution_supplementary_project_resolves(tmp_path: Path) -> None:
-    # personal-ops / SecondBrain are repo-less supplementary registry projects
-    # (absent from portfolio-truth). Both their name and their supp: canonical
-    # key must resolve, not flag as minted dialects.
+    # claude-code-harness / SecondBrain are repo-less supplementary registry
+    # projects (absent from portfolio-truth). Both their name and their supp:
+    # canonical key must resolve, not flag as minted dialects.
+    #
+    # personal-ops used to stand here. It graduated: the auditor now tracks it as
+    # saagpatel/personal-ops, so its supplementary enrollment was retired and
+    # supp:personal-ops is no longer a key the registry can emit.
     truth, markdown = _passing_paths(tmp_path)
     _write_identity_truth(truth)
     bridge_db = tmp_path / "bridge.db"
     _write_bridge_db(
         bridge_db,
         activity_rows=[
-            ("personal-ops", "supp:personal-ops"),
+            ("claude-code-harness", "supp:claude-code-harness"),
             ("SecondBrain", "supp:SecondBrain"),
         ],
     )

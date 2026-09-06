@@ -535,3 +535,18 @@ def test_two_map_names_for_one_entry_are_not_a_conflict(tmp_path: Path):
         overrides_config_path=None,
     )
     assert registry["warnings"]["notion_page_id_conflicts"] == []
+
+
+def test_personal_ops_has_one_identity_not_a_supplementary_duplicate():
+    # personal-ops is tracked by the auditor as saagpatel/personal-ops. A
+    # leftover supp:personal-ops enrollment would collide with it on the
+    # normalized form "personalops", and the collision would refuse the Notion
+    # binding for the most active project in bridge-db.
+    from github_repo_auditor.project_registry import load_overrides_config
+
+    _, supplementary, memory_meta, *_ = load_overrides_config(
+        Path("config/project-registry-overrides.json")
+    )
+    assert [s["canonical_key"] for s in supplementary if "personal-ops" in s["canonical_key"]] == []
+    # Memory notes must point at the surviving identity, not the retired key.
+    assert "supp:personal-ops" not in memory_meta.values()
