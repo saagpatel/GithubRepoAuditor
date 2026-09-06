@@ -143,7 +143,6 @@ DEFAULT_NOTION_TITLE_ALIASES: dict[str, str] = {
     "GithubRepoAuditor-public": "GithubRepoAuditor",
     "Notion Operating System": "Notion",
     "OrbitForge (staging)": "OrbitForge",
-    "Personal Ops": "operator-os-docs",
     "PomGambler-prod": "PomGambler",
 }
 

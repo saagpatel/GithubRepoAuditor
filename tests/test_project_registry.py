@@ -606,3 +606,31 @@ def test_registry_schema_version_pins_the_published_shape():
         "notion_local_ambiguous",
     }
     assert set(registry["warnings"]) == {"normalized_key_collisions"}
+
+
+def test_personal_ops_owns_its_own_notion_row(tmp_path: Path):
+    # The "Personal Ops" title used to be aliased onto operator-os-docs, from the
+    # era when personal-ops lived outside the Projects workspace and had no
+    # auditor identity of its own. The auditor tracks saagpatel/personal-ops
+    # directly now, so that alias would hand one project's Notion row to another
+    # the moment resolution order shifted. The row belongs to the repo.
+    snapshot = _snapshot(
+        _ident("personal-ops", "personal-ops", "saagpatel/personal-ops"),
+        _ident("operator-os-docs", "operator-os-docs", "saagpatel/operator-os-docs"),
+    )
+    snap = _pid_snapshot(
+        tmp_path,
+        [
+            {"title": "Personal Ops", "page_id": "page-personal-ops"},
+            {"title": "operator-os-docs", "page_id": "page-docs"},
+        ],
+    )
+    registry = build_project_registry(
+        snapshot,
+        notion_snapshot_path=snap,
+        overrides_config_path=Path("config/project-registry-overrides.json"),
+    )
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    assert by_key["personal-ops"]["notion_local_page_id"] == "page-personal-ops"
+    assert by_key["operator-os-docs"]["notion_local_page_id"] == "page-docs"
+    assert registry["unmatched"]["notion_local"] == []
