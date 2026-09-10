@@ -47,6 +47,27 @@ filters timestamped local stores only: bridge-db activity, session-costs, and
 notification-hub durable events. Untimestamped Notion snapshot rows are skipped
 in since-window mode.
 
+## Cursor Cloud specific instructions
+
+Cursor Cloud builds start from this repository's checkout and must not depend on
+the local `.venv`, sibling repositories, generated `output/` artifacts, or
+credential-bearing files. The checked-in `.python-version` selects Python
+3.11.15; `.cursor/environment.json` pins `uv==0.12.12` and installs the locked
+runtime and development dependencies with `uv sync --locked`.
+
+Use these repository-local, non-interactive checks in a Cloud build or agent:
+
+```sh
+uv run --locked --extra dev --extra serve --extra config pytest -q -k 'not semantic_index'
+uv run --locked --extra dev ruff check src/ tests/
+```
+
+The `semantic` extra is intentionally opt-in because it adds heavyweight ML
+dependencies; tests that require it should be run only when that extra is
+explicitly requested. GitHub, Anthropic, and Notion credentials are optional
+and must be supplied through Cursor Secrets when a task genuinely needs them;
+never copy local `.env` files or tokens into a Cloud build.
+
 ## Known Risks
 
 - `output/portfolio-truth-latest.json` is generated state, but it is also the current truth surface for other local workflows. Regenerate it deliberately after catalog or context changes.

@@ -1,0 +1,4 @@
+{
+  "name": "github-repo-auditor",
+  "install": "set -eu; python -m pip install --disable-pip-version-check --user 'uv==0.12.12'; export PATH=\"$(python -m site --user-base)/bin:$PATH\"; uv python install 3.11.15; uv sync --locked --python 3.11.15 --extra dev --extra serve --extra config"
+}
