@@ -11,7 +11,7 @@
 
 **Case study — [Operator OS: a multi-agent control plane over a repo portfolio](CASE-STUDY.md).** How this auditor's truth layer anchors six local services and two coordinated coding agents (Claude Code + Codex), with real portfolio metrics and a [90-second demo plan](DEMO-PLAN.md).
 
-GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
+GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 13 analyzers across completeness, interest, and advisory dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
 
 Today the project is best understood as a GitHub portfolio operating system:
 
@@ -131,7 +131,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ## Features
 
-- **12 Analyzers** — README quality, test coverage, CI/CD, dependency freshness, commit patterns, bus factor, code complexity, security controls, license, build readiness, GraphQL signals, and more
+- **13 Analyzers** — README quality, test coverage, CI/CD, dependency freshness, commit patterns, bus factor, code complexity, security controls, license, build readiness, GraphQL signals, and more
 - **Dual-Axis Scoring** — Completeness (does this project have what shipped software should?) and Interest (is this worth anyone's time?) scored independently on 0.0–1.0 scales
 - **Letter Grades + Tier Classification** — A–F grades with Shipped / Functional / WIP / Skeleton / Abandoned tiers; 15 achievement badges ("Fully Tested", "CI Champion", "Zero Debt", etc.)
 - **Quick Wins Engine** — For each repo, shows exactly which single action moves it to the next tier and how far it is from getting there
@@ -214,8 +214,8 @@ Expected outputs include `output/demo/demo-report.json`,
 `output/demo/operator-control-center-demo.json`,
 `output/demo/operator-control-center-demo.md`,
 `output/demo/portfolio-truth-latest.json`,
-`output/demo/weekly-command-center-<username>-<date>.json`,
-`output/demo/security-burndown-<username>-<date>.json`,
+`output/demo/weekly-command-center-demo.json`,
+`output/demo/security-burndown-demo.json`,
 `output/demo/pending-proposals.json`, and `output/demo/portfolio-warehouse.db`.
 
 To browse the same fixture in the local web UI:
@@ -279,7 +279,7 @@ audit report <github-username> --portfolio-truth
 # Semantic search across the portfolio index
 audit triage <github-username> --ask "Python projects with no tests"
 
-# Weekly operator briefing (requires Anthropic API key)
+# Weekly operator briefing (LLM suggestions are optional)
 audit run <github-username> --briefing
 
 # Deep Dive — targeted repo rerun merged into the latest baseline
@@ -302,7 +302,7 @@ and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json`
 `.md`.
 
 `audit triage --approval-center` is also read-only. It loads the latest approval history,
-groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and
+groups work into sections including `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and
 `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval
 capture stays separate from writeback apply.
 
@@ -350,7 +350,7 @@ smokes. [docs/release-gates.md](docs/release-gates.md) retains the release gates
 
 ## Architecture
 
-The auditor follows a pipeline architecture: fetch repo list via GitHub API → shallow-clone each repo → run all 12 analyzers in sequence → aggregate scores → generate outputs. Analyzers are pluggable via `--analyzers-dir` for custom extensions. The scoring engine computes completeness and interest independently, applies configurable scoring profiles, and derives letter grades from the combined result. All output writers (Excel, HTML, JSON, Markdown, Notion) are isolated from the analysis layer and consume the same scored result object. Workbook ranking and trend views always use the full filtered portfolio baseline, even for targeted or incremental reruns.
+The auditor follows a pipeline architecture: fetch repo list via GitHub API → shallow-clone each repo → run all 13 analyzers in sequence → aggregate scores → generate outputs. Analyzers are pluggable via `--analyzers-dir` for custom extensions. The scoring engine computes completeness and interest independently, applies configurable scoring profiles, and derives separate letter grades from the completeness and interest scores. All output writers (Excel, HTML, JSON, Markdown, Notion) are isolated from the analysis layer and consume the same scored result object. Workbook ranking and trend views always use the full filtered portfolio baseline, even for targeted or incremental reruns.
 
 Partial reruns now require a compatible full-baseline report, not just any previous report. The stored baseline contract tracks the audit-affecting portfolio context used to produce the last trustworthy baseline, and targeted or incremental reruns will fail closed if that contract no longer matches the current request.
 
@@ -423,7 +423,7 @@ That command generates stable sample `standard` and `template` workbooks, valida
 After that manual desktop Excel check, record the outcome back into the gate artifacts:
 
 ```bash
-make workbook-signoff ARGS="--reviewer yourname --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed"
+make workbook-signoff ARGS="--reviewer yourname --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed --check core-navigation-links-work=passed --check operator-story-consistent=passed --check repo-detail-selector-works=passed --check run-changes-readable=passed"
 ```
 
 ## Managed Campaigns and Governance
@@ -456,7 +456,7 @@ The daily operator loop is now:
 - Run `make workbook-signoff ...` after the manual Excel-open check for workbook-facing changes
 - Browse [http://127.0.0.1:8080/](http://127.0.0.1:8080/) after `audit serve` to review the dashboard
 
-Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, whether recent high-confidence guidance has been validating or turning noisy, what trust policy now applies to the live recommendation (`act-now`, `act-with-review`, `verify-first`, or `monitor`), whether a soft exception or recent policy-flip drift should make the operator treat that recommendation more cautiously, and whether recent soft caution is still earning trust or has become cautious enough to recover toward a stronger policy.
+Scheduled automation stays artifact-first. The manually dispatched workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, whether recent high-confidence guidance has been validating or turning noisy, what trust policy now applies to the live recommendation (`act-now`, `act-with-review`, `verify-first`, or `monitor`), whether a soft exception or recent policy-flip drift should make the operator treat that recommendation more cautiously, and whether recent soft caution is still earning trust or has become cautious enough to recover toward a stronger policy.
 
 In newer follow-through phases, that same weekly story also carries whether a recommendation is escalating, recovering, rebuilding, re-acquiring confidence, or aging back down. The important product principle is still the same: workbook, HTML, Markdown, and review-pack surfaces should tell the same story in different formats.
 

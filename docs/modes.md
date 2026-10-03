@@ -4,7 +4,8 @@ GitHub Repo Auditor now works best when you think about it as one operating syst
 four product modes. The flags stay the same underneath; this guide is the shared map for
 the docs, CLI help, workbook, HTML, Markdown, review-pack, and scheduled-handoff wording.
 
-As of Arc F Sprint 4.3 the CLI has four subcommands (`run`, `triage`, `report`, `serve`).
+The CLI has four workflow subcommands (`run`, `triage`, `report`, `serve`) plus
+`security-burndown`, `security-gate`, and `pr-evidence`.
 Examples below show the subcommand form first. The flat form (`audit <user> --flag`) still
 works and shows a deprecation warning. See [docs/audit-cli-migration.md](audit-cli-migration.md)
 for the full mapping.
@@ -224,7 +225,7 @@ Each section should answer the same three questions quickly:
 
 ## Subcommand flag reference
 
-The four subcommands group flags by workflow. All subcommands accept the shared globals
+The four workflow subcommands group flags by workflow and accept the shared globals
 `--token`, `--output-dir`, `--config`, and `--verbose`.
 
 ### audit run

@@ -36,7 +36,7 @@ Flags that belong here: `--repos`, `--skip-forks`, `--skip-archived`, `--skip-cl
 `--scoring-profile`, `--watch`, `--resume`, `--vuln-check`, `--reindex`,
 `--embedder`.
 
-Global flags available in all subcommands: `--token`, `--output-dir`, `--config`,
+Global flags available in the four workflow subcommands: `--token`, `--output-dir`, `--config`,
 `--verbose`.
 
 ### audit triage

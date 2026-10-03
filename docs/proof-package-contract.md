@@ -95,6 +95,7 @@ Run:
 python scripts/validate_proof_package.py docs/proof-packages/<package>/proof-package.json
 ```
 
-The validator checks structure and local file references. It intentionally does
-not judge whether a claim is true; the package author must still choose honest
+The validator checks structure, local file references, and portfolio-truth schema
+and freshness against the current producer contract. It does not otherwise
+judge whether a claim is true; the package author must still choose honest
 claim statements and bounded evidence.

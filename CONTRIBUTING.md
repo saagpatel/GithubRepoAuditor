@@ -89,7 +89,7 @@ and route tests do not establish production or human acceptance.
 
 ## Coding Conventions
 
-These conventions come from the project's `CLAUDE.md` and must be followed in all contributions:
+These conventions must be followed in all contributions:
 
 - **Type hints on all functions** — parameters and return types, always. Use `from __future__ import annotations` at the top of each module.
 - **f-strings** — use f-strings for string interpolation, not `%` formatting or `.format()`.
@@ -123,7 +123,6 @@ if TYPE_CHECKING:
 
 class YourDimensionAnalyzer(BaseAnalyzer):
     name = "your_dimension"
-    weight = 0.05  # fraction of overall completeness score
 
     def analyze(
         self,
@@ -160,7 +159,7 @@ ALL_ANALYZERS = [
 
 ### Step 3 — Add a weight in the scorer
 
-Open `src/github_repo_auditor/scorer.py` and add your dimension name to the `WEIGHTS` dict. Weights must sum to `1.0` after adding the new entry, so adjust existing weights proportionally.
+For a completeness-scored dimension, open `src/github_repo_auditor/scorer.py` and add your dimension name to the `WEIGHTS` dict. Interest is scored separately; advisory dimensions such as `description` remain unweighted. Weights must sum to `1.0` after adding the new entry, so adjust existing weights proportionally.
 
 ### Step 4 — Write tests
 
@@ -180,7 +179,7 @@ Before opening a PR, verify:
 - [ ] `make lint` reports no errors.
 - [ ] `make type-check` reports no errors (or pre-existing errors only — do not introduce new ones).
 - [ ] No hardcoded GitHub usernames or API tokens anywhere in the diff.
-- [ ] New analyzer (if any) is registered in `ALL_ANALYZERS` and has a weight in `WEIGHTS`.
+- [ ] New analyzer (if any) is registered in `ALL_ANALYZERS` and, if completeness-scored, has a weight in `WEIGHTS`.
 - [ ] New tests added for any new public functions or analyzer logic.
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` with a brief description of the change.
 - [ ] Commit messages follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`.

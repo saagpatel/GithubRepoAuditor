@@ -36,7 +36,7 @@ That means the architecture is intentionally split between raw state assembly an
 
 ### `audit`
 
-`src/github_repo_auditor/cli.py` remains the single entrypoint. It keeps one flag-based command surface and packages the product around four guidance modes:
+`src/github_repo_auditor/cli.py` remains the single entrypoint. It exposes workflow and gate subcommands alongside the legacy flag-based command surface and packages the product around four guidance modes:
 
 - `First Run`
 - `Weekly Review`
@@ -449,7 +449,7 @@ Visible terminology can be cleaned up, but stored keys and historical loading pa
 The most important current paths are:
 
 ```text
-src/
+src/github_repo_auditor/
   cli.py
   reporter.py
   review_pack.py
