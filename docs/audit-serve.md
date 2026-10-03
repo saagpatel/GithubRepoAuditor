@@ -3,7 +3,7 @@
 `audit serve` starts a local FastAPI + progressively enhanced web interface over your latest audit output.
 It is a read-mostly operator tool: you can browse portfolio state, per-repo history, run
 history, and the approval queue, and you can trigger new audit runs through a form.
-It binds to `127.0.0.1` only and requires no authentication — treat it as a local-only
+It binds to `127.0.0.1` by default and requires no authentication — treat it as a local-only
 tool for solo operator use.
 
 ## Installation
@@ -45,9 +45,9 @@ Full flag reference (`audit serve --help`):
 | `--port PORT` | `8080` | Port to listen on |
 | `--host HOST` | `127.0.0.1` | Interface to bind (do not change to `0.0.0.0`) |
 | `--output-dir DIR` | `./output` | Directory where audit output files live |
-| `--config PATH` | `./audit-config.yaml` | Path to audit config file |
-| `--verbose` | off | Print detailed output |
-| `--token TOKEN` | `$GITHUB_TOKEN` | GitHub token forwarded to triggered runs |
+| `--config PATH` | unset | Accepted CLI option; not forwarded to triggered runs |
+| `--verbose` | off | Accepted CLI option; not used by the web launcher |
+| `--token TOKEN` | `$GITHUB_TOKEN` or `gh auth token` | Accepted CLI option; not forwarded to triggered runs, which resolve their own credentials |
 
 Once started, open `http://127.0.0.1:8080/` in your browser. The server runs until you
 press Ctrl-C.
@@ -86,8 +86,7 @@ run timestamp, username, repo count, portfolio grade, and any run-level notes.
 
 ### `GET /approvals`
 
-Approval queue. Reads the latest approval-center state and renders open items grouped by
-status (`needs-reapproval`, `ready-for-review`, `approved-manual`, `blocked`). Approve
+Approval queue. Reads persisted approval records from the warehouse and renders them in a table. Approve
 and reject buttons submit via HTMX and record intent locally — they do not trigger
 writeback automatically.
 
@@ -135,7 +134,7 @@ completed, failed, cancelled, disconnected, and recovered states.
 - **No authentication.** The UI is designed for single-user local use only. Do not
   expose it on a non-loopback interface or behind a shared reverse proxy without adding
   your own auth layer.
-- **Binds to `127.0.0.1` only.** The default host is intentionally loopback. Changing
+- **Defaults to `127.0.0.1`.** The default host is intentionally loopback. Changing
   `--host` to `0.0.0.0` is unsupported and not recommended.
 - **Not for multi-user environments.** The approval intent log and run session registry
   are in-memory or local-file only; there is no multi-user isolation.

@@ -151,7 +151,7 @@ That command generates canonical sample `standard` and `template` workbooks, val
 After the manual Excel-open check, record the signoff:
 
 ```bash
-make workbook-signoff ARGS="--reviewer <name> --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed"
+make workbook-signoff ARGS="--reviewer <name> --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed --check core-navigation-links-work=passed --check operator-story-consistent=passed --check repo-detail-selector-works=passed --check run-changes-readable=passed"
 ```
 
 ## Scheduled handoff issues
