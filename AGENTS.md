@@ -18,7 +18,16 @@ The current machine-readable truth surface is `output/portfolio-truth-latest.jso
 
 ## How To Run
 
-Refresh and verify the local portfolio truth snapshot:
+For repository verification, start with the credential-free fixture commands in
+[CONTRIBUTING.md](CONTRIBUTING.md). That guide is authoritative for environment
+extras, focused/broader tests and conditional browser checks. The full semantic
+lane and operator workflows are separate from the lightweight fixture baseline.
+
+The following commands are deliberate operator work: they scan the configured
+local projects workspace and regenerate canonical/compatibility outputs. Do not
+use them as a smoke test or run them to verify documentation changes.
+
+Refresh and verify the local portfolio truth snapshot only when requested:
 
 ```sh
 uv run python -m github_repo_auditor.cli report saagpatel --portfolio-truth
@@ -26,14 +35,15 @@ jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_stat
 uv run operator-os-seam-linter --truth output/portfolio-truth-latest.json --json
 ```
 
-Useful checks for repo changes:
+For a focused repository check, use the locked fixture baseline:
 
 ```sh
-uv run ruff check .
-uv run pytest -q
+uv run --locked --extra dev ruff check src/ tests/
+uv run --locked --extra dev --extra serve --extra config pytest tests/test_scorer.py -q -p no:cacheprovider
 ```
 
-Use narrower tests when the change is scoped and the full suite would be disproportionate.
+Select the focused test file for the changed module; use CONTRIBUTING.md for
+broader checks and the optional semantic environment that full CI requires.
 
 The seam-linter checks truth freshness, schema pinning, and generated Markdown
 provenance markers. Its identity-resolution check is opt-in:
