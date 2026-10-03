@@ -324,31 +324,16 @@ For a full description of all flags grouped by workflow, see
 
 ### Run tests
 
-```bash
-pytest
-```
+Use the [contributor verification lanes](CONTRIBUTING.md#safe-smoke-and-focused-tests)
+for the focused fixture check and broader suites with their required extras.
 
 ## Development
 
-For local development, clone the repo and install with the dev + config extras:
-
-```bash
-git clone https://github.com/saagpatel/GithubRepoAuditor.git
-cd GithubRepoAuditor
-pip install -e ".[dev,serve,semantic,config]"
-```
-
-Common dev commands:
-
-```bash
-python3 -m pytest -q -p no:cacheprovider   # full test suite
-python3 -m ruff check src/ tests/          # lint
-python3 -m ruff format src/ tests/         # format
-make workbook-gate                         # workbook invariant check
-make release-gate                          # mutation testing gate
-```
-
-See [docs/release-gates.md](docs/release-gates.md) for the full gate checklist.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the locked local environment, safe
+fixture smoke, focused and broader test lanes, lint/format/typecheck/build
+commands, optional semantic prerequisites, and conditional UI/report checks.
+Live audits and portfolio-truth regeneration are operator workflows, not test
+smokes. [docs/release-gates.md](docs/release-gates.md) retains the release gates.
 
 ## Tech Stack
 

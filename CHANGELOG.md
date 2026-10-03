@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Clarify locked contributor setup, optional test dependencies, and credential-free fixture verification without workstation discovery.
+
 ### Added
 - Added the local-only `audit pr-evidence <snapshot.json>` operator path with
   strict `PRHeadEvidenceV1` input validation and deterministic
