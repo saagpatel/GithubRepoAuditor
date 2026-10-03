@@ -29,19 +29,19 @@ An analyzer should inspect one aspect of a repo and return:
 In addition to existing README quality fields, `ReadmeAnalyzer` now produces:
 
 - `readme_last_touched_days` — days since the README file was last modified, based on Git history
-- `code_last_touched_days` — days since any non-README file in the repo was last modified
-- `readme_staleness_ratio` — `readme_last_touched_days / code_last_touched_days`; higher means the README is aging faster than the code
-- `readme_stale` — boolean; `true` when `readme_staleness_ratio > 5.0` AND `code_last_touched_days < 90`, i.e., the README is more than five times older than the code and the code is still being actively touched
+- `code_last_touched_days` — days since a code file matching `_CODE_GLOBS` in `readme.py` was last committed
+- `readme_staleness_ratio` — `readme_last_touched_days / max(code_last_touched_days, 1)`; higher means the README is aging faster than the code
+- `readme_stale` — boolean or null when either age is unknown; `true` when `readme_staleness_ratio > 5.0` AND `code_last_touched_days < 90`, i.e., the README is more than five times older than the code and the code is still being actively touched
 
 Excel and control-center surfacing for these staleness fields is wired via S2.4.
 
 ### ActivityAnalyzer
 
-`ActivityAnalyzer` now produces release signal fields via `GithubClient.get_releases()`:
+`ActivityAnalyzer` now produces release signal fields via `GitHubClient.get_releases()`:
 
 - `has_any_release` — boolean; whether the repo has at least one published release
 - `release_count` — total number of releases fetched (capped at 10 per run)
-- `releases_available` — whether the releases endpoint was reachable
+- `releases_available` — false on HTTP 404; other HTTP errors leave it true with an empty release list
 - `latest_release_age_days` — days since the most recent release was published
 - `latest_release_is_prerelease` — boolean; whether the most recent release is marked as a pre-release
 
@@ -63,11 +63,12 @@ Inputs that are **not** stable (do not include): wall-clock time, run-specific I
 
 ### Current opt-ins
 
-Three analyzers currently opt in:
+Four analyzers currently opt in:
 
 - `DependenciesAnalyzer` — hashes lockfile bytes
 - `ReadmeAnalyzer` — hashes README content + git timestamps
 - `StructureAnalyzer` — hashes sorted directory listing + primary language
+- `DescriptionAnalyzer` — hashes description + primary language + sorted topics
 
 ### Validating correctness with `--reconcile-cache`
 

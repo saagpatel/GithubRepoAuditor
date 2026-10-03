@@ -33,7 +33,10 @@ Expected generated artifacts:
 The truth artifacts are regenerated on every run: the schema version comes from
 the producer constant and the timestamp is computed at generation time, so the
 demo always reflects the current contract. `validate_proof_package.py` fails the
-package if either drifts.
+package if either drifts. The committed proof manifest still declares schema
+`0.11.0`, while the producer emits `0.12.0`; `make demo` does not update that
+manifest. Validation requires its schema metadata to be reconciled with the
+current producer as well as fresh generated artifacts.
 
 ## Desktop Demo
 
