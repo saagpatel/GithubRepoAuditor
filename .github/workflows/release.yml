@@ -6,12 +6,14 @@ on:
       - "v*"
 
 permissions:
-  contents: write  # required for softprops/action-gh-release
+  contents: read
 
 jobs:
   build-and-release:
     name: Build dist artifacts and create GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required for softprops/action-gh-release
 
     steps:
       - name: Checkout
