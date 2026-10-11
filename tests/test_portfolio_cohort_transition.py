@@ -1364,7 +1364,11 @@ def test_clock_departure_is_covered_and_recorded(
     )
 
 
-@pytest.mark.parametrize("receipt_time", [None, "broken", "2026-10-11T08:31:57"])
+@pytest.mark.parametrize(
+    "receipt_time",
+    # The last case is after RUN_AT yet inside publication's 3-minute skew allowance.
+    [None, "broken", "2026-10-11T08:31:57", "2026-10-11T09:02:00+00:00"],
+)
 def test_invalid_receipt_time_fails_closed_with_diagnostics(
     transition_workspace: tuple[Path, Path, Path],
     receipt_time: str | None,

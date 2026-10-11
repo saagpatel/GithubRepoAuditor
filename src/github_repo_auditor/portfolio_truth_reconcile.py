@@ -1070,9 +1070,13 @@ def build_portfolio_truth_snapshot(
             )
             if receipt_time.tzinfo is None:
                 raise ValueError("timezone missing")
+            # A receipt cannot observe the future; evaluating as of a later clock
+            # could reclassify a near-boundary repo as a clock-only arrival.
+            if now is not None and now.tzinfo is not None and receipt_time > now:
+                raise ValueError("observation time is after the run clock")
         except (ValueError, TypeError) as exc:
             raise CohortR3Error(
-                "PortfolioTruth R3 requires a parseable timezone-aware security receipt observation time (produced_at).",
+                "PortfolioTruth R3 requires a parseable timezone-aware security receipt observation time (produced_at) that is not after the run clock.",
                 _r3_diagnostics(
                     candidate_projects=candidate.projects,
                     current_projects=candidate.projects,
