@@ -491,6 +491,12 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
             "- Security overlay not run for this snapshot "
             "(re-run with `--portfolio-truth-include-security`)."
         )
+    pending = list(security_posture.get("pending_coverage_repositories") or [])
+    if pending:
+        lines.append(
+            f"- Security coverage PENDING for {len(pending)} repo(s) that entered attention "
+            f"after the last receipt ({', '.join(pending)}); do not treat them as clear."
+        )
 
     lines.extend(["", "## Movement"])
     lines.append(
@@ -722,8 +728,15 @@ def _build_security_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
         total_secrets += admission.total_open_secrets
         if admission.has_findings:
             repos_with_open += 1
+    # Repos that entered attention after the last security receipt are not
+    # cohort members yet, so the loop above cannot see them. Carry them
+    # explicitly so the digest never reports "all clear" over uncovered repos.
+    clock = _mapping(_mapping(portfolio_truth.get("source_summary")).get("security_coverage_clock"))
+    pending = [str(name) for name in clock.get("pending_security_coverage_repositories") or []]
     return {
         "scanned_count": scanned,
+        "pending_coverage_count": len(pending),
+        "pending_coverage_repositories": pending,
         "repos_with_open_high_critical": repos_with_open,
         "repos_with_blocking_findings": repos_with_open,
         "unadmitted_count": unadmitted,
