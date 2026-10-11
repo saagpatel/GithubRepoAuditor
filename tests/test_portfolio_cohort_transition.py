@@ -33,6 +33,7 @@ from github_repo_auditor.portfolio_truth_publish import (
     publish_portfolio_truth,
 )
 from github_repo_auditor.portfolio_truth_reconcile import (
+    CohortR3Error,
     _validate_security_receipt_cohort_identity,
 )
 
@@ -1133,3 +1134,283 @@ def test_case_19_interrupted_publication_is_recovered_from_the_journal(
         now=NOW,
     )
     assert latest.read_bytes() != before
+
+
+# Receipt-time regression cases use real Git activity observations and publication.
+RECEIPT_AT = datetime(2026, 10, 11, 8, 31, 57, tzinfo=timezone.utc)
+RUN_AT = datetime(2026, 10, 11, 9, 0, 5, tzinfo=timezone.utc)
+ACTIVITY_AT = datetime(2026, 9, 10, 8, 59, 40, tzinfo=timezone.utc)
+CLOCK_REPO = "d/agent-permission-diff-bot"
+
+
+def _commit_activity(project: Path, at: datetime) -> None:
+    import os
+
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture activity",
+        ],
+        cwd=project,
+        capture_output=True,
+        check=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_DATE": at.isoformat(),
+            "GIT_COMMITTER_DATE": at.isoformat(),
+        },
+    )
+
+
+def _clock_workspace(
+    transition_workspace: tuple[Path, Path, Path],
+    *,
+    operating_path: str = "finish",
+    category: str = "vanity",
+) -> tuple[Path, Path, Path]:
+    workspace, catalog, output = transition_workspace
+    _git_project(workspace, "agent-permission-diff-bot", CLOCK_REPO)
+    _commit_activity(workspace / "agent-permission-diff-bot", ACTIVITY_AT)
+    with catalog.open("a") as handle:
+        handle.write(
+            f"\n  agent-permission-diff-bot:\n    lifecycle_state: maintenance\n    operating_path: {operating_path}\n    category: {category}\n"
+        )
+    return workspace, catalog, output
+
+
+def _clock_publish(
+    workspace: Path,
+    catalog: Path,
+    output: Path,
+    required: tuple[str, ...],
+    *,
+    metadata: dict | None = None,
+):
+    metadata = _metadata(RECEIPT_AT) if metadata is None else metadata
+    metadata["cohort_repository_count"] = len(required)
+    alerts = validate_security_coverage_receipt(
+        _sign(_legacy_receipt_payload(required, now=RECEIPT_AT)),
+        max_age_hours=24,
+        expected_cohort_count=len(required),
+        now=RUN_AT,
+    ).entries_by_full_name
+    return _publish(
+        workspace,
+        catalog,
+        output,
+        security_alerts_by_name=alerts,
+        security_coverage_metadata=metadata,
+        security_cohort_required=required,
+        security_cohort_outgoing=(),
+        security_cohort_transition=_transition(kind="steady", prior_truth_sha256=None),
+        now=RUN_AT,
+    )
+
+
+def test_receipt_clock_crossing_is_pending_and_is_published(
+    transition_workspace: tuple[Path, Path, Path],
+) -> None:
+    workspace, catalog, output = _clock_workspace(transition_workspace)
+    _clock_publish(workspace, catalog, output, ("d/Alpha",))
+    truth = json.loads((output / "portfolio-truth-latest.json").read_text())
+    clock = truth["source_summary"]["security_coverage_clock"]
+    assert clock["pending_security_coverage_repositories"] == [CLOCK_REPO]
+    assert clock["pending_security_coverage_count"] == 1
+    project = next(
+        p for p in truth["projects"] if p["identity"]["repo_full_name"] == CLOCK_REPO
+    )
+    assert project["derived"]["attention_state"] == "decision-needed"
+    assert project["security"]["cohort_member"] is False
+    assert project["security"]["coverage_state"] == "unknown"
+    assert (
+        "**Pending security coverage**: `d/agent-permission-diff-bot`"
+        in (workspace / "PORTFOLIO-AUDIT-REPORT.md").read_text()
+    )
+    transition = json.loads(
+        (output / PORTFOLIO_COHORT_TRANSITION_FILENAME).read_text()
+    )["transition"]
+    assert transition["pending_security_coverage_repositories"] == [CLOCK_REPO]
+    assert not list(output.glob("portfolio-cohort-r3-failure-*.json"))
+    # The additive summary remains readable as prior truth for the next planner/run.
+    from github_repo_auditor.portfolio_truth_publish import load_prior_security_evidence
+
+    prior = load_prior_security_evidence(
+        output / "portfolio-truth-latest.json", security_max_age_hours=24
+    )
+    assert CLOCK_REPO in prior.final_cohort_repositories
+    assert CLOCK_REPO not in prior.alerts_by_full_name
+
+
+@pytest.mark.parametrize("failure", ["moved-head", "gap", "reclassification"])
+def test_non_clock_r3_failure_writes_metadata_and_preserves_truth(
+    transition_workspace: tuple[Path, Path, Path],
+    failure: str,
+) -> None:
+    workspace, catalog, output = _clock_workspace(transition_workspace)
+    _publish(workspace, catalog, output, now=RECEIPT_AT - timedelta(hours=1))
+    latest = output / "portfolio-truth-latest.json"
+    before = latest.read_bytes()
+    import hashlib
+
+    metadata = _metadata(RECEIPT_AT)
+    # Binding the prior truth is independently strict; pass the actual digest.
+    transition = _transition(
+        kind="steady", prior_truth_sha256=hashlib.sha256(before).hexdigest()
+    )
+    if failure == "moved-head":
+        _commit_activity(
+            workspace / "agent-permission-diff-bot", RECEIPT_AT - timedelta(minutes=1)
+        )
+        required = (
+            "d/Alpha",
+            CLOCK_REPO,
+        )  # collection planned when this input was stale
+        expected_side = "receipt_only"
+    else:
+        if failure == "reclassification":
+            catalog.write_text(
+                catalog.read_text()
+                .replace("category: vanity\n", "category: infrastructure\n")
+                .replace("operating_path: finish", "operating_path: maintain")
+                .replace("lifecycle_state: maintenance", "lifecycle_state: active")
+            )
+        else:
+            _commit_activity(
+                workspace / "agent-permission-diff-bot",
+                ACTIVITY_AT - timedelta(hours=1),
+            )
+        required = ("d/Alpha",)
+        expected_side = "derived_only"
+    metadata["cohort_repository_count"] = len(required)
+    alerts = validate_security_coverage_receipt(
+        _sign(_legacy_receipt_payload(required, now=RECEIPT_AT)),
+        max_age_hours=24,
+        expected_cohort_count=len(required),
+        now=RUN_AT,
+    ).entries_by_full_name
+    with pytest.raises(CohortR3Error, match=expected_side) as caught:
+        _publish(
+            workspace,
+            catalog,
+            output,
+            security_alerts_by_name=alerts,
+            security_coverage_metadata=metadata,
+            security_cohort_required=required,
+            security_cohort_outgoing=(),
+            security_cohort_transition=transition,
+            now=RUN_AT,
+        )
+    assert latest.read_bytes() == before
+    artifacts = list(output.glob("portfolio-cohort-r3-failure-*.json"))
+    assert len(artifacts) == 1
+    assert str(artifacts[0]) in str(caught.value)
+    diagnostic = json.loads(artifacts[0].read_text())
+    assert diagnostic["receipt"]["receipt_id"] == metadata["receipt_id"]
+    assert diagnostic["receipt"]["produced_at"] == RECEIPT_AT.isoformat()
+    assert diagnostic["evaluation_clock"] == RECEIPT_AT.isoformat()
+    assert diagnostic["run_clock"] == RUN_AT.isoformat()
+    assert diagnostic["required_repositories"] == sorted(required, key=str.lower)
+    row = next(
+        row
+        for row in diagnostic["differing_repositories"]
+        if row["repository"] == CLOCK_REPO
+    )
+    assert row["activity_source"] == "git"
+    assert row["local_head"] is not None
+    assert row["classification"]["operating_path"] in {"finish", "maintain"}
+    if failure == "moved-head":
+        assert (
+            row["activity_timestamp"] == (RECEIPT_AT - timedelta(minutes=1)).isoformat()
+        )
+        assert row["attention_as_of_receipt"] == row["attention_now"] == "manual-only"
+    else:
+        assert row["attention_as_of_receipt"] in {"decision-needed", "active-infra"}
+
+
+def test_clock_departure_is_covered_and_recorded(
+    transition_workspace: tuple[Path, Path, Path],
+) -> None:
+    workspace, catalog, output = _clock_workspace(
+        transition_workspace, operating_path="maintain", category="commercial"
+    )
+    _clock_publish(
+        workspace,
+        catalog,
+        output,
+        tuple(sorted(("d/Alpha", CLOCK_REPO), key=str.lower)),
+    )
+    truth = json.loads((output / "portfolio-truth-latest.json").read_text())
+    clock = truth["source_summary"]["security_coverage_clock"]
+    assert clock["clock_departed_repositories"] == [CLOCK_REPO]
+    assert clock["pending_security_coverage_repositories"] == []
+    transition = json.loads(
+        (output / PORTFOLIO_COHORT_TRANSITION_FILENAME).read_text()
+    )["transition"]
+    assert (
+        transition["clock_departed_repositories"]
+        == transition["departed_repositories"]
+        == [CLOCK_REPO]
+    )
+    assert (
+        "Covered by the receipt; left default attention"
+        in (workspace / "PORTFOLIO-AUDIT-REPORT.md").read_text()
+    )
+
+
+@pytest.mark.parametrize("receipt_time", [None, "broken", "2026-10-11T08:31:57"])
+def test_invalid_receipt_time_fails_closed_with_diagnostics(
+    transition_workspace: tuple[Path, Path, Path],
+    receipt_time: str | None,
+) -> None:
+    workspace, catalog, output = _clock_workspace(transition_workspace)
+    metadata = _metadata(RECEIPT_AT)
+    if receipt_time is None:
+        metadata.pop("produced_at")
+    else:
+        metadata["produced_at"] = receipt_time
+    with pytest.raises(CohortR3Error, match="R3 requires.*observation time") as caught:
+        _clock_publish(workspace, catalog, output, ("d/Alpha",), metadata=metadata)
+    artifacts = list(output.glob("portfolio-cohort-r3-failure-*.json"))
+    assert len(artifacts) == 1
+    assert str(artifacts[0]) in str(caught.value)
+    assert json.loads(artifacts[0].read_text())["evaluation_clock"] is None
+    assert not (output / "portfolio-truth-latest.json").exists()
+
+
+def test_clock_entering_declared_outgoing_still_fails_r4() -> None:
+    with pytest.raises(ValueError, match="outgoing repositories that are still"):
+        _validate_security_receipt_cohort_identity(
+            projects=_projects(("d/Alpha", CLOCK_REPO)),
+            candidate_projects=[
+                _project("d/Alpha"),
+                _project(CLOCK_REPO, state="manual-only"),
+            ],
+            current_candidate_projects=_projects(("d/Alpha", CLOCK_REPO)),
+            security_alerts_by_name=_receipt(("d/Alpha", CLOCK_REPO)),
+            required_repositories=("d/Alpha",),
+            outgoing_repositories=(CLOCK_REPO,),
+            transition=_transition(kind="shrink", outgoing=(CLOCK_REPO,)),
+        )
+
+
+def test_current_security_retention_is_not_reported_as_clock_departure() -> None:
+    outcome = _validate_security_receipt_cohort_identity(
+        projects=[_project(CLOCK_REPO, state="decision-needed")],
+        candidate_projects=[_project(CLOCK_REPO, state="active-product")],
+        current_candidate_projects=[_project(CLOCK_REPO, state="parked")],
+        receipt_final_projects=[_project(CLOCK_REPO, state="decision-needed")],
+        security_alerts_by_name=_receipt((CLOCK_REPO,), **{CLOCK_REPO: _entry(high=1)}),
+        required_repositories=(CLOCK_REPO,),
+        outgoing_repositories=(),
+        transition=_transition(kind="steady"),
+    )
+    assert outcome.final == (CLOCK_REPO,)
+    assert outcome.clock_departed == ()
+    assert outcome.departed == ()

@@ -3392,7 +3392,7 @@ def test_empty_security_metadata_cannot_bypass_cohort_identity(
     catalog_path = tmp_path / "portfolio-catalog.yaml"
     catalog_path.write_text("repos: {}\n")
 
-    with pytest.raises(ValueError, match="expected 1, observed 0"):
+    with pytest.raises(ValueError, match="R3 requires.*observation time"):
         build_portfolio_truth_snapshot(
             workspace_root=workspace,
             catalog_path=catalog_path,
