@@ -9,8 +9,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import github_repo_auditor.portfolio_generation as generation
-
 from github_repo_auditor.portfolio_generation import (
     _terminal_observed_in_order,
     ArtifactInput,
@@ -189,7 +187,9 @@ class PortfolioGenerationTests(unittest.TestCase):
                 else:
                     identity[field] = value
                 truth_path.write_text(json.dumps(payload))
-                with patch.object(generation, "_crash_if_requested") as crash_check:
+                with patch(
+                    "github_repo_auditor.portfolio_generation._crash_if_requested"
+                ) as crash_check:
                     with self.assertRaisesRegex(PortfolioGenerationError, message):
                         publish_generation(
                             root=root,
@@ -325,8 +325,9 @@ class PortfolioGenerationTests(unittest.TestCase):
                     if step == "after_artifacts_written":
                         truth_path.write_bytes(invalid if stage_valid else valid)
 
-                with patch.object(
-                    generation, "_crash_if_requested", side_effect=change_source
+                with patch(
+                    "github_repo_auditor.portfolio_generation._crash_if_requested",
+                    side_effect=change_source,
                 ):
                     if stage_valid:
                         result = publish_generation(

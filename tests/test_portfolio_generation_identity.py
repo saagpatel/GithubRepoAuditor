@@ -27,10 +27,6 @@ from github_repo_auditor.portfolio_cohort_plan_contract import (
     build_cohort_plan_payload,
     validate_cohort_plan,
 )
-from github_repo_auditor.portfolio_decision_queue import (
-    build_decision_digest,
-    render_decision_digest_markdown,
-)
 from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from github_repo_auditor.portfolio_truth_validate import (
     _snapshot_from_payload,
@@ -297,11 +293,26 @@ def build_fixture(root: Path, *, clock: datetime | None = None) -> dict[str, Any
             truth["inputs"]["github_security"]["receipt_id"]
             == admissions["A"]["receipt_id"]
         )
-        digest = build_decision_digest(truth)
-        _write(folder / "decision-queue-v2.json", digest)
+        # Companion files are explicitly synthetic opaque publication artifacts.
+        # This test validates canonical truth, identity binding and byte retention;
+        # decision-digest semantics belong to the digest builder's own tests.
+        _write(
+            folder / "decision-queue-v2.json",
+            {
+                "contract_version": "portfolio_decision_digest_v2",
+                "fixture": "offline publication companion",
+                "source": {
+                    "github_security_receipt_id": admissions["A"]["receipt_id"],
+                    "portfolio_truth_sha256": _stamp(folder / "portfolio-truth.json")[
+                        "sha256"
+                    ],
+                },
+                "decision_queue": [],
+            },
+        )
         _write(
             folder / "portfolio-digest.md",
-            render_decision_digest_markdown(digest).encode(),
+            b"# Offline publication companion\n\nSynthetic artifact fixture.\n",
         )
         validated.append(marker)
     config = {
