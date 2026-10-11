@@ -1894,6 +1894,7 @@ def collect_security_coverage(
             "incoming": list(cohort_plan.incoming_repositories),
             "outgoing": list(cohort_plan.outgoing_repositories),
             "plan_id": cohort_plan.plan_id,
+            "plan_generated_at": cohort_plan.generated_at,
             "prior_truth_sha256": cohort_plan.prior_truth_sha256,
         }
         expected_count = len(cohort)
@@ -2783,6 +2784,11 @@ def _validate_receipt_cohort_transition(
     plan_id = transition.get("plan_id")
     if not isinstance(plan_id, str) or not _RECEIPT_ID_RE.fullmatch(plan_id):
         raise SecurityCoverageError("cohort transition plan_id must be a sha256 identity")
+    if "plan_generated_at" in transition:
+        _parse_datetime(
+            transition["plan_generated_at"],
+            field_name="cohort.transition.plan_generated_at",
+        )
     prior_truth_sha256 = transition.get("prior_truth_sha256")
     if not isinstance(prior_truth_sha256, str) or not _SHA256_RE.fullmatch(
         prior_truth_sha256

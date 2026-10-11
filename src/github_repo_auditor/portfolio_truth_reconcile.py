@@ -644,10 +644,12 @@ class MaterializationContext:
 
     Both callers must derive candidate attention from one implementation or the
     two derivations drift, which is the failure this contract exists to prevent.
+    `now` is the derivation clock; `observed_at` records current local evidence.
     """
 
     workspace_root: Path
     now: datetime
+    observed_at: datetime
     catalog_data: dict[str, Any]
     legacy_rows: dict[str, dict[str, str]]
     notion_context: dict[str, dict[str, str]]
@@ -673,6 +675,7 @@ class MaterializationContext:
                 legacy_rows=self.legacy_rows,
                 notion_context=self.notion_context,
                 now=self.now,
+                observed_at=self.observed_at,
                 workspace_root=self.workspace_root,
                 release_count_by_name=self.release_count_by_name,
                 degraded_dimensions_by_name=self.degraded_dimensions_by_name,
@@ -699,6 +702,7 @@ def build_materialization_context(
     include_notion: bool = True,
     notion_context_fallback: dict[str, dict[str, str]] | None = None,
     now: datetime | None = None,
+    observed_at: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     degraded_dimensions_by_name: dict[str, list[str]] | None = None,
     prior_notion_generated_at: str | None = None,
@@ -744,6 +748,7 @@ def build_materialization_context(
     return MaterializationContext(
         workspace_root=workspace_root,
         now=now,
+        observed_at=observed_at or now,
         catalog_data=catalog_data,
         legacy_rows=legacy_rows,
         notion_context=notion_context,
@@ -819,18 +824,28 @@ def build_portfolio_truth_snapshot(
     producer: dict[str, Any] | None = None,
     prior_notion_generated_at: str | None = None,
 ) -> PortfolioTruthBuildResult:
+    now = now or datetime.now(timezone.utc)
+    materialization_now = now
+    if security_coverage_metadata is not None and security_alerts_by_name is not None:
+        plan_generated_at = (security_cohort_transition or {}).get("plan_generated_at")
+        if plan_generated_at is not None:
+            materialization_now = datetime.fromisoformat(
+                plan_generated_at.replace("Z", "+00:00")
+            )
+        # Older receipts lack the plan clock: retain wall-clock derivation for
+        # compatibility. Freshness and observation times always use `now`.
     context = build_materialization_context(
         workspace_root=workspace_root,
         catalog_path=catalog_path,
         legacy_registry_path=legacy_registry_path,
         include_notion=include_notion,
         notion_context_fallback=notion_context_fallback,
-        now=now,
+        now=materialization_now,
+        observed_at=now,
         release_count_by_name=release_count_by_name,
         degraded_dimensions_by_name=degraded_dimensions_by_name,
         prior_notion_generated_at=prior_notion_generated_at,
     )
-    now = context.now
     catalog_data = context.catalog_data
     legacy_rows = context.legacy_rows
     notion_context = context.notion_context
@@ -1180,6 +1195,7 @@ def _build_truth_project(
     notion_context: dict[str, dict[str, str]],
     now: datetime,
     workspace_root: Path,
+    observed_at: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     degraded_dimensions_by_name: dict[str, list[str]] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
@@ -1564,14 +1580,14 @@ def _build_truth_project(
     repository_state = (
         observe_repository_state(
             project_path,
-            observed_at=now,
+            observed_at=observed_at or now,
             remote_default_branch=remote_default_branch,
             workspace_root=workspace_root,
         )
         if project_path is not None and has_git
         else {
             "state": "not_a_repository",
-            "observed_at": now.isoformat(),
+            "observed_at": (observed_at or now).isoformat(),
             "remote_default_branch": remote_default_branch
             or {
                 "state": "unknown",

@@ -57,6 +57,17 @@ named.
 producer both call it; `tests/test_portfolio_cohort_plan.py` asserts that, because
 two equivalent algorithms would silently drift apart and reproduce the deadlock.
 
+The collector carries the plan's `generated_at` as the optional
+`cohort.transition.plan_generated_at` receipt field. Publication derives both
+the pre-security candidate (R3) and final attention (R5) at that instant, so a
+recency boundary between planning and publication cannot change membership by
+itself. Current source is still read and exact set equality still rejects a
+catalog or repository membership change. Receipt freshness, provider age
+checks, local observation timestamps, and snapshot generation use the
+publication clock. Older receipts without this field retain wall-clock
+derivation. This is an additive extension of `GitHubSecurityCoverageReceiptV1`;
+the field, when present, must be a timestamp with a timezone.
+
 ## Departure evidence
 
 A repository may leave the published default-attention cohort only with positive

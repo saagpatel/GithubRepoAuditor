@@ -7,6 +7,7 @@ failure straight back to the transition class it protects.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -389,12 +390,14 @@ def _transition_receipt_payload(
     producer_commit: str = "a" * 40,
     prior_truth_sha256: str = "b" * 64,
     now: datetime = NOW,
+    plan_generated_at: datetime = NOW,
 ) -> dict:
     plan = _plan(
         prospective=prospective,
         prior=prior,
         producer_commit=producer_commit,
         prior_truth_sha256=prior_truth_sha256,
+        generated_at=plan_generated_at,
     )
     return collect_security_coverage(
         _truth_payload(plan.collection_repositories),
@@ -440,9 +443,10 @@ def _plan(
     prior: tuple[str, ...],
     producer_commit: str = "a" * 40,
     prior_truth_sha256: str = "b" * 64,
+    generated_at: datetime = NOW,
 ):
     payload = build_cohort_plan_payload(
-        generated_at=NOW,
+        generated_at=generated_at,
         producer_commit=producer_commit,
         producer_repository="saagpatel/GithubRepoAuditor",
         catalog_sha256="c" * 64,
@@ -894,6 +898,27 @@ def test_required_and_outgoing_must_be_disjoint() -> None:
         )
 
 
+def test_collector_carries_plan_instant_through_receipt_validation() -> None:
+    plan_at = NOW - timedelta(minutes=30)
+    payload = _transition_receipt_payload(
+        prospective=ELEVEN, prior=ELEVEN, plan_generated_at=plan_at
+    )
+    loaded = validate_security_coverage_receipt(
+        payload, expected_cohort_count=None, max_cohort_size=24, now=NOW
+    )
+    assert loaded.transition["plan_generated_at"] == plan_at.isoformat()
+
+
+@pytest.mark.parametrize("value", [None, "invalid", "2026-10-11T08:30:00", 123])
+def test_receipt_rejects_invalid_plan_instant(value: object) -> None:
+    payload = _transition_receipt_payload(prospective=ELEVEN, prior=ELEVEN)
+    payload["cohort"]["transition"]["plan_generated_at"] = value
+    with pytest.raises(SecurityCoverageError, match="plan_generated_at"):
+        validate_security_coverage_receipt(
+            _sign(payload), expected_cohort_count=None, max_cohort_size=24, now=NOW
+        )
+
+
 # --------------------------------------------------------------------------
 # 12 / 19 / 21 — publication-level transaction cases
 # --------------------------------------------------------------------------
@@ -997,6 +1022,124 @@ def _truth_alerts() -> dict:
         now=NOW,
     )
     return loaded.entries_by_full_name
+
+
+PLAN_AT = datetime(2026, 10, 11, 8, 30, tzinfo=timezone.utc)
+CHECK_AT = datetime(2026, 10, 11, 9, 0, tzinfo=timezone.utc)
+LAST_ACTIVITY = datetime(2026, 9, 10, 8, 59, 40, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def recency_transition_workspace(
+    transition_workspace: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, Path]:
+    import github_repo_auditor.portfolio_truth_sources as sources
+
+    workspace, catalog, output_dir = transition_workspace
+    _git_project(workspace, "Beta", "d/Beta")
+    with catalog.open("a") as handle:
+        handle.write(
+            "  Beta:\n    owner: d\n    lifecycle_state: active\n"
+            "    operating_path: finish\n    category: vanity\n"
+        )
+    gather_git_facts = sources._gather_git_facts
+
+    def fixed_git_facts(project_path: Path) -> dict:
+        facts = gather_git_facts(project_path)
+        if project_path.name == "Beta":
+            facts["last_commit_at"] = LAST_ACTIVITY
+        return facts
+
+    monkeypatch.setattr(sources, "_gather_git_facts", fixed_git_facts)
+    _publish(workspace, catalog, output_dir, now=PLAN_AT - timedelta(hours=1))
+    return workspace, catalog, output_dir
+
+
+def _publish_recency_receipt(
+    workspace: Path,
+    catalog: Path,
+    output_dir: Path,
+    *,
+    carry_plan_time: bool = True,
+    check_at: datetime = CHECK_AT,
+) -> None:
+    payload = _transition_receipt_payload(
+        prospective=("d/Alpha",),
+        prior=("d/Alpha",),
+        now=PLAN_AT,
+        plan_generated_at=PLAN_AT,
+        prior_truth_sha256=hashlib.sha256(
+            (output_dir / "portfolio-truth-latest.json").read_bytes()
+        ).hexdigest(),
+    )
+    if not carry_plan_time:
+        del payload["cohort"]["transition"]["plan_generated_at"]
+    loaded = validate_security_coverage_receipt(
+        _sign(payload), expected_cohort_count=None, max_cohort_size=24, now=CHECK_AT
+    )
+    metadata = _metadata(PLAN_AT)
+    metadata["age_hours"] = loaded.age_hours
+    _publish(
+        workspace,
+        catalog,
+        output_dir,
+        security_alerts_by_name=loaded.entries_by_full_name,
+        security_coverage_metadata=metadata,
+        security_cohort_required=loaded.required_repositories,
+        security_cohort_outgoing=loaded.outgoing_repositories,
+        security_cohort_transition=loaded.transition,
+        now=check_at,
+    )
+
+
+def test_plan_clock_keeps_recency_cliff_outside_r3_and_r5(
+    recency_transition_workspace: tuple[Path, Path, Path],
+) -> None:
+    workspace, catalog, output_dir = recency_transition_workspace
+    assert (PLAN_AT - LAST_ACTIVITY).days == 30
+    assert (CHECK_AT - LAST_ACTIVITY).days == 31
+    _publish_recency_receipt(workspace, catalog, output_dir)
+    truth = json.loads((output_dir / "portfolio-truth-latest.json").read_text())
+    beta = next(p for p in truth["projects"] if p["identity"]["display_name"] == "Beta")
+    assert beta["derived"]["activity_status"] == "recent"
+    assert beta["derived"]["attention_state"] == "manual-only"
+    assert beta["repository_state"]["observed_at"] == CHECK_AT.isoformat()
+    assert truth["generated_at"] == CHECK_AT.isoformat()
+    assert truth["inputs"]["github_security"]["age_hours"] == 0.5
+    outcome = json.loads(
+        (output_dir / PORTFOLIO_COHORT_TRANSITION_FILENAME).read_text()
+    )["transition"]
+    assert outcome["required_repositories"] == ["d/Alpha"]
+    assert outcome["final_repositories"] == ["d/Alpha"]
+
+
+def test_receipt_without_plan_clock_retains_wall_clock_r3_failure(
+    recency_transition_workspace: tuple[Path, Path, Path],
+) -> None:
+    with pytest.raises(ValueError, match=r"derived_only=\['d/Beta'\]"):
+        _publish_recency_receipt(*recency_transition_workspace, carry_plan_time=False)
+
+
+def test_plan_clock_does_not_hide_real_catalog_membership_change(
+    recency_transition_workspace: tuple[Path, Path, Path],
+) -> None:
+    workspace, catalog, output_dir = recency_transition_workspace
+    catalog.write_text(
+        catalog.read_text().replace("category: vanity", "category: commercial")
+    )
+    with pytest.raises(ValueError, match=r"derived_only=\['d/Beta'\]"):
+        _publish_recency_receipt(workspace, catalog, output_dir)
+
+
+def test_plan_clock_does_not_extend_receipt_freshness_at_publication(
+    recency_transition_workspace: tuple[Path, Path, Path],
+) -> None:
+    # Evidence validated as fresh at load time must fail once it exceeds the
+    # publication's 24-hour window, even though derivation stays at PLAN_AT.
+    with pytest.raises(ValueError, match="configured freshness window"):
+        _publish_recency_receipt(
+            *recency_transition_workspace, check_at=PLAN_AT + timedelta(hours=25)
+        )
 
 
 def test_case_12_prior_truth_replaced_between_collection_and_production(

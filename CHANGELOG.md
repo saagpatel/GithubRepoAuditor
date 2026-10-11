@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Derive receipt-backed security cohort and final attention at the cohort plan's
+  instant, preserving wall-clock freshness checks and legacy receipt behavior.
 - Clarify locked contributor setup, optional test dependencies, and credential-free fixture verification without workstation discovery.
 
 ### Added
