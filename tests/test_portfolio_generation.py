@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
+
+import github_repo_auditor.portfolio_generation as generation
 
 from github_repo_auditor.portfolio_generation import (
     _terminal_observed_in_order,
@@ -75,7 +79,18 @@ class PortfolioGenerationTests(unittest.TestCase):
         digest = self.base / f"digest-{marker}.json"
         markdown = self.base / f"digest-{marker}.md"
         truth.write_text(
-            json.dumps({"schema_version": "0.12.0", "marker": marker})
+            json.dumps(
+                {
+                    "schema_version": "0.12.0",
+                    "marker": marker,
+                    "inputs": {
+                        "github_security": {
+                            "receipt_id": security().receipt_id,
+                            "content_sha256": security().content_sha256,
+                        }
+                    },
+                }
+            )
         )
         digest.write_text(
             json.dumps(
@@ -125,6 +140,280 @@ class PortfolioGenerationTests(unittest.TestCase):
         self.assertEqual(pointer["current"]["generation_id"], second.generation_id)
         self.assertEqual(pointer["previous"]["generation_id"], first.generation_id)
         self.assertEqual(resolve_current(root).manifest_sha256, second.manifest_sha256)
+        manifest = json.loads((second.generation_dir / "manifest.json").read_bytes())
+        truth = json.loads(
+            (second.generation_dir / "portfolio-truth.json").read_bytes()
+        )
+        for field in ("receipt_id", "content_sha256"):
+            self.assertEqual(
+                truth["inputs"]["github_security"][field],
+                manifest["github_security"][field],
+            )
+
+    def test_invalid_truth_identity_preserves_pointer_and_visible_generations(
+        self,
+    ) -> None:
+        root = self.base / "managed"
+        self.publish(root, "one", when=CREATED)
+        pointer_before = (root / "pointer.json").read_bytes()
+        releases_before = {
+            path.relative_to(root): path.read_bytes()
+            for path in (root / "releases").rglob("*")
+            if path.is_file()
+        }
+        cases = []
+        for field in ("receipt_id", "content_sha256"):
+            for value in (
+                None,
+                True,
+                7,
+                [],
+                {},
+                "",
+                "invalid",
+                " " + getattr(security(), field),
+            ):
+                cases.append((field, value, "invalid"))
+            cases.append((field, "missing", "invalid"))
+            cases.append((field, getattr(security(), field).upper(), "invalid"))
+            wrong = "sha256:" + "f" * 64 if field == "receipt_id" else "f" * 64
+            cases.append((field, wrong, f"{field} mismatch"))
+        for index, (field, value, message) in enumerate(cases):
+            with self.subTest(field=field, value=value):
+                artifacts = self.inputs(f"invalid-{index}")
+                truth_path = artifacts[0].source
+                payload = json.loads(truth_path.read_bytes())
+                identity = payload["inputs"]["github_security"]
+                if value == "missing":
+                    del identity[field]
+                else:
+                    identity[field] = value
+                truth_path.write_text(json.dumps(payload))
+                with patch.object(generation, "_crash_if_requested") as crash_check:
+                    with self.assertRaisesRegex(PortfolioGenerationError, message):
+                        publish_generation(
+                            root=root,
+                            artifacts=artifacts,
+                            producer=producer(),
+                            security=security(),
+                            created_at=CREATED + timedelta(minutes=1),
+                        )
+                steps = [call.args[0] for call in crash_check.call_args_list]
+                self.assertNotIn("after_generation_visible", steps)
+                self.assertEqual((root / "pointer.json").read_bytes(), pointer_before)
+                self.assertEqual(
+                    {
+                        path.relative_to(root): path.read_bytes()
+                        for path in (root / "releases").rglob("*")
+                        if path.is_file()
+                    },
+                    releases_before,
+                )
+                self.assertFalse(list(root.glob(".portfolio-generation-stage-*")))
+
+    def test_malformed_truth_and_input_objects_are_refused(self) -> None:
+        cases = [
+            (b"{", "not valid JSON"),
+            (b"\xff", "not valid JSON"),
+            (b"[]", "must be a JSON object"),
+            (b"null", "must be a JSON object"),
+            (b"true", "must be a JSON object"),
+            (b'"truth"', "must be a JSON object"),
+            (b'{"schema_version":"0.11.0"}', "schema mismatch"),
+            (b"{}", "schema mismatch"),
+        ]
+        for value in (None, True, "invalid", [], {}):
+            cases.append(
+                (
+                    json.dumps({"schema_version": "0.12.0", "inputs": value}).encode(),
+                    "inputs(\\.github_security)? must be a JSON object",
+                )
+            )
+            cases.append(
+                (
+                    json.dumps(
+                        {
+                            "schema_version": "0.12.0",
+                            "inputs": {"github_security": value},
+                        }
+                    ).encode(),
+                    "(must be a JSON object|receipt_id is invalid)",
+                )
+            )
+        cases.append((b'{"schema_version":"0.12.0"}', "inputs must be a JSON object"))
+        for index, (content, message) in enumerate(cases):
+            with self.subTest(content=content):
+                root = self.base / f"malformed-{index}"
+                artifacts = self.inputs(f"malformed-{index}")
+                artifacts[0].source.write_bytes(content)
+                with self.assertRaisesRegex(PortfolioGenerationError, message):
+                    publish_generation(
+                        root=root,
+                        artifacts=artifacts,
+                        producer=producer(),
+                        security=security(),
+                        created_at=CREATED,
+                    )
+                self.assertFalse((root / "pointer.json").exists())
+                self.assertFalse(list((root / "releases").iterdir()))
+
+    def test_canonical_truth_artifact_and_contract_are_required(self) -> None:
+        cases = (
+            (
+                None,
+                "application/json",
+                "ghra.portfolio_truth@0.12.0",
+                "artifact is required",
+            ),
+            (
+                "truth.json",
+                "application/json",
+                "ghra.portfolio_truth@0.12.0",
+                "artifact is required",
+            ),
+            (
+                "portfolio-truth.json",
+                "text/plain",
+                "ghra.portfolio_truth@0.12.0",
+                "contract mismatch",
+            ),
+            (
+                "portfolio-truth.json",
+                "application/json",
+                "ghra.portfolio_truth@0.11.0",
+                "contract mismatch",
+            ),
+        )
+        for index, (name, media_type, contract_version, message) in enumerate(cases):
+            with self.subTest(
+                name=name, media_type=media_type, contract=contract_version
+            ):
+                root = self.base / f"contract-{index}"
+                artifacts = self.inputs(f"contract-{index}")
+                if name is None:
+                    artifacts = artifacts[1:]
+                else:
+                    artifacts[0] = ArtifactInput(
+                        name, artifacts[0].source, media_type, contract_version
+                    )
+                with self.assertRaisesRegex(PortfolioGenerationError, message):
+                    publish_generation(
+                        root=root,
+                        artifacts=artifacts,
+                        producer=producer(),
+                        security=security(),
+                        created_at=CREATED,
+                    )
+                self.assertFalse((root / "pointer.json").exists())
+                self.assertFalse(list((root / "releases").iterdir()))
+
+    def test_truth_identity_check_uses_staged_bytes(self) -> None:
+        for stage_valid in (False, True):
+            with self.subTest(stage_valid=stage_valid):
+                root = self.base / f"staged-{stage_valid}"
+                artifacts = self.inputs(f"staged-{stage_valid}")
+                truth_path = artifacts[0].source
+                valid = truth_path.read_bytes()
+                invalid_payload = json.loads(valid)
+                invalid_payload["inputs"]["github_security"]["receipt_id"] = (
+                    "sha256:" + "f" * 64
+                )
+                invalid = json.dumps(invalid_payload).encode()
+                truth_path.write_bytes(valid if stage_valid else invalid)
+
+                def change_source(step: str) -> None:
+                    if step == "after_artifacts_written":
+                        truth_path.write_bytes(invalid if stage_valid else valid)
+
+                with patch.object(
+                    generation, "_crash_if_requested", side_effect=change_source
+                ):
+                    if stage_valid:
+                        result = publish_generation(
+                            root=root,
+                            artifacts=artifacts,
+                            producer=producer(),
+                            security=security(),
+                            created_at=CREATED,
+                        )
+                        self.assertEqual(
+                            (
+                                result.generation_dir / "portfolio-truth.json"
+                            ).read_bytes(),
+                            valid,
+                        )
+                    else:
+                        with self.assertRaisesRegex(
+                            PortfolioGenerationError, "receipt_id mismatch"
+                        ):
+                            publish_generation(
+                                root=root,
+                                artifacts=artifacts,
+                                producer=producer(),
+                                security=security(),
+                                created_at=CREATED,
+                            )
+                        self.assertFalse((root / "pointer.json").exists())
+                        self.assertFalse(list((root / "releases").iterdir()))
+
+    def test_legacy_truth_history_stays_readable_through_publish_and_swap(self) -> None:
+        root = self.base / "managed"
+        original = self.publish(root, "legacy", when=CREATED)
+        legacy_truth = json.dumps(
+            {"schema_version": "0.11.0", "marker": "legacy"}
+        ).encode()
+        (original.generation_dir / "portfolio-truth.json").write_bytes(legacy_truth)
+        manifest = json.loads((original.generation_dir / "manifest.json").read_bytes())
+        for record in manifest["artifacts"]:
+            if record["name"] == "portfolio-truth.json":
+                record["sha256"] = hashlib.sha256(legacy_truth).hexdigest()
+                record["size_bytes"] = len(legacy_truth)
+                record["contract_version"] = "ghra.portfolio_truth@0.11.0"
+        core = {
+            key: value
+            for key, value in manifest.items()
+            if key not in {"generation_id", "content_identity_sha256"}
+        }
+
+        def canonical_bytes(value: object) -> bytes:
+            return (
+                json.dumps(
+                    value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                )
+                + "\n"
+            ).encode()
+
+        identity = hashlib.sha256(canonical_bytes(core)).hexdigest()
+        legacy_id = f"portfolio-generation-{identity[:16]}"
+        manifest["generation_id"] = legacy_id
+        manifest["content_identity_sha256"] = identity
+        manifest_bytes = canonical_bytes(manifest)
+        (original.generation_dir / "manifest.json").write_bytes(manifest_bytes)
+        legacy_dir = original.generation_dir.with_name(legacy_id)
+        original.generation_dir.rename(legacy_dir)
+        pointer = json.loads((root / "pointer.json").read_bytes())
+        pointer["current"] = {
+            "generation_id": legacy_id,
+            "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        }
+        (root / "pointer.json").write_bytes(canonical_bytes(pointer))
+        self.assertEqual(resolve_current(root).generation_id, legacy_id)
+        fresh = self.publish(root, "fresh", when=CREATED + timedelta(minutes=1))
+        self.assertEqual(read_pointer(root)["previous"]["generation_id"], legacy_id)
+        self.assertEqual(
+            (legacy_dir / "portfolio-truth.json").read_bytes(), legacy_truth
+        )
+        rolled_back = swap_current_previous(
+            root, updated_at=CREATED + timedelta(minutes=2)
+        )
+        self.assertEqual(rolled_back["current"]["generation_id"], legacy_id)
+        self.assertEqual(resolve_current(root).generation_id, legacy_id)
+        rolled_forward = swap_current_previous(
+            root, updated_at=CREATED + timedelta(minutes=3)
+        )
+        self.assertEqual(
+            rolled_forward["current"]["generation_id"], fresh.generation_id
+        )
 
     def test_process_death_never_leaves_an_invalid_pointer(self):
         steps = (

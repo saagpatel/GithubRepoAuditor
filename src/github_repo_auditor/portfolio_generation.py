@@ -552,6 +552,72 @@ def _pointer_entry(value: object, *, field: str) -> dict[str, str] | None:
     }
 
 
+def _validate_staged_truth_security(
+    stage: Path, *, manifest: Mapping[str, Any]
+) -> None:
+    """Bind newly published truth to its admitted security receipt identity.
+
+    This publication-only check deliberately leaves historical generation
+    readback compatible with truth written before immutable input identities.
+    """
+    from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
+
+    truth_record = next(
+        (
+            record
+            for record in manifest["artifacts"]
+            if record["name"] == "portfolio-truth.json"
+        ),
+        None,
+    )
+    if truth_record is None:
+        raise PortfolioGenerationError("portfolio-truth.json artifact is required")
+    if (
+        truth_record["media_type"] != "application/json"
+        or truth_record["contract_version"] != f"ghra.portfolio_truth@{SCHEMA_VERSION}"
+    ):
+        raise PortfolioGenerationError("portfolio truth artifact contract mismatch")
+    content = _read_regular(
+        stage / "portfolio-truth.json", label="artifact portfolio-truth.json"
+    )
+    try:
+        truth = json.loads(content)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise PortfolioGenerationError("portfolio truth is not valid JSON") from exc
+    if not isinstance(truth, dict):
+        raise PortfolioGenerationError("portfolio truth must be a JSON object")
+    if truth.get("schema_version") != SCHEMA_VERSION:
+        raise PortfolioGenerationError("portfolio truth schema mismatch")
+    inputs = truth.get("inputs")
+    if not isinstance(inputs, dict):
+        raise PortfolioGenerationError("portfolio truth inputs must be a JSON object")
+    github_security = inputs.get("github_security")
+    if not isinstance(github_security, dict):
+        raise PortfolioGenerationError(
+            "portfolio truth inputs.github_security must be a JSON object"
+        )
+    receipt_id = github_security.get("receipt_id")
+    if (
+        not isinstance(receipt_id, str)
+        or not receipt_id.startswith("sha256:")
+        or not SHA256_RE.fullmatch(receipt_id[7:])
+    ):
+        raise PortfolioGenerationError(
+            "portfolio truth inputs.github_security.receipt_id is invalid"
+        )
+    content_sha256 = _validate_sha256(
+        github_security.get("content_sha256"),
+        field="portfolio truth inputs.github_security.content_sha256",
+    )
+    expected = manifest["github_security"]
+    if receipt_id != expected["receipt_id"]:
+        raise PortfolioGenerationError("portfolio truth security receipt_id mismatch")
+    if content_sha256 != expected["content_sha256"]:
+        raise PortfolioGenerationError(
+            "portfolio truth security content_sha256 mismatch"
+        )
+
+
 def read_pointer(root: Path, *, validate_generations: bool = True) -> dict[str, Any]:
     payload = _read_object(root / POINTER_NAME, label="portfolio generation pointer")
     if set(payload) != {"schema_version", "current", "previous", "updated_at"}:
@@ -652,11 +718,12 @@ def publish_generation(
             _write_fsynced(stage / MANIFEST_NAME, manifest_bytes, exclusive=True)
             _fsync_directory(stage)
             _crash_if_requested("after_manifest_written")
-            verify_generation_dir(
+            staged_manifest, _ = verify_generation_dir(
                 stage,
                 expected_generation_id=generation_id,
                 expected_manifest_sha256=manifest_sha256,
             )
+            _validate_staged_truth_security(stage, manifest=staged_manifest)
             _crash_if_requested("after_stage_validated")
             generation_dir = releases / generation_id
             if generation_dir.exists():
