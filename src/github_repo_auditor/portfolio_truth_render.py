@@ -250,6 +250,15 @@ def render_portfolio_report_markdown(
         lines.append("")
 
     lines.extend(["## Security Posture", ""])
+    clock_coverage = snapshot.source_summary.get("security_coverage_clock", {})
+    for repository in clock_coverage.get("pending_security_coverage_repositories", []):
+        lines.append(
+            f"- **Pending security coverage**: `{repository}` entered default attention after the receipt observation because it became stale."
+        )
+    for repository in clock_coverage.get("clock_departed_repositories", []):
+        lines.append(
+            f"- Covered by the receipt; left default attention since observation due to the clock: `{repository}`."
+        )
     attention = _security_attention_items(snapshot.projects)
     scanned_count = security_overview["scanned_count"]
     if attention:

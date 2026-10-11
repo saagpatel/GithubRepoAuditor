@@ -516,6 +516,40 @@ def test_security_posture_reports_clean_when_scanned_and_no_open_alerts() -> Non
     assert "All 2 admitted repos are clear" in rendered
 
 
+def test_security_posture_names_pending_coverage_beside_all_clear() -> None:
+    # A repo that went stale after the last security receipt is pending
+    # coverage, not a cohort member; "all clear" must not stand alone.
+    portfolio_truth = {
+        "projects": [
+            _security_project("CleanA", "baseline", _sec(True, 0, 0)),
+            _security_project("CleanB", "baseline", _sec(True, 0, 0)),
+        ],
+        "source_summary": {
+            "security_coverage_clock": {
+                "pending_security_coverage_count": 1,
+                "pending_security_coverage_repositories": ["saagpatel/StaleC"],
+            }
+        },
+    }
+    digest = _digest_for(portfolio_truth)
+    assert digest["security_posture"]["pending_coverage_count"] == 1
+    assert digest["security_posture"]["pending_coverage_repositories"] == ["saagpatel/StaleC"]
+
+    rendered = render_weekly_command_center_markdown(digest)
+    assert "All 2 admitted repos are clear" in rendered
+    assert (
+        "Security coverage PENDING for 1 repo(s) that entered attention after the "
+        "last receipt (saagpatel/StaleC); do not treat them as clear."
+    ) in rendered
+
+
+def test_security_posture_has_no_pending_line_without_pending_repos() -> None:
+    portfolio_truth = {"projects": [_security_project("CleanA", "baseline", _sec(True, 0, 0))]}
+    digest = _digest_for(portfolio_truth)
+    assert digest["security_posture"]["pending_coverage_count"] == 0
+    assert "PENDING" not in render_weekly_command_center_markdown(digest)
+
+
 def test_security_posture_ignores_projects_outside_security_cohort() -> None:
     out_of_cohort = _sec(False)
     out_of_cohort["cohort_member"] = False

@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Evaluate security-cohort R3 staleness at the receipt observation time; report clock-only arrivals as pending security coverage and covered clock departures explicitly. Preserve metadata-only R3 failure diagnostics beside publication outputs.
+
 - Clarify locked contributor setup, optional test dependencies, and credential-free fixture verification without workstation discovery.
 
 ### Added
