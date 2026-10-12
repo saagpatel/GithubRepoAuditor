@@ -13,9 +13,7 @@ from github_repo_auditor import cli
 
 def _write_overlay(path: Path) -> Path:
     path.write_text(
-        "schema: reckoning-verdicts/1\n"
-        "updated_at: null\n"
-        "families: {}\n",
+        "schema: reckoning-verdicts/1\nupdated_at: null\nfamilies: {}\n",
         encoding="utf-8",
     )
     return path
@@ -144,7 +142,11 @@ def test_shared_artifact_refresh_passes_overlay_to_workbook(
         reckoning_overlay=object(),
     )
     json_path = tmp_path / "report.json"
-    monkeypatch.setattr(shared, "write_approval_center_artifacts", lambda *_a, **_k: (Path("approval.json"), Path("approval.md"), {}))
+    monkeypatch.setattr(
+        shared,
+        "write_approval_center_artifacts",
+        lambda *_a, **_k: (Path("approval.json"), Path("approval.md"), {}),
+    )
     monkeypatch.setattr(shared, "write_json_report", lambda *_a, **_k: json_path)
     monkeypatch.setattr(shared, "write_markdown_report", lambda *_a, **_k: None)
     monkeypatch.setattr(shared, "write_pcc_export", lambda *_a, **_k: None)
@@ -156,11 +158,19 @@ def test_shared_artifact_refresh_passes_overlay_to_workbook(
     )
     monkeypatch.setattr(shared, "export_review_pack", lambda *_a, **_k: None)
     monkeypatch.setattr(shared, "export_html_dashboard", lambda *_a, **_k: None)
-    monkeypatch.setattr(shared, "report_artifact_datetime", lambda *_a: report.generated_at)
+    monkeypatch.setattr(
+        shared, "report_artifact_datetime", lambda *_a: report.generated_at
+    )
     monkeypatch.setattr(
         shared,
         "write_control_center_artifacts",
-        lambda *_a, **_k: (Path("control.json"), Path("control.md"), Path("weekly.json"), Path("weekly.md"), {}),
+        lambda *_a, **_k: (
+            Path("control.json"),
+            Path("control.md"),
+            Path("weekly.json"),
+            Path("weekly.md"),
+            {},
+        ),
     )
     monkeypatch.setattr(shared, "write_warehouse_snapshot", lambda *_a, **_k: None)
 

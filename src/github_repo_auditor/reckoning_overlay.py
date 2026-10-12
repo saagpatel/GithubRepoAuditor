@@ -49,7 +49,7 @@ def _path_key(value: str, workspace_root: Path | None) -> str:
         (workspace_root or Path.home() / "Projects").expanduser().as_posix()
     ).casefold()
     if path.startswith(root + "/"):
-        path = path[len(root) + 1:]
+        path = path[len(root) + 1 :]
     return path
 
 

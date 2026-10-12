@@ -269,7 +269,9 @@ def test_path_matching_uses_casefolded_workspace_relative_aliases(tmp_path) -> N
     overlay = load_reckoning_overlay(
         _write_overlay(tmp_path / "paths.yaml", {"local": _family("Foo")})
     )
-    assert overlay.lookup(local_path=str(Path.home() / "Projects" / "foo"))[0] == "local"
+    assert (
+        overlay.lookup(local_path=str(Path.home() / "Projects" / "foo"))[0] == "local"
+    )
 
 
 @pytest.mark.parametrize(
@@ -382,7 +384,9 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         ws.title for ws in absent.worksheets if ws.sheet_state == "visible"
     } == CORE_VISIBLE_SHEETS
     present_path = export_excel(
-        report, tmp_path / "present.xlsx", excel_mode=mode,
+        report,
+        tmp_path / "present.xlsx",
+        excel_mode=mode,
         reckoning_overlay=load_reckoning_overlay(overlay_path),
     )
     present = load_workbook_allowing_native_sparklines(present_path)

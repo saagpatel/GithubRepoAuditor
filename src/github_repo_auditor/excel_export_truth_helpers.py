@@ -21,11 +21,12 @@ def load_reckoning_truth(truth_dir: Path) -> dict[str, Any]:
     if not isinstance(truth, dict) or not isinstance(truth.get("projects"), list):
         raise ValueError("Reckoning requires portfolio truth with a projects list")
     if any(
-        not isinstance(project, dict)
-        or not isinstance(project.get("identity"), dict)
+        not isinstance(project, dict) or not isinstance(project.get("identity"), dict)
         for project in truth["projects"]
     ):
-        raise ValueError("Reckoning requires an identity mapping for each truth project")
+        raise ValueError(
+            "Reckoning requires an identity mapping for each truth project"
+        )
     return truth
 
 
