@@ -7,6 +7,7 @@ from typing import Any, Callable
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
+from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
 from github_repo_auditor.reckoning_overlay import ReckoningOverlay
 
 
@@ -217,25 +218,7 @@ def export_excel_workbook(
 
     portfolio_truth = None
     if reckoning_overlay is not None:
-        truth_path = (truth_dir or report_path.parent) / "portfolio-truth-latest.json"
-        try:
-            portfolio_truth = json.loads(truth_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise ValueError(
-                "Reckoning requires a readable portfolio-truth-latest.json in truth_dir (or beside the report)"
-            ) from exc
-        if not isinstance(portfolio_truth, dict) or not isinstance(
-            portfolio_truth.get("projects"), list
-        ):
-            raise ValueError("Reckoning requires portfolio truth with a projects list")
-        if any(
-            not isinstance(project, dict)
-            or not isinstance(project.get("identity"), dict)
-            for project in portfolio_truth["projects"]
-        ):
-            raise ValueError(
-                "Reckoning requires an identity mapping for each truth project"
-            )
+        portfolio_truth = load_reckoning_truth(truth_dir or report_path.parent)
 
     risk_lookup, risk_posture = load_risk_truth(truth_dir)
 

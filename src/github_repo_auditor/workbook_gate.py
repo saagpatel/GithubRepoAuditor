@@ -1204,7 +1204,6 @@ def run_workbook_gate(
     synthetic_reckoning_overlay: bool = False,
 ) -> dict:
     from tempfile import TemporaryDirectory
-    import os
 
     import yaml
 
@@ -1213,9 +1212,10 @@ def run_workbook_gate(
         core_visible_sheets_for_overlay,
     )
     from github_repo_auditor.reckoning_overlay import load_reckoning_overlay
+    from github_repo_auditor.portfolio_truth_types import truth_latest_path
 
-    if not synthetic_reckoning_overlay and os.environ.get("GHRA_RECKONING_OVERLAY"):
-        raise ValueError("Workbook gate requires GHRA_RECKONING_OVERLAY unset, or --synthetic-reckoning-overlay, to avoid reading private verdicts.")
+    if synthetic_reckoning_overlay:
+        output_dir = output_dir / "synthetic-reckoning"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "workbook-gate-report.json"
@@ -1249,7 +1249,7 @@ def run_workbook_gate(
                     }
                 )
             )
-            (input_dir / "portfolio-truth-latest.json").write_text(
+            truth_latest_path(input_dir).write_text(
                 json.dumps(
                     {
                         "projects": [
@@ -1282,12 +1282,13 @@ def run_workbook_gate(
                     }
                 )
             )
-        present = load_reckoning_overlay(overlay_path) is not None
+        overlay = load_reckoning_overlay(overlay_path)
+        present = overlay is not None
         standard_path = export_excel(
             report_path,
             output_dir / "workbook-gate-standard.xlsx",
             excel_mode="standard",
-            reckoning_overlay=overlay_path,
+            reckoning_overlay=overlay,
             truth_dir=input_dir,
         )
         template_path = export_excel(
@@ -1295,7 +1296,7 @@ def run_workbook_gate(
             output_dir / "workbook-gate-template.xlsx",
             excel_mode="template",
             template_path=DEFAULT_TEMPLATE_PATH,
-            reckoning_overlay=overlay_path,
+            reckoning_overlay=overlay,
             truth_dir=input_dir,
         )
 
@@ -1339,13 +1340,14 @@ def run_workbook_gate(
             and wb["Reckoning"]["D6"].value == "_archive/LocalOnly, LocalMirror"
             and wb["Reckoning"]["E6"].value == "archive"
             and wb["Reckoning"]["P6"].value == "decision-needed"
-            and wb["Reckoning"]["Q6"].value == "2026-02-01T00:00:00Z"
-            and wb["Reckoning"]["R6"].value == 2
-            and wb["Reckoning"]["S6"].value is None
+            and wb["Reckoning"]["Q6"].value == "archived, decision-needed"
+            and wb["Reckoning"]["R6"].value == "2026-02-01T00:00:00Z"
+            and wb["Reckoning"]["S6"].value == 2
+            and wb["Reckoning"]["T6"].value is None
             and wb["Reckoning"]["A7"].value == "remote-family"
-            and wb["Reckoning"]["R7"].value == 0
-            and wb["Reckoning"]["S7"].value == "fixture-owner/remote-only"
-            and wb["Reckoning"].auto_filter.ref == "A5:S7"
+            and wb["Reckoning"]["S7"].value == 0
+            and wb["Reckoning"]["T7"].value == "fixture-owner/remote-only"
+            and wb["Reckoning"].auto_filter.ref == "A5:T7"
             and wb["Reckoning"]["A10"].value == "Unreckoned projects"
             and wb["Reckoning"]["B11"].value == 1
             and wb["Reckoning"]["A13"].value == "unassigned-key"

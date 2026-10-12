@@ -9,6 +9,7 @@ from typing import Any, Callable
 from openpyxl import Workbook
 
 from github_repo_auditor.reckoning_overlay import ReckoningOverlay
+from github_repo_auditor.weekly_command_center import ATTENTION_STATE_RANK
 
 RECKONING_HEADERS = [
     "Family",
@@ -27,6 +28,7 @@ RECKONING_HEADERS = [
     "Wave",
     "Decided at",
     "Truth attention state",
+    "Attention states",
     "Last activity",
     "Matched projects",
     "Unmatched members",
@@ -50,14 +52,10 @@ def _latest_activity(values: list[str]) -> str:
 
 
 def _family_attention(states: list[str]) -> str:
-    # Existing weekly_command_center path-attention ordering; other states have
-    # no urgency rank, so retain their distinct values when none is ranked.
-    rank = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
-    ranked = [state for state in states if state in rank]
+    # Unranked states tie and retain saved-truth order; expose all separately.
     return (
-        min(ranked, key=rank.__getitem__)
-        if ranked
-        else ", ".join(dict.fromkeys(states))
+        min(states, key=lambda state: ATTENTION_STATE_RANK.get(state, 9))
+        if states else ""
     )
 
 
@@ -128,6 +126,7 @@ def _build_reckoning_content(
                 family.get("wave", ""),
                 str(family.get("decided_at") or ""),
                 _family_attention([state for state in states if state]),
+                ", ".join(dict.fromkeys(state for state in states if state)),
                 _latest_activity([activity for activity in activities if activity]),
                 len(projects),
                 ", ".join(

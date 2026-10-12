@@ -21,7 +21,11 @@ from github_repo_auditor.reckoning_overlay import (
     ReckoningOverlay,
     load_reckoning_overlay,
 )
-from github_repo_auditor.workbook_gate import _sample_report_data, run_workbook_gate
+from github_repo_auditor.workbook_gate import (
+    _sample_report_data,
+    record_manual_signoff,
+    run_workbook_gate,
+)
 
 
 def _family(key: str, **changes: object) -> dict:
@@ -53,7 +57,8 @@ def test_absent_env_and_cli_path_selection(tmp_path, monkeypatch) -> None:
         {"explicit": _family("Explicit", future={"preserved": True})},
     )
     monkeypatch.setenv("GHRA_RECKONING_OVERLAY", str(env_path))
-    assert "env" in load_reckoning_overlay().families
+    assert load_reckoning_overlay() is None
+    assert "env" in load_reckoning_overlay(env_path).families
     overlay = load_reckoning_overlay(explicit)
     assert overlay.families["explicit"]["future"] == {"preserved": True}
     assert (
@@ -160,7 +165,7 @@ def test_family_counts_projects_once_and_preserves_member_matching_precedence() 
     assert (truth, overlay.data) == before
 
 
-def test_unranked_attention_lists_distinct_states() -> None:
+def test_unranked_attention_has_single_value_and_lists_distinct_states() -> None:
     overlay = ReckoningOverlay(
         {
             "families": {
@@ -179,7 +184,8 @@ def test_unranked_attention_lists_distinct_states() -> None:
         ]
     }
     row = dict(zip(RECKONING_HEADERS, build_reckoning_rows(truth, overlay)[0]))
-    assert row["Truth attention state"] == "archived, parked"
+    assert row["Truth attention state"] == "archived"
+    assert row["Attention states"] == "archived, parked"
     assert row["Matched projects"] == 3
     assert row["Last activity"] == ""
 
@@ -227,6 +233,43 @@ def test_validation_lists_all_schema_rule_problems(tmp_path) -> None:
     assert "assimilate_into" in message
     assert "seed_brief" in message
     assert "also appears" in message
+
+
+@pytest.mark.parametrize(
+    "first,second",
+    [
+        ({"key": "Foo"}, {"key": "~/Projects/Foo"}),
+        ({"key": "Foo"}, {"key": "foo"}),
+        ({"key": "~/Projects/Foo"}, {"key": "foo"}),
+        ({"key": "owner/first", "local_paths": ["Foo"]}, {"key": "foo"}),
+        ({"key": "Foo"}, {"key": "owner/second", "local_paths": ["~/Projects/foo"]}),
+        (
+            {"key": "owner/first", "local_paths": ["./Foo/"]},
+            {"key": "owner/second", "local_paths": ["~/Projects/foo"]},
+        ),
+    ],
+)
+def test_folder_aliases_cannot_belong_to_two_families(tmp_path, first, second) -> None:
+    # Exercise an absolute home path as well as a relative, case-folded alias.
+    first = copy.deepcopy(first)
+    if first["key"].startswith("~/"):
+        first["key"] = str(Path(first["key"]).expanduser())
+    path = _write_overlay(
+        tmp_path / "duplicate.yaml",
+        {
+            "first": _family(first["key"], members=[first]),
+            "second": _family(second["key"], members=[second]),
+        },
+    )
+    with pytest.raises(ReckoningOverlayError, match="also appears"):
+        load_reckoning_overlay(path)
+
+
+def test_path_matching_uses_casefolded_workspace_relative_aliases(tmp_path) -> None:
+    overlay = load_reckoning_overlay(
+        _write_overlay(tmp_path / "paths.yaml", {"local": _family("Foo")})
+    )
+    assert overlay.lookup(local_path=str(Path.home() / "Projects" / "foo"))[0] == "local"
 
 
 @pytest.mark.parametrize(
@@ -331,15 +374,17 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         )
     )
     before = {path: path.read_bytes() for path in (report, overlay_path, truth_path)}
+    monkeypatch.setenv("GHRA_RECKONING_OVERLAY", str(overlay_path))
     absent_path = export_excel(report, tmp_path / "absent.xlsx", excel_mode=mode)
     absent = load_workbook_allowing_native_sparklines(absent_path)
     assert "Reckoning" not in absent.sheetnames
     assert {
         ws.title for ws in absent.worksheets if ws.sheet_state == "visible"
     } == CORE_VISIBLE_SHEETS
-    # Environment selection exercises the normal runtime entry point too.
-    monkeypatch.setenv("GHRA_RECKONING_OVERLAY", str(overlay_path))
-    present_path = export_excel(report, tmp_path / "present.xlsx", excel_mode=mode)
+    present_path = export_excel(
+        report, tmp_path / "present.xlsx", excel_mode=mode,
+        reckoning_overlay=load_reckoning_overlay(overlay_path),
+    )
     present = load_workbook_allowing_native_sparklines(present_path)
     assert set(present.sheetnames) == set(absent.sheetnames) | {"Reckoning"}
     sheet = present["Reckoning"]
@@ -362,6 +407,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         2,
         "2026-10-11T00:00:00Z",
         "decision-needed",
+        "decision-needed, archived",
         "2025-12-31T20:00:00-08:00",
         2,
         None,
@@ -369,10 +415,10 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
     assert sheet["B6"].data_type == "s"
     assert sheet["A7"].value == "remote"
     assert sheet["D7"].value == "fixture-owner/remote-only"
-    assert sheet["P7"].value is None and sheet["Q7"].value is None
-    assert sheet["R7"].value == 0
-    assert sheet["S7"].value == "fixture-owner/remote-only"
-    assert sheet.auto_filter.ref == "A5:S7"
+    assert all(sheet[f"{column}7"].value is None for column in ("P", "Q", "R"))
+    assert sheet["S7"].value == 0
+    assert sheet["T7"].value == "fixture-owner/remote-only"
+    assert sheet.auto_filter.ref == "A5:T7"
     assert sheet["A10"].value == "Unreckoned projects"
     assert sheet["A11"].value == "Count" and sheet["B11"].value == 1
     assert sheet["A13"].value == "unassigned-key"
@@ -410,3 +456,7 @@ def test_workbook_gate_with_synthetic_overlay(tmp_path, monkeypatch) -> None:
     section = result["automated_checks"]["sections"][-1]
     assert section["name"] == "reckoning"
     assert section["status"] == "passed"
+    assert (tmp_path / "synthetic-reckoning" / "workbook-gate-standard.xlsx").is_file()
+    assert not (tmp_path / "workbook-gate-result.json").exists()
+    with pytest.raises(FileNotFoundError, match="No workbook gate result"):
+        record_manual_signoff(tmp_path, reviewer="Fixture", outcome="passed", checks=[])

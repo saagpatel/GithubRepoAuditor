@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+import posixpath
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -43,13 +43,14 @@ _UniqueKeyLoader.add_constructor(
 
 
 def _path_key(value: str, workspace_root: Path | None) -> str:
-    path = Path(value).expanduser()
-    if workspace_root is not None and path.is_absolute():
-        try:
-            path = path.relative_to(workspace_root.expanduser())
-        except ValueError:
-            pass  # Absolute paths outside the workspace are supported by the schema.
-    return path.as_posix().rstrip("/")
+    # Normalize lexically: overlay validation must not read or resolve checkouts.
+    path = posixpath.normpath(Path(value).expanduser().as_posix()).casefold()
+    root = posixpath.normpath(
+        (workspace_root or Path.home() / "Projects").expanduser().as_posix()
+    ).casefold()
+    if path.startswith(root + "/"):
+        path = path[len(root) + 1:]
+    return path
 
 
 @dataclass(frozen=True)
@@ -222,7 +223,10 @@ def _validate(data: Any) -> dict[str, Any]:
             if not isinstance(key, str) or not key.strip():
                 errors.append(f"{member_prefix}.key must be a non-empty string")
                 continue
-            member_ids: list[tuple[str, Any]] = [("key", key.casefold())]
+            member_ids: list[tuple[str, Any]] = [
+                ("key", key.casefold()),
+                ("path", _path_key(key, None)),
+            ]
             github_id = member.get("github_id")
             if github_id is not None:
                 if type(github_id) is not int or github_id <= 0:
@@ -275,11 +279,10 @@ def _validate_timestamp(value: Any, field: str, errors: list[str]) -> None:
 
 
 def load_reckoning_overlay(path: Path | None = None) -> ReckoningOverlay | None:
-    """Explicit path takes precedence over GHRA_RECKONING_OVERLAY; absent is off."""
-    configured = path if path is not None else os.environ.get("GHRA_RECKONING_OVERLAY")
-    if not configured:
+    """Load an explicit overlay path; environment selection belongs to the CLI."""
+    if path is None:
         return None
-    overlay_path = Path(configured).expanduser()
+    overlay_path = path.expanduser()
     try:
         data = yaml.load(
             overlay_path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader

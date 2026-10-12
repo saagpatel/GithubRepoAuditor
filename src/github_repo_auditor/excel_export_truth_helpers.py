@@ -4,8 +4,29 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
+
+
+def load_reckoning_truth(truth_dir: Path) -> dict[str, Any]:
+    """Require a saved truth snapshot before a requested Reckoning export."""
+    truth_path = truth_latest_path(truth_dir)
+    try:
+        truth = json.loads(truth_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(
+            f"Reckoning requires a readable {truth_path.name} in truth_dir (or beside the report)"
+        ) from exc
+    if not isinstance(truth, dict) or not isinstance(truth.get("projects"), list):
+        raise ValueError("Reckoning requires portfolio truth with a projects list")
+    if any(
+        not isinstance(project, dict)
+        or not isinstance(project.get("identity"), dict)
+        for project in truth["projects"]
+    ):
+        raise ValueError("Reckoning requires an identity mapping for each truth project")
+    return truth
 
 
 def load_risk_truth(truth_dir: Path | None) -> tuple[dict[str, str], dict[str, int]]:

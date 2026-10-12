@@ -60,10 +60,39 @@ from github_repo_auditor.github_security_coverage import (
     DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     DEFAULT_MAX_COHORT_SIZE,
 )
+from github_repo_auditor.reckoning_overlay import (
+    ReckoningOverlayError,
+    load_reckoning_overlay,
+)
 
 
 # Emitted at most once per process when legacy flat invocation is used.
 _LEGACY_WARNING_EVENTS: set[str] = set()
+
+
+def _prepare_reckoning_export(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Load requested private workbook inputs before any audit or shared refresh."""
+    overlay_path = getattr(args, "reckoning_overlay", None)
+    if overlay_path is None:
+        configured_path = os.environ.get("GHRA_RECKONING_OVERLAY")
+        overlay_path = Path(configured_path).expanduser() if configured_path else None
+
+    try:
+        overlay = load_reckoning_overlay(overlay_path)
+        if overlay is None:
+            args.reckoning_overlay = None
+            return
+
+        from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
+
+        load_reckoning_truth(Path(args.output_dir))
+    except (ReckoningOverlayError, OSError, ValueError) as exc:
+        parser.error(str(exc))
+
+    # export_excel accepts an already validated object, avoiding environment
+    # lookup or overlay parsing anywhere below the CLI boundary.
+    args.reckoning_overlay = overlay
+
 
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
@@ -2204,6 +2233,7 @@ def main() -> None:
         or args.review_governance
         or args.review_packet
     ):
+        _prepare_reckoning_export(args, parser)
         _run_approval_capture_mode(args, parser)
         return
 
@@ -2321,6 +2351,7 @@ def main() -> None:
         return
 
     if args.watch:
+        _prepare_reckoning_export(args, parser)
         _run_watch_mode(args, config_inspection)
         return
 
@@ -2330,6 +2361,7 @@ def main() -> None:
         run_semantic_search_mode(args, query)
         return
 
+    _prepare_reckoning_export(args, parser)
     _run_main_audit_cycle(args, config_inspection)
 
 

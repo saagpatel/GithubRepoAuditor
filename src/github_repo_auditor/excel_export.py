@@ -1887,10 +1887,14 @@ def export_excel(
     excel_mode: str = "standard",
     template_path: Path | None = None,
     truth_dir: Path | None = None,
-    reckoning_overlay: Path | None = None,
+    reckoning_overlay: Path | ReckoningOverlay | None = None,
 ) -> Path:
     """Generate the flagship Excel dashboard."""
-    overlay = load_reckoning_overlay(reckoning_overlay)
+    overlay = (
+        reckoning_overlay
+        if isinstance(reckoning_overlay, ReckoningOverlay)
+        else load_reckoning_overlay(reckoning_overlay)
+    )
     return _export_excel_workbook(
         report_path,
         output_path,
