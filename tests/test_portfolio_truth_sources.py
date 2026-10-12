@@ -363,6 +363,28 @@ def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
     ]
 
 
+def test_live_nested_checkout_wins_identity_and_representation_over_archive() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    archive = _p(
+        "Repo", "owner/Repo", path="_archive/Repo",
+        head=head, common_dir="/git/archive/.git",
+    )
+    archive["group_entry"] = {"lifecycle_state": "archived", "operating_path": "archive"}
+    live = _p(
+        "Renamed", "owner/Repo", path="NestedProjects/Longer/Renamed",
+        head=head, common_dir="/git/live/.git",
+    )
+    live["group_entry"] = {"lifecycle_state": "maintenance", "operating_path": "maintain"}
+
+    result = _dedupe_checkouts_by_origin([archive, live], checkout_collisions=collisions)
+
+    assert result == [live]
+    assert result[0]["name"] == "Renamed"
+    assert result[0]["group_entry"]["lifecycle_state"] != "archived"
+    assert collisions[0]["selection"]["representative_path"] == live["path"]
+
+
 def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> None:
     collisions: list[dict] = []
     head = "1" * 40
