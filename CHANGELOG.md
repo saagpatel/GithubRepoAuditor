@@ -13,6 +13,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Reject reckoning path collisions under the saved truth workspace root and
+  validate canonical truth before exporting private overlay workbooks.
+
+- Prefer live checkouts over archive copies, validate private overlay inputs in
+  CLI preflight, preserve overlays on shared workbook refresh, and isolate
+  synthetic gates and exports from private runtime settings.
+
+- Show every reckoning family once, aggregate matched truth activity and attention,
+  and expose unmatched members and unreckoned truth projects in the workbook.
+
+- Read private runtime reckoning verdicts into an optional visible workbook sheet
+  without changing canonical truth; discover `_archive` children with archived defaults.
+
 - Refuse new portfolio generation publication when staged truth lacks valid
   GitHub security receipt and content identities or disagrees with the admitted
   manifest; preserve historical generation readback compatibility.

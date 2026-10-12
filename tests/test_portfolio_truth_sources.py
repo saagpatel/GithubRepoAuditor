@@ -12,6 +12,9 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from github_repo_auditor.portfolio_catalog import load_portfolio_catalog
+from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+
 from github_repo_auditor.portfolio_truth_sources import (
     WORKSPACE_EXCLUSION_REASONS,
     _dedupe_checkouts_by_origin,
@@ -20,6 +23,66 @@ from github_repo_auditor.portfolio_truth_sources import (
     discover_workspace_projects,
     workspace_exclusion_reason,
 )
+
+
+def test_archive_is_a_container_with_index_and_catalog_defaults(tmp_path) -> None:
+    archive = tmp_path / "_archive"
+    archive.mkdir()
+    (archive / "README.md").write_text("Archive index")
+    for name in ("Local", "Override"):
+        project = archive / name
+        project.mkdir()
+        (project / "README.md").write_text("Local project")
+    catalog_path = Path(__file__).resolve().parents[1] / "config/portfolio-catalog.yaml"
+    catalog = load_portfolio_catalog(catalog_path)
+    assert catalog["errors"] == []
+    discovered = discover_workspace_projects(tmp_path, catalog_data=catalog)
+    assert {project["path"] for project in discovered} == {
+        "_archive/Local",
+        "_archive/Override",
+    }
+    assert all(
+        project["group_entry"]["lifecycle_state"] == "archived"
+        for project in discovered
+    )
+    assert all(
+        project["group_entry"]["operating_path"] == "archive" for project in discovered
+    )
+    # Use only the public group's data with synthetic repo declarations.
+    import yaml
+
+    synthetic_catalog = tmp_path / "catalog.yaml"
+    synthetic_catalog.write_text(
+        yaml.safe_dump(
+            {
+                "groups": {
+                    "archive": {
+                        "path_prefixes": ["_archive"],
+                        "lifecycle_state": "archived",
+                        "operating_path": "archive",
+                    }
+                },
+                "repos": {
+                    "_archive/Override": {
+                        "lifecycle_state": "maintenance",
+                        "operating_path": "maintain",
+                    }
+                },
+            }
+        )
+    )
+    result = build_portfolio_truth_snapshot(
+        workspace_root=tmp_path,
+        catalog_path=synthetic_catalog,
+        include_notion=False,
+    )
+    by_name = {
+        project.identity.display_name: project for project in result.snapshot.projects
+    }
+    assert by_name["Local"].declared.lifecycle_state == "archived"
+    assert by_name["Local"].declared.operating_path == "archive"
+    assert by_name["Override"].declared.lifecycle_state == "maintenance"
+    assert by_name["Override"].declared.operating_path == "maintain"
 
 
 def _p(
@@ -298,6 +361,47 @@ def test_working_checkout_is_preferred_over_bare_same_origin_repo() -> None:
             "bare": True,
         },
     ]
+
+
+def test_live_nested_checkout_wins_identity_and_representation_over_archive() -> None:
+    collisions: list[dict] = []
+    head = "1" * 40
+    archive = _p(
+        "Repo", "owner/Repo", path="_archive/Repo",
+        head=head, common_dir="/git/archive/.git",
+    )
+    archive["group_entry"] = {"lifecycle_state": "archived", "operating_path": "archive"}
+    live = _p(
+        "Renamed", "owner/Repo", path="NestedProjects/Longer/Renamed",
+        head=head, common_dir="/git/live/.git",
+    )
+    live["group_entry"] = {"lifecycle_state": "maintenance", "operating_path": "maintain"}
+
+    result = _dedupe_checkouts_by_origin([archive, live], checkout_collisions=collisions)
+
+    assert result == [live]
+    assert result[0]["name"] == "Renamed"
+    assert result[0]["group_entry"]["lifecycle_state"] != "archived"
+    assert collisions[0]["selection"]["representative_path"] == live["path"]
+
+
+def test_archive_clone_beats_external_worktree_placeholder_as_representative() -> None:
+    from github_repo_auditor.portfolio_truth_sources import _checkout_representative
+
+    archive = _p(
+        "Repo", "owner/Repo", path="_archive/Repo",
+        head="1" * 40, common_dir="/git/archive/.git",
+    )
+    placeholder = {
+        "name": "external-worktree",
+        "path": "external-worktree",
+        "repo_full_name": "owner/Repo",
+        "_external_worktree": True,
+        "_checkout_observation": {"state": "unknown", "bare": None},
+    }
+
+    assert _checkout_representative([placeholder, archive], "owner/Repo") is archive
+    assert _checkout_representative([archive, placeholder], "owner/Repo") is archive
 
 
 def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> None:

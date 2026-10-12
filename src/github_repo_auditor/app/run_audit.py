@@ -1043,6 +1043,7 @@ def _write_report_outputs(
         collection=args.collection,
         excel_mode=args.excel_mode,
         truth_dir=output_dir,
+        reckoning_overlay=getattr(args, "reckoning_overlay", None),
     )
     report.runtime_breakdown["workbook_build_seconds"] = round(perf_counter() - workbook_start, 3)
     md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)

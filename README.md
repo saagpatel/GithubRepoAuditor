@@ -105,6 +105,34 @@ audit triage <github-username> --approval-center
 
 Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, scorecards overrides, and `--excel-mode template` as advanced paths.
 
+Private family verdicts can be displayed in a visible `Reckoning` workbook sheet
+with `--reckoning-overlay PATH` or `GHRA_RECKONING_OVERLAY` (the flag takes
+precedence). The YAML's `schema` value is `reckoning-verdicts`, then a slash, then
+`1`; invalid verdicts stop CLI preflight before the GitHub audit. The overlay is
+read once at startup, so a long `--watch` run picks up edits after a restart. Export also requires the saved
+`portfolio-truth-latest.json` beside the audit report, or in the exporter API's
+`truth_dir`. Each overlay family gets one row in overlay order, including
+families with no saved truth match. `Members` lists the family's member keys;
+`Matched projects` counts matched truth projects and `Unmatched members` lists
+member keys with no match. Matching retains a GitHub repository ID tier, but
+canonical truth carries no repository ID today, so current truth matches by
+`owner/repo`, then workspace-relative path. `Truth attention state` is a single
+value using the existing urgency order (`decision-needed`, `active-product`,
+`active-infra`), with unranked ties resolved in saved-truth order. `Attention states`
+lists all distinct matched states. Last activity is the
+latest matched timestamp. An `Unreckoned projects` block below the family table
+reports the count and first 50 keys of truth projects with no family.
+
+Keep the overlay outside this repository and published artifacts. It is read
+only, is never copied into output, and adds no fields to canonical truth. The
+resulting workbook contains private verdicts and should be treated as private.
+Without an overlay, no `Reckoning` sheet is added. Both workbook modes can be
+checked without private inputs using
+`make workbook-gate ARGS="--synthetic-reckoning-overlay"`. This gate writes to
+`output/workbook-gate/synthetic-reckoning/`, keeping the normal desktop signoff
+artifacts separate. The environment variable is read only by the audit CLI;
+demo, benchmark, and direct exporter calls require an explicit overlay argument.
+
 ## Demo and Guides
 
 - Safe demo path: run `make demo` after a local clone to generate sample artifacts from the committed fixture without a GitHub token.

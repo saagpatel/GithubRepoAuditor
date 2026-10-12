@@ -195,7 +195,7 @@ def discover_workspace_projects(
         if exclusion_reason is not None:
             _record_exclusion(exclusion_counts, exclusion_reason)
             continue
-        if _is_project_dir(child):
+        if child.name != "_archive" and _is_project_dir(child):
             discovered.append(
                 _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
             )
@@ -421,8 +421,10 @@ def _checkout_representative(
     return min(
         group,
         key=lambda project: (
+            project.get("_external_worktree") is True,
             _checkout_observation(project).get("state") != "observed",
             _checkout_observation(project).get("bare") is True,
+            "_archive" in Path(str(project.get("path", ""))).parts,
             str(project.get("name", "")).lower() != repo_base,
             len(Path(str(project.get("path", ""))).parts),
             len(str(project.get("path", ""))),
@@ -439,6 +441,7 @@ def _checkout_identity_project(
     return min(
         group,
         key=lambda project: (
+            "_archive" in Path(str(project.get("path", ""))).parts,
             str(project.get("name", "")).lower() != repo_base,
             len(Path(str(project.get("path", ""))).parts),
             len(str(project.get("path", ""))),

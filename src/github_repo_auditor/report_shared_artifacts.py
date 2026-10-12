@@ -44,6 +44,7 @@ def refresh_shared_artifacts_from_report(
         trend_data=trend_data, diff_data=diff_dict, score_history=score_history,
         portfolio_profile=args.portfolio_profile, collection=args.collection,
         excel_mode=args.excel_mode, truth_dir=output_dir,
+        reckoning_overlay=getattr(args, "reckoning_overlay", None),
     )
     export_review_pack(report.to_dict(), output_dir, diff_data=diff_dict,
                        portfolio_profile=args.portfolio_profile, collection=args.collection)

@@ -8,6 +8,12 @@ import pytest
 from github_repo_auditor.models import RepoMetadata
 
 
+@pytest.fixture(autouse=True)
+def clear_reckoning_overlay_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Private runtime settings must not affect fixture exports."""
+    monkeypatch.delenv("GHRA_RECKONING_OVERLAY", raising=False)
+
+
 @pytest.fixture
 def sample_metadata() -> RepoMetadata:
     """A realistic RepoMetadata for testing."""

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
 import sys
+import tarfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -11,6 +15,94 @@ import pytest
 from github_repo_auditor.config import inspect_config
 
 ROOT = Path(__file__).resolve().parents[1]
+
+_FAMILY_VERDICT_BLOCK = re.compile(rb"(?ms)^families:[ \t]*\r?\n.*?(?=^\S|\Z)")
+_FAMILY_VERDICT_KEY = re.compile(rb"(?m)^[ \t]+(?:fate|rationale):")
+
+
+def _private_reckoning_signatures(contents: bytes) -> list[str]:
+    signatures: list[str] = []
+    if b"reckoning-verdicts/1" in contents:
+        signatures.append("reckoning-verdicts/1")
+    if any(
+        _FAMILY_VERDICT_KEY.search(block.group())
+        for block in _FAMILY_VERDICT_BLOCK.finditer(contents)
+    ):
+        signatures.append("families verdict fields")
+    return signatures
+
+
+def test_built_distributions_exclude_private_reckoning_data(tmp_path):
+    private = tmp_path / "reckoning-verdicts.yaml"
+    private.write_text("schema: reckoning-verdicts/1\nfamilies: {}\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "build", "--outdir", str(tmp_path / "dist")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "GHRA_RECKONING_OVERLAY": str(private),
+            "TMPDIR": str(tmp_path),
+            "PIP_CACHE_DIR": str(tmp_path / "pip-cache"),
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    (wheel,) = (tmp_path / "dist").glob("*.whl")
+    (sdist,) = (tmp_path / "dist").glob("*.tar.gz")
+    with zipfile.ZipFile(wheel) as archive:
+        wheel_files = [
+            (item.filename, archive.read(item))
+            for item in archive.infolist()
+            if not item.is_dir()
+        ]
+    with tarfile.open(sdist) as archive:
+        sdist_files = [
+            (member.name, extracted.read())
+            for member in archive.getmembers()
+            if member.isfile()
+            and (extracted := archive.extractfile(member)) is not None
+        ]
+
+    for files in (wheel_files, sdist_files):
+        names = [name for name, _ in files]
+        assert any(
+            name.endswith("github_repo_auditor/reckoning_overlay.py") for name in names
+        )
+        assert not any(
+            ("reckoning" in name.lower() or "verdicts" in name.lower())
+            and Path(name).name not in {
+                "reckoning_overlay.py", "test_reckoning_overlay.py", "test_cli_reckoning.py",
+            }
+            for name in names
+        )
+        for name, contents in files:
+            if not name.endswith(".py"):
+                assert _private_reckoning_signatures(contents) == [], name
+
+
+@pytest.mark.parametrize(
+    "contents, expected",
+    [
+        (b"schema: reckoning-verdicts/1\n", ["reckoning-verdicts/1"]),
+        (
+            b"Documentation mentions reckoning-verdicts/1 inline.\n",
+            ["reckoning-verdicts/1"],
+        ),
+        (
+            b"families:\n  Example:\n    fate: archive\n",
+            ["families verdict fields"],
+        ),
+        (
+            b"families:\n  Example:\n    rationale: unsupported\n",
+            ["families verdict fields"],
+        ),
+        (b"families:\n  Example:\n    fate: keep", ["families verdict fields"]),
+        (b"families:\n  Example:\n    owner: team\nother: value\n", []),
+    ],
+)
+def test_private_reckoning_signature_scanner(contents: bytes, expected: list[str]):
+    assert _private_reckoning_signatures(contents) == expected
 
 
 def _project_dependency_names() -> set[str]:

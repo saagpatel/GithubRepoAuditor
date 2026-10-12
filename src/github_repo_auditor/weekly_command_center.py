@@ -23,6 +23,7 @@ MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
 MAX_RISK_ATTENTION_ITEMS = 5
 MAX_SECURITY_ATTENTION_ITEMS = 5
+ATTENTION_STATE_RANK = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
 _PERSISTED_DIGEST_SCHEMA = "weekly_command_center_digest_v2"
 _PERSISTED_REDACTED_TEXT = "<redacted>"
 _PERSISTED_WEEKLY_DIGEST = {
@@ -614,7 +615,6 @@ def _build_path_attention_items(
 ) -> list[dict[str, Any]]:
     projects = list(portfolio_truth.get("projects") or [])
     candidates: list[dict[str, Any]] = []
-    status_rank = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
     context_rank = {
         "none": 0,
         "boilerplate": 1,
@@ -665,7 +665,7 @@ def _build_path_attention_items(
 
     candidates.sort(
         key=lambda item: (
-            status_rank.get(item["attention_state"], 9),
+            ATTENTION_STATE_RANK.get(item["attention_state"], 9),
             0 if item["operating_path"] == "unspecified" else 1,
             0 if item["path_confidence"] == "low" else 1,
             context_rank.get(item["context_quality"], 9),

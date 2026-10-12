@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
+
+from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
+from github_repo_auditor.reckoning_overlay import ReckoningOverlay
 
 
 def build_excel_workbook(
@@ -71,6 +74,9 @@ def build_excel_workbook(
     core_visible_sheets: set[str],
     template_info_sheet: str,
     preferred_order: list[str],
+    build_reckoning_sheet: Callable[..., Any] | None = None,
+    reckoning_overlay: ReckoningOverlay | None = None,
+    portfolio_truth: dict[str, Any] | None = None,
 ) -> None:
     run_workbook_build_steps(
         [
@@ -165,6 +171,10 @@ def build_excel_workbook(
             ),
         ]
     )
+    if reckoning_overlay is not None:
+        if build_reckoning_sheet is None:
+            raise ValueError("Reckoning requires a sheet builder")
+        build_reckoning_sheet(wb, portfolio_truth, reckoning_overlay)
     inject_sheet_navigation(wb)
     apply_workbook_named_ranges(
         wb,
@@ -202,8 +212,13 @@ def export_excel_workbook(
     build_risk_summary_sheet,
     inject_native_sparklines,
     build_template_sparkline_specs,
+    reckoning_overlay: ReckoningOverlay | None = None,
 ) -> Path:
     data = json.loads(report_path.read_text())
+
+    portfolio_truth = None
+    if reckoning_overlay is not None:
+        portfolio_truth = load_reckoning_truth(truth_dir or report_path.parent)
 
     risk_lookup, risk_posture = load_risk_truth(truth_dir)
 
@@ -217,6 +232,12 @@ def export_excel_workbook(
     else:
         wb = Workbook()
 
+    reckoning_kwargs = {}
+    if reckoning_overlay is not None:
+        reckoning_kwargs = {
+            "reckoning_overlay": reckoning_overlay,
+            "portfolio_truth": portfolio_truth,
+        }
     build_excel_workbook(
         wb,
         data,
@@ -227,6 +248,7 @@ def export_excel_workbook(
         collection=collection,
         excel_mode=excel_mode,
         risk_lookup=risk_lookup,
+        **reckoning_kwargs,
     )
 
     if risk_posture:

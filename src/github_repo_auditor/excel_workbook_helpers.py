@@ -10,6 +10,7 @@ DEFAULT_PREFERRED_SHEET_ORDER = [
     "Dashboard",
     "Review Queue",
     "Portfolio Explorer",
+    "Reckoning",
     "Implementation Hotspots",
     "Operator Outcomes",
     "Approval Ledger",
@@ -47,6 +48,10 @@ CORE_VISIBLE_SHEETS = {
     "Executive Summary",
     "Print Pack",
 }
+
+
+def core_visible_sheets_for_overlay(present: bool) -> set[str]:
+    return CORE_VISIBLE_SHEETS | ({"Reckoning"} if present else set())
 
 
 def set_autofilter(ws, max_col: int, max_row: int, start_row: int = 1) -> None:
