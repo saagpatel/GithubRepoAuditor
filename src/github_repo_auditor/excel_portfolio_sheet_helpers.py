@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -27,6 +28,8 @@ RECKONING_HEADERS = [
     "Decided at",
     "Truth attention state",
     "Last activity",
+    "Matched projects",
+    "Unmatched members",
 ]
 
 
@@ -34,30 +37,85 @@ def build_reckoning_rows(
     truth: dict[str, Any],
     overlay: ReckoningOverlay,
 ) -> list[list[Any]]:
-    """One row per truth project, including unassigned and local-only projects."""
-    rows: list[list[Any]] = []
+    """One row per overlay family, including families absent from saved truth."""
+    return _build_reckoning_content(truth, overlay)[0]
+
+
+def _latest_activity(values: list[str]) -> str:
+    def timestamp(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value)
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+
+    return max(values, key=timestamp) if values else ""
+
+
+def _family_attention(states: list[str]) -> str:
+    # Existing weekly_command_center path-attention ordering; other states have
+    # no urgency rank, so retain their distinct values when none is ranked.
+    rank = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
+    ranked = [state for state in states if state in rank]
+    return (
+        min(ranked, key=rank.__getitem__)
+        if ranked
+        else ", ".join(dict.fromkeys(states))
+    )
+
+
+def _build_reckoning_content(
+    truth: dict[str, Any], overlay: ReckoningOverlay
+) -> tuple[list[list[Any]], list[str]]:
+    projects_by_family: dict[str, list[dict[str, Any]]] = {
+        family_id: [] for family_id in overlay.families
+    }
+    matched_members: dict[str, set[str]] = {
+        family_id: set() for family_id in overlay.families
+    }
+    unreckoned: list[str] = []
     workspace_root = (
         Path(truth["workspace_root"]) if truth.get("workspace_root") else None
     )
     for project in truth["projects"]:
         identity = project["identity"]
-        derived = project.get("derived", {})
-        match = overlay.lookup(
+        matches = overlay.lookup_members(
             github_id=identity.get("github_id")
             or project.get("repository_state", {}).get("github_id"),
             repo_full_name=identity.get("repo_full_name", ""),
             local_path=identity.get("path", ""),
             workspace_root=workspace_root,
         )
-        family_id, family = match if match else ("", {})
+        if not matches:
+            unreckoned.append(
+                identity.get("project_key")
+                or identity.get("repo_full_name")
+                or identity.get("path", "")
+            )
+            continue
+        # Preserve lookup's first-family choice for ambiguous normalized paths.
+        family_id = matches[0][0]
+        projects_by_family[family_id].append(project)
+        matched_members[family_id].update(
+            member["key"] for matched_id, member in matches if matched_id == family_id
+        )
+
+    rows: list[list[Any]] = []
+    for family_id, family in overlay.families.items():
+        projects = projects_by_family[family_id]
+        states = [
+            project.get("derived", {}).get("attention_state") for project in projects
+        ]
+        activities = [
+            project.get("derived", {}).get("last_meaningful_activity_at")
+            for project in projects
+        ]
+        member_keys = [member["key"] for member in family["members"]]
         evidence = family.get("evidence") or {}
         github = family.get("github") or {}
         rows.append(
             [
                 family_id,
-                family.get("title") or identity.get("display_name", ""),
+                family.get("title") or family_id,
                 family.get("cluster", ""),
-                identity.get("repo_full_name") or identity.get("path", ""),
+                ", ".join(member_keys),
                 family.get("fate", ""),
                 family.get("assimilate_into", ""),
                 ", ".join(family.get("tags", [])),
@@ -69,11 +127,15 @@ def build_reckoning_rows(
                 github.get("visibility_after", ""),
                 family.get("wave", ""),
                 str(family.get("decided_at") or ""),
-                derived.get("attention_state", ""),
-                derived.get("last_meaningful_activity_at", ""),
+                _family_attention([state for state in states if state]),
+                _latest_activity([activity for activity in activities if activity]),
+                len(projects),
+                ", ".join(
+                    key for key in member_keys if key not in matched_members[family_id]
+                ),
             ]
         )
-    return rows
+    return rows, unreckoned
 
 
 def build_reckoning_sheet(
@@ -98,12 +160,13 @@ def build_reckoning_sheet(
     set_sheet_header(
         ws,
         "Reckoning",
-        "Private family verdicts alongside saved portfolio truth; one row per project. Blank verdicts are unassigned.",
+        "Private family verdicts alongside saved portfolio truth; one row per family. Coverage gaps appear below and in Unmatched members.",
         width=len(RECKONING_HEADERS),
     )
-    write_portfolio_table(
+    rows, unreckoned = _build_reckoning_content(truth, overlay)
+    end_row = write_portfolio_table(
         ws,
-        build_reckoning_rows(truth, overlay),
+        rows,
         start_row=5,
         headers=RECKONING_HEADERS,
         freeze_panes="E6",
@@ -115,6 +178,28 @@ def build_reckoning_sheet(
         add_table=add_table,
         auto_width=auto_width,
     )
+    block_row = end_row + 3
+    family_filter = ws.auto_filter.ref
+    ws.cell(row=block_row, column=1, value="Unreckoned projects")
+    style_header_row(ws, block_row, 2)
+    style_data_cell(ws.cell(row=block_row + 1, column=1, value="Count"), "left")
+    style_data_cell(ws.cell(row=block_row + 1, column=2, value=len(unreckoned)), "left")
+    write_portfolio_table(
+        ws,
+        [[key] for key in unreckoned[:50]],
+        start_row=block_row + 2,
+        headers=["Project key (first 50)"],
+        freeze_panes="E6",
+        table_name="tblUnreckonedProjects",
+        centered_columns=set(),
+        style_header_row=style_header_row,
+        style_data_cell=style_data_cell,
+        apply_zebra_stripes=apply_zebra_stripes,
+        add_table=add_table,
+        auto_width=auto_width,
+    )
+    # Visible sheets use a single worksheet filter; keep it on family rows.
+    ws.auto_filter.ref = family_filter
     # Private prose is data, even when it starts with Excel's formula prefix.
     for row in ws.iter_rows(min_row=6):
         for cell in row:
@@ -194,7 +279,8 @@ def build_portfolio_explorer_rows(
                 ", ".join(entry["collections"]),
                 audit.get("portfolio_catalog", {}).get("lifecycle_state", "") or "—",
                 audit.get("portfolio_catalog", {}).get("criticality", "") or "—",
-                audit.get("portfolio_catalog", {}).get("intended_disposition", "") or "—",
+                audit.get("portfolio_catalog", {}).get("intended_disposition", "")
+                or "—",
                 audit.get("portfolio_catalog", {}).get("operating_path", "") or "—",
                 audit.get("scorecard", {}).get("maturity_level", "") or "—",
                 build_maturity_gap_summary(audit),
@@ -209,7 +295,9 @@ def build_portfolio_explorer_rows(
 
 def build_portfolio_catalog_table_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
     rows: list[list[Any]] = []
-    for audit in sorted(audits, key=lambda item: item.get("metadata", {}).get("name", "")):
+    for audit in sorted(
+        audits, key=lambda item: item.get("metadata", {}).get("name", "")
+    ):
         catalog = audit.get("portfolio_catalog", {})
         rows.append(
             [
@@ -235,7 +323,9 @@ def build_portfolio_catalog_table_rows(audits: list[dict[str, Any]]) -> list[lis
 
 def build_scorecard_table_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
     rows: list[list[Any]] = []
-    for audit in sorted(audits, key=lambda item: item.get("metadata", {}).get("name", "")):
+    for audit in sorted(
+        audits, key=lambda item: item.get("metadata", {}).get("name", "")
+    ):
         scorecard = audit.get("scorecard", {})
         rows.append(
             [

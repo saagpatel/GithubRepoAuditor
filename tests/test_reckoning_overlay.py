@@ -6,14 +6,19 @@ from pathlib import Path
 
 import pytest
 import yaml
+from openpyxl import Workbook
 
 from github_repo_auditor.cli import build_parser, build_subcommand_parser
-from github_repo_auditor.excel_export import export_excel
-from github_repo_auditor.excel_portfolio_sheet_helpers import RECKONING_HEADERS
+from github_repo_auditor.excel_export import _build_reckoning_sheet, export_excel
+from github_repo_auditor.excel_portfolio_sheet_helpers import (
+    RECKONING_HEADERS,
+    build_reckoning_rows,
+)
 from github_repo_auditor.excel_template import load_workbook_allowing_native_sparklines
 from github_repo_auditor.excel_workbook_helpers import CORE_VISIBLE_SHEETS
 from github_repo_auditor.reckoning_overlay import (
     ReckoningOverlayError,
+    ReckoningOverlay,
     load_reckoning_overlay,
 )
 from github_repo_auditor.workbook_gate import _sample_report_data, run_workbook_gate
@@ -31,7 +36,9 @@ def _family(key: str, **changes: object) -> dict:
 
 def _write_overlay(path: Path, families: dict) -> Path:
     path.write_text(
-        yaml.safe_dump({"schema": "reckoning-verdicts/1", "families": families})
+        yaml.safe_dump(
+            {"schema": "reckoning-verdicts/1", "families": families}, sort_keys=False
+        )
     )
     return path
 
@@ -99,6 +106,105 @@ def test_matching_precedence_and_archive_path(tmp_path) -> None:
     )
     assert overlay.lookup(local_path="Other") is None
     assert overlay.data == original
+
+
+def test_family_counts_projects_once_and_preserves_member_matching_precedence() -> None:
+    overlay = ReckoningOverlay(
+        {
+            "families": {
+                "by-id": _family(
+                    "fixture-owner/original",
+                    members=[
+                        {"key": "fixture-owner/original", "github_id": 17},
+                        {"key": "Mirror", "github_id": 17},
+                        {"key": "LocalAlias"},
+                        {"key": "MissingFolder"},
+                    ],
+                ),
+                "by-name": _family("fixture-owner/other"),
+                "by-path": _family("Local"),
+            }
+        }
+    )
+    truth = {
+        "projects": [
+            {
+                "identity": {
+                    "github_id": 17,
+                    "repo_full_name": "fixture-owner/other",
+                    "path": "Local",
+                },
+                "derived": {"attention_state": "active-infra"},
+            },
+            {
+                "identity": {
+                    "repo_full_name": "fixture-owner/original",
+                    "path": "LocalAlias",
+                },
+                "derived": {"attention_state": "active-product"},
+            },
+        ]
+    }
+    before = copy.deepcopy((truth, overlay.data))
+    rows = [
+        dict(zip(RECKONING_HEADERS, row))
+        for row in build_reckoning_rows(truth, overlay)
+    ]
+    assert [row["Family"] for row in rows] == ["by-id", "by-name", "by-path"]
+    assert rows[0]["Matched projects"] == 2
+    assert rows[0]["Unmatched members"] == "MissingFolder"
+    assert rows[0]["Truth attention state"] == "active-product"
+    assert rows[1]["Matched projects"] == rows[2]["Matched projects"] == 0
+    assert rows[1]["Unmatched members"] == "fixture-owner/other"
+    assert rows[2]["Unmatched members"] == "Local"
+    assert (truth, overlay.data) == before
+
+
+def test_unranked_attention_lists_distinct_states() -> None:
+    overlay = ReckoningOverlay(
+        {
+            "families": {
+                "local": _family("Local", members=[{"key": "Local"}, {"key": "Mirror"}])
+            }
+        }
+    )
+    truth = {
+        "projects": [
+            {"identity": {"path": path}, "derived": {"attention_state": state}}
+            for path, state in [
+                ("Local", "archived"),
+                ("Mirror", "parked"),
+                ("Local", "archived"),
+            ]
+        ]
+    }
+    row = dict(zip(RECKONING_HEADERS, build_reckoning_rows(truth, overlay)[0]))
+    assert row["Truth attention state"] == "archived, parked"
+    assert row["Matched projects"] == 3
+    assert row["Last activity"] == ""
+
+
+@pytest.mark.parametrize("count", [0, 55])
+def test_unreckoned_block_counts_all_projects_and_lists_first_50(count) -> None:
+    truth = {
+        "projects": [
+            {"identity": {"project_key": f"=project-{index}", "path": f"Local{index}"}}
+            for index in range(count)
+        ]
+    }
+    wb = Workbook()
+    _build_reckoning_sheet(wb, truth, ReckoningOverlay({"families": {}}))
+    sheet = wb["Reckoning"]
+    assert sheet["A8"].value == "Unreckoned projects"
+    assert sheet["B9"].value == count
+    assert sheet.max_row == 10 + min(count, 50)
+    assert sheet.auto_filter.ref is None
+    assert [
+        sheet.cell(row=11 + index, column=1).value for index in range(min(count, 50))
+    ] == [f"=project-{index}" for index in range(min(count, 50))]
+    if count:
+        assert sheet["A11"].data_type == "s"
+    wb.close()
 
 
 def test_validation_lists_all_schema_rule_problems(tmp_path) -> None:
@@ -175,6 +281,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         {
             "local": _family(
                 "_archive/LocalOnly",
+                members=[{"key": "_archive/LocalOnly"}, {"key": "LocalMirror"}],
                 fate="archive",
                 title="=Private text",
                 tags=["custom-tag"],
@@ -186,6 +293,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
                 wave=2,
                 decided_at="2026-10-11T00:00:00Z",
             ),
+            "remote": _family("fixture-owner/remote-only"),
         },
     )
     truth_path = tmp_path / "portfolio-truth-latest.json"
@@ -193,6 +301,13 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         json.dumps(
             {
                 "projects": [
+                    {
+                        "identity": {"path": "LocalMirror"},
+                        "derived": {
+                            "attention_state": "decision-needed",
+                            "last_meaningful_activity_at": "2025-12-31T20:00:00-08:00",
+                        },
+                    },
                     {
                         "identity": {
                             "display_name": "LocalOnly",
@@ -205,6 +320,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
                     },
                     {
                         "identity": {
+                            "project_key": "unassigned-key",
                             "display_name": "Unassigned",
                             "path": "Unassigned",
                         },
@@ -233,7 +349,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         "local",
         "=Private text",
         None,
-        "_archive/LocalOnly",
+        "_archive/LocalOnly, LocalMirror",
         "archive",
         None,
         "custom-tag",
@@ -245,13 +361,22 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         "private",
         2,
         "2026-10-11T00:00:00Z",
-        "archived",
-        "2026-01-01T00:00:00Z",
+        "decision-needed",
+        "2025-12-31T20:00:00-08:00",
+        2,
+        None,
     ]
     assert sheet["B6"].data_type == "s"
-    assert sheet["B7"].value == "Unassigned"
-    assert sheet["A7"].value is None and sheet["E7"].value is None
-    assert sheet.max_row == 7
+    assert sheet["A7"].value == "remote"
+    assert sheet["D7"].value == "fixture-owner/remote-only"
+    assert sheet["P7"].value is None and sheet["Q7"].value is None
+    assert sheet["R7"].value == 0
+    assert sheet["S7"].value == "fixture-owner/remote-only"
+    assert sheet.auto_filter.ref == "A5:S7"
+    assert sheet["A10"].value == "Unreckoned projects"
+    assert sheet["A11"].value == "Count" and sheet["B11"].value == 1
+    assert sheet["A13"].value == "unassigned-key"
+    assert sheet.max_row == 13
     for path, content in before.items():
         assert path.read_bytes() == content
     assert list(tmp_path.glob("*verdict*")) == []
@@ -259,8 +384,10 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
     present.close()
 
 
+@pytest.mark.parametrize("mode", ["standard", "template"])
+@pytest.mark.parametrize("contents", [None, "not JSON"])
 def test_requested_overlay_requires_saved_truth_before_writing_workbook(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, mode, contents
 ) -> None:
     monkeypatch.delenv("GHRA_RECKONING_OVERLAY", raising=False)
     report = tmp_path / "report.json"
@@ -269,10 +396,10 @@ def test_requested_overlay_requires_saved_truth_before_writing_workbook(
         tmp_path / "private.yaml", {"local": _family("Local")}
     )
     output = tmp_path / "workbook.xlsx"
+    if contents is not None:
+        (tmp_path / "portfolio-truth-latest.json").write_text(contents)
     with pytest.raises(ValueError, match="portfolio-truth-latest.json"):
-        export_excel(
-            report, output, excel_mode="template", reckoning_overlay=overlay_path
-        )
+        export_excel(report, output, excel_mode=mode, reckoning_overlay=overlay_path)
     assert not output.exists()
 
 

@@ -1234,10 +1234,16 @@ def run_workbook_gate(
                         "families": {
                             "local-family": {
                                 "title": "Local project",
-                                "members": [{"key": "_archive/LocalOnly"}],
+                                "members": [{"key": "_archive/LocalOnly"}, {"key": "LocalMirror"}],
                                 "fate": "archive",
                                 "status": "approved",
                                 "tags": ["strip-for-parts"],
+                            },
+                            "remote-family": {
+                                "title": "Remote-only project",
+                                "members": [{"key": "fixture-owner/remote-only"}],
+                                "fate": "pending",
+                                "status": "proposed",
                             },
                         },
                     }
@@ -1258,7 +1264,15 @@ def run_workbook_gate(
                                 },
                             },
                             {
+                                "identity": {"path": "LocalMirror"},
+                                "derived": {
+                                    "attention_state": "decision-needed",
+                                    "last_meaningful_activity_at": "2026-02-01T00:00:00Z",
+                                },
+                            },
+                            {
                                 "identity": {
+                                    "project_key": "unassigned-key",
                                     "path": "Unassigned",
                                     "display_name": "Unassigned",
                                 },
@@ -1322,17 +1336,27 @@ def run_workbook_gate(
             and wb["Reckoning"].sheet_state == "visible"
             and [cell.value for cell in wb["Reckoning"][5]] == RECKONING_HEADERS
             and wb["Reckoning"]["A6"].value == "local-family"
-            and wb["Reckoning"]["D6"].value == "_archive/LocalOnly"
+            and wb["Reckoning"]["D6"].value == "_archive/LocalOnly, LocalMirror"
             and wb["Reckoning"]["E6"].value == "archive"
-            and wb["Reckoning"]["P6"].value == "archived"
-            and wb["Reckoning"].max_row == 7
+            and wb["Reckoning"]["P6"].value == "decision-needed"
+            and wb["Reckoning"]["Q6"].value == "2026-02-01T00:00:00Z"
+            and wb["Reckoning"]["R6"].value == 2
+            and wb["Reckoning"]["S6"].value is None
+            and wb["Reckoning"]["A7"].value == "remote-family"
+            and wb["Reckoning"]["R7"].value == 0
+            and wb["Reckoning"]["S7"].value == "fixture-owner/remote-only"
+            and wb["Reckoning"].auto_filter.ref == "A5:S7"
+            and wb["Reckoning"]["A10"].value == "Unreckoned projects"
+            and wb["Reckoning"]["B11"].value == 1
+            and wb["Reckoning"]["A13"].value == "unassigned-key"
+            and wb["Reckoning"].max_row == 13
             for wb in workbooks
         )
         checks.append(
             _check_result(
                 "reckoning-population",
                 "passed" if valid else "failed",
-                "Synthetic local-only and unassigned truth projects must appear with verdicts and truth state.",
+                "Every synthetic family must appear once with aggregated truth and unmatched members; unreckoned truth projects must appear only below the family table.",
             )
         )
     else:

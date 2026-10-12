@@ -70,26 +70,71 @@ class ReckoningOverlay:
         workspace_root: Path | None = None,
     ) -> tuple[str, dict[str, Any]] | None:
         """Match globally by ID, then owner/repo, then workspace-relative path."""
+        matches = self.lookup_members(
+            github_id=github_id,
+            repo_full_name=repo_full_name,
+            local_path=local_path,
+            workspace_root=workspace_root,
+        )
+        if matches:
+            family_id = matches[0][0]
+            return family_id, self.families[family_id]
+        return None
+
+    def lookup_members(
+        self,
+        *,
+        github_id: int | None = None,
+        repo_full_name: str = "",
+        local_path: str = "",
+        workspace_root: Path | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Resolve the family by ID > name > path, then match its member aliases."""
         members = [
-            (family_id, family, member)
+            (family_id, member)
             for family_id, family in self.families.items()
             for member in family["members"]
         ]
+        matches: list[tuple[str, dict[str, Any]]] = []
         if github_id is not None:
-            for family_id, family, member in members:
-                if member.get("github_id") == github_id:
-                    return family_id, family
+            matches.extend(
+                [
+                    (family_id, member)
+                    for family_id, member in members
+                    if member.get("github_id") == github_id
+                ]
+            )
         if repo_full_name:
-            for family_id, family, member in members:
-                if member["key"].casefold() == repo_full_name.casefold():
-                    return family_id, family
+            matches.extend(
+                [
+                    (family_id, member)
+                    for family_id, member in members
+                    if member["key"].casefold() == repo_full_name.casefold()
+                ]
+            )
         if local_path:
             target = _path_key(local_path, workspace_root)
-            for family_id, family, member in members:
-                paths = [member["key"], *member.get("local_paths", [])]
-                if any(_path_key(path, workspace_root) == target for path in paths):
-                    return family_id, family
-        return None
+            matches.extend(
+                [
+                    (family_id, member)
+                    for family_id, member in members
+                    if any(
+                        _path_key(path, workspace_root) == target
+                        for path in [member["key"], *member.get("local_paths", [])]
+                    )
+                ]
+            )
+        if not matches:
+            return []
+        family_id = matches[0][0]
+        matched_keys = {
+            member["key"] for matched_id, member in matches if matched_id == family_id
+        }
+        return [
+            (family_id, member)
+            for matched_id, member in members
+            if matched_id == family_id and member["key"] in matched_keys
+        ]
 
 
 def _validate(data: Any) -> dict[str, Any]:
