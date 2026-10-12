@@ -421,9 +421,10 @@ def _checkout_representative(
     return min(
         group,
         key=lambda project: (
-            "_archive" in Path(str(project.get("path", ""))).parts,
+            project.get("_external_worktree") is True,
             _checkout_observation(project).get("state") != "observed",
             _checkout_observation(project).get("bare") is True,
+            "_archive" in Path(str(project.get("path", ""))).parts,
             str(project.get("name", "")).lower() != repo_base,
             len(Path(str(project.get("path", ""))).parts),
             len(str(project.get("path", ""))),

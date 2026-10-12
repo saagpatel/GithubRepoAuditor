@@ -107,8 +107,9 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 Private family verdicts can be displayed in a visible `Reckoning` workbook sheet
 with `--reckoning-overlay PATH` or `GHRA_RECKONING_OVERLAY` (the flag takes
-precedence). The YAML must use schema `reckoning-verdicts` version `1`; invalid verdicts
-stop CLI preflight before the GitHub audit. Export also requires the saved
+precedence). The YAML's `schema` value is `reckoning-verdicts`, then a slash, then
+`1`; invalid verdicts stop CLI preflight before the GitHub audit. The overlay is
+read once at startup, so a long `--watch` run picks up edits after a restart. Export also requires the saved
 `portfolio-truth-latest.json` beside the audit report, or in the exporter API's
 `truth_dir`. Each overlay family gets one row in overlay order, including
 families with no saved truth match. `Members` lists the family's member keys;

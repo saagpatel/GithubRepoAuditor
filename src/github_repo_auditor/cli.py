@@ -83,9 +83,11 @@ def _prepare_reckoning_export(args: argparse.Namespace, parser: argparse.Argumen
             args.reckoning_overlay = None
             return
 
-        from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
+        # A dry run never exports a workbook, so only the overlay itself is checked.
+        if not getattr(args, "dry_run", False):
+            from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
 
-        load_reckoning_truth(Path(args.output_dir))
+            load_reckoning_truth(Path(args.output_dir))
     except (ReckoningOverlayError, OSError, ValueError) as exc:
         parser.error(str(exc))
 

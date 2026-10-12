@@ -385,6 +385,25 @@ def test_live_nested_checkout_wins_identity_and_representation_over_archive() ->
     assert collisions[0]["selection"]["representative_path"] == live["path"]
 
 
+def test_archive_clone_beats_external_worktree_placeholder_as_representative() -> None:
+    from github_repo_auditor.portfolio_truth_sources import _checkout_representative
+
+    archive = _p(
+        "Repo", "owner/Repo", path="_archive/Repo",
+        head="1" * 40, common_dir="/git/archive/.git",
+    )
+    placeholder = {
+        "name": "external-worktree",
+        "path": "external-worktree",
+        "repo_full_name": "owner/Repo",
+        "_external_worktree": True,
+        "_checkout_observation": {"state": "unknown", "bare": None},
+    }
+
+    assert _checkout_representative([placeholder, archive], "owner/Repo") is archive
+    assert _checkout_representative([archive, placeholder], "owner/Repo") is archive
+
+
 def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> None:
     collisions: list[dict] = []
     head = "1" * 40
