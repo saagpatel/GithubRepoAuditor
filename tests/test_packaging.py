@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tarfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -11,6 +14,39 @@ import pytest
 from github_repo_auditor.config import inspect_config
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_built_distributions_exclude_private_reckoning_data(tmp_path):
+    private = tmp_path / "reckoning-verdicts.yaml"
+    private.write_text("schema: reckoning-verdicts/1\nfamilies: {}\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "build", "--outdir", str(tmp_path / "dist")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "GHRA_RECKONING_OVERLAY": str(private),
+            "TMPDIR": str(tmp_path),
+            "PIP_CACHE_DIR": str(tmp_path / "pip-cache"),
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    (wheel,) = (tmp_path / "dist").glob("*.whl")
+    (sdist,) = (tmp_path / "dist").glob("*.tar.gz")
+    with zipfile.ZipFile(wheel) as archive:
+        wheel_files = archive.namelist()
+    with tarfile.open(sdist) as archive:
+        sdist_files = archive.getnames()
+    for files in (wheel_files, sdist_files):
+        assert any(
+            name.endswith("github_repo_auditor/reckoning_overlay.py") for name in files
+        )
+        assert not any(
+            ("reckoning" in name.lower() or "verdicts" in name.lower())
+            and Path(name).name not in {"reckoning_overlay.py", "test_reckoning_overlay.py"}
+            for name in files
+        )
 
 
 def _project_dependency_names() -> set[str]:
