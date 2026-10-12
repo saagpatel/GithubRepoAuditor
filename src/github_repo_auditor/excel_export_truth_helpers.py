@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from github_repo_auditor.portfolio_truth_types import truth_latest_path
+from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION, truth_latest_path
+from github_repo_auditor.portfolio_truth_validate import (
+    canonicalize_truth_snapshot_payload,
+)
 
 
 def load_reckoning_truth(truth_dir: Path) -> dict[str, Any]:
@@ -18,16 +21,21 @@ def load_reckoning_truth(truth_dir: Path) -> dict[str, Any]:
         raise ValueError(
             f"Reckoning requires a readable {truth_path.name} in truth_dir (or beside the report)"
         ) from exc
-    if not isinstance(truth, dict) or not isinstance(truth.get("projects"), list):
-        raise ValueError("Reckoning requires portfolio truth with a projects list")
-    if any(
-        not isinstance(project, dict) or not isinstance(project.get("identity"), dict)
-        for project in truth["projects"]
-    ):
+    if not isinstance(truth, dict):
         raise ValueError(
-            "Reckoning requires an identity mapping for each truth project"
+            f"Reckoning requires valid {truth_path.name}: root must be an object"
         )
-    return truth
+    if truth.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError(
+            f"Reckoning requires valid {truth_path.name}: unsupported schema_version "
+            f"{truth.get('schema_version')!r}; expected {SCHEMA_VERSION}"
+        )
+    try:
+        # The portable validator pins /demo-workspace; saved operator truth may
+        # use any workspace root, so use its shared model-validation entrypoint.
+        return canonicalize_truth_snapshot_payload(truth)
+    except ValueError as exc:
+        raise ValueError(f"Reckoning requires valid {truth_path.name}: {exc}") from exc
 
 
 def load_risk_truth(truth_dir: Path | None) -> tuple[dict[str, str], dict[str, int]]:

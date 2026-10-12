@@ -10,18 +10,21 @@ from openpyxl import Workbook
 
 from github_repo_auditor.cli import build_parser, build_subcommand_parser
 from github_repo_auditor.excel_export import _build_reckoning_sheet, export_excel
+from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
 from github_repo_auditor.excel_portfolio_sheet_helpers import (
     RECKONING_HEADERS,
     build_reckoning_rows,
 )
 from github_repo_auditor.excel_template import load_workbook_allowing_native_sparklines
 from github_repo_auditor.excel_workbook_helpers import CORE_VISIBLE_SHEETS
+from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
 from github_repo_auditor.reckoning_overlay import (
     ReckoningOverlayError,
     ReckoningOverlay,
     load_reckoning_overlay,
 )
 from github_repo_auditor.workbook_gate import (
+    _sample_reckoning_truth,
     _sample_report_data,
     record_manual_signoff,
     run_workbook_gate,
@@ -275,6 +278,55 @@ def test_path_matching_uses_casefolded_workspace_relative_aliases(tmp_path) -> N
 
 
 @pytest.mark.parametrize(
+    "first,second",
+    [
+        ({"key": "/mnt/work/Foo"}, {"key": "foo"}),
+        ({"key": "owner/first", "local_paths": ["/mnt/work/Foo"]}, {"key": "foo"}),
+        (
+            {"key": "/mnt/work/Foo"},
+            {"key": "owner/second", "local_paths": ["./foo/"]},
+        ),
+    ],
+)
+def test_truth_workspace_path_collisions_fail_matching(tmp_path, first, second) -> None:
+    overlay = load_reckoning_overlay(
+        _write_overlay(
+            tmp_path / "paths.yaml",
+            {
+                "first": _family(first["key"], members=[first]),
+                "second": _family(second["key"], members=[second]),
+            },
+        )
+    )
+    # Early validation retains the default root; the saved truth supplies this one.
+    with pytest.raises(ReckoningOverlayError, match="families 'first' and 'second'"):
+        build_reckoning_rows(
+            {
+                "workspace_root": "/mnt/work",
+                "projects": [{"identity": {"path": "Foo"}}],
+            },
+            overlay,
+        )
+
+
+def test_truth_workspace_path_aliases_within_one_family_are_allowed(tmp_path) -> None:
+    overlay = load_reckoning_overlay(
+        _write_overlay(
+            tmp_path / "paths.yaml",
+            {
+                "local": _family(
+                    "/mnt/work/Foo",
+                    members=[{"key": "/mnt/work/Foo", "local_paths": ["./foo/"]}],
+                )
+            },
+        )
+    )
+    assert (
+        overlay.lookup(local_path="FOO", workspace_root=Path("/mnt/work"))[0] == "local"
+    )
+
+
+@pytest.mark.parametrize(
     "contents",
     [
         "schema: wrong\nfamilies: {}",
@@ -325,8 +377,8 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         tmp_path / "private.yaml",
         {
             "local": _family(
-                "_archive/LocalOnly",
-                members=[{"key": "_archive/LocalOnly"}, {"key": "LocalMirror"}],
+                "archive/localonly",
+                members=[{"key": "archive/localonly"}, {"key": "lab/localmirror"}],
                 fate="archive",
                 title="=Private text",
                 tags=["custom-tag"],
@@ -342,39 +394,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         },
     )
     truth_path = tmp_path / "portfolio-truth-latest.json"
-    truth_path.write_text(
-        json.dumps(
-            {
-                "projects": [
-                    {
-                        "identity": {"path": "LocalMirror"},
-                        "derived": {
-                            "attention_state": "decision-needed",
-                            "last_meaningful_activity_at": "2025-12-31T20:00:00-08:00",
-                        },
-                    },
-                    {
-                        "identity": {
-                            "display_name": "LocalOnly",
-                            "path": "_archive/LocalOnly",
-                        },
-                        "derived": {
-                            "attention_state": "archived",
-                            "last_meaningful_activity_at": "2026-01-01T00:00:00Z",
-                        },
-                    },
-                    {
-                        "identity": {
-                            "project_key": "unassigned-key",
-                            "display_name": "Unassigned",
-                            "path": "Unassigned",
-                        },
-                        "derived": {},
-                    },
-                ]
-            }
-        )
-    )
+    truth_path.write_text(json.dumps(_sample_reckoning_truth()))
     before = {path: path.read_bytes() for path in (report, overlay_path, truth_path)}
     monkeypatch.setenv("GHRA_RECKONING_OVERLAY", str(overlay_path))
     absent_path = export_excel(report, tmp_path / "absent.xlsx", excel_mode=mode)
@@ -398,7 +418,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         "local",
         "=Private text",
         None,
-        "_archive/LocalOnly, LocalMirror",
+        "archive/localonly, lab/localmirror",
         "archive",
         None,
         "custom-tag",
@@ -411,8 +431,8 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
         2,
         "2026-10-11T00:00:00Z",
         "decision-needed",
-        "decision-needed, archived",
-        "2025-12-31T20:00:00-08:00",
+        "archived, decision-needed",
+        "2026-02-01T00:00:00+00:00",
         2,
         None,
     ]
@@ -425,7 +445,7 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
     assert sheet.auto_filter.ref == "A5:T7"
     assert sheet["A10"].value == "Unreckoned projects"
     assert sheet["A11"].value == "Count" and sheet["B11"].value == 1
-    assert sheet["A13"].value == "unassigned-key"
+    assert sheet["A13"].value == "studio/unassigned"
     assert sheet.max_row == 13
     for path, content in before.items():
         assert path.read_bytes() == content
@@ -435,7 +455,16 @@ def test_workbook_uses_full_truth_without_mutating_inputs(
 
 
 @pytest.mark.parametrize("mode", ["standard", "template"])
-@pytest.mark.parametrize("contents", [None, "not JSON"])
+@pytest.mark.parametrize(
+    "contents",
+    [
+        None,
+        "not JSON",
+        json.dumps({"projects": [{"identity": {}}]}),
+        json.dumps({"schema_version": SCHEMA_VERSION, "projects": [{"identity": {}}]}),
+        json.dumps({"schema_version": "999.0.0", "projects": []}),
+    ],
+)
 def test_requested_overlay_requires_saved_truth_before_writing_workbook(
     tmp_path, monkeypatch, mode, contents
 ) -> None:
@@ -451,6 +480,33 @@ def test_requested_overlay_requires_saved_truth_before_writing_workbook(
     with pytest.raises(ValueError, match="portfolio-truth-latest.json"):
         export_excel(report, output, excel_mode=mode, reckoning_overlay=overlay_path)
     assert not output.exists()
+
+
+def test_reckoning_truth_rejects_unsupported_schema(tmp_path) -> None:
+    truth = _sample_reckoning_truth()
+    truth["schema_version"] = "999.0.0"
+    (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+    with pytest.raises(ValueError, match="unsupported schema_version '999.0.0'"):
+        load_reckoning_truth(tmp_path)
+
+
+def test_reckoning_truth_validates_required_fields(tmp_path) -> None:
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"schema_version": SCHEMA_VERSION, "projects": [{"identity": {}}]})
+    )
+    with pytest.raises(ValueError, match="missing field: derived"):
+        load_reckoning_truth(tmp_path)
+
+
+def test_reckoning_truth_accepts_valid_operator_workspace(tmp_path) -> None:
+    truth = _sample_reckoning_truth()
+    truth["workspace_root"] = "/mnt/work"
+    truth["source_summary"]["workspace_root"] = "/mnt/work"
+    path = tmp_path / "portfolio-truth-latest.json"
+    path.write_text(json.dumps(truth))
+    before = path.read_bytes()
+    assert load_reckoning_truth(tmp_path) == truth
+    assert path.read_bytes() == before
 
 
 def test_workbook_gate_with_synthetic_overlay(tmp_path, monkeypatch) -> None:

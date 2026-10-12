@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Reject reckoning path collisions under the saved truth workspace root and
+  validate canonical truth before exporting private overlay workbooks.
+
 - Prefer live checkouts over archive copies, validate private overlay inputs in
   CLI preflight, preserve overlays on shared workbook refresh, and isolate
   synthetic gates and exports from private runtime settings.

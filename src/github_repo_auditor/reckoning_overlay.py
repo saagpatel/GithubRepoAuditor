@@ -96,6 +96,19 @@ class ReckoningOverlay:
             for family_id, family in self.families.items()
             for member in family["members"]
         ]
+        if workspace_root is not None:
+            paths: dict[str, str] = {}
+            for family_id, member in members:
+                for path in [member["key"], *member.get("local_paths", [])]:
+                    normalized = _path_key(path, workspace_root)
+                    previous = paths.get(normalized)
+                    if previous is not None and previous != family_id:
+                        raise ReckoningOverlayError(
+                            f"Invalid reckoning overlay: normalized path {normalized!r} "
+                            f"belongs to families {previous!r} and {family_id!r} "
+                            "under the truth workspace root"
+                        )
+                    paths[normalized] = family_id
         matches: list[tuple[str, dict[str, Any]]] = []
         if github_id is not None:
             matches.extend(
