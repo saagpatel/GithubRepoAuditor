@@ -110,9 +110,15 @@ with `--reckoning-overlay PATH` or `GHRA_RECKONING_OVERLAY` (the flag takes
 precedence). The YAML must use schema `reckoning-verdicts/1`; invalid verdicts
 stop export with validation errors. Export also requires the saved
 `portfolio-truth-latest.json` beside the audit report, or in the exporter API's
-`truth_dir`. Each truth project gets a row, including local-only projects;
-unassigned projects have blank verdicts. Identity matches by GitHub ID when
-available, then `owner/repo`, then workspace-relative path.
+`truth_dir`. Each overlay family gets one row in overlay order, including
+families with no saved truth match. `Members` lists the family's member keys;
+`Matched projects` counts matched truth projects and `Unmatched members` lists
+member keys with no match. Identity matches by GitHub ID when available, then
+`owner/repo`, then workspace-relative path. Family attention uses the existing
+urgency order (`decision-needed`, `active-product`, `active-infra`); when none
+of those states is present, distinct states are listed. Last activity is the
+latest matched timestamp. An `Unreckoned projects` block below the family table
+reports the count and first 50 keys of truth projects with no family.
 
 Keep the overlay outside this repository and published artifacts. It is read
 only, is never copied into output, and adds no fields to canonical truth. The

@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Show every reckoning family once, aggregate matched truth activity and attention,
+  and expose unmatched members and unreckoned truth projects in the workbook.
+
 - Read private runtime reckoning verdicts into an optional visible workbook sheet
   without changing canonical truth; discover `_archive` children with archived defaults.
 
