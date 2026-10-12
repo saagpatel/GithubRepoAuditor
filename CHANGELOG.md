@@ -13,6 +13,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Prefer live checkouts over archive copies, validate private overlay inputs in
+  CLI preflight, preserve overlays on shared workbook refresh, and isolate
+  synthetic gates and exports from private runtime settings.
+
 - Show every reckoning family once, aggregate matched truth activity and attention,
   and expose unmatched members and unreckoned truth projects in the workbook.
 

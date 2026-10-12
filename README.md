@@ -107,16 +107,18 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 Private family verdicts can be displayed in a visible `Reckoning` workbook sheet
 with `--reckoning-overlay PATH` or `GHRA_RECKONING_OVERLAY` (the flag takes
-precedence). The YAML must use schema `reckoning-verdicts/1`; invalid verdicts
-stop export with validation errors. Export also requires the saved
+precedence). The YAML must use schema `reckoning-verdicts` version `1`; invalid verdicts
+stop CLI preflight before the GitHub audit. Export also requires the saved
 `portfolio-truth-latest.json` beside the audit report, or in the exporter API's
 `truth_dir`. Each overlay family gets one row in overlay order, including
 families with no saved truth match. `Members` lists the family's member keys;
 `Matched projects` counts matched truth projects and `Unmatched members` lists
-member keys with no match. Identity matches by GitHub ID when available, then
-`owner/repo`, then workspace-relative path. Family attention uses the existing
-urgency order (`decision-needed`, `active-product`, `active-infra`); when none
-of those states is present, distinct states are listed. Last activity is the
+member keys with no match. Matching retains a GitHub repository ID tier, but
+canonical truth carries no repository ID today, so current truth matches by
+`owner/repo`, then workspace-relative path. `Truth attention state` is a single
+value using the existing urgency order (`decision-needed`, `active-product`,
+`active-infra`), with unranked ties resolved in saved-truth order. `Attention states`
+lists all distinct matched states. Last activity is the
 latest matched timestamp. An `Unreckoned projects` block below the family table
 reports the count and first 50 keys of truth projects with no family.
 
@@ -125,7 +127,10 @@ only, is never copied into output, and adds no fields to canonical truth. The
 resulting workbook contains private verdicts and should be treated as private.
 Without an overlay, no `Reckoning` sheet is added. Both workbook modes can be
 checked without private inputs using
-`make workbook-gate ARGS="--synthetic-reckoning-overlay"`.
+`make workbook-gate ARGS="--synthetic-reckoning-overlay"`. This gate writes to
+`output/workbook-gate/synthetic-reckoning/`, keeping the normal desktop signoff
+artifacts separate. The environment variable is read only by the audit CLI;
+demo, benchmark, and direct exporter calls require an explicit overlay argument.
 
 ## Demo and Guides
 
