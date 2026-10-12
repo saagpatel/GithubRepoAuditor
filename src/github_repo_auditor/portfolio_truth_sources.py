@@ -195,7 +195,7 @@ def discover_workspace_projects(
         if exclusion_reason is not None:
             _record_exclusion(exclusion_counts, exclusion_reason)
             continue
-        if _is_project_dir(child):
+        if child.name != "_archive" and _is_project_dir(child):
             discovered.append(
                 _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
             )

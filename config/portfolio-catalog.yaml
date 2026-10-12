@@ -7,6 +7,12 @@ defaults:
   maturity_program: maintain
   target_maturity: operating
 groups:
+  archive:
+    label: Archive
+    path_prefixes:
+    - _archive
+    lifecycle_state: archived
+    operating_path: archive
   itprjsviaclaude:
     label: IT Tools
     section_marker: ITPRJsViaClaude/
