@@ -105,6 +105,22 @@ audit triage <github-username> --approval-center
 
 Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, scorecards overrides, and `--excel-mode template` as advanced paths.
 
+Private family verdicts can be displayed in a visible `Reckoning` workbook sheet
+with `--reckoning-overlay PATH` or `GHRA_RECKONING_OVERLAY` (the flag takes
+precedence). The YAML must use schema `reckoning-verdicts/1`; invalid verdicts
+stop export with validation errors. Export also requires the saved
+`portfolio-truth-latest.json` beside the audit report, or in the exporter API's
+`truth_dir`. Each truth project gets a row, including local-only projects;
+unassigned projects have blank verdicts. Identity matches by GitHub ID when
+available, then `owner/repo`, then workspace-relative path.
+
+Keep the overlay outside this repository and published artifacts. It is read
+only, is never copied into output, and adds no fields to canonical truth. The
+resulting workbook contains private verdicts and should be treated as private.
+Without an overlay, no `Reckoning` sheet is added. Both workbook modes can be
+checked without private inputs using
+`make workbook-gate ARGS="--synthetic-reckoning-overlay"`.
+
 ## Demo and Guides
 
 - Safe demo path: run `make demo` after a local clone to generate sample artifacts from the committed fixture without a GitHub token.

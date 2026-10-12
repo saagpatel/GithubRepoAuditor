@@ -171,6 +171,10 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
     )
     _add_global_flags(p)
     p.add_argument(
+        "--reckoning-overlay", type=Path, metavar="PATH",
+        help=argparse.SUPPRESS,  # Advanced option; keep primary subcommand help bounded.
+    )
+    p.add_argument(
         "--repos",
         nargs="+",
         default=None,
@@ -574,6 +578,12 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="Run context quality triage across the portfolio",
     )
     _add_automation_proposal_flags(p)
+    p.add_argument(
+        "--reckoning-overlay",
+        type=Path,
+        metavar="PATH",
+        help=argparse.SUPPRESS,  # Documented in flat help and the workbook guide.
+    )
     p.add_argument(
         "--excel-mode",
         choices=["template", "standard"],
@@ -1052,6 +1062,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--pdf",
         action="store_true",
         help="Generate PDF audit report",
+    )
+    parser.add_argument(
+        "--reckoning-overlay",
+        type=Path,
+        metavar="PATH",
+        help="Private verdict overlay for the workbook (or GHRA_RECKONING_OVERLAY)",
     )
     parser.add_argument(
         "--excel-mode",

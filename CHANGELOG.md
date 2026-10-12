@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Read private runtime reckoning verdicts into an optional visible workbook sheet
+  without changing canonical truth; discover `_archive` children with archived defaults.
+
 - Refuse new portfolio generation publication when staged truth lacks valid
   GitHub security receipt and content identities or disagrees with the admitted
   manifest; preserve historical generation readback compatibility.

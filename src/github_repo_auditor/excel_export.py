@@ -10,6 +10,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from github_repo_auditor.reckoning_overlay import (
+    ReckoningOverlay,
+    load_reckoning_overlay,
+)
+from github_repo_auditor.excel_portfolio_sheet_helpers import build_reckoning_sheet
+
 from openpyxl import Workbook
 from openpyxl.chart import BubbleChart, Reference
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule, IconSetRule
@@ -1760,6 +1766,8 @@ def _build_excel_workbook(
     collection: str | None = None,
     excel_mode: str = "standard",
     risk_lookup: dict[str, str] | None = None,
+    reckoning_overlay: ReckoningOverlay | None = None,
+    portfolio_truth: dict | None = None,
 ) -> None:
     _build_excel_workbook_runner(
         wb,
@@ -1771,7 +1779,11 @@ def _build_excel_workbook(
         collection=collection,
         excel_mode=excel_mode,
         risk_lookup=risk_lookup,
+        reckoning_overlay=reckoning_overlay,
+        portfolio_truth=portfolio_truth,
         **_build_excel_workbook_runtime(
+            build_reckoning_sheet=_build_reckoning_sheet,
+            reckoning_present=reckoning_overlay is not None,
             build_dashboard=_build_dashboard,
             build_all_repos=_build_all_repos,
             build_portfolio_explorer=_build_portfolio_explorer,
@@ -1824,6 +1836,25 @@ def _build_excel_workbook(
     )
 
 
+def _build_reckoning_sheet(
+    wb: Workbook,
+    truth: dict | None,
+    overlay: ReckoningOverlay | None,
+) -> None:
+    build_reckoning_sheet(
+        wb,
+        truth,
+        overlay,
+        get_or_create_sheet=_get_or_create_sheet,
+        set_sheet_header=_set_sheet_header,
+        style_header_row=style_header_row,
+        style_data_cell=style_data_cell,
+        apply_zebra_stripes=apply_zebra_stripes,
+        add_table=_add_table,
+        auto_width=auto_width,
+    )
+
+
 def _build_risk_summary_sheet(wb: Workbook, risk_posture: dict) -> None:
     ws = _get_or_create_sheet(wb, "Risk Summary")
     ws.sheet_properties.tabColor = "DC2626"
@@ -1856,8 +1887,10 @@ def export_excel(
     excel_mode: str = "standard",
     template_path: Path | None = None,
     truth_dir: Path | None = None,
+    reckoning_overlay: Path | None = None,
 ) -> Path:
     """Generate the flagship Excel dashboard."""
+    overlay = load_reckoning_overlay(reckoning_overlay)
     return _export_excel_workbook(
         report_path,
         output_path,
@@ -1869,6 +1902,7 @@ def export_excel(
         excel_mode=excel_mode,
         template_path=template_path,
         truth_dir=truth_dir,
+        reckoning_overlay=overlay,
         load_risk_truth=_load_risk_truth,
         default_template_path=DEFAULT_TEMPLATE_PATH,
         resolve_template_path=resolve_template_path,

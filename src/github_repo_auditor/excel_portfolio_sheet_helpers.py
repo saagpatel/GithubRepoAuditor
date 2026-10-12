@@ -2,7 +2,125 @@
 
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
+
+from openpyxl import Workbook
+
+from github_repo_auditor.reckoning_overlay import ReckoningOverlay
+
+RECKONING_HEADERS = [
+    "Family",
+    "Title",
+    "Cluster",
+    "Members",
+    "Fate",
+    "Assimilate into",
+    "Tags",
+    "Gut",
+    "Status",
+    "Rationale",
+    "Dossier",
+    "Seed brief",
+    "Visibility after",
+    "Wave",
+    "Decided at",
+    "Truth attention state",
+    "Last activity",
+]
+
+
+def build_reckoning_rows(
+    truth: dict[str, Any],
+    overlay: ReckoningOverlay,
+) -> list[list[Any]]:
+    """One row per truth project, including unassigned and local-only projects."""
+    rows: list[list[Any]] = []
+    workspace_root = (
+        Path(truth["workspace_root"]) if truth.get("workspace_root") else None
+    )
+    for project in truth["projects"]:
+        identity = project["identity"]
+        derived = project.get("derived", {})
+        match = overlay.lookup(
+            github_id=identity.get("github_id")
+            or project.get("repository_state", {}).get("github_id"),
+            repo_full_name=identity.get("repo_full_name", ""),
+            local_path=identity.get("path", ""),
+            workspace_root=workspace_root,
+        )
+        family_id, family = match if match else ("", {})
+        evidence = family.get("evidence") or {}
+        github = family.get("github") or {}
+        rows.append(
+            [
+                family_id,
+                family.get("title") or identity.get("display_name", ""),
+                family.get("cluster", ""),
+                identity.get("repo_full_name") or identity.get("path", ""),
+                family.get("fate", ""),
+                family.get("assimilate_into", ""),
+                ", ".join(family.get("tags", [])),
+                family.get("gut", ""),
+                family.get("status", ""),
+                family.get("rationale", ""),
+                evidence.get("dossier", ""),
+                evidence.get("seed_brief", ""),
+                github.get("visibility_after", ""),
+                family.get("wave", ""),
+                str(family.get("decided_at") or ""),
+                derived.get("attention_state", ""),
+                derived.get("last_meaningful_activity_at", ""),
+            ]
+        )
+    return rows
+
+
+def build_reckoning_sheet(
+    wb: Workbook,
+    truth: dict[str, Any] | None,
+    overlay: ReckoningOverlay | None,
+    *,
+    get_or_create_sheet: Callable[..., Any],
+    set_sheet_header: Callable[..., Any],
+    style_header_row: Callable[..., Any],
+    style_data_cell: Callable[..., Any],
+    apply_zebra_stripes: Callable[..., Any],
+    add_table: Callable[..., Any],
+    auto_width: Callable[..., Any],
+) -> None:
+    if overlay is None:
+        return
+    if truth is None:
+        raise ValueError("Reckoning requires the full portfolio truth snapshot")
+    ws = get_or_create_sheet(wb, "Reckoning")
+    ws.sheet_properties.tabColor = "7C3AED"
+    set_sheet_header(
+        ws,
+        "Reckoning",
+        "Private family verdicts alongside saved portfolio truth; one row per project. Blank verdicts are unassigned.",
+        width=len(RECKONING_HEADERS),
+    )
+    write_portfolio_table(
+        ws,
+        build_reckoning_rows(truth, overlay),
+        start_row=5,
+        headers=RECKONING_HEADERS,
+        freeze_panes="E6",
+        table_name="tblReckoning",
+        centered_columns=set(),
+        style_header_row=style_header_row,
+        style_data_cell=style_data_cell,
+        apply_zebra_stripes=apply_zebra_stripes,
+        add_table=add_table,
+        auto_width=auto_width,
+    )
+    # Private prose is data, even when it starts with Excel's formula prefix.
+    for row in ws.iter_rows(min_row=6):
+        for cell in row:
+            if isinstance(cell.value, str):
+                cell.data_type = "s"
+
 
 PORTFOLIO_EXPLORER_HEADERS = [
     "Repo",

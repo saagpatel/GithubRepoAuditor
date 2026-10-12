@@ -10,7 +10,6 @@ from xml.etree import ElementTree as ET
 
 from github_repo_auditor.excel_export import export_excel
 from github_repo_auditor.excel_template import DEFAULT_TEMPLATE_PATH, load_workbook_allowing_native_sparklines
-from github_repo_auditor.excel_workbook_helpers import CORE_VISIBLE_SHEETS
 
 DEFAULT_GATE_DIR = Path("output") / "workbook-gate"
 RESULT_FILENAME = "workbook-gate-result.json"
@@ -1199,24 +1198,155 @@ def _flatten_failed_checks(sections: list[dict]) -> list[str]:
     return errors
 
 
-def run_workbook_gate(output_dir: Path = DEFAULT_GATE_DIR) -> dict:
+def run_workbook_gate(
+    output_dir: Path = DEFAULT_GATE_DIR,
+    *,
+    synthetic_reckoning_overlay: bool = False,
+) -> dict:
+    from tempfile import TemporaryDirectory
+    import os
+
+    import yaml
+
+    from github_repo_auditor.excel_portfolio_sheet_helpers import RECKONING_HEADERS
+    from github_repo_auditor.excel_workbook_helpers import (
+        core_visible_sheets_for_overlay,
+    )
+    from github_repo_auditor.reckoning_overlay import load_reckoning_overlay
+
+    if not synthetic_reckoning_overlay and os.environ.get("GHRA_RECKONING_OVERLAY"):
+        raise ValueError("Workbook gate requires GHRA_RECKONING_OVERLAY unset, or --synthetic-reckoning-overlay, to avoid reading private verdicts.")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "workbook-gate-report.json"
     report_path.write_text(json.dumps(_sample_report_data(), indent=2))
 
-    standard_path = export_excel(report_path, output_dir / "workbook-gate-standard.xlsx", excel_mode="standard")
-    template_path = export_excel(
-        report_path,
-        output_dir / "workbook-gate-template.xlsx",
-        excel_mode="template",
-        template_path=DEFAULT_TEMPLATE_PATH,
-    )
+    # Synthetic private inputs live only in a temporary directory, never output/.
+    with TemporaryDirectory(prefix="ghra-workbook-inputs-") as temporary:
+        input_dir = Path(temporary)
+        overlay_path = None
+        if synthetic_reckoning_overlay:
+            overlay_path = input_dir / "verdicts.yaml"
+            overlay_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "schema": "reckoning-verdicts/1",
+                        "families": {
+                            "local-family": {
+                                "title": "Local project",
+                                "members": [{"key": "_archive/LocalOnly"}],
+                                "fate": "archive",
+                                "status": "approved",
+                                "tags": ["strip-for-parts"],
+                            },
+                        },
+                    }
+                )
+            )
+            (input_dir / "portfolio-truth-latest.json").write_text(
+                json.dumps(
+                    {
+                        "projects": [
+                            {
+                                "identity": {
+                                    "path": "_archive/LocalOnly",
+                                    "display_name": "LocalOnly",
+                                },
+                                "derived": {
+                                    "attention_state": "archived",
+                                    "last_meaningful_activity_at": "2026-01-01T00:00:00Z",
+                                },
+                            },
+                            {
+                                "identity": {
+                                    "path": "Unassigned",
+                                    "display_name": "Unassigned",
+                                },
+                                "derived": {},
+                            },
+                        ],
+                    }
+                )
+            )
+        present = load_reckoning_overlay(overlay_path) is not None
+        standard_path = export_excel(
+            report_path,
+            output_dir / "workbook-gate-standard.xlsx",
+            excel_mode="standard",
+            reckoning_overlay=overlay_path,
+            truth_dir=input_dir,
+        )
+        template_path = export_excel(
+            report_path,
+            output_dir / "workbook-gate-template.xlsx",
+            excel_mode="template",
+            template_path=DEFAULT_TEMPLATE_PATH,
+            reckoning_overlay=overlay_path,
+            truth_dir=input_dir,
+        )
+
+    expected_visible = core_visible_sheets_for_overlay(present)
+    if present:
+        # Providing saved truth also enables the exporter's existing Risk Summary.
+        expected_visible.add("Risk Summary")
 
     automated_sections = [
-        _validate_workbook_artifact(standard_path, workbook_mode="standard", expected_visible=CORE_VISIBLE_SHEETS),
-        _validate_workbook_artifact(template_path, workbook_mode="template", expected_visible=CORE_VISIBLE_SHEETS),
+        _validate_workbook_artifact(
+            standard_path, workbook_mode="standard", expected_visible=expected_visible
+        ),
+        _validate_workbook_artifact(
+            template_path, workbook_mode="template", expected_visible=expected_visible
+        ),
         _validate_parity(standard_path, template_path),
     ]
+    checks = []
+    workbooks = [
+        load_workbook_allowing_native_sparklines(path)
+        for path in (standard_path, template_path)
+    ]
+    if present:
+        values = [
+            list(wb["Reckoning"].values) if "Reckoning" in wb.sheetnames else []
+            for wb in workbooks
+        ]
+        valid = bool(values[0]) and values[0] == values[1]
+        checks.append(
+            _check_result(
+                "reckoning-parity",
+                "passed" if valid else "failed",
+                "Reckoning cell values must match across both modes.",
+            )
+        )
+        valid = all(
+            "Reckoning" in wb.sheetnames
+            and wb["Reckoning"].sheet_state == "visible"
+            and [cell.value for cell in wb["Reckoning"][5]] == RECKONING_HEADERS
+            and wb["Reckoning"]["A6"].value == "local-family"
+            and wb["Reckoning"]["D6"].value == "_archive/LocalOnly"
+            and wb["Reckoning"]["E6"].value == "archive"
+            and wb["Reckoning"]["P6"].value == "archived"
+            and wb["Reckoning"].max_row == 7
+            for wb in workbooks
+        )
+        checks.append(
+            _check_result(
+                "reckoning-population",
+                "passed" if valid else "failed",
+                "Synthetic local-only and unassigned truth projects must appear with verdicts and truth state.",
+            )
+        )
+    else:
+        valid = all("Reckoning" not in wb.sheetnames for wb in workbooks)
+        checks.append(
+            _check_result(
+                "reckoning-absent",
+                "passed" if valid else "failed",
+                "No overlay means no Reckoning sheet.",
+            )
+        )
+    for wb in workbooks:
+        wb.close()
+    automated_sections.append(_section_result("reckoning", checks))
     validation_errors = _flatten_failed_checks(automated_sections)
     manual_signoff = _manual_signoff_template(standard_path)
     checklist_path = _write_manual_checklist(output_dir, manual_signoff)
@@ -1393,6 +1523,11 @@ def main() -> None:
         help="Record the outcome of the manual desktop Excel signoff against the existing workbook gate artifact.",
     )
     parser.add_argument(
+        "--synthetic-reckoning-overlay",
+        action="store_true",
+        help="Check the private Reckoning sheet using temporary synthetic verdicts and truth.",
+    )
+    parser.add_argument(
         "--reviewer",
         default="",
         help="Reviewer name for a recorded manual signoff.",
@@ -1424,7 +1559,10 @@ def main() -> None:
             notes=args.notes,
         )
     else:
-        result = run_workbook_gate(Path(args.output_dir))
+        result = run_workbook_gate(
+            Path(args.output_dir),
+            synthetic_reckoning_overlay=args.synthetic_reckoning_overlay,
+        )
     print(format_gate_result(result))
     if result["status"] != "ok":
         raise SystemExit(1)
