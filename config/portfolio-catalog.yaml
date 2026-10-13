@@ -1388,10 +1388,10 @@ repos:
     operating_path: archive
     category: infrastructure
     tool_provenance: codex
-    notes: Drill-verified (dated passing drill) at 2026-07-17 tribunal judgment; tribunal
-      KEEP maps to this manual-only standing-tooling contract. The 2026-07-11
-      disposable real-repository recovery drill also passed, including broken-main
-      rejection, timeout handling, and force-tracked .env blocking.
+    notes: Drill-verified (dated passing drill) at 2026-07-17 tribunal judgment. The
+      2026-07-11 disposable real-repository recovery drill also passed, including
+      broken-main rejection, timeout handling, and force-tracked .env blocking.
+      Archived on GitHub 2026-10-12.
     maturity_program: maintain
     target_maturity: operating
   sovereign-intelligence:
@@ -1602,7 +1602,7 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Rubric v1.1 graduated 2026-07-17; 182 repos judged and dispositions merged. Re-runnable on demand, not scheduled.
+    notes: Rubric v1.1 graduated 2026-07-17; 182 repos judged and dispositions merged. Archived on GitHub 2026-10-12.
   drift-court:
     owner: d
     purpose: intent-vs-diff arbitration for delegated agent work, pricing silence and disguise
@@ -1641,7 +1641,7 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Rubric v1.0 graduated 2026-07-17. Runs on operator request or after a tribunal re-run; not scheduled.
+    notes: Rubric v1.0 graduated 2026-07-17. Archived on GitHub 2026-10-12.
   instrument-foundry:
     owner: d
     purpose: extracted judgment-instrument chassis and doctrine proven across graduated instruments
