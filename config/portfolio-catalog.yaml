@@ -83,16 +83,16 @@ repos:
   _machine/machine-control-tower:
     owner: d
     purpose: local machine-ops and Codex operating-layer control surface for durable operator cockpit assets
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     criticality: high
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: codex
     maturity_program: maintain
     target_maturity: operating
     doctor_standard: full
-    notes: Owns Raycast script commands, active-project verification routing, read-only ops snapshots, and mirrored Codex operating-layer prompt/eval snapshots for ~.
+    notes: Owned Raycast script commands, active-project verification routing, read-only ops snapshots, and mirrored Codex operating-layer prompt/eval snapshots for ~. Archived on GitHub 2026-10-12.
   agent-bridge:
     owner: d
     purpose: local SQLite-backed MCP shared-state bus for coordinating coding agents
@@ -138,9 +138,9 @@ repos:
   ApplyKit:
     owner: d
     purpose: deterministic local-first application packet generation
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: commercial
     tool_provenance: codex
     maturity_program: maintain
@@ -189,9 +189,9 @@ repos:
     operating_path: experiment
   HowMoneyMoves:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: vanity
     tool_provenance: claude-code
   JobMarketHeatmap:
@@ -215,17 +215,17 @@ repos:
       a settled portfolio-recovery exclusion).
   JSMTicketAnalyticsExport:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: it-work
     tool_provenance: claude-code
   LifeCadenceLedger:
     owner: d
     purpose: recurring commitment ledger for personal cadence and obligations
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: experiment
+    operating_path: archive
     category: vanity
     tool_provenance: claude-code
     maturity_program: experiment
@@ -244,9 +244,9 @@ repos:
     doctor_standard: full
   knowledgecore:
     owner: d
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: codex
   OrbitMechanic:
@@ -309,9 +309,9 @@ repos:
     tool_provenance: claude-code
   ResumeEvolver:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: codex
     doctor_standard: basic
   ScreenshottoDataSelect:
@@ -325,10 +325,10 @@ repos:
     owner: d
     purpose: local-first visual dataflow desktop app for node-based pipelines and
       local LLM workflows
-    lifecycle_state: dormant
+    lifecycle_state: archived
     criticality: medium
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: productivity
     tool_provenance: codex
     maturity_program: maintain
@@ -344,9 +344,9 @@ repos:
     tool_provenance: claude-code
   Terroir:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   Cartograph:
     owner: d
@@ -380,28 +380,28 @@ repos:
     doctor_standard: full
   Chromafield:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   Seismoscope:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   AIWorkFlow:
     owner: d
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: commercial
     tool_provenance: claude-code
   job-search-2026:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: vanity
   Phantom Frequencies:
     owner: d
@@ -417,9 +417,9 @@ repos:
     notes: Release-candidate branch and playtest packet exist; human cohort, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   RedditSentimentAnalyzer:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: vanity
     tool_provenance: claude-code
   SignalDecay:
@@ -457,9 +457,9 @@ repos:
     tool_provenance: claude-code
   AssistSupport:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: it-work
     tool_provenance: codex
   bridge-db:
@@ -479,9 +479,9 @@ repos:
     tool_provenance: claude-code
   DNSWatcher:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: codex
     category: vanity
   GlassLayer:
@@ -575,9 +575,9 @@ repos:
     notes: Active operating-layer localhost daemon; surface runtime or operator-signal decisions only after fresh read-only verification.
   Premise:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: vanity
     tool_provenance: claude-code
   Pulse Orbit:
@@ -639,15 +639,15 @@ repos:
     tool_provenance: claude-code
   Calibrate:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   GhostRoutes:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
     maturity_program: maintain
     notes: Archived from active operator attention on 2026-06-13. The corrupt local checkout was preserved at ~/Projects/GhostRoutes.corrupt-20260613T124820Z and ~/Projects/GhostRoutes was restored from a fresh origin clone. Keep this repo archived/deferred unless explicitly reactivated.
@@ -665,34 +665,34 @@ repos:
     notes: Verified unsigned device Release bundle and external cohort packet exist; physical-device, human-proof, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   Nocturne:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   Redact:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   RoomTone:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   TideEngine:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
-    automation_eligible: true
+    automation_eligible: false
   Wavelength:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     tool_provenance: claude-code
   ComplianceKit:
     owner: d
@@ -783,9 +783,9 @@ repos:
     tool_provenance: codex
   ScreenshotAnnotate:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: it-work
   TicketHandoff:
     owner: d
@@ -830,16 +830,16 @@ repos:
       confirm purpose/criticality.'
   SmartClipboard:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   SnippetLibrary:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   TicketDashboard:
@@ -868,9 +868,9 @@ repos:
       confirm purpose/criticality.'
   Chronomap:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   Conductor:
@@ -882,23 +882,23 @@ repos:
       confirm purpose/criticality.'
   Echolocate:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   prompt-englab:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   TerraSynth:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   AIFortuneTeller:
@@ -914,9 +914,9 @@ repos:
     operating_path: maintain
   ITServiceHealth:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: it-work
   Notion:
     owner: d
@@ -997,14 +997,14 @@ repos:
   operator-os-docs:
     owner: d
     purpose: architecture and coherence documentation package for the local Operator OS
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: experiment
+    operating_path: archive
     category: infrastructure
     tool_provenance: codex
     maturity_program: experiment
     target_maturity: functional
-    notes: Evidence/history-style docs; use only when a cross-system architecture or conformance decision is active.
+    notes: Evidence/history-style docs. Archived on GitHub 2026-10-12.
   fable-outputs:
     owner: d
     purpose: time-boxed Fable-window artifact and campaign-output workspace
@@ -1117,9 +1117,9 @@ repos:
     category: infrastructure
   stockpulse:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: vanity
   BattleGrid:
     owner: d
@@ -1136,16 +1136,16 @@ repos:
   OddworksCabinet:
     owner: d
     purpose: evidence-first gallery and release surface for small authored Oddworks experiences
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     criticality: high
     review_cadence: weekly
-    operating_path: finish
+    operating_path: archive
     category: commercial
     tool_provenance: codex
     maturity_program: finish
     target_maturity: operating
     automation_eligible: false
-    notes: Verified private candidate exists with genuine Liminal and SignalDecay media and explicit candidate status; public deployment remains gated until release approval.
+    notes: Verified private candidate exists with genuine Liminal and SignalDecay media and explicit candidate status; never publicly deployed. Archived on GitHub 2026-10-12.
   LegalDocsReview:
     owner: d
     lifecycle_state: dormant
@@ -1187,9 +1187,9 @@ repos:
     tool_provenance: claude-code
   IncidentMgmt:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: it-work
   SlackIncidentBot:
     owner: d
@@ -1723,7 +1723,7 @@ repos:
   canon-court:
     owner: d
     purpose: portfolio-truth canonical-key reconciliation docket
-    lifecycle_state: dormant
+    lifecycle_state: archived
     criticality: low
     review_cadence: quarterly
     operating_path: archive
@@ -1736,13 +1736,13 @@ repos:
   operating-memory-os:
     owner: d
     purpose: local-first system that remembers the operator's work life and can be queried about it
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     criticality: high
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: claude-code
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: In flight, operator-driven. Ships 1-3 closed; Ship 4 merge-ready with scheduled assets deliberately unarmed pending a supervised run. Held at manual-only rather than active on purpose - active + maintain + infrastructure enrolls a repo in the Tier 0 cohort, whose size is a fail-closed contract pinned in two scheduled jobs. Promote only alongside those pins.
+    notes: Ships 1-3 closed; Ship 4 was merge-ready with scheduled assets unarmed. Archived on GitHub 2026-10-12.

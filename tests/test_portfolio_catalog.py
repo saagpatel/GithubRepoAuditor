@@ -265,9 +265,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     # Tier 1, Tier 2, and explicitly unranked projects remain available only when
     # the operator asks for them. They do not create default portfolio attention.
     manual_only = {
-        "_machine/machine-control-tower",
         "agent-bridge",
-        "knowledgecore",
         "mcpforge",
         "mcpaudit-web",
         "notification-hub",
@@ -278,16 +276,13 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "portfolio-index",
         "portfolio-mcp",
         "peer-agent-tools",
-        "ApplyKit",
         "JobCommandCenter",
-        "AIWorkFlow",
         "Phantom Frequencies",
         "SignalDecay",
         "Afterimage",
         "Liminal",
         "DeepTank",
         "BattleGrid",
-        "OddworksCabinet",
         "Temper",
         "book-two-manuscript",
         "ccusage",
@@ -298,14 +293,29 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
     assert catalog["repos"]["gpt_rag"]["lifecycle_state"] == "dormant"
 
-    # Reckoning wave 0 archived these on GitHub; each repo row now carries the
+    # The reckoning archived these on GitHub; each repo row now carries the
     # archive contract, overriding its former manual-only or active state.
     for repo_name in (
+        # wave 0
         "portfolio-tribunal",
         "consolidation-map",
         "Lazarus",
         "repository-renaissance",
         "portfolio-health",
+        # waves 1-3
+        "_machine/machine-control-tower",
+        "knowledgecore",
+        "operating-memory-os",
+        "ApplyKit",
+        "AIWorkFlow",
+        "OddworksCabinet",
+        "DNSWatcher",
+        "AssistSupport",
+        "Calibrate",
+        "Chromafield",
+        "Seismoscope",
+        "JSMTicketAnalyticsExport",
+        "operator-os-docs",
     ):
         entry = catalog["repos"][repo_name.lower()]
         assert entry["lifecycle_state"] == "archived"

@@ -2097,8 +2097,11 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "safelight": "active-product",
         "operator-os-explainer": "active-product",
     }
+    # ApplyKit was archived on GitHub by the reckoning; its catalog row carries
+    # the archive contract, so it derives archived rather than manual-only.
     for name in supporting_or_retired:
-        assert by_display_name[name].derived.attention_state == "manual-only"
+        expected = "archived" if name == "ApplyKit" else "manual-only"
+        assert by_display_name[name].derived.attention_state == expected
 
     registry = build_project_registry(
         result.snapshot.to_dict(),
