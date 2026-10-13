@@ -24,7 +24,6 @@ DEFAULT_OPERATING_REPOS = (
     Path.home() / "Projects/cross-system-smoke",
     Path.home() / "Projects/mcpforge",
     Path.home() / "Projects/portfolio-index",
-    Path.home() / "Projects/portfolio-health",
 )
 
 EXCLUDED_DIR_NAMES = {
