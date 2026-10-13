@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-DEFAULT_WEEKLY_WORKFLOW_STEP = "Open the standard workbook first, then use --control-center for read-only triage."
+DEFAULT_WEEKLY_WORKFLOW_STEP = (
+    "Open the standard workbook first, then use --control-center for read-only triage."
+)
 
 APPROVAL_OVERRIDE_CANDIDATES = (
     ("top_needs_reapproval_approvals", "needs-reapproval", "Needs Re-Approval"),
@@ -51,14 +53,18 @@ def _approval_safe_posture(command_hint: str | None) -> str:
     return "bounded-command"
 
 
-def _build_priority_evidence_items(items: list[dict[str, Any]], *, label_prefix: str) -> list[dict[str, Any]]:
+def _build_priority_evidence_items(
+    items: list[dict[str, Any]], *, label_prefix: str
+) -> list[dict[str, Any]]:
     evidence_items: list[dict[str, Any]] = []
     for item in items[:3]:
         label = _text(item.get("label") or item.get("subject_key") or "Approval")
         command_hint = _approval_command_hint(item)
         evidence_item = {
             "label": f"{label_prefix}: {label}",
-            "summary": _text(item.get("summary"), "No approval summary is recorded yet."),
+            "summary": _text(
+                item.get("summary"), "No approval summary is recorded yet."
+            ),
             "kind": "approval-workflow",
             "safe_posture": _approval_safe_posture(command_hint),
         }
@@ -68,7 +74,9 @@ def _build_priority_evidence_items(items: list[dict[str, Any]], *, label_prefix:
     return evidence_items
 
 
-def _approval_override_candidate(weekly_pack: Mapping[str, Any]) -> dict[str, Any] | None:
+def _approval_override_candidate(
+    weekly_pack: Mapping[str, Any],
+) -> dict[str, Any] | None:
     for key, state, label_prefix in APPROVAL_OVERRIDE_CANDIDATES:
         items = list(weekly_pack.get(key) or [])
         if items:
@@ -94,7 +102,9 @@ def _approval_workflow_step(decision: str) -> str:
         decision = decision[:-1]
     if decision.lower().startswith(("open ", "use ", "stay ", "continue ")):
         return f"{decision}."
-    return f"Open the standard workbook first, then {decision[0].lower()}{decision[1:]}."
+    return (
+        f"Open the standard workbook first, then {decision[0].lower()}{decision[1:]}."
+    )
 
 
 def apply_weekly_scheduling_overlay(
@@ -134,7 +144,9 @@ def apply_weekly_scheduling_overlay(
     return updated
 
 
-def resolve_weekly_story_value(weekly_pack: Mapping[str, Any], key: str, *fallbacks: Any) -> str:
+def resolve_weekly_story_value(
+    weekly_pack: Mapping[str, Any], key: str, *fallbacks: Any
+) -> str:
     story = weekly_pack.get("weekly_story_v1")
     if isinstance(story, Mapping):
         value = _text(story.get(key))

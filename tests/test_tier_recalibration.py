@@ -1,5 +1,6 @@
 # tests/test_tier_recalibration.py
 """Tests for the tier distribution report (Arc H A4)."""
+
 from github_repo_auditor.tier_recalibration import tier_distribution_report
 
 

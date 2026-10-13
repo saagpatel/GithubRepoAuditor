@@ -19,7 +19,10 @@ def current_item_last_outcome(
         and current_item.get("lane") not in attention_lanes
     ):
         return "quieted"
-    if previous_match.get("lane") == "blocked" and current_item.get("lane") in {"urgent", "ready"}:
+    if previous_match.get("lane") == "blocked" and current_item.get("lane") in {
+        "urgent",
+        "ready",
+    }:
         return "improved"
     if previous_match.get("lane") == "urgent" and current_item.get("lane") == "ready":
         return "improved"
@@ -157,7 +160,9 @@ def summary_decision_memory(
     recently_quieted_count = summary.get("recently_quieted_count", 0)
     confirmed_resolved_count = summary.get("confirmed_resolved_count", 0)
     reopened_after_resolution_count = summary.get("reopened_after_resolution_count", 0)
-    decision_memory_window_runs = summary.get("decision_memory_window_runs", len(recent_runs))
+    decision_memory_window_runs = summary.get(
+        "decision_memory_window_runs", len(recent_runs)
+    )
 
     if primary_target:
         key = queue_identity(primary_target)
@@ -167,7 +172,8 @@ def summary_decision_memory(
         return {
             "decision_memory_status": decision_memory_status,
             "primary_target_last_seen_at": memory.get(
-                "last_seen_at", recent_runs[0].get("generated_at", "") if recent_runs else ""
+                "last_seen_at",
+                recent_runs[0].get("generated_at", "") if recent_runs else "",
             ),
             "primary_target_last_intervention": memory.get("last_intervention", {}),
             "primary_target_last_outcome": memory.get("last_outcome", "no-change"),

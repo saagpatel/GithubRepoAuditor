@@ -49,7 +49,9 @@ def _seed(output_dir: Path, status: str = STATUS_PENDING) -> Path:
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *flags: str) -> None:
     from github_repo_auditor.cli import main
 
-    monkeypatch.setattr(sys, "argv", ["audit", "--output-dir", str(tmp_path), "user", *flags])
+    monkeypatch.setattr(
+        sys, "argv", ["audit", "--output-dir", str(tmp_path), "user", *flags]
+    )
     main()
 
 
@@ -66,7 +68,9 @@ def test_list_proposals_populated(monkeypatch, tmp_path, capsys) -> None:
     assert "pending" in out
 
 
-def test_approve_proposal_transitions_and_persists(monkeypatch, tmp_path, capsys) -> None:
+def test_approve_proposal_transitions_and_persists(
+    monkeypatch, tmp_path, capsys
+) -> None:
     proposals_path = _seed(tmp_path)
     _run(monkeypatch, tmp_path, "--approve-proposal", "context-pr:owner/MyRepo")
 
@@ -76,7 +80,9 @@ def test_approve_proposal_transitions_and_persists(monkeypatch, tmp_path, capsys
     assert persisted.approved_by == "local-operator"
 
 
-def test_reject_proposal_transitions_and_persists(monkeypatch, tmp_path, capsys) -> None:
+def test_reject_proposal_transitions_and_persists(
+    monkeypatch, tmp_path, capsys
+) -> None:
     proposals_path = _seed(tmp_path)
     _run(monkeypatch, tmp_path, "--reject-proposal", "context-pr:owner/MyRepo")
 
@@ -84,7 +90,9 @@ def test_reject_proposal_transitions_and_persists(monkeypatch, tmp_path, capsys)
     assert load_proposals(proposals_path)[0].status == STATUS_REJECTED
 
 
-def test_approve_unknown_proposal_warns_and_leaves_queue(monkeypatch, tmp_path, capsys) -> None:
+def test_approve_unknown_proposal_warns_and_leaves_queue(
+    monkeypatch, tmp_path, capsys
+) -> None:
     proposals_path = _seed(tmp_path)
     _run(monkeypatch, tmp_path, "--approve-proposal", "context-pr:owner/Ghost")
 

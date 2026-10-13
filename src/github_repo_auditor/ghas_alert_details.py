@@ -35,7 +35,9 @@ def _extract_detail(alert: dict) -> dict:
     dependency = alert.get("dependency") or {}
     package = dependency.get("package") or {}
 
-    severity_raw = (advisory.get("severity", "") or vulnerability.get("severity", "") or "").lower()
+    severity_raw = (
+        advisory.get("severity", "") or vulnerability.get("severity", "") or ""
+    ).lower()
 
     first_patched: str | None = None
     first_patched_obj = vulnerability.get("first_patched_version")
@@ -95,7 +97,9 @@ def fetch_dependabot_details(
             status = exc.response.status_code if exc.response is not None else None
             if status not in _EXPECTED_UNAVAILABLE_STATUSES:
                 # Static message only — no interpolated values (CodeQL contract)
-                logger.debug("Dependabot detail fetch unavailable for a repo (best-effort)")
+                logger.debug(
+                    "Dependabot detail fetch unavailable for a repo (best-effort)"
+                )
             results[repo_name] = []
         except Exception:
             # Static message only — no interpolated values (CodeQL contract)

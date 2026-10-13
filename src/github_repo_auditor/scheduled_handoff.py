@@ -41,7 +41,9 @@ def _weekly_section_value(
     field: str,
     *fallbacks: object,
 ) -> str:
-    return _first_present((weekly_sections.get(section_id) or {}).get(field), *fallbacks)
+    return _first_present(
+        (weekly_sections.get(section_id) or {}).get(field), *fallbacks
+    )
 
 
 def _queue_counts(summary: dict) -> str:
@@ -68,13 +70,19 @@ def _has_regressions(diff_data: dict) -> bool:
 
 def _allowlisted_queue_urgency(queue_summary: dict) -> tuple[str, str] | None:
     """Derive handoff urgency from the persisted finite lane counts."""
-    lane_counts = queue_summary.get("lane_counts") if isinstance(queue_summary, dict) else None
+    lane_counts = (
+        queue_summary.get("lane_counts") if isinstance(queue_summary, dict) else None
+    )
     if not isinstance(lane_counts, dict):
         return None
 
     def count(lane: str) -> int:
         value = lane_counts.get(lane, 0)
-        return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+        return (
+            value
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0
+            else 0
+        )
 
     if count("blocked"):
         return "blocked", "blocked-lane-count"
@@ -143,14 +151,19 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     queue = payload.get("operator_queue", []) or []
     recent_changes = payload.get("operator_recent_changes", []) or []
     issue_candidate = payload.get("issue_candidate", {})
-    weekly_pack = payload.get("weekly_pack") or build_weekly_review_pack(payload, payload.get("diff_data"))
+    weekly_pack = payload.get("weekly_pack") or build_weekly_review_pack(
+        payload, payload.get("diff_data")
+    )
     weekly_story = weekly_pack.get("weekly_story_v1") or {}
-    weekly_sections = {section.get("id"): section for section in weekly_story.get("sections") or []}
+    weekly_sections = {
+        section.get("id"): section for section in weekly_story.get("sections") or []
+    }
     campaign_summary = payload.get("campaign_summary", {}) or {}
     writeback_preview = payload.get("writeback_preview", {}) or {}
     github_projects = writeback_preview.get("github_projects", {}) or {}
     project_drift = [
-        item for item in (payload.get("managed_state_drift", []) or [])
+        item
+        for item in (payload.get("managed_state_drift", []) or [])
         if str(item.get("target", "")).startswith("github-project")
     ]
     primary_target = summary.get("primary_target") or {}
@@ -305,7 +318,11 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
         f"- Queue counts: {_queue_counts(summary)}",
         f"- Issue automation: `{issue_candidate.get('action', 'quiet')}` ({issue_candidate.get('reason', 'quiet')})",
-        *( [f"- Existing issue: #{issue_candidate.get('issue_number')}"] if issue_candidate.get("issue_number") else [] ),
+        *(
+            [f"- Existing issue: #{issue_candidate.get('issue_number')}"]
+            if issue_candidate.get("issue_number")
+            else []
+        ),
         *(
             [
                 f"- Campaign mirror: {campaign_summary.get('label', campaign_summary.get('campaign_type', '—'))}",
@@ -390,7 +407,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             f"({primary_target.get('policy_flip_count', 0)} flip(s))"
         )
     else:
-        lines.append("- Recent policy path: No recent trust-policy flip path is recorded for the current target.")
+        lines.append(
+            "- Recent policy path: No recent trust-policy flip path is recorded for the current target."
+        )
     lines.append("")
     lines.append("## Exception Pattern Learning")
     lines.append("")
@@ -409,7 +428,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('overcautious_count', 0)} overcautious case(s) across {hotspot.get('exception_count', 0)} exception case(s)"
             )
     else:
-        lines.append("- No repeated overcautious exception hotspots are recorded in the recent window.")
+        lines.append(
+            "- No repeated overcautious exception hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Trust Recovery")
     lines.append("")
@@ -491,7 +512,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('match_count', 0)} sticky class signal(s) across {hotspot.get('exception_count', 0)} exception case(s)"
             )
     else:
-        lines.append("- No repeated class-level policy debt hotspots are recorded in the recent window.")
+        lines.append(
+            "- No repeated class-level policy debt hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Class-Level Trust Normalization")
     lines.append("")
@@ -517,7 +540,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('match_count', 0)} normalization signal(s) across {hotspot.get('exception_count', 0)} exception case(s)"
             )
     else:
-        lines.append("- No repeated class-level normalization hotspots are recorded in the recent window.")
+        lines.append(
+            "- No repeated class-level normalization hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Class Memory Freshness")
     lines.append("")
@@ -543,7 +568,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('freshness_status', 'fresh')} with {hotspot.get('decayed_class_retirement_rate', 0.0):.0%} retired-like signal"
             )
     else:
-        lines.append("- No unusually fresh class-memory hotspots are recorded in the recent window.")
+        lines.append(
+            "- No unusually fresh class-memory hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Trust Decay Controls")
     lines.append("")
@@ -566,7 +593,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('freshness_status', 'stale')} with {hotspot.get('decayed_class_sticky_rate', 0.0):.0%} sticky-like signal"
             )
     else:
-        lines.append("- No stale class-memory hotspots are recorded in the recent window.")
+        lines.append(
+            "- No stale class-memory hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Class Trust Reweighting")
     lines.append("")
@@ -600,7 +629,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('reweight_score', 0.0):.2f} with {hotspot.get('weighted_class_caution_score', 0.0):.2f} caution"
             )
     if not support_hotspots and not caution_hotspots:
-        lines.append("- No strong class reweighting hotspots are recorded in the recent window.")
+        lines.append(
+            "- No strong class reweighting hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Class Trust Momentum")
     lines.append("")
@@ -626,7 +657,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('momentum_status', 'building')} at {hotspot.get('momentum_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No sustained class-momentum hotspots are recorded in the recent window.")
+        lines.append(
+            "- No sustained class-momentum hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reweighting Stability")
     lines.append("")
@@ -647,7 +680,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('stability_status', 'oscillating')} across {hotspot.get('recent_class_reweight_path', 'no path recorded')}"
             )
     else:
-        lines.append("- No oscillating class-momentum hotspots are recorded in the recent window.")
+        lines.append(
+            "- No oscillating class-momentum hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Class Transition Health")
     lines.append("")
@@ -665,7 +700,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {summary.get('class_transition_health_summary', 'No class transition health summary is recorded yet.')}"
     )
     if primary_target.get("recent_transition_path"):
-        lines.append(f"- Recent transition path: {primary_target.get('recent_transition_path')}")
+        lines.append(
+            f"- Recent transition path: {primary_target.get('recent_transition_path')}"
+        )
     stalled_transition_hotspots = summary.get("stalled_transition_hotspots") or []
     if stalled_transition_hotspots:
         for hotspot in stalled_transition_hotspots[:3]:
@@ -674,7 +711,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('health_status', 'stalled')} across {hotspot.get('transition_age_runs', 0)} run(s)"
             )
     else:
-        lines.append("- No stalled pending-transition hotspots are recorded in the recent window.")
+        lines.append(
+            "- No stalled pending-transition hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Pending Transition Resolution")
     lines.append("")
@@ -693,7 +732,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('resolution_status', 'confirmed')} across {hotspot.get('recent_transition_path', 'no transition path recorded')}"
             )
     else:
-        lines.append("- No recent pending-transition resolutions are recorded in the recent window.")
+        lines.append(
+            "- No recent pending-transition resolutions are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Transition Closure Confidence")
     lines.append("")
@@ -705,7 +746,10 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     if summary.get("primary_target_transition_closure_confidence_reasons"):
         lines.append(
             "- Closure reasons: "
-            + "; ".join(summary.get("primary_target_transition_closure_confidence_reasons") or [])
+            + "; ".join(
+                summary.get("primary_target_transition_closure_confidence_reasons")
+                or []
+            )
         )
     lines.append(
         f"- Closure window: {summary.get('transition_closure_window_runs', 4)} run(s)"
@@ -740,9 +784,13 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {summary.get('class_pending_resolution_summary', 'No class pending-resolution summary is recorded yet.')}"
     )
     if primary_target.get("recent_pending_debt_path"):
-        lines.append(f"- Recent pending-debt path: {primary_target.get('recent_pending_debt_path')}")
+        lines.append(
+            f"- Recent pending-debt path: {primary_target.get('recent_pending_debt_path')}"
+        )
     pending_debt_hotspots = summary.get("pending_debt_hotspots") or []
-    healthy_pending_resolution_hotspots = summary.get("healthy_pending_resolution_hotspots") or []
+    healthy_pending_resolution_hotspots = (
+        summary.get("healthy_pending_resolution_hotspots") or []
+    )
     if pending_debt_hotspots:
         for hotspot in pending_debt_hotspots[:3]:
             lines.append(
@@ -758,7 +806,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_pending_debt_path', 'no path recorded')}"
             )
     else:
-        lines.append("- No class pending-debt hotspots are recorded in the recent window.")
+        lines.append(
+            "- No class pending-debt hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Pending Debt Freshness")
     lines.append("")
@@ -785,9 +835,13 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {summary.get('pending_debt_decay_summary', 'No pending-debt decay summary is recorded yet.')}"
     )
     if primary_target.get("recent_pending_signal_mix"):
-        lines.append(f"- Recent pending signal mix: {primary_target.get('recent_pending_signal_mix')}")
+        lines.append(
+            f"- Recent pending signal mix: {primary_target.get('recent_pending_signal_mix')}"
+        )
     stale_pending_debt_hotspots = summary.get("stale_pending_debt_hotspots") or []
-    fresh_pending_resolution_hotspots = summary.get("fresh_pending_resolution_hotspots") or []
+    fresh_pending_resolution_hotspots = (
+        summary.get("fresh_pending_resolution_hotspots") or []
+    )
     if stale_pending_debt_hotspots:
         for hotspot in stale_pending_debt_hotspots[:3]:
             lines.append(
@@ -803,7 +857,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_pending_signal_mix', 'no mix recorded')}"
             )
     else:
-        lines.append("- No pending-debt freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No pending-debt freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Closure Forecast Reweighting")
     lines.append("")
@@ -820,7 +876,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     if summary.get("primary_target_closure_forecast_reweight_reasons"):
         lines.append(
             "- Forecast reasons: "
-            + "; ".join(summary.get("primary_target_closure_forecast_reweight_reasons") or [])
+            + "; ".join(
+                summary.get("primary_target_closure_forecast_reweight_reasons") or []
+            )
         )
     lines.append(
         f"- Reweighting window: {summary.get('closure_forecast_reweighting_window_runs', 4)} run(s)"
@@ -828,7 +886,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reweighting_summary', 'No closure-forecast reweighting summary is recorded yet.')}"
     )
-    supporting_pending_resolution_hotspots = summary.get("supporting_pending_resolution_hotspots") or []
+    supporting_pending_resolution_hotspots = (
+        summary.get("supporting_pending_resolution_hotspots") or []
+    )
     caution_pending_debt_hotspots = summary.get("caution_pending_debt_hotspots") or []
     if supporting_pending_resolution_hotspots:
         for hotspot in supporting_pending_resolution_hotspots[:3]:
@@ -845,7 +905,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('weighted_pending_debt_caution_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No closure-forecast reweighting hotspots are recorded in the recent window.")
+        lines.append(
+            "- No closure-forecast reweighting hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Closure Forecast Freshness")
     lines.append("")
@@ -869,8 +931,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_freshness_summary', 'No closure-forecast freshness summary is recorded yet.')}"
     )
-    stale_closure_forecast_hotspots = summary.get("stale_closure_forecast_hotspots") or []
-    fresh_closure_forecast_signal_hotspots = summary.get("fresh_closure_forecast_signal_hotspots") or []
+    stale_closure_forecast_hotspots = (
+        summary.get("stale_closure_forecast_hotspots") or []
+    )
+    fresh_closure_forecast_signal_hotspots = (
+        summary.get("fresh_closure_forecast_signal_hotspots") or []
+    )
     if stale_closure_forecast_hotspots:
         for hotspot in stale_closure_forecast_hotspots[:3]:
             lines.append(
@@ -886,7 +952,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{max(hotspot.get('decayed_confirmation_forecast_rate', 0.0), hotspot.get('decayed_clearance_forecast_rate', 0.0)):.0%}"
             )
     else:
-        lines.append("- No closure-forecast freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No closure-forecast freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Closure Forecast Momentum")
     lines.append("")
@@ -907,7 +975,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_momentum_summary', 'No closure-forecast momentum summary is recorded yet.')}"
     )
-    sustained_confirmation_hotspots = summary.get("sustained_confirmation_hotspots") or []
+    sustained_confirmation_hotspots = (
+        summary.get("sustained_confirmation_hotspots") or []
+    )
     sustained_clearance_hotspots = summary.get("sustained_clearance_hotspots") or []
     if sustained_confirmation_hotspots:
         for hotspot in sustained_confirmation_hotspots[:3]:
@@ -924,7 +994,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_momentum_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No closure-forecast momentum hotspots are recorded in the recent window.")
+        lines.append(
+            "- No closure-forecast momentum hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Hysteresis Decay Controls")
     lines.append("")
@@ -949,7 +1021,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_refresh_recovery_summary', 'No closure-forecast refresh-recovery summary is recorded yet.')}"
     )
-    recovering_confirmation_hotspots = summary.get("recovering_confirmation_hotspots") or []
+    recovering_confirmation_hotspots = (
+        summary.get("recovering_confirmation_hotspots") or []
+    )
     recovering_clearance_hotspots = summary.get("recovering_clearance_hotspots") or []
     if recovering_confirmation_hotspots:
         for hotspot in recovering_confirmation_hotspots[:3]:
@@ -966,7 +1040,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_refresh_recovery_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No closure-forecast refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No closure-forecast refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reacquisition Controls")
     lines.append("")
@@ -1009,7 +1085,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_reacquisition_persistence_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No reacquisition-persistence hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reacquisition-persistence hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Recovery Churn Controls")
     lines.append("")
@@ -1044,7 +1122,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reacquisition_freshness_summary', 'No reacquisition-freshness summary is recorded yet.')}"
     )
-    fresh_reacquisition_signal_hotspots = summary.get("fresh_reacquisition_signal_hotspots") or []
+    fresh_reacquisition_signal_hotspots = (
+        summary.get("fresh_reacquisition_signal_hotspots") or []
+    )
     stale_reacquisition_hotspots = summary.get("stale_reacquisition_hotspots") or []
     if fresh_reacquisition_signal_hotspots:
         for hotspot in fresh_reacquisition_signal_hotspots[:3]:
@@ -1063,7 +1143,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('decayed_reacquired_clearance_rate', 0.0):.0%} clearance-like signal"
             )
     else:
-        lines.append("- No reacquisition-freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reacquisition-freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Persistence Reset Controls")
     lines.append("")
@@ -1088,8 +1170,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_refresh_recovery_summary', 'No reset-refresh recovery summary is recorded yet.')}"
     )
-    recovering_from_confirmation_reset_hotspots = summary.get("recovering_from_confirmation_reset_hotspots") or []
-    recovering_from_clearance_reset_hotspots = summary.get("recovering_from_clearance_reset_hotspots") or []
+    recovering_from_confirmation_reset_hotspots = (
+        summary.get("recovering_from_confirmation_reset_hotspots") or []
+    )
+    recovering_from_clearance_reset_hotspots = (
+        summary.get("recovering_from_clearance_reset_hotspots") or []
+    )
     if recovering_from_confirmation_reset_hotspots:
         for hotspot in recovering_from_confirmation_reset_hotspots[:3]:
             lines.append(
@@ -1105,7 +1191,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_reset_refresh_recovery_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No reset-refresh recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reset-refresh recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Controls")
     lines.append("")
@@ -1148,7 +1236,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_reset_reentry_persistence_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No reset re-entry persistence hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reset re-entry persistence hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Churn Controls")
     lines.append("")
@@ -1172,7 +1262,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_reset_reentry_churn_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No reset re-entry churn hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reset re-entry churn hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Freshness")
     lines.append("")
@@ -1183,7 +1275,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_freshness_summary', 'No reset re-entry freshness summary is recorded yet.')}"
     )
-    fresh_reset_reentry_signal_hotspots = summary.get("fresh_reset_reentry_signal_hotspots") or []
+    fresh_reset_reentry_signal_hotspots = (
+        summary.get("fresh_reset_reentry_signal_hotspots") or []
+    )
     stale_reset_reentry_hotspots = summary.get("stale_reset_reentry_hotspots") or []
     if fresh_reset_reentry_signal_hotspots:
         for hotspot in fresh_reset_reentry_signal_hotspots[:3]:
@@ -1202,7 +1296,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('decayed_reset_reentered_clearance_rate', 0.0):.0%} clearance-like signal"
             )
     else:
-        lines.append("- No reset re-entry freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reset re-entry freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Reset Controls")
     lines.append("")
@@ -1227,8 +1323,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_refresh_recovery_summary', 'No reset re-entry refresh-recovery summary is recorded yet.')}"
     )
-    recovering_from_confirmation_reentry_reset_hotspots = summary.get("recovering_from_confirmation_reentry_reset_hotspots") or []
-    recovering_from_clearance_reentry_reset_hotspots = summary.get("recovering_from_clearance_reentry_reset_hotspots") or []
+    recovering_from_confirmation_reentry_reset_hotspots = (
+        summary.get("recovering_from_confirmation_reentry_reset_hotspots") or []
+    )
+    recovering_from_clearance_reentry_reset_hotspots = (
+        summary.get("recovering_from_clearance_reentry_reset_hotspots") or []
+    )
     if recovering_from_confirmation_reentry_reset_hotspots:
         for hotspot in recovering_from_confirmation_reentry_reset_hotspots[:3]:
             lines.append(
@@ -1244,7 +1344,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('closure_forecast_reset_reentry_refresh_recovery_score', 0.0):.2f}"
             )
     else:
-        lines.append("- No reset re-entry refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No reset re-entry refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Controls")
     lines.append("")
@@ -1265,12 +1367,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_freshness_summary', 'No reset re-entry rebuild-freshness summary is recorded yet.')}"
     )
-    stale_reset_reentry_rebuild_hotspots = summary.get(
-        "stale_reset_reentry_rebuild_hotspots"
-    ) or []
-    fresh_reset_reentry_rebuild_signal_hotspots = summary.get(
-        "fresh_reset_reentry_rebuild_signal_hotspots"
-    ) or []
+    stale_reset_reentry_rebuild_hotspots = (
+        summary.get("stale_reset_reentry_rebuild_hotspots") or []
+    )
+    fresh_reset_reentry_rebuild_signal_hotspots = (
+        summary.get("fresh_reset_reentry_rebuild_signal_hotspots") or []
+    )
     if fresh_reset_reentry_rebuild_signal_hotspots:
         for hotspot in fresh_reset_reentry_rebuild_signal_hotspots[:3]:
             lines.append(
@@ -1286,7 +1388,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_signal_mix', 'no rebuilt signal mix recorded')}"
             )
     else:
-        lines.append("- No rebuilt-freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuilt-freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Reset Controls")
     lines.append("")
@@ -1311,12 +1415,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary', 'No reset re-entry rebuild-refresh-recovery summary is recorded yet.')}"
     )
-    recovering_from_confirmation_rebuild_reset_hotspots = summary.get(
-        "recovering_from_confirmation_rebuild_reset_hotspots"
-    ) or []
-    recovering_from_clearance_rebuild_reset_hotspots = summary.get(
-        "recovering_from_clearance_rebuild_reset_hotspots"
-    ) or []
+    recovering_from_confirmation_rebuild_reset_hotspots = (
+        summary.get("recovering_from_confirmation_rebuild_reset_hotspots") or []
+    )
+    recovering_from_clearance_rebuild_reset_hotspots = (
+        summary.get("recovering_from_clearance_rebuild_reset_hotspots") or []
+    )
     if recovering_from_confirmation_rebuild_reset_hotspots:
         for hotspot in recovering_from_confirmation_rebuild_reset_hotspots[:3]:
             lines.append(
@@ -1334,7 +1438,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_refresh_path', 'no rebuild refresh path recorded')}"
             )
     else:
-        lines.append("- No rebuilt refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuilt refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-entry Controls")
     lines.append("")
@@ -1360,10 +1466,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_persistence_summary', 'No reset re-entry rebuild re-entry persistence summary is recorded yet.')}"
     )
-    just_reentered_rebuild_hotspots = summary.get("just_reentered_rebuild_hotspots") or []
-    holding_reset_reentry_rebuild_reentry_hotspots = summary.get(
-        "holding_reset_reentry_rebuild_reentry_hotspots"
-    ) or []
+    just_reentered_rebuild_hotspots = (
+        summary.get("just_reentered_rebuild_hotspots") or []
+    )
+    holding_reset_reentry_rebuild_reentry_hotspots = (
+        summary.get("holding_reset_reentry_rebuild_reentry_hotspots") or []
+    )
     if just_reentered_rebuild_hotspots:
         for hotspot in just_reentered_rebuild_hotspots[:3]:
             lines.append(
@@ -1381,7 +1489,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_persistence_path', 'no rebuild re-entry persistence path recorded')}"
             )
     else:
-        lines.append("- No rebuilt re-entry persistence hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuilt re-entry persistence hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Churn Controls")
     lines.append("")
@@ -1396,9 +1506,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_churn_summary', 'No reset re-entry rebuild re-entry churn summary is recorded yet.')}"
     )
-    reset_reentry_rebuild_reentry_churn_hotspots = summary.get(
-        "reset_reentry_rebuild_reentry_churn_hotspots"
-    ) or []
+    reset_reentry_rebuild_reentry_churn_hotspots = (
+        summary.get("reset_reentry_rebuild_reentry_churn_hotspots") or []
+    )
     if reset_reentry_rebuild_reentry_churn_hotspots:
         for hotspot in reset_reentry_rebuild_reentry_churn_hotspots[:3]:
             lines.append(
@@ -1408,7 +1518,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_churn_path', 'no rebuild re-entry churn path recorded')}"
             )
     else:
-        lines.append("- No rebuilt re-entry churn hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuilt re-entry churn hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Freshness")
     lines.append("")
@@ -1419,12 +1531,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_freshness_summary', 'No reset re-entry rebuild re-entry freshness summary is recorded yet.')}"
     )
-    stale_reset_reentry_rebuild_reentry_hotspots = summary.get(
-        "stale_reset_reentry_rebuild_reentry_hotspots"
-    ) or []
-    fresh_reset_reentry_rebuild_reentry_signal_hotspots = summary.get(
-        "fresh_reset_reentry_rebuild_reentry_signal_hotspots"
-    ) or []
+    stale_reset_reentry_rebuild_reentry_hotspots = (
+        summary.get("stale_reset_reentry_rebuild_reentry_hotspots") or []
+    )
+    fresh_reset_reentry_rebuild_reentry_signal_hotspots = (
+        summary.get("fresh_reset_reentry_rebuild_reentry_signal_hotspots") or []
+    )
     if fresh_reset_reentry_rebuild_reentry_signal_hotspots:
         for hotspot in fresh_reset_reentry_rebuild_reentry_signal_hotspots[:3]:
             lines.append(
@@ -1440,7 +1552,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_signal_mix', 'no rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No rebuilt re-entry freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuilt re-entry freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Reset Controls")
     lines.append("")
@@ -1458,12 +1572,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild re-entry refresh recovery: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status', 'none')} "
         f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary', 'No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.')})"
     )
-    refresh_reentry_confirmation_hotspots = summary.get(
-        "recovering_from_confirmation_rebuild_reentry_reset_hotspots"
-    ) or []
-    refresh_reentry_clearance_hotspots = summary.get(
-        "recovering_from_clearance_rebuild_reentry_reset_hotspots"
-    ) or []
+    refresh_reentry_confirmation_hotspots = (
+        summary.get("recovering_from_confirmation_rebuild_reentry_reset_hotspots") or []
+    )
+    refresh_reentry_clearance_hotspots = (
+        summary.get("recovering_from_clearance_rebuild_reentry_reset_hotspots") or []
+    )
     if refresh_reentry_confirmation_hotspots:
         for hotspot in refresh_reentry_confirmation_hotspots[:3]:
             lines.append(
@@ -1479,7 +1593,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"({hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score', 0.0):.2f})"
             )
     else:
-        lines.append("- No rebuilt re-entry refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuilt re-entry refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Controls")
     lines.append("")
@@ -1504,12 +1620,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary', 'No reset re-entry rebuild re-entry restore freshness summary is recorded yet.')}"
     )
-    stale_reset_reentry_rebuild_reentry_restore_hotspots = summary.get(
-        "stale_reset_reentry_rebuild_reentry_restore_hotspots"
-    ) or []
-    fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots = summary.get(
-        "fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots"
-    ) or []
+    stale_reset_reentry_rebuild_reentry_restore_hotspots = (
+        summary.get("stale_reset_reentry_rebuild_reentry_restore_hotspots") or []
+    )
+    fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots = (
+        summary.get("fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots") or []
+    )
     if stale_reset_reentry_rebuild_reentry_restore_hotspots:
         for hotspot in stale_reset_reentry_rebuild_reentry_restore_hotspots[:3]:
             lines.append(
@@ -1527,7 +1643,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_signal_mix', 'no restored rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No restored rebuilt re-entry freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No restored rebuilt re-entry freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Reset Controls")
     lines.append("")
@@ -1554,7 +1672,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_signal_mix', 'no restored rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No restored rebuilt re-entry reset hotspots are recorded in the recent window.")
+        lines.append(
+            "- No restored rebuilt re-entry reset hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery")
     lines.append("")
@@ -1565,11 +1685,15 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.')}"
     )
-    restore_refresh_hotspots = summary.get(
-        "recovering_from_confirmation_rebuild_reentry_restore_reset_hotspots"
-    ) or summary.get(
-        "recovering_from_clearance_rebuild_reentry_restore_reset_hotspots"
-    ) or []
+    restore_refresh_hotspots = (
+        summary.get(
+            "recovering_from_confirmation_rebuild_reentry_restore_reset_hotspots"
+        )
+        or summary.get(
+            "recovering_from_clearance_rebuild_reentry_restore_reset_hotspots"
+        )
+        or []
+    )
     if restore_refresh_hotspots:
         for hotspot in restore_refresh_hotspots[:3]:
             lines.append(
@@ -1579,7 +1703,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_refresh_path', 'no restore refresh path recorded')}"
             )
     else:
-        lines.append("- No restored rebuilt re-entry refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No restored rebuilt re-entry refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls")
     lines.append("")
@@ -1598,7 +1724,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; "
         f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_persistence_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerestore_persistence_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-restore persistence path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_persistence_path')}"
         )
@@ -1612,7 +1740,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild re-entry restore re-restore churn controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status', 'none')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_churn_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerestore_churn_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-restore churn path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_churn_path')}"
         )
@@ -1626,19 +1756,25 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild re-entry restore re-restore freshness: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status', 'insufficient-data')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-restore freshness reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-restore signal mix: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary', 'No reset re-entry rebuild re-entry restore re-restore freshness summary is recorded yet.')}"
     )
-    stale_rerestore_hotspots = summary.get(
-        "stale_reset_reentry_rebuild_reentry_restore_rerestore_hotspots"
-    ) or []
-    fresh_rerestore_hotspots = summary.get(
-        "fresh_reset_reentry_rebuild_reentry_restore_rerestore_signal_hotspots"
-    ) or []
+    stale_rerestore_hotspots = (
+        summary.get("stale_reset_reentry_rebuild_reentry_restore_rerestore_hotspots")
+        or []
+    )
+    fresh_rerestore_hotspots = (
+        summary.get(
+            "fresh_reset_reentry_rebuild_reentry_restore_rerestore_signal_hotspots"
+        )
+        or []
+    )
     if stale_rerestore_hotspots:
         for hotspot in stale_rerestore_hotspots[:3]:
             lines.append(
@@ -1656,7 +1792,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix', 'no rerestored rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No rerestored rebuilt re-entry freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rerestored rebuilt re-entry freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls")
     lines.append("")
@@ -1664,7 +1802,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild re-entry restore re-restore reset controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status', 'none')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-restore reset reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-restore signal mix: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix')}"
         )
@@ -1680,26 +1820,36 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_signal_mix', 'no rerestored rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No rerestored rebuilt re-entry reset hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rerestored rebuilt re-entry reset hotspots are recorded in the recent window."
+        )
     lines.append("")
-    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery")
+    lines.append(
+        "## Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery"
+    )
     lines.append("")
     lines.append(
         f"- Reset re-entry rebuild re-entry restore re-restore refresh recovery: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status', 'none')} "
         f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-restore refresh path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.')}"
     )
-    rerestore_refresh_hotspots = summary.get(
-        "recovering_from_confirmation_rebuild_reentry_rerestore_reset_hotspots"
-    ) or summary.get(
-        "recovering_from_clearance_rebuild_reentry_rerestore_reset_hotspots"
-    ) or []
+    rerestore_refresh_hotspots = (
+        summary.get(
+            "recovering_from_confirmation_rebuild_reentry_rerestore_reset_hotspots"
+        )
+        or summary.get(
+            "recovering_from_clearance_rebuild_reentry_rerestore_reset_hotspots"
+        )
+        or []
+    )
     if rerestore_refresh_hotspots:
         for hotspot in rerestore_refresh_hotspots[:3]:
             lines.append(
@@ -1709,7 +1859,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path', 'no rerestore refresh path recorded')}"
             )
     else:
-        lines.append("- No rerestored rebuilt re-entry refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rerestored rebuilt re-entry refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls")
     lines.append("")
@@ -1728,18 +1880,22 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score', 0.0):.2f}; "
         f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs', 0)} run(s))"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-restore persistence path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-re-restore persistence summary is recorded yet.')}"
     )
-    rererestore_persistence_hotspots = summary.get(
-        "just_rererestored_rebuild_reentry_hotspots"
-    ) or summary.get(
-        "holding_reset_reentry_rebuild_reentry_restore_rererestore_hotspots"
-    ) or []
+    rererestore_persistence_hotspots = (
+        summary.get("just_rererestored_rebuild_reentry_hotspots")
+        or summary.get(
+            "holding_reset_reentry_rebuild_reentry_restore_rererestore_hotspots"
+        )
+        or []
+    )
     if rererestore_persistence_hotspots:
         for hotspot in rererestore_persistence_hotspots[:3]:
             lines.append(
@@ -1749,24 +1905,31 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path', 'no re-re-restore persistence path recorded')}"
             )
     else:
-        lines.append("- No re-re-restored persistence hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-restored persistence hotspots are recorded in the recent window."
+        )
     lines.append("")
-    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls")
+    lines.append(
+        "## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls"
+    )
     lines.append("")
     lines.append(
         f"- Reset re-entry rebuild re-entry restore re-re-restore churn controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status', 'none')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-restore churn reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-restore churn path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-re-restore churn summary is recorded yet.')}"
     )
-    rererestore_churn_hotspots = summary.get(
-        "reset_reentry_rebuild_reentry_restore_rererestore_churn_hotspots"
-    ) or []
+    rererestore_churn_hotspots = (
+        summary.get("reset_reentry_rebuild_reentry_restore_rererestore_churn_hotspots")
+        or []
+    )
     if rererestore_churn_hotspots:
         for hotspot in rererestore_churn_hotspots[:3]:
             lines.append(
@@ -1776,7 +1939,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path', 'no re-re-restore churn path recorded')}"
             )
     else:
-        lines.append("- No re-re-restored churn hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-restored churn hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness")
     lines.append("")
@@ -1784,19 +1949,25 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild re-entry restore re-re-restore freshness: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status', 'insufficient-data')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-re-restore freshness reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-restore signal mix: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary', 'No reset re-entry rebuild re-entry restore re-re-restore freshness summary is recorded yet.')}"
     )
-    stale_rererestore_hotspots = summary.get(
-        "stale_reset_reentry_rebuild_reentry_restore_rererestore_hotspots"
-    ) or []
-    fresh_rererestore_hotspots = summary.get(
-        "fresh_reset_reentry_rebuild_reentry_restore_rererestore_signal_hotspots"
-    ) or []
+    stale_rererestore_hotspots = (
+        summary.get("stale_reset_reentry_rebuild_reentry_restore_rererestore_hotspots")
+        or []
+    )
+    fresh_rererestore_hotspots = (
+        summary.get(
+            "fresh_reset_reentry_rebuild_reentry_restore_rererestore_signal_hotspots"
+        )
+        or []
+    )
     if stale_rererestore_hotspots:
         for hotspot in stale_rererestore_hotspots[:3]:
             lines.append(
@@ -1814,22 +1985,30 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix', 'no re-re-restored rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No re-re-restored freshness hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-restored freshness hotspots are recorded in the recent window."
+        )
     lines.append("")
-    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls")
+    lines.append(
+        "## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls"
+    )
     lines.append("")
     lines.append(
         f"- Reset re-entry rebuild re-entry restore re-re-restore reset controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status', 'none')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reset reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-restore signal mix: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary', 'No reset re-entry rebuild re-entry restore re-re-restore reset summary is recorded yet.')}"
     )
-    rererestore_reset_hotspots = stale_rererestore_hotspots or fresh_rererestore_hotspots
+    rererestore_reset_hotspots = (
+        stale_rererestore_hotspots or fresh_rererestore_hotspots
+    )
     if rererestore_reset_hotspots:
         for hotspot in rererestore_reset_hotspots[:3]:
             lines.append(
@@ -1838,26 +2017,36 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix', 'no re-re-restored rebuilt re-entry signal mix recorded')}"
             )
     else:
-        lines.append("- No re-re-restored reset hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-restored reset hotspots are recorded in the recent window."
+        )
     lines.append("")
-    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery")
+    lines.append(
+        "## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery"
+    )
     lines.append("")
     lines.append(
         f"- Reset re-entry rebuild re-entry restore re-re-restore refresh recovery: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status', 'none')} "
         f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-restore refresh path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.')}"
     )
-    rererestore_refresh_hotspots = summary.get(
-        "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots"
-    ) or summary.get(
-        "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots"
-    ) or []
+    rererestore_refresh_hotspots = (
+        summary.get(
+            "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots"
+        )
+        or summary.get(
+            "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots"
+        )
+        or []
+    )
     if rererestore_refresh_hotspots:
         for hotspot in rererestore_refresh_hotspots[:3]:
             lines.append(
@@ -1867,7 +2056,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path', 'no re-re-restore refresh path recorded')}"
             )
     else:
-        lines.append("- No re-re-restored rebuilt re-entry refresh-recovery hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-restored rebuilt re-entry refresh-recovery hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls")
     lines.append("")
@@ -1879,25 +2070,31 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore summary is recorded yet.')}"
     )
     lines.append("")
-    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence")
+    lines.append(
+        "## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+    )
     lines.append("")
     lines.append(
         f"- Reset re-entry rebuild re-entry restore re-re-re-restore persistence: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status', 'none')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score', 0.0):.2f}; "
         f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs', 0)} run(s))"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-re-restore persistence path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore persistence summary is recorded yet.')}"
     )
-    rerererestore_persistence_hotspots = summary.get(
-        "just_rerererestored_rebuild_reentry_hotspots"
-    ) or summary.get(
-        "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots"
-    ) or []
+    rerererestore_persistence_hotspots = (
+        summary.get("just_rerererestored_rebuild_reentry_hotspots")
+        or summary.get(
+            "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots"
+        )
+        or []
+    )
     if rerererestore_persistence_hotspots:
         for hotspot in rerererestore_persistence_hotspots[:3]:
             lines.append(
@@ -1908,24 +2105,33 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path', 'no re-re-re-restore persistence path recorded')}"
             )
     else:
-        lines.append("- No re-re-re-restored rebuilt re-entry persistence hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-re-restored rebuilt re-entry persistence hotspots are recorded in the recent window."
+        )
     lines.append("")
-    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls")
+    lines.append(
+        "## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+    )
     lines.append("")
     lines.append(
         f"- Reset re-entry rebuild re-entry restore re-re-re-restore churn controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status', 'none')} "
         f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet.')})"
     )
-    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path"):
+    if primary_target.get(
+        "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path"
+    ):
         lines.append(
             f"- Recent reset re-entry rebuild re-entry restore re-re-re-restore churn path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path')}"
         )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn summary is recorded yet.')}"
     )
-    rerererestore_churn_hotspots = summary.get(
-        "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots"
-    ) or []
+    rerererestore_churn_hotspots = (
+        summary.get(
+            "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots"
+        )
+        or []
+    )
     if rerererestore_churn_hotspots:
         for hotspot in rerererestore_churn_hotspots[:3]:
             lines.append(
@@ -1935,7 +2141,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path', 'no re-re-re-restore churn path recorded')}"
             )
     else:
-        lines.append("- No re-re-re-restored rebuilt re-entry churn hotspots are recorded in the recent window.")
+        lines.append(
+            "- No re-re-re-restored rebuilt re-entry churn hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Persistence")
     lines.append("")
@@ -1952,9 +2160,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary', 'No reset re-entry rebuild-persistence summary is recorded yet.')}"
     )
     just_rebuilt_hotspots = summary.get("just_rebuilt_hotspots") or []
-    holding_reset_reentry_rebuild_hotspots = summary.get(
-        "holding_reset_reentry_rebuild_hotspots"
-    ) or []
+    holding_reset_reentry_rebuild_hotspots = (
+        summary.get("holding_reset_reentry_rebuild_hotspots") or []
+    )
     if just_rebuilt_hotspots:
         for hotspot in just_rebuilt_hotspots[:3]:
             lines.append(
@@ -1972,7 +2180,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_reset_reentry_rebuild_persistence_path', 'no rebuild persistence path recorded')}"
             )
     else:
-        lines.append("- No rebuild-persistence hotspots are recorded in the recent window.")
+        lines.append(
+            "- No rebuild-persistence hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Churn Controls")
     lines.append("")
@@ -1987,9 +2197,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_churn_summary', 'No reset re-entry rebuild-churn summary is recorded yet.')}"
     )
-    reset_reentry_rebuild_churn_hotspots = summary.get(
-        "reset_reentry_rebuild_churn_hotspots"
-    ) or []
+    reset_reentry_rebuild_churn_hotspots = (
+        summary.get("reset_reentry_rebuild_churn_hotspots") or []
+    )
     if reset_reentry_rebuild_churn_hotspots:
         for hotspot in reset_reentry_rebuild_churn_hotspots[:3]:
             lines.append(
@@ -2013,7 +2223,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_hysteresis_summary', 'No closure-forecast hysteresis summary is recorded yet.')}"
     )
-    oscillating_closure_forecast_hotspots = summary.get("oscillating_closure_forecast_hotspots") or []
+    oscillating_closure_forecast_hotspots = (
+        summary.get("oscillating_closure_forecast_hotspots") or []
+    )
     if oscillating_closure_forecast_hotspots:
         for hotspot in oscillating_closure_forecast_hotspots[:3]:
             lines.append(
@@ -2022,7 +2234,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('recent_closure_forecast_path', 'no forecast path recorded')}"
             )
     else:
-        lines.append("- No oscillating closure-forecast hotspots are recorded in the recent window.")
+        lines.append(
+            "- No oscillating closure-forecast hotspots are recorded in the recent window."
+        )
     lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")
@@ -2043,7 +2257,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append("## What Got Better")
     lines.append("")
     if resolved_count:
-        lines.append(f"- {resolved_count} attention item(s) cleared since the last run.")
+        lines.append(
+            f"- {resolved_count} attention item(s) cleared since the last run."
+        )
     elif summary.get("trend_status") == "quiet":
         lines.append(
             f"- The queue is quiet and has held for {summary.get('quiet_streak_runs', 0)} consecutive run(s)."
@@ -2069,7 +2285,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append("## What Is Still Stuck")
     lines.append("")
     if persisting_count:
-        lines.append(f"- {persisting_count} attention item(s) are still open from the previous run.")
+        lines.append(
+            f"- {persisting_count} attention item(s) are still open from the previous run."
+        )
     if summary.get("follow_through_summary"):
         lines.append(f"- {summary.get('follow_through_summary')}")
     if not persisting_count and not summary.get("follow_through_summary"):
@@ -2086,9 +2304,7 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append("")
     if summary.get("primary_target_last_intervention"):
         intervention = summary.get("primary_target_last_intervention") or {}
-        lines.append(
-            f"- {_intervention_markdown(intervention)}"
-        )
+        lines.append(f"- {_intervention_markdown(intervention)}")
     elif summary.get("recent_interventions"):
         for intervention in (summary.get("recent_interventions") or [])[:3]:
             lines.append(f"- {_intervention_markdown(intervention)}")
@@ -2101,13 +2317,19 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         lines.append(f"- {summary.get('primary_target_done_criteria')}")
     if summary.get("closure_guidance"):
         lines.append(f"- {summary.get('closure_guidance')}")
-    if not summary.get("primary_target_done_criteria") and not summary.get("closure_guidance"):
+    if not summary.get("primary_target_done_criteria") and not summary.get(
+        "closure_guidance"
+    ):
         lines.append("- No active done-state guidance is recorded.")
     lines.append("")
     lines.append("## Resolution Evidence")
     lines.append("")
-    lines.append(f"- {summary.get('primary_target_resolution_evidence', 'No resolution evidence is recorded yet.')}")
-    lines.append(f"- {summary.get('resolution_evidence_summary', 'No recent resolution-evidence rollup is recorded yet.')}")
+    lines.append(
+        f"- {summary.get('primary_target_resolution_evidence', 'No resolution evidence is recorded yet.')}"
+    )
+    lines.append(
+        f"- {summary.get('resolution_evidence_summary', 'No recent resolution-evidence rollup is recorded yet.')}"
+    )
     lines.append("")
     lines.append("## Aging Pressure")
     lines.append("")
@@ -2131,7 +2353,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             f"- {summary.get('reopened_after_resolution_count', 0)} item(s) reopened after an earlier quiet or resolved state."
         )
     else:
-        lines.append("- No item reopened after an earlier quiet or resolved state in the recent window.")
+        lines.append(
+            "- No item reopened after an earlier quiet or resolved state in the recent window."
+        )
     lines.append("")
     lines.append("## Confidence Validation")
     lines.append("")
@@ -2164,16 +2388,27 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         lines.append("")
         for item in queue[:5]:
             repo = f"{item.get('repo')}: " if item.get("repo") else ""
-            lines.append(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
+            lines.append(
+                f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}"
+            )
             lines.append(f"  - Why: {item.get('summary', 'No summary available.')}")
-            lines.append(f"  - Next: {item.get('recommended_action', 'Review the latest state.')}")
+            lines.append(
+                f"  - Next: {item.get('recommended_action', 'Review the latest state.')}"
+            )
         lines.append("")
     if recent_changes:
         lines.append("## Recent Changes")
         lines.append("")
         for change in recent_changes[:5]:
-            subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"
-            lines.append(f"- {change.get('generated_at', '')[:10]} {subject}: {change.get('summary', change.get('kind', 'change'))}")
+            subject = (
+                change.get("repo")
+                or change.get("repo_full_name")
+                or change.get("item_id")
+                or "portfolio"
+            )
+            lines.append(
+                f"- {change.get('generated_at', '')[:10]} {subject}: {change.get('summary', change.get('kind', 'change'))}"
+            )
         lines.append("")
     return "\n".join(lines).strip() + "\n"
 
@@ -2197,7 +2432,9 @@ def build_scheduled_handoff(
     control_center_path = _latest_artifact(output_dir, "operator-control-center-*.json")
     control_center = _load_json(control_center_path)
     if not control_center:
-        raise FileNotFoundError("No operator control-center artifact was found in the output directory.")
+        raise FileNotFoundError(
+            "No operator control-center artifact was found in the output directory."
+        )
 
     diff_data = _load_json(_latest_artifact(output_dir, "audit-diff-*.json"))
     summary = control_center.get("operator_summary", {})
@@ -2276,7 +2513,9 @@ def main() -> None:
     )
     issue = payload.get("issue_candidate", {})
     print(f"Scheduled handoff: {payload.get('markdown_path', '')}")
-    print(f"Issue automation: {issue.get('action', 'quiet')} ({issue.get('reason', 'quiet')})")
+    print(
+        f"Issue automation: {issue.get('action', 'quiet')} ({issue.get('reason', 'quiet')})"
+    )
 
 
 if __name__ == "__main__":

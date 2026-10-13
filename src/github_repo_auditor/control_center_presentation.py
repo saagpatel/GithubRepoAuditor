@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from github_repo_auditor.operator_control_center_artifacts import should_print_control_center_item
+from github_repo_auditor.operator_control_center_artifacts import (
+    should_print_control_center_item,
+)
 
 
 def _control_center_next_step_hint() -> str:
@@ -51,7 +53,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
     primary_target = summary.get("primary_target") or {}
     if primary_target:
         repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
-        print(f"  Primary target: {repo}{primary_target.get('title', 'Operator target')}")
+        print(
+            f"  Primary target: {repo}{primary_target.get('title', 'Operator target')}"
+        )
     if summary.get("primary_target_reason"):
         print(f"  Why this is the top target: {summary['primary_target_reason']}")
     if summary.get("primary_target_done_criteria"):
@@ -90,7 +94,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
         )
     if summary.get("adaptive_confidence_summary"):
-        print(f"  Why this confidence is actionable: {summary['adaptive_confidence_summary']}")
+        print(
+            f"  Why this confidence is actionable: {summary['adaptive_confidence_summary']}"
+        )
     if summary.get("primary_target_exception_status") not in {None, "", "none"}:
         print(
             "  Trust policy exception: "
@@ -116,8 +122,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
         )
     if summary.get("recovery_confidence_summary"):
-        print(f"  Recovery confidence summary: {summary['recovery_confidence_summary']}")
-    if summary.get("primary_target_exception_retirement_status") not in {None, "", "none"}:
+        print(
+            f"  Recovery confidence summary: {summary['recovery_confidence_summary']}"
+        )
+    if summary.get("primary_target_exception_retirement_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Exception retirement: "
             f"{summary.get('primary_target_exception_retirement_status', 'none')} "
@@ -129,7 +141,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_policy_debt_status', 'none')} "
             f"({summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')})"
         )
-    if summary.get("primary_target_class_normalization_status") not in {None, "", "none"}:
+    if summary.get("primary_target_class_normalization_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Class-level trust normalization: "
             f"{summary.get('primary_target_class_normalization_status', 'none')} "
@@ -155,8 +171,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_transition_closure_likely_outcome', 'none')})"
         )
     if summary.get("transition_closure_confidence_summary"):
-        print(f"  Transition closure summary: {summary['transition_closure_confidence_summary']}")
-    if summary.get("primary_target_class_pending_debt_status") not in {None, "", "none"}:
+        print(
+            f"  Transition closure summary: {summary['transition_closure_confidence_summary']}"
+        )
+    if summary.get("primary_target_class_pending_debt_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Class pending debt audit: "
             f"{summary.get('primary_target_class_pending_debt_status', 'none')} "
@@ -165,7 +187,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
     if summary.get("class_pending_debt_summary"):
         print(f"  Class pending debt summary: {summary['class_pending_debt_summary']}")
     if summary.get("class_pending_resolution_summary"):
-        print(f"  Class pending resolution summary: {summary['class_pending_resolution_summary']}")
+        print(
+            f"  Class pending resolution summary: {summary['class_pending_resolution_summary']}"
+        )
     if summary.get("primary_target_pending_debt_freshness_status"):
         print(
             "  Pending debt freshness: "
@@ -173,7 +197,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.')})"
         )
     if summary.get("pending_debt_freshness_summary"):
-        print(f"  Pending debt freshness summary: {summary['pending_debt_freshness_summary']}")
+        print(
+            f"  Pending debt freshness summary: {summary['pending_debt_freshness_summary']}"
+        )
     if summary.get("pending_debt_decay_summary"):
         print(f"  Pending debt decay summary: {summary['pending_debt_decay_summary']}")
     if summary.get("primary_target_closure_forecast_reweight_direction"):
@@ -217,14 +243,20 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(
             f"  Closure forecast hysteresis summary: {summary['closure_forecast_hysteresis_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_decay_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_decay_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Hysteresis decay controls: "
             f"{summary.get('primary_target_closure_forecast_decay_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_decay_summary"):
-        print(f"  Closure forecast decay summary: {summary['closure_forecast_decay_summary']}")
+        print(
+            f"  Closure forecast decay summary: {summary['closure_forecast_decay_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_refresh_recovery_status") not in {
         None,
         "",
@@ -253,7 +285,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(
             f"  Closure forecast reacquisition summary: {summary['closure_forecast_reacquisition_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reacquisition_persistence_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reacquisition_persistence_status"
+    ) not in {
         None,
         "",
         "none",
@@ -279,8 +313,12 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_recovery_churn_summary"):
-        print(f"  Recovery churn summary: {summary['closure_forecast_recovery_churn_summary']}")
-    if summary.get("primary_target_closure_forecast_reacquisition_freshness_status") not in {
+        print(
+            f"  Recovery churn summary: {summary['closure_forecast_recovery_churn_summary']}"
+        )
+    if summary.get(
+        "primary_target_closure_forecast_reacquisition_freshness_status"
+    ) not in {
         None,
         "",
         "insufficient-data",
@@ -308,7 +346,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(
             f"  Persistence reset summary: {summary['closure_forecast_persistence_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_refresh_recovery_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_refresh_recovery_status"
+    ) not in {
         None,
         "",
         "none",
@@ -333,8 +373,12 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_reset_reentry_summary"):
-        print(f"  Reset re-entry summary: {summary['closure_forecast_reset_reentry_summary']}")
-    if summary.get("primary_target_closure_forecast_reset_reentry_persistence_status") not in {
+        print(
+            f"  Reset re-entry summary: {summary['closure_forecast_reset_reentry_summary']}"
+        )
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_persistence_status"
+    ) not in {
         None,
         "",
         "none",
@@ -350,7 +394,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry persistence summary: "
             f"{summary['closure_forecast_reset_reentry_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_churn_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_churn_status"
+    ) not in {
         None,
         "",
         "none",
@@ -365,7 +411,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry churn summary: "
             f"{summary['closure_forecast_reset_reentry_churn_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_freshness_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_freshness_status"
+    ) not in {
         None,
         "",
         "none",
@@ -380,7 +428,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry freshness summary: "
             f"{summary['closure_forecast_reset_reentry_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_reset_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_reset_status"
+    ) not in {
         None,
         "",
         "none",
@@ -395,7 +445,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry reset summary: "
             f"{summary['closure_forecast_reset_reentry_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_refresh_recovery_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_refresh_recovery_status"
+    ) not in {
         None,
         "",
         "none",
@@ -410,7 +462,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_status"
+    ) not in {
         None,
         "",
         "none",
@@ -438,7 +492,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild freshness summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reset_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reset_status"
+    ) not in {
         None,
         "",
         "none",
@@ -466,7 +522,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_status"
+    ) not in {
         None,
         "",
         "none",
@@ -490,7 +548,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score', 0.0):.2f}; "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_age_runs', 0)} run(s))"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_persistence_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_persistence_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_persistence_summary']}"
@@ -563,7 +623,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status', 'insufficient-data')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_reason', 'No reset re-entry rebuild re-entry restore freshness reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore freshness summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary']}"
@@ -576,7 +638,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason', 'No reset re-entry rebuild re-entry restore reset reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary']}"
@@ -604,7 +668,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason', 'No reset re-entry rebuild re-entry restore re-restore reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary']}"
@@ -693,7 +759,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary']}"
@@ -752,7 +820,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary']}"
@@ -802,7 +872,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_churn_status") not in {
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_churn_status"
+    ) not in {
         None,
         "",
         "none",
@@ -826,11 +898,15 @@ def _print_control_center_summary(snapshot: dict) -> None:
     if summary.get("exception_pattern_summary"):
         print(f"  Exception pattern summary: {summary['exception_pattern_summary']}")
     if summary.get("exception_retirement_summary"):
-        print(f"  Exception retirement summary: {summary['exception_retirement_summary']}")
+        print(
+            f"  Exception retirement summary: {summary['exception_retirement_summary']}"
+        )
     if summary.get("policy_debt_summary"):
         print(f"  Policy debt summary: {summary['policy_debt_summary']}")
     if summary.get("trust_normalization_summary"):
-        print(f"  Trust normalization summary: {summary['trust_normalization_summary']}")
+        print(
+            f"  Trust normalization summary: {summary['trust_normalization_summary']}"
+        )
     if summary.get("class_memory_summary"):
         print(f"  Class memory summary: {summary['class_memory_summary']}")
     if summary.get("class_decay_summary"):
@@ -880,12 +956,17 @@ def _print_control_center_summary(snapshot: dict) -> None:
                 )
         omitted_count = len(lane_items) - len(items)
         if omitted_count > 0:
-            print(f"    ({omitted_count} experiment/manual-only item(s) hidden from default view.)")
+            print(
+                f"    ({omitted_count} experiment/manual-only item(s) hidden from default view.)"
+            )
     if recent_changes:
         print("\nRecently Changed")
         for item in recent_changes[:5]:
             subject = (
-                item.get("repo") or item.get("repo_full_name") or item.get("item_id") or "portfolio"
+                item.get("repo")
+                or item.get("repo_full_name")
+                or item.get("item_id")
+                or "portfolio"
             )
             print(
                 f"  - {item.get('generated_at', '')[:10]} {subject}: {item.get('summary', item.get('kind', 'change'))}"

@@ -197,7 +197,9 @@ def discover_workspace_projects(
             continue
         if child.name != "_archive" and _is_project_dir(child):
             discovered.append(
-                _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
+                _inspect_project_dir(
+                    child, workspace_root, catalog_data=catalog_data, now=now
+                )
             )
             continue
         discovered.extend(
@@ -306,9 +308,7 @@ def _checkout_topology_group(
 
     resolved_root = workspace_root.resolve()
     expanded = list(group)
-    known_paths = {
-        Path(str(project["project_path"])).resolve() for project in group
-    }
+    known_paths = {Path(str(project["project_path"])).resolve() for project in group}
     published_paths = {str(project.get("path") or "") for project in group}
     external_worktree_count = 0
     for source_project in group:
@@ -547,8 +547,7 @@ def _checkout_collision_record(
                 "independent same-origin clones have different or unavailable heads"
             )
         elif any(
-            _checkout_observation(project).get("dirty") is True
-            for project in group
+            _checkout_observation(project).get("dirty") is True for project in group
         ):
             state = "unknown"
             reason_code = "full_clone_local_work_present"
@@ -559,9 +558,7 @@ def _checkout_collision_record(
                 "independent same-origin clones have equivalent observed heads; "
                 "the deterministic compatibility representative is selected"
             )
-    elif any(
-        _checkout_observation(project).get("dirty") is True for project in group
-    ):
+    elif any(_checkout_observation(project).get("dirty") is True for project in group):
         state = "unknown"
         reason_code = "linked_worktree_local_work_present"
         reason = "a linked same-origin worktree contains local work"
@@ -726,7 +723,9 @@ def _discover_nested_projects(
             continue
         if _is_project_dir(child):
             discovered.append(
-                _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
+                _inspect_project_dir(
+                    child, workspace_root, catalog_data=catalog_data, now=now
+                )
             )
             continue
         discovered.extend(
@@ -950,7 +949,9 @@ def _inspect_project_dir(
         if git_facts.get("has_git")
         else {}
     )
-    last_activity = git_facts.get("last_commit_at") or _latest_meaningful_mtime(project_path)
+    last_activity = git_facts.get("last_commit_at") or _latest_meaningful_mtime(
+        project_path
+    )
     context_analysis = analyze_project_context(project_path, context_files)
 
     return {
@@ -996,7 +997,9 @@ def _is_project_dir(path: Path) -> bool:
     if any(name.endswith((".xcodeproj", ".xcworkspace")) for name in names):
         return True
     visible_files = [
-        child for child in children if child.is_file() and not child.name.startswith(".")
+        child
+        for child in children
+        if child.is_file() and not child.name.startswith(".")
     ]
     return bool(visible_files)
 
@@ -1037,12 +1040,17 @@ def _classify_context_quality(project_path: Path, context_files: list[str]) -> s
 # Utility: returns True if context quality is "boilerplate".
 # Called indirectly via context analysis pipeline.
 def detect_boilerplate_context(project_path: Path, context_files: list[str]) -> bool:
-    return analyze_project_context(project_path, context_files).context_quality == "boilerplate"
+    return (
+        analyze_project_context(project_path, context_files).context_quality
+        == "boilerplate"
+    )
 
 
 def _detect_stack(project_path: Path) -> list[str]:
     stack: list[str] = []
-    names = {child.name for child in project_path.iterdir() if not child.name.startswith(".")}
+    names = {
+        child.name for child in project_path.iterdir() if not child.name.startswith(".")
+    }
     if "Cargo.toml" in names:
         stack.append("Rust")
     if "pyproject.toml" in names or "requirements.txt" in names:
@@ -1066,7 +1074,9 @@ def _detect_stack(project_path: Path) -> list[str]:
             stack.append("Node.js")
         if "typescript" in dependencies or (project_path / "tsconfig.json").exists():
             stack.append("TypeScript")
-    if (project_path / "src-tauri" / "tauri.conf.json").is_file() or "tauri.conf.json" in names:
+    if (
+        project_path / "src-tauri" / "tauri.conf.json"
+    ).is_file() or "tauri.conf.json" in names:
         stack.append("Tauri 2")
     return _dedupe(stack) or ["Unknown"]
 
@@ -1116,7 +1126,9 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
     try:
         return {
             **base,
-            "last_commit_at": datetime.fromisoformat(result.stdout.strip().replace("Z", "+00:00")),
+            "last_commit_at": datetime.fromisoformat(
+                result.stdout.strip().replace("Z", "+00:00")
+            ),
         }
     except ValueError:
         return base
@@ -1311,7 +1323,14 @@ def _git_default_branch(project_path: Path) -> str:
     """
     try:
         result = subprocess.run(
-            ["git", "-C", str(project_path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            [
+                "git",
+                "-C",
+                str(project_path),
+                "symbolic-ref",
+                "--short",
+                "refs/remotes/origin/HEAD",
+            ],
             capture_output=True,
             text=True,
             timeout=5,
@@ -1367,7 +1386,9 @@ def _git_github_remotes(project_path: Path) -> list[tuple[str, str]]:
     return remotes
 
 
-def _select_portfolio_identity_remote(checkout_name: str, remotes: list[tuple[str, str]]) -> str:
+def _select_portfolio_identity_remote(
+    checkout_name: str, remotes: list[tuple[str, str]]
+) -> str:
     """Choose the GitHub repo identity used by portfolio truth.
 
     ``origin`` remains the normal source of truth. An explicit ``canonical``
@@ -1378,7 +1399,9 @@ def _select_portfolio_identity_remote(checkout_name: str, remotes: list[tuple[st
         if remote_name == "canonical":
             return full_name
 
-    origin = next((full_name for remote_name, full_name in remotes if remote_name == "origin"), "")
+    origin = next(
+        (full_name for remote_name, full_name in remotes if remote_name == "origin"), ""
+    )
     if not origin:
         return remotes[0][1]
     if not _is_archive_repo_identity(origin):
@@ -1435,7 +1458,8 @@ def _latest_meaningful_mtime(project_path: Path) -> datetime | None:
         if (
             path.name not in TEXT_ALLOWLIST
             and path.name not in MANIFEST_ALLOWLIST
-            and path.suffix not in {".py", ".rs", ".ts", ".tsx", ".js", ".jsx", ".swift", ".gd"}
+            and path.suffix
+            not in {".py", ".rs", ".ts", ".tsx", ".js", ".jsx", ".swift", ".gd"}
         ):
             continue
         try:

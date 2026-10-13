@@ -81,7 +81,9 @@ def test_build_project_preview_summary_reports_configured_items():
         ]
     }
 
-    result = build_project_preview_summary(config, {"label": "Security Review"}, grouped_actions)
+    result = build_project_preview_summary(
+        config, {"label": "Security Review"}, grouped_actions
+    )
 
     assert result["status"] == "configured"
     assert result["item_count"] == 1

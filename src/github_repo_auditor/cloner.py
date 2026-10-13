@@ -56,7 +56,9 @@ def _git_askpass_env(token: str | None) -> Generator[dict[str, str] | None, None
             pass
 
 
-def clone_repo(clone_url: str, name: str, token: str | None = None, clone_dir: Path | None = None) -> Path:
+def clone_repo(
+    clone_url: str, name: str, token: str | None = None, clone_dir: Path | None = None
+) -> Path:
     """Shallow-clone a single repo into clone_dir/name.
 
     Returns the path to the cloned repo directory.
@@ -129,7 +131,9 @@ def clone_workspace(
         workers = min(CLONE_WORKERS, total)
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
-                executor.submit(clone_repo, repo.clone_url, repo.name, token, clone_dir): (index, repo)
+                executor.submit(
+                    clone_repo, repo.clone_url, repo.name, token, clone_dir
+                ): (index, repo)
                 for index, repo in enumerate(repos, 1)
             }
             completed = 0

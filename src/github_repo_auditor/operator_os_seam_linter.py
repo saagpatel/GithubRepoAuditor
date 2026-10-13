@@ -10,9 +10,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from github_repo_auditor.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
+from github_repo_auditor.portfolio_truth_render import (
+    GENERATED_MARKDOWN_PROVENANCE_MARKER,
+)
 from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
-from github_repo_auditor.portfolio_truth_types import LEGACY_SCHEMA_VERSIONS, SCHEMA_VERSION, truth_latest_path
+from github_repo_auditor.portfolio_truth_types import (
+    LEGACY_SCHEMA_VERSIONS,
+    SCHEMA_VERSION,
+    truth_latest_path,
+)
 from github_repo_auditor.portfolio_catalog import load_portfolio_catalog
 from github_repo_auditor.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
@@ -199,7 +205,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     workspace_root = Path(args.workspace_root).expanduser()
     output_dir = Path(args.output_dir).expanduser()
-    truth_path = Path(args.truth).expanduser() if args.truth else truth_latest_path(output_dir)
+    truth_path = (
+        Path(args.truth).expanduser() if args.truth else truth_latest_path(output_dir)
+    )
     markdown_paths = [Path(path).expanduser() for path in args.markdown]
     if not markdown_paths:
         markdown_paths = [
@@ -224,7 +232,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.worklist_output:
         worklist_path = Path(args.worklist_output).expanduser()
         worklist_path.parent.mkdir(parents=True, exist_ok=True)
-        worklist_path.write_text(json.dumps(build_worklist_payload(result), indent=2) + "\n")
+        worklist_path.write_text(
+            json.dumps(build_worklist_payload(result), indent=2) + "\n"
+        )
     if args.json:
         print(json.dumps(payload, indent=2))
     else:
@@ -248,8 +258,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Also audit cross-store project identity dialects in local operator stores.",
     )
     parser.add_argument("--bridge-db", type=Path, default=DEFAULT_BRIDGE_DB_PATH)
-    parser.add_argument("--notification-db", type=Path, default=DEFAULT_NOTIFICATION_DB_PATH)
-    parser.add_argument("--notion-snapshot", type=Path, default=DEFAULT_NOTION_SNAPSHOT_PATH)
+    parser.add_argument(
+        "--notification-db", type=Path, default=DEFAULT_NOTIFICATION_DB_PATH
+    )
+    parser.add_argument(
+        "--notion-snapshot", type=Path, default=DEFAULT_NOTION_SNAPSHOT_PATH
+    )
     parser.add_argument(
         "--identity-since",
         help=(
@@ -265,7 +279,9 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("config") / "portfolio-catalog.yaml",
     )
-    parser.add_argument("--max-staleness-hours", type=int, default=DEFAULT_MAX_STALENESS_HOURS)
+    parser.add_argument(
+        "--max-staleness-hours", type=int, default=DEFAULT_MAX_STALENESS_HOURS
+    )
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -541,11 +557,17 @@ def _check_rollup_integrity(
         and project["derived"].get("attention_state") == "decision-needed"
     )
     summary = truth.get("source_summary")
-    counts = summary.get("attention_state_counts") if isinstance(summary, dict) else None
-    summary_count = counts.get("decision-needed", 0) if isinstance(counts, dict) else None
+    counts = (
+        summary.get("attention_state_counts") if isinstance(summary, dict) else None
+    )
+    summary_count = (
+        counts.get("decision-needed", 0) if isinstance(counts, dict) else None
+    )
     rollups = truth.get("rollups")
     decision = rollups.get("decision") if isinstance(rollups, dict) else None
-    rollup_count = decision.get("decision_needed_count") if isinstance(decision, dict) else None
+    rollup_count = (
+        decision.get("decision_needed_count") if isinstance(decision, dict) else None
+    )
     if summary_count is None or rollup_count is None:
         return [
             SeamLintFinding(

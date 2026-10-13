@@ -92,9 +92,13 @@ class Briefing:
     date: str
     shipped_this_week: list[ShippedRepo] = field(default_factory=list)
     needs_attention: list[NeedsAttentionRepo] = field(default_factory=list)
-    health_delta: dict[str, list[ScoreMover]] = field(default_factory=dict)  # up/down keys
+    health_delta: dict[str, list[ScoreMover]] = field(
+        default_factory=dict
+    )  # up/down keys
     suggestions: list[Suggestion] = field(default_factory=list)
-    suppressed_by_prefs: list[str] = field(default_factory=list)  # repo names skipped due to prefs
+    suppressed_by_prefs: list[str] = field(
+        default_factory=list
+    )  # repo names skipped due to prefs
     initiatives: list[InitiativeStatus] = field(default_factory=list)
     suggested_initiatives: list[InitiativeSuggestionRow] = field(default_factory=list)
     dismissed_repos: list[DismissedRepoRow] = field(default_factory=list)
@@ -142,7 +146,9 @@ def _build_shipped(audits: list[dict]) -> list[ShippedRepo]:
         else:
             automation_status = "unknown"
         shipped.append(
-            ShippedRepo(name=name, language=language, automation_status=automation_status)
+            ShippedRepo(
+                name=name, language=language, automation_status=automation_status
+            )
         )
     shipped.sort(key=lambda r: r.name)
     return shipped
@@ -300,7 +306,9 @@ def _build_suggestions(
             top_hotspot_type = hotspots[0].get("category", "") if hotspots else ""
             # Check suppression: action_type=hotspot category, target_context=repo name or "*"
             suppressed = (
-                is_suppressed(prefs, top_hotspot_type, repo_name) if top_hotspot_type else None
+                is_suppressed(prefs, top_hotspot_type, repo_name)
+                if top_hotspot_type
+                else None
             )
             if suppressed is not None:
                 suppressed_names.append(repo_name)
@@ -331,7 +339,9 @@ def _build_suggestions(
                 if related:
                     related_by_repo[name] = related
             except Exception as exc:
-                logger.debug("briefing: semantic neighbor lookup failed for %r: %s", name, exc)
+                logger.debug(
+                    "briefing: semantic neighbor lookup failed for %r: %s", name, exc
+                )
 
     # Build a compact summary per repo
     summaries = []
@@ -340,7 +350,9 @@ def _build_suggestions(
         score = audit.get("overall_score", 0.0)
         lang = audit.get("metadata", {}).get("language") or "unknown"
         hotspots = audit.get("hotspots", [])
-        top_hotspot = hotspots[0].get("title", "no hotspot") if hotspots else "no hotspot"
+        top_hotspot = (
+            hotspots[0].get("title", "no hotspot") if hotspots else "no hotspot"
+        )
         line = f"- {name} (lang={lang}, score={score:.2f}, top-hotspot={top_hotspot})"
         related = related_by_repo.get(name, [])
         if related:
@@ -365,7 +377,11 @@ def _build_suggestions(
 
     try:
         raw = provider.generate(
-            prompt, model, max_tokens=150, cost_tracker=cost_tracker, feature="briefing-suggestion"
+            prompt,
+            model,
+            max_tokens=150,
+            cost_tracker=cost_tracker,
+            feature="briefing-suggestion",
         )
     except Exception as exc:
         logger.warning("briefing suggestion LLM call failed: %s", exc)
@@ -401,7 +417,9 @@ def _parse_suggestions_json(raw: str, top_repos: list[dict]) -> list[Suggestion]
             result.append(Suggestion(name=name, action=action))
         return result
 
-    logger.warning("briefing: could not parse LLM suggestions response, using empty suggestions")
+    logger.warning(
+        "briefing: could not parse LLM suggestions response, using empty suggestions"
+    )
     return []
 
 
@@ -712,7 +730,9 @@ def render_markdown(briefing: Briefing) -> str:
         lines.append("| Repo | Language | Automation |")
         lines.append("|------|----------|------------|")
         for repo in briefing.shipped_this_week:
-            lines.append(f"| {repo.name} | {repo.language} | {repo.automation_status} |")
+            lines.append(
+                f"| {repo.name} | {repo.language} | {repo.automation_status} |"
+            )
     else:
         lines.append("*No commits pushed in the last 7 days.*")
     lines.append("")
@@ -768,7 +788,9 @@ def render_markdown(briefing: Briefing) -> str:
         for s in briefing.suggestions:
             lines.append(f"- **{s.name}**: {s.action}")
     else:
-        lines.append("*No suggestions generated (LLM provider not configured or unavailable).*")
+        lines.append(
+            "*No suggestions generated (LLM provider not configured or unavailable).*"
+        )
     lines.append("")
 
     lines.append("---")
@@ -788,7 +810,9 @@ def render_voice(briefing: Briefing) -> str:
     parts: list[str] = []
 
     # Header
-    parts.append(f"Weekly operator briefing for {briefing.username}, generated on {briefing.date}.")
+    parts.append(
+        f"Weekly operator briefing for {briefing.username}, generated on {briefing.date}."
+    )
     parts.append("")
 
     # ── Dismissed suppressions ────────────────────────────────────────────────
@@ -824,7 +848,9 @@ def render_voice(briefing: Briefing) -> str:
                     else "automation status unknown"
                 )
             )
-            repo_sentences.append(f"{repo.name}, written in {repo.language}, is {auto_note}")
+            repo_sentences.append(
+                f"{repo.name}, written in {repo.language}, is {auto_note}"
+            )
         shipped_text = (
             f"Shipped this week: {len(briefing.shipped_this_week)} "
             f"{'repo' if len(briefing.shipped_this_week) == 1 else 'repos'} had commits. "
@@ -857,15 +883,17 @@ def render_voice(briefing: Briefing) -> str:
     up = briefing.health_delta.get("up", [])
     down = briefing.health_delta.get("down", [])
     if not up and not down:
-        delta_text = (
-            "Portfolio health delta: no historical data available to compute score changes."
-        )
+        delta_text = "Portfolio health delta: no historical data available to compute score changes."
     else:
         sentences = []
         for m in up:
-            sentences.append(f"{m.name} improved by {m.delta:+.3f} points to {m.new_score:.3f}")
+            sentences.append(
+                f"{m.name} improved by {m.delta:+.3f} points to {m.new_score:.3f}"
+            )
         for m in down:
-            sentences.append(f"{m.name} declined by {m.delta:.3f} points to {m.new_score:.3f}")
+            sentences.append(
+                f"{m.name} declined by {m.delta:.3f} points to {m.new_score:.3f}"
+            )
         delta_text = "Portfolio health delta: " + ". ".join(sentences) + "."
     parts.append(delta_text)
     parts.append("")
@@ -912,9 +940,9 @@ def generate_briefing(
     """
     audits: list[dict] = report_data.get("audits", [])
     username = report_data.get("username", "unknown")
-    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime(
-        "%Y-%m-%d"
-    )
+    date = report_data.get("generated_at", "")[:10] or datetime.now(
+        timezone.utc
+    ).strftime("%Y-%m-%d")
 
     # Resolve provider (same strategy as narrative.py) — use Haiku-equivalent for cost
     try:
@@ -930,7 +958,10 @@ def generate_briefing(
         provider_obj, resolved_model_from_result = result
         # If user didn't specify a model, use cheap Haiku-equivalent instead of Sonnet default
         if model is None:
-            from github_repo_auditor.narrative import DEFAULT_ANTHROPIC_MODEL, DEFAULT_GITHUB_MODELS_MODEL
+            from github_repo_auditor.narrative import (
+                DEFAULT_ANTHROPIC_MODEL,
+                DEFAULT_GITHUB_MODELS_MODEL,
+            )
 
             if resolved_model_from_result == DEFAULT_ANTHROPIC_MODEL:
                 resolved_model = _ANTHROPIC_BRIEFING_MODEL

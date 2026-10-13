@@ -36,30 +36,84 @@ CLOSURE_FORECAST_EVENT_DEFAULTS: tuple[tuple[str, Any], ...] = (
     ("closure_forecast_reset_reentry_rebuild_reentry_status", "none"),
     ("closure_forecast_reset_reentry_rebuild_reentry_persistence_status", "none"),
     ("closure_forecast_reset_reentry_rebuild_reentry_churn_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_freshness_status", "insufficient-data"),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_freshness_status",
+        "insufficient-data",
+    ),
     ("closure_forecast_reset_reentry_rebuild_reentry_reset_status", "none"),
     ("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status", "none"),
     ("closure_forecast_reset_reentry_rebuild_reentry_restore_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status", "none"),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status",
+        "none",
+    ),
     ("closure_forecast_reset_reentry_rebuild_reentry_restore_churn_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status", "insufficient-data"),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status",
+        "insufficient-data",
+    ),
     ("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status", "none"),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status",
+        "none",
+    ),
     ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status", "insufficient-data"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status", "insufficient-data"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status", "none"),
-    ("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status", "none"),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
+        "insufficient-data",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status",
+        "insufficient-data",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+        "none",
+    ),
+    (
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+        "none",
+    ),
 )
 
 
@@ -141,7 +195,9 @@ def target_closure_forecast_history(
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
     matching_events = [
-        event for event in closure_forecast_events if event.get("class_key") == class_key
+        event
+        for event in closure_forecast_events
+        if event.get("class_key") == class_key
     ][:class_closure_forecast_transition_window_runs]
     signals = [closure_forecast_signal_from_event(event) for event in matching_events]
     relevant_signals = [signal for signal in signals if abs(signal) >= 0.05]
@@ -188,7 +244,11 @@ def target_closure_forecast_history(
 
     if flip_count >= 2:
         stability_status = "oscillating"
-    elif flip_count == 1 or momentum_status in {"building", "insufficient-data", "reversing"}:
+    elif flip_count == 1 or momentum_status in {
+        "building",
+        "insufficient-data",
+        "reversing",
+    }:
         stability_status = "watch"
     else:
         stability_status = "stable"
@@ -223,7 +283,9 @@ def apply_closure_forecast_reweighting_control(
     pending_debt_freshness_status: str,
     closure_forecast_reweight_direction: str,
     closure_forecast_reweight_score: float,
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
+    target_specific_normalization_noise: Callable[
+        [dict[str, Any], dict[str, Any]], bool
+    ],
 ) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
     effect = "none"
     effect_reason = ""
@@ -302,7 +364,9 @@ def apply_closure_forecast_reweighting_control(
             "pending debt, so the pending state was cleared back to the weaker posture."
         )
         if transition_status == "pending-support":
-            reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+            reverted_policy = target.get(
+                "pre_class_normalization_trust_policy", trust_policy
+            )
             reverted_reason = target.get(
                 "pre_class_normalization_trust_policy_reason", trust_policy_reason
             )
@@ -387,20 +451,26 @@ def pending_debt_freshness_hotspots(
                 "pending_debt_freshness_status", "insufficient-data"
             ),
             "decayed_pending_debt_rate": target.get("decayed_pending_debt_rate", 0.0),
-            "decayed_pending_resolution_rate": target.get("decayed_pending_resolution_rate", 0.0),
+            "decayed_pending_resolution_rate": target.get(
+                "decayed_pending_resolution_rate", 0.0
+            ),
             "recent_pending_signal_mix": target.get("recent_pending_signal_mix", ""),
             "recent_pending_debt_path": target.get("recent_pending_debt_path", ""),
             "dominant_count": target.get("decayed_pending_debt_rate", 0.0),
             "pending_entry_count": len(
                 [
                     part
-                    for part in (target.get("recent_pending_debt_path", "") or "").split(" -> ")
+                    for part in (
+                        target.get("recent_pending_debt_path", "") or ""
+                    ).split(" -> ")
                     if part
                 ]
             ),
         }
         if mode == "fresh":
-            current["dominant_count"] = target.get("decayed_pending_resolution_rate", 0.0)
+            current["dominant_count"] = target.get(
+                "decayed_pending_resolution_rate", 0.0
+            )
         existing = grouped.get(class_key)
         if existing is None or current["dominant_count"] > existing["dominant_count"]:
             grouped[class_key] = current
@@ -465,7 +535,9 @@ def closure_forecast_hotspots(
             "pending_entry_count": len(
                 [
                     part
-                    for part in (target.get("recent_pending_debt_path", "") or "").split(" -> ")
+                    for part in (
+                        target.get("recent_pending_debt_path", "") or ""
+                    ).split(" -> ")
                     if part
                 ]
             ),
@@ -482,11 +554,14 @@ def closure_forecast_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reweight_direction") == "supporting-confirmation"
+            if item.get("closure_forecast_reweight_direction")
+            == "supporting-confirmation"
         ]
         hotspots.sort(
             key=lambda item: (
-                -float(item.get("weighted_pending_resolution_support_score", 0.0) or 0.0),
+                -float(
+                    item.get("weighted_pending_resolution_support_score", 0.0) or 0.0
+                ),
                 -int(item.get("pending_entry_count", 0) or 0),
                 str(item.get("label", "")),
             )

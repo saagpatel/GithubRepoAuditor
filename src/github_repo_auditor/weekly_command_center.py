@@ -8,7 +8,10 @@ from typing import Any
 
 from github_repo_auditor.portfolio_automation import select_automation_candidates
 from github_repo_auditor.portfolio_decision_queue import build_decision_digest
-from github_repo_auditor.portfolio_truth_types import display_activity_status, truth_latest_path
+from github_repo_auditor.portfolio_truth_types import (
+    display_activity_status,
+    truth_latest_path,
+)
 from github_repo_auditor.portfolio_truth_trends import (
     build_verdict_transition_ledger,
     render_movement_summary,
@@ -731,8 +734,12 @@ def _build_security_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
     # Repos that entered attention after the last security receipt are not
     # cohort members yet, so the loop above cannot see them. Carry them
     # explicitly so the digest never reports "all clear" over uncovered repos.
-    clock = _mapping(_mapping(portfolio_truth.get("source_summary")).get("security_coverage_clock"))
-    pending = [str(name) for name in clock.get("pending_security_coverage_repositories") or []]
+    clock = _mapping(
+        _mapping(portfolio_truth.get("source_summary")).get("security_coverage_clock")
+    )
+    pending = [
+        str(name) for name in clock.get("pending_security_coverage_repositories") or []
+    ]
     return {
         "scanned_count": scanned,
         "pending_coverage_count": len(pending),

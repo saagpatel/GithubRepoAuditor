@@ -58,7 +58,9 @@ def _latest_baseline_reference(run: dict | None) -> dict:
 def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchPlan:
     strategy = getattr(args, "watch_strategy", "adaptive")
     signature = build_filter_signature_from_args(args, scoring_profile=scoring_profile)
-    requested_context = build_requested_baseline_context(args, scoring_profile=scoring_profile)
+    requested_context = build_requested_baseline_context(
+        args, scoring_profile=scoring_profile
+    )
     checkpoint = load_watch_checkpoint(output_dir, getattr(args, "username", ""))
     runs = load_latest_audit_runs(output_dir, getattr(args, "username", ""), limit=20)
     latest = runs[0] if runs else None
@@ -124,9 +126,9 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
             latest_trusted_baseline=latest_baseline_reference,
         )
 
-    checkpoint_signature = (checkpoint or {}).get("filter_signature") or (checkpoint or {}).get(
-        "baseline_signature"
-    )
+    checkpoint_signature = (checkpoint or {}).get("filter_signature") or (
+        checkpoint or {}
+    ).get("baseline_signature")
     if checkpoint_signature and checkpoint_signature != signature:
         return WatchPlan(
             "full",
@@ -170,7 +172,9 @@ def build_review_bundle(
     watch_state: dict | None = None,
     emit_when_quiet: bool = False,
 ) -> dict:
-    thresholds = MATERIALITY_THRESHOLDS.get(materiality, MATERIALITY_THRESHOLDS["standard"])
+    thresholds = MATERIALITY_THRESHOLDS.get(
+        materiality, MATERIALITY_THRESHOLDS["standard"]
+    )
     context = build_analyst_context(
         report_data,
         profile_name=portfolio_profile,
@@ -195,11 +199,15 @@ def build_review_bundle(
         "emitted": emitted,
         "safe_to_defer": not material_changes,
         "material_change_count": len(material_changes),
-        "top_change_types": sorted({change["change_type"] for change in material_changes}),
+        "top_change_types": sorted(
+            {change["change_type"] for change in material_changes}
+        ),
         "profile_name": context["profile_name"],
         "collection_name": context["collection_name"],
         "material_fingerprint": material_fingerprint,
-        "review_sync": watch_state.get("review_sync", "local") if watch_state else "local",
+        "review_sync": watch_state.get("review_sync", "local")
+        if watch_state
+        else "local",
         "decisions": decisions,
     }
     alerts = [
@@ -231,7 +239,8 @@ def evaluate_material_changes(
 ) -> list[dict]:
     changes: list[dict] = []
     repo_index = {
-        audit.get("metadata", {}).get("name", ""): audit for audit in report_data.get("audits", [])
+        audit.get("metadata", {}).get("name", ""): audit
+        for audit in report_data.get("audits", [])
     }
 
     if diff_data:
@@ -302,7 +311,8 @@ def evaluate_material_changes(
             )
             if (
                 hotspot_change.get("new_count", 0) > hotspot_change.get("old_count", 0)
-                or hotspot_change.get("old_primary") != hotspot_change.get("new_primary")
+                or hotspot_change.get("old_primary")
+                != hotspot_change.get("new_primary")
             ) and current_severity >= thresholds["hotspot"]:
                 changes.append(
                     _change(
@@ -370,7 +380,9 @@ def evaluate_material_changes(
             )
         )
 
-    changes.sort(key=lambda item: (item["severity"], item.get("repo_name", "")), reverse=True)
+    changes.sort(
+        key=lambda item: (item["severity"], item.get("repo_name", "")), reverse=True
+    )
     deduped: list[dict] = []
     seen: set[tuple[str, str, str]] = set()
     for change in changes:
@@ -381,7 +393,9 @@ def evaluate_material_changes(
         deduped.append(change)
     if acknowledgments:
         deduped = [
-            change for change in deduped if not is_change_acknowledged(change, acknowledgments)
+            change
+            for change in deduped
+            if not is_change_acknowledged(change, acknowledgments)
         ]
     return deduped
 
@@ -436,7 +450,9 @@ def _build_review_targets(
     return targets
 
 
-def _build_review_decisions(report_data: dict, material_changes: list[dict]) -> list[dict]:
+def _build_review_decisions(
+    report_data: dict, material_changes: list[dict]
+) -> list[dict]:
     if not material_changes:
         return [
             {
@@ -460,9 +476,9 @@ def _build_review_decisions(report_data: dict, material_changes: list[dict]) -> 
                 "reason": "Governance drift exists and should be resolved before governed apply.",
             }
         )
-    if report_data.get("governance_preview", {}).get("applyable_count", 0) and not report_data.get(
-        "governance_approval"
-    ):
+    if report_data.get("governance_preview", {}).get(
+        "applyable_count", 0
+    ) and not report_data.get("governance_approval"):
         decisions.append(
             {
                 "decision": "approve-governance",

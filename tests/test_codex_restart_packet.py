@@ -25,7 +25,10 @@ def _git_repo(path: Path, *, remote: bool = True) -> None:
     _run(["git", "add", "README.md"], path)
     _run(["git", "commit", "-m", "init"], path)
     if remote:
-        _run(["git", "remote", "add", "origin", "https://example.com/test/repo.git"], path)
+        _run(
+            ["git", "remote", "add", "origin", "https://example.com/test/repo.git"],
+            path,
+        )
 
 
 def test_restart_packet_reports_ahead_and_behind_from_upstream(tmp_path: Path) -> None:
@@ -72,22 +75,30 @@ def test_restart_packet_reports_ahead_and_behind_from_upstream(tmp_path: Path) -
     assert repos["BehindRepo"]["behind"] == 1
 
 
-def test_discovery_excludes_archive_dependency_and_eval_fixture_repos(tmp_path: Path) -> None:
+def test_discovery_excludes_archive_dependency_and_eval_fixture_repos(
+    tmp_path: Path,
+) -> None:
     _git_repo(tmp_path / "RealRepo")
     _git_repo(tmp_path / ".portfolio-noise-archive" / "OldClone")
     _git_repo(tmp_path / "RealRepo" / "node_modules" / "NestedPackage")
     _git_repo(tmp_path / "evals" / "fixtures" / "adv-fixture")
 
-    repos = {repo.relative_to(tmp_path).as_posix() for repo in discover_git_repos(tmp_path)}
+    repos = {
+        repo.relative_to(tmp_path).as_posix() for repo in discover_git_repos(tmp_path)
+    }
 
     assert repos == {"RealRepo"}
 
 
-def test_discovery_treats_git_backed_workspace_root_as_container(tmp_path: Path) -> None:
+def test_discovery_treats_git_backed_workspace_root_as_container(
+    tmp_path: Path,
+) -> None:
     _git_repo(tmp_path)
     _git_repo(tmp_path / "NestedRepo")
 
-    repos = {repo.relative_to(tmp_path).as_posix() for repo in discover_git_repos(tmp_path)}
+    repos = {
+        repo.relative_to(tmp_path).as_posix() for repo in discover_git_repos(tmp_path)
+    }
 
     assert repos == {"NestedRepo"}
 

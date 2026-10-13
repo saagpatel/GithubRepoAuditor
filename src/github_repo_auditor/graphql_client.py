@@ -55,10 +55,12 @@ def bulk_fetch_repos(
     on_progress(page, repos_so_far) — called per page.
     """
     session = requests.Session()
-    session.headers.update({
-        "Authorization": f"bearer {token}",
-        "Content-Type": "application/json",
-    })
+    session.headers.update(
+        {
+            "Authorization": f"bearer {token}",
+            "Content-Type": "application/json",
+        }
+    )
 
     all_repos: list[dict] = []
     cursor: str | None = None
@@ -106,22 +108,25 @@ def _map_to_rest_format(node: dict) -> dict:
 
     # Build topics list
     topics = [
-        t["topic"]["name"]
-        for t in node.get("repositoryTopics", {}).get("nodes", [])
+        t["topic"]["name"] for t in node.get("repositoryTopics", {}).get("nodes", [])
     ]
 
     return {
         "name": node["name"],
         "full_name": node["nameWithOwner"],
         "description": node.get("description"),
-        "language": node["primaryLanguage"]["name"] if node.get("primaryLanguage") else None,
+        "language": node["primaryLanguage"]["name"]
+        if node.get("primaryLanguage")
+        else None,
         "private": node["isPrivate"],
         "fork": node["isFork"],
         "archived": node["isArchived"],
         "created_at": node["createdAt"],
         "updated_at": node["updatedAt"],
         "pushed_at": node.get("pushedAt"),
-        "default_branch": node["defaultBranchRef"]["name"] if node.get("defaultBranchRef") else "main",
+        "default_branch": node["defaultBranchRef"]["name"]
+        if node.get("defaultBranchRef")
+        else "main",
         "stargazers_count": node["stargazerCount"],
         "forks_count": node["forkCount"],
         "open_issues_count": node.get("issues", {}).get("totalCount", 0),

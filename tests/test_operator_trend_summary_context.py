@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from github_repo_auditor.operator_trend_summary_context import build_trend_summary_context
+from github_repo_auditor.operator_trend_summary_context import (
+    build_trend_summary_context,
+)
 
 
 def test_build_trend_summary_context_packages_attention_counts() -> None:

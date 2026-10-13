@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from github_repo_auditor.action_sync_packets import EXECUTION_PRIORITY
-from github_repo_auditor.action_sync_readiness import CAMPAIGN_DISPLAY_ORDER, READINESS_PRIORITY
+from github_repo_auditor.action_sync_readiness import (
+    CAMPAIGN_DISPLAY_ORDER,
+    READINESS_PRIORITY,
+)
 from github_repo_auditor.ops_writeback import CAMPAIGN_DEFINITIONS
 from github_repo_auditor.warehouse import (
     load_campaign_outcomes,
@@ -13,7 +16,9 @@ from github_repo_auditor.warehouse import (
 
 OUTCOME_LOOKBACK = 12
 RECENT_RUN_LOOKBACK = 20
-JUDGED_STATES = frozenset({"holding-clean", "drift-returned", "reopened", "rollback-watch"})
+JUDGED_STATES = frozenset(
+    {"holding-clean", "drift-returned", "reopened", "rollback-watch"}
+)
 BIAS_PRIORITY = {"promote": 0, "neutral": 1, "defer": 2}
 READINESS_STAGE_LABELS = {
     "drift-review": "drift-review",
@@ -49,11 +54,22 @@ def _history_row(row: dict[str, Any]) -> dict[str, Any]:
             "run_id": row.get("run_id", payload.get("run_id", "")),
             "generated_at": row.get("generated_at", payload.get("generated_at", "")),
             "campaign_type": row.get("campaign_type", payload.get("campaign_type", "")),
-            "monitoring_state": row.get("monitoring_state", payload.get("monitoring_state", "no-recent-apply")),
-            "pressure_effect": row.get("pressure_effect", payload.get("pressure_effect", "insufficient-evidence")),
-            "drift_state": row.get("drift_state", payload.get("drift_state", "insufficient-evidence")),
-            "reopen_state": row.get("reopen_state", payload.get("reopen_state", "insufficient-evidence")),
-            "rollback_state": row.get("rollback_state", payload.get("rollback_state", "not-applicable")),
+            "monitoring_state": row.get(
+                "monitoring_state", payload.get("monitoring_state", "no-recent-apply")
+            ),
+            "pressure_effect": row.get(
+                "pressure_effect",
+                payload.get("pressure_effect", "insufficient-evidence"),
+            ),
+            "drift_state": row.get(
+                "drift_state", payload.get("drift_state", "insufficient-evidence")
+            ),
+            "reopen_state": row.get(
+                "reopen_state", payload.get("reopen_state", "insufficient-evidence")
+            ),
+            "rollback_state": row.get(
+                "rollback_state", payload.get("rollback_state", "not-applicable")
+            ),
             "latest_target": row.get("latest_target", payload.get("latest_target", "")),
             "label": row.get("label", payload.get("label", "")),
             "summary": row.get("summary", payload.get("summary", "")),
@@ -74,8 +90,12 @@ def _current_outcomes(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     return outcomes
 
 
-def _campaign_histories(report_data: dict[str, Any], outcome_history: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    rows = _current_outcomes(report_data) + [_history_row(row) for row in outcome_history]
+def _campaign_histories(
+    report_data: dict[str, Any], outcome_history: list[dict[str, Any]]
+) -> dict[str, list[dict[str, Any]]]:
+    rows = _current_outcomes(report_data) + [
+        _history_row(row) for row in outcome_history
+    ]
     deduped: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
         campaign_type = str(row.get("campaign_type") or "").strip()
@@ -84,7 +104,9 @@ def _campaign_histories(report_data: dict[str, Any], outcome_history: list[dict[
         key = (str(row.get("run_id") or ""), campaign_type)
         if key not in deduped:
             deduped[key] = row
-    grouped: dict[str, list[dict[str, Any]]] = {campaign_type: [] for campaign_type in CAMPAIGN_DISPLAY_ORDER}
+    grouped: dict[str, list[dict[str, Any]]] = {
+        campaign_type: [] for campaign_type in CAMPAIGN_DISPLAY_ORDER
+    }
     for row in deduped.values():
         grouped.setdefault(str(row.get("campaign_type") or ""), []).append(row)
     for campaign_type in grouped:
@@ -96,7 +118,9 @@ def _campaign_histories(report_data: dict[str, Any], outcome_history: list[dict[
     return grouped
 
 
-def _recent_activity_counts(report_data: dict[str, Any], recent_campaign_runs: list[dict[str, Any]]) -> dict[str, int]:
+def _recent_activity_counts(
+    report_data: dict[str, Any], recent_campaign_runs: list[dict[str, Any]]
+) -> dict[str, int]:
     counts = {campaign_type: 0 for campaign_type in CAMPAIGN_DISPLAY_ORDER}
     rows = list(recent_campaign_runs)
     campaign_summary = _copy_mapping(report_data.get("campaign_summary"))
@@ -186,7 +210,9 @@ def _summary(record: dict[str, Any]) -> str:
     )
 
 
-def _readiness_sort_key(record: dict[str, Any], tuning: dict[str, Any]) -> tuple[int, int, int, int, int]:
+def _readiness_sort_key(
+    record: dict[str, Any], tuning: dict[str, Any]
+) -> tuple[int, int, int, int, int]:
     return (
         READINESS_PRIORITY.get(str(record.get("readiness_stage") or "idle"), 99),
         BIAS_PRIORITY.get(str(tuning.get("recommendation_bias") or "neutral"), 99),
@@ -196,7 +222,9 @@ def _readiness_sort_key(record: dict[str, Any], tuning: dict[str, Any]) -> tuple
     )
 
 
-def _packet_sort_key(packet: dict[str, Any], tuning: dict[str, Any]) -> tuple[int, int, int, int, int]:
+def _packet_sort_key(
+    packet: dict[str, Any], tuning: dict[str, Any]
+) -> tuple[int, int, int, int, int]:
     return (
         EXECUTION_PRIORITY.get(str(packet.get("execution_state") or "stay-local"), 99),
         BIAS_PRIORITY.get(str(tuning.get("recommendation_bias") or "neutral"), 99),
@@ -234,7 +262,9 @@ def _execution_next_action_sync_step(packet: dict[str, Any]) -> str:
 
 def _next_tuned_campaign_summary(record: dict[str, Any], tuning: dict[str, Any]) -> str:
     label = str(record.get("label") or record.get("campaign_type") or "Campaign")
-    stage = READINESS_STAGE_LABELS.get(str(record.get("readiness_stage") or "idle"), "idle")
+    stage = READINESS_STAGE_LABELS.get(
+        str(record.get("readiness_stage") or "idle"), "idle"
+    )
     bias = str(tuning.get("recommendation_bias") or "neutral")
     tuning_status = str(tuning.get("tuning_status") or "insufficient-evidence")
     judged_count = int(tuning.get("judged_count", 0) or 0)
@@ -253,17 +283,35 @@ def _campaign_tuning_summary(
     readiness_records: list[dict[str, Any]],
     tuning_by_campaign: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
-    actionable = [record for record in readiness_records if int(record.get("action_count", 0) or 0) > 0]
+    actionable = [
+        record
+        for record in readiness_records
+        if int(record.get("action_count", 0) or 0) > 0
+    ]
     if not actionable:
         return {
             "summary": "Campaign tuning is idle because no current campaign has meaningful actions that need a bounded tie-break yet.",
-            "counts": {"proven": 0, "mixed": 0, "caution": 0, "insufficient-evidence": 0},
+            "counts": {
+                "proven": 0,
+                "mixed": 0,
+                "caution": 0,
+                "insufficient-evidence": 0,
+            },
         }
-    ordered = sorted(actionable, key=lambda record: _readiness_sort_key(record, tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})))
+    ordered = sorted(
+        actionable,
+        key=lambda record: _readiness_sort_key(
+            record, tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})
+        ),
+    )
     top_record = ordered[0]
     top_tuning = tuning_by_campaign.get(str(top_record.get("campaign_type") or ""), {})
     counts = {
-        status: sum(1 for item in tuning_by_campaign.values() if item.get("tuning_status") == status)
+        status: sum(
+            1
+            for item in tuning_by_campaign.values()
+            if item.get("tuning_status") == status
+        )
         for status in ("proven", "mixed", "caution", "insufficient-evidence")
     }
     return {
@@ -278,7 +326,11 @@ def _top_tuning_group(
     tuning_status: str,
     primary_key: str,
 ) -> list[dict[str, Any]]:
-    filtered = [record for record in tuning_records if str(record.get("tuning_status") or "") == tuning_status]
+    filtered = [
+        record
+        for record in tuning_records
+        if str(record.get("tuning_status") or "") == tuning_status
+    ]
     return sorted(
         filtered,
         key=lambda item: (
@@ -293,7 +345,11 @@ def _next_tuned_campaign(
     readiness_records: list[dict[str, Any]],
     tuning_by_campaign: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
-    actionable = [record for record in readiness_records if int(record.get("action_count", 0) or 0) > 0]
+    actionable = [
+        record
+        for record in readiness_records
+        if int(record.get("action_count", 0) or 0) > 0
+    ]
     if not actionable:
         return {
             "campaign_type": "",
@@ -301,7 +357,12 @@ def _next_tuned_campaign(
             "recommendation_bias": "neutral",
             "tuning_status": "insufficient-evidence",
         }
-    ordered = sorted(actionable, key=lambda record: _readiness_sort_key(record, tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})))
+    ordered = sorted(
+        actionable,
+        key=lambda record: _readiness_sort_key(
+            record, tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})
+        ),
+    )
     record = ordered[0]
     tuning = tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})
     return {
@@ -315,15 +376,24 @@ def _next_tuned_campaign(
     }
 
 
-def _queue_tuning_lines(queue: list[dict[str, Any]], tuning_by_campaign: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+def _queue_tuning_lines(
+    queue: list[dict[str, Any]], tuning_by_campaign: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
     for item in queue:
         mapped = dict(item)
         campaign_type = str(mapped.get("suggested_campaign") or "").strip()
         tuning = tuning_by_campaign.get(campaign_type, {})
-        mapped["campaign_tuning_status"] = str(tuning.get("tuning_status") or "insufficient-evidence")
-        mapped["campaign_tuning_summary"] = str(tuning.get("summary") or "No campaign tuning evidence is surfaced for this item yet.")
-        mapped["campaign_tuning_line"] = f"Campaign Tuning: {mapped['campaign_tuning_summary']}"
+        mapped["campaign_tuning_status"] = str(
+            tuning.get("tuning_status") or "insufficient-evidence"
+        )
+        mapped["campaign_tuning_summary"] = str(
+            tuning.get("summary")
+            or "No campaign tuning evidence is surfaced for this item yet."
+        )
+        mapped["campaign_tuning_line"] = (
+            f"Campaign Tuning: {mapped['campaign_tuning_summary']}"
+        )
         enriched.append(mapped)
     return enriched
 
@@ -336,9 +406,16 @@ def _sorted_stage_group(
     stage_value: str,
     packet: bool = False,
 ) -> list[dict[str, Any]]:
-    filtered = [record for record in records if str(record.get(stage_key) or "") == stage_value]
+    filtered = [
+        record for record in records if str(record.get(stage_key) or "") == stage_value
+    ]
     sort_fn = _packet_sort_key if packet else _readiness_sort_key
-    return sorted(filtered, key=lambda record: sort_fn(record, tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})))
+    return sorted(
+        filtered,
+        key=lambda record: sort_fn(
+            record, tuning_by_campaign.get(str(record.get("campaign_type") or ""), {})
+        ),
+    )
 
 
 def build_action_sync_tuning_bundle(
@@ -354,31 +431,77 @@ def build_action_sync_tuning_bundle(
 ) -> dict[str, Any]:
     histories = _campaign_histories(report_data, outcome_history)
     activity_counts = _recent_activity_counts(report_data, recent_campaign_runs)
-    readiness_records = list((readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns") or [])
+    readiness_records = list(
+        (readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns")
+        or []
+    )
     packet_records = list(packets_bundle.get("action_sync_packets") or [])
 
     tuning_records: list[dict[str, Any]] = []
     tuning_by_campaign: dict[str, dict[str, Any]] = {}
     for campaign_type in CAMPAIGN_DISPLAY_ORDER:
         rows = histories.get(campaign_type, [])[:OUTCOME_LOOKBACK]
-        judged_rows = [row for row in rows if str(row.get("monitoring_state") or "") in JUDGED_STATES]
+        judged_rows = [
+            row
+            for row in rows
+            if str(row.get("monitoring_state") or "") in JUDGED_STATES
+        ]
         judged_count = len(judged_rows)
-        monitor_now_count = sum(1 for row in rows if str(row.get("monitoring_state") or "") == "monitor-now")
+        monitor_now_count = sum(
+            1 for row in rows if str(row.get("monitoring_state") or "") == "monitor-now"
+        )
         record = {
             "campaign_type": campaign_type,
             "label": str(CAMPAIGN_DEFINITIONS[campaign_type]["label"]),
             "judged_count": judged_count,
             "monitor_now_count": monitor_now_count,
-            "holding_clean_rate": _rate(sum(1 for row in judged_rows if str(row.get("monitoring_state") or "") == "holding-clean"), judged_count),
-            "drift_return_rate": _rate(sum(1 for row in judged_rows if str(row.get("monitoring_state") or "") == "drift-returned"), judged_count),
-            "reopen_rate": _rate(sum(1 for row in judged_rows if str(row.get("monitoring_state") or "") == "reopened"), judged_count),
-            "rollback_watch_rate": _rate(sum(1 for row in judged_rows if str(row.get("monitoring_state") or "") == "rollback-watch"), judged_count),
-            "pressure_reduction_rate": _rate(sum(1 for row in judged_rows if str(row.get("pressure_effect") or "") == "reduced"), judged_count),
+            "holding_clean_rate": _rate(
+                sum(
+                    1
+                    for row in judged_rows
+                    if str(row.get("monitoring_state") or "") == "holding-clean"
+                ),
+                judged_count,
+            ),
+            "drift_return_rate": _rate(
+                sum(
+                    1
+                    for row in judged_rows
+                    if str(row.get("monitoring_state") or "") == "drift-returned"
+                ),
+                judged_count,
+            ),
+            "reopen_rate": _rate(
+                sum(
+                    1
+                    for row in judged_rows
+                    if str(row.get("monitoring_state") or "") == "reopened"
+                ),
+                judged_count,
+            ),
+            "rollback_watch_rate": _rate(
+                sum(
+                    1
+                    for row in judged_rows
+                    if str(row.get("monitoring_state") or "") == "rollback-watch"
+                ),
+                judged_count,
+            ),
+            "pressure_reduction_rate": _rate(
+                sum(
+                    1
+                    for row in judged_rows
+                    if str(row.get("pressure_effect") or "") == "reduced"
+                ),
+                judged_count,
+            ),
             "recent_activity_count": int(activity_counts.get(campaign_type, 0) or 0),
             "recent_run_count": min(len(recent_runs), RECENT_RUN_LOOKBACK),
         }
         record["tuning_status"] = _tuning_status(record)
-        record["recommendation_bias"] = _recommendation_bias(str(record["tuning_status"]))
+        record["recommendation_bias"] = _recommendation_bias(
+            str(record["tuning_status"])
+        )
         record["summary"] = _summary(record)
         tuning_records.append(record)
         tuning_by_campaign[campaign_type] = record
@@ -388,20 +511,32 @@ def build_action_sync_tuning_bundle(
     }
     tuned_packet_records = sorted(
         packet_records,
-        key=lambda packet: _packet_sort_key(packet, tuning_by_campaign.get(str(packet.get("campaign_type") or ""), {})),
+        key=lambda packet: _packet_sort_key(
+            packet, tuning_by_campaign.get(str(packet.get("campaign_type") or ""), {})
+        ),
     )
-    actionable_packets = [packet for packet in tuned_packet_records if str(packet.get("execution_state") or "") != "stay-local"]
-    next_apply_candidate = actionable_packets[0] if actionable_packets else {
-        "campaign_type": "",
-        "execution_state": "stay-local",
-        "summary": "Stay local for now; no current campaign has a safe execution handoff.",
-    }
+    actionable_packets = [
+        packet
+        for packet in tuned_packet_records
+        if str(packet.get("execution_state") or "") != "stay-local"
+    ]
+    next_apply_candidate = (
+        actionable_packets[0]
+        if actionable_packets
+        else {
+            "campaign_type": "",
+            "execution_state": "stay-local",
+            "summary": "Stay local for now; no current campaign has a safe execution handoff.",
+        }
+    )
     next_tuned = _next_tuned_campaign(readiness_records, tuning_by_campaign)
     execution_next_step = _execution_next_action_sync_step(next_apply_candidate)
     queue = _queue_tuning_lines(queue, tuning_by_campaign)
     return {
         "action_sync_tuning": tuning_records,
-        "campaign_tuning_summary": _campaign_tuning_summary(readiness_records, tuning_by_campaign),
+        "campaign_tuning_summary": _campaign_tuning_summary(
+            readiness_records, tuning_by_campaign
+        ),
         "next_tuned_campaign": next_tuned,
         "next_action_sync_step": execution_next_step
         or (
@@ -412,13 +547,51 @@ def build_action_sync_tuning_bundle(
             else "Stay local for now; no current campaign needs preview or apply."
         ),
         "next_apply_candidate": next_apply_candidate,
-        "top_apply_ready_campaigns": _sorted_stage_group(readiness_records, tuning_by_campaign, stage_key="readiness_stage", stage_value="apply-ready"),
-        "top_preview_ready_campaigns": _sorted_stage_group(readiness_records, tuning_by_campaign, stage_key="readiness_stage", stage_value="preview-ready"),
-        "top_drift_review_campaigns": _sorted_stage_group(readiness_records, tuning_by_campaign, stage_key="readiness_stage", stage_value="drift-review"),
-        "top_blocked_campaigns": _sorted_stage_group(readiness_records, tuning_by_campaign, stage_key="readiness_stage", stage_value="blocked"),
-        "top_ready_to_apply_packets": _sorted_stage_group(packet_records, tuning_by_campaign, stage_key="execution_state", stage_value="ready-to-apply", packet=True),
-        "top_needs_approval_packets": _sorted_stage_group(packet_records, tuning_by_campaign, stage_key="execution_state", stage_value="needs-approval", packet=True),
-        "top_review_drift_packets": _sorted_stage_group(packet_records, tuning_by_campaign, stage_key="execution_state", stage_value="review-drift", packet=True),
+        "top_apply_ready_campaigns": _sorted_stage_group(
+            readiness_records,
+            tuning_by_campaign,
+            stage_key="readiness_stage",
+            stage_value="apply-ready",
+        ),
+        "top_preview_ready_campaigns": _sorted_stage_group(
+            readiness_records,
+            tuning_by_campaign,
+            stage_key="readiness_stage",
+            stage_value="preview-ready",
+        ),
+        "top_drift_review_campaigns": _sorted_stage_group(
+            readiness_records,
+            tuning_by_campaign,
+            stage_key="readiness_stage",
+            stage_value="drift-review",
+        ),
+        "top_blocked_campaigns": _sorted_stage_group(
+            readiness_records,
+            tuning_by_campaign,
+            stage_key="readiness_stage",
+            stage_value="blocked",
+        ),
+        "top_ready_to_apply_packets": _sorted_stage_group(
+            packet_records,
+            tuning_by_campaign,
+            stage_key="execution_state",
+            stage_value="ready-to-apply",
+            packet=True,
+        ),
+        "top_needs_approval_packets": _sorted_stage_group(
+            packet_records,
+            tuning_by_campaign,
+            stage_key="execution_state",
+            stage_value="needs-approval",
+            packet=True,
+        ),
+        "top_review_drift_packets": _sorted_stage_group(
+            packet_records,
+            tuning_by_campaign,
+            stage_key="execution_state",
+            stage_value="review-drift",
+            packet=True,
+        ),
         "top_proven_campaigns": _top_tuning_group(
             tuning_records,
             tuning_status="proven",
@@ -453,7 +626,13 @@ def load_action_sync_tuning_bundle(
         packets_bundle,
         outcomes_bundle,
         queue,
-        recent_runs=load_latest_audit_runs(output_dir, username, limit=RECENT_RUN_LOOKBACK),
-        recent_campaign_runs=load_recent_campaign_runs(output_dir, username, limit=RECENT_RUN_LOOKBACK),
-        outcome_history=load_campaign_outcomes(output_dir, username, limit=OUTCOME_LOOKBACK * len(CAMPAIGN_DISPLAY_ORDER)),
+        recent_runs=load_latest_audit_runs(
+            output_dir, username, limit=RECENT_RUN_LOOKBACK
+        ),
+        recent_campaign_runs=load_recent_campaign_runs(
+            output_dir, username, limit=RECENT_RUN_LOOKBACK
+        ),
+        outcome_history=load_campaign_outcomes(
+            output_dir, username, limit=OUTCOME_LOOKBACK * len(CAMPAIGN_DISPLAY_ORDER)
+        ),
     )

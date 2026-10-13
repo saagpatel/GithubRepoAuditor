@@ -29,7 +29,12 @@ def test_load_risk_truth_keys_by_slug_and_display_name(tmp_path: Path) -> None:
 
 def test_load_risk_truth_no_slug_when_repo_full_name_absent(tmp_path: Path) -> None:
     truth = {
-        "projects": [{"identity": {"display_name": "PlainRepo"}, "risk": {"risk_tier": "moderate"}}]
+        "projects": [
+            {
+                "identity": {"display_name": "PlainRepo"},
+                "risk": {"risk_tier": "moderate"},
+            }
+        ]
     }
     (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps(truth))
     risk_lookup, posture = load_risk_truth(tmp_path)

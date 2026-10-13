@@ -107,4 +107,6 @@ def _repo_context_quality(repo: dict[str, Any]) -> str:
 
 def run_triage(repos: list[dict[str, Any]]) -> list[TriageEntry]:
     """Return TriageEntry for every repo that has at least one failure mode."""
-    return [TriageEntry.from_repo(repo) for repo in repos if assess_repo_failure_modes(repo)]
+    return [
+        TriageEntry.from_repo(repo) for repo in repos if assess_repo_failure_modes(repo)
+    ]

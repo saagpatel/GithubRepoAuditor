@@ -55,7 +55,8 @@ def _family_attention(states: list[str]) -> str:
     # Unranked states tie and retain saved-truth order; expose all separately.
     return (
         min(states, key=lambda state: ATTENTION_STATE_RANK.get(state, 9))
-        if states else ""
+        if states
+        else ""
     )
 
 

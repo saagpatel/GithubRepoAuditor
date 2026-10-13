@@ -121,9 +121,13 @@ class TestInitiativesRoute:
         assert resp.status_code == 200
         assert "MyRepo" in resp.text
 
-    def test_counts_appear_in_header(self, output_dir: Path, client: TestClient) -> None:
+    def test_counts_appear_in_header(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """Header counts reflect on-track, at-risk, overdue, met correctly."""
-        truth = _make_portfolio_truth([_bronze_repo("OnTrackRepo"), _bronze_repo("OverdueRepo")])
+        truth = _make_portfolio_truth(
+            [_bronze_repo("OnTrackRepo"), _bronze_repo("OverdueRepo")]
+        )
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
         _write_initiatives(
             output_dir,
@@ -153,7 +157,9 @@ class TestInitiativesRoute:
         # The page should mention counts (1 on-track, 1 overdue)
         assert "on-track" in resp.text or "1" in resp.text
 
-    def test_closed_initiative_not_in_rows(self, output_dir: Path, client: TestClient) -> None:
+    def test_closed_initiative_not_in_rows(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """Closed initiative is not rendered as a table row."""
         truth = _make_portfolio_truth([_bronze_repo("ClosedRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -177,7 +183,9 @@ class TestInitiativesRoute:
         # (it is counted in the footer "N closed" summary instead)
         assert "ClosedRepo" not in resp.text
 
-    def test_closed_count_shown_in_header(self, output_dir: Path, client: TestClient) -> None:
+    def test_closed_count_shown_in_header(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """Closed initiative count appears in the header summary line."""
         _write_initiatives(
             output_dir,
@@ -232,7 +240,9 @@ class TestInitiativeGapRoute:
         resp = client.get("/initiatives/GapRepo/gap?target=3")
         assert resp.status_code == 200
 
-    def test_gap_lists_missing_requirements(self, output_dir: Path, client: TestClient) -> None:
+    def test_gap_lists_missing_requirements(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """Bronze repo targeting Gold tier → shows unmet Gold requirements."""
         truth = _make_portfolio_truth([_bronze_repo("GapRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -249,14 +259,18 @@ class TestInitiativeGapRoute:
         assert resp.status_code == 200
         assert "All requirements met" in resp.text
 
-    def test_unknown_repo_returns_404(self, output_dir: Path, client: TestClient) -> None:
+    def test_unknown_repo_returns_404(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """Repo not in portfolio-truth → 404."""
         truth = _make_portfolio_truth([_bronze_repo("KnownRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
         resp = client.get("/initiatives/Nonexistent/gap?target=3")
         assert resp.status_code == 404
 
-    def test_no_portfolio_truth_returns_404(self, output_dir: Path, client: TestClient) -> None:
+    def test_no_portfolio_truth_returns_404(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """No portfolio-truth file → 404 (repo cannot be found)."""
         resp = client.get("/initiatives/AnyRepo/gap?target=2")
         assert resp.status_code == 404

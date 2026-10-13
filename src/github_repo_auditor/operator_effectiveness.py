@@ -21,7 +21,9 @@ def build_operator_effectiveness_bundle(
     ordered_history = _chronological(state_history)[:LOOKBACK_RUNS]
     sufficient_history = len(ordered_history) >= MIN_HISTORY_RUNS
     high_pressure_history = _high_pressure_history(ordered_history)
-    high_pressure_series = [item["high_pressure_count"] for item in high_pressure_history]
+    high_pressure_series = [
+        item["high_pressure_count"] for item in high_pressure_history
+    ]
     high_pressure_trend_status = _high_pressure_trend_status(high_pressure_series)
     high_pressure_trend_summary = _high_pressure_trend_summary(
         high_pressure_trend_status,
@@ -31,18 +33,28 @@ def build_operator_effectiveness_bundle(
     judged = _judged_recommendation_counts(calibration_history)
     judged_count = judged["judged"]
     enough_calibration = judged_count >= MIN_JUDGED_RECOMMENDATIONS
-    review_to_action_closure_rate = _review_to_action_closure_rate(campaign_history, sufficient_history)
+    review_to_action_closure_rate = _review_to_action_closure_rate(
+        campaign_history, sufficient_history
+    )
     median_runs_to_quiet_after_escalation = _median_runs_to_quiet_after_escalation(
         high_pressure_series,
         sufficient_history,
     )
-    repeated_regression_rate = _repeated_regression_rate(ordered_history, sufficient_history)
-    recommendation_validation_rate = _recommendation_validation_rate(judged, enough_calibration)
+    repeated_regression_rate = _repeated_regression_rate(
+        ordered_history, sufficient_history
+    )
+    recommendation_validation_rate = _recommendation_validation_rate(
+        judged, enough_calibration
+    )
     noisy_guidance_rate = _noisy_guidance_rate(judged, enough_calibration)
 
-    recent_reopened_recommendations = _recent_reopened_recommendations(calibration_history)
+    recent_reopened_recommendations = _recent_reopened_recommendations(
+        calibration_history
+    )
     recent_closed_actions = _recent_closed_actions(campaign_history)
-    recent_regression_examples = _recent_regression_examples(evidence_events, ordered_history, review_history)
+    recent_regression_examples = _recent_regression_examples(
+        evidence_events, ordered_history, review_history
+    )
 
     portfolio_outcomes_summary = {
         "review_to_action_closure_rate": review_to_action_closure_rate,
@@ -75,7 +87,10 @@ def build_operator_effectiveness_bundle(
 
 
 def _chronological(history: list[dict]) -> list[dict]:
-    return sorted(history or [], key=lambda item: str(item.get("generated_at") or item.get("run_id") or ""))
+    return sorted(
+        history or [],
+        key=lambda item: str(item.get("generated_at") or item.get("run_id") or ""),
+    )
 
 
 def _high_pressure_history(history: list[dict]) -> list[dict]:
@@ -130,13 +145,20 @@ def _high_pressure_trend_summary(status: str, history: list[dict]) -> str:
     return f"Blocked and urgent queue pressure is stable, with {latest} high-pressure item(s) in the latest run."
 
 
-def _review_to_action_closure_rate(campaign_history: list[dict], sufficient_history: bool) -> dict[str, Any]:
+def _review_to_action_closure_rate(
+    campaign_history: list[dict], sufficient_history: bool
+) -> dict[str, Any]:
     if not sufficient_history:
-        return _insufficient_rate("Not enough recent operator history is available to judge whether reviewed actions are closing cleanly.")
+        return _insufficient_rate(
+            "Not enough recent operator history is available to judge whether reviewed actions are closing cleanly."
+        )
     actions: dict[str, dict] = {}
     ordered = sorted(
         campaign_history or [],
-        key=lambda item: (str(item.get("generated_at", "")), str(item.get("action_id", ""))),
+        key=lambda item: (
+            str(item.get("generated_at", "")),
+            str(item.get("action_id", "")),
+        ),
     )[-200:]
     for item in ordered:
         action_id = str(item.get("action_id") or "").strip()
@@ -144,7 +166,9 @@ def _review_to_action_closure_rate(campaign_history: list[dict], sufficient_hist
             continue
         actions[action_id] = item
     if not actions:
-        return _insufficient_rate("No managed campaign actions were recorded in the recent window, so closure rate cannot be judged yet.")
+        return _insufficient_rate(
+            "No managed campaign actions were recorded in the recent window, so closure rate cannot be judged yet."
+        )
     closed_states = {"resolved", "cancelled", "closed"}
     closed = sum(
         1
@@ -164,7 +188,9 @@ def _review_to_action_closure_rate(campaign_history: list[dict], sufficient_hist
     }
 
 
-def _median_runs_to_quiet_after_escalation(series: list[int], sufficient_history: bool) -> dict[str, Any]:
+def _median_runs_to_quiet_after_escalation(
+    series: list[int], sufficient_history: bool
+) -> dict[str, Any]:
     if not sufficient_history:
         return {
             "status": "insufficient-evidence",
@@ -197,9 +223,13 @@ def _median_runs_to_quiet_after_escalation(series: list[int], sufficient_history
     }
 
 
-def _repeated_regression_rate(history: list[dict], sufficient_history: bool) -> dict[str, Any]:
+def _repeated_regression_rate(
+    history: list[dict], sufficient_history: bool
+) -> dict[str, Any]:
     if not sufficient_history:
-        return _insufficient_rate("Not enough recent operator history is available to judge whether attention is reopening after resolution.")
+        return _insufficient_rate(
+            "Not enough recent operator history is available to judge whether attention is reopening after resolution."
+        )
     reopened = 0
     resolved = 0
     for item in history:
@@ -234,9 +264,13 @@ def _judged_recommendation_counts(calibration_history: list[dict]) -> dict[str, 
     return {"validated": 0, "partial": 0, "unresolved": 0, "reopened": 0, "judged": 0}
 
 
-def _recommendation_validation_rate(counts: dict[str, int], enough_calibration: bool) -> dict[str, Any]:
+def _recommendation_validation_rate(
+    counts: dict[str, int], enough_calibration: bool
+) -> dict[str, Any]:
     if not enough_calibration:
-        return _insufficient_rate("Fewer than three judged recommendations are available, so validation rate is still too noisy to trust.")
+        return _insufficient_rate(
+            "Fewer than three judged recommendations are available, so validation rate is still too noisy to trust."
+        )
     value = (counts["validated"] + counts["partial"]) / max(counts["judged"], 1)
     return {
         "status": "measured",
@@ -250,9 +284,13 @@ def _recommendation_validation_rate(counts: dict[str, int], enough_calibration: 
     }
 
 
-def _noisy_guidance_rate(counts: dict[str, int], enough_calibration: bool) -> dict[str, Any]:
+def _noisy_guidance_rate(
+    counts: dict[str, int], enough_calibration: bool
+) -> dict[str, Any]:
     if not enough_calibration:
-        return _insufficient_rate("Fewer than three judged recommendations are available, so guidance noise cannot be judged confidently yet.")
+        return _insufficient_rate(
+            "Fewer than three judged recommendations are available, so guidance noise cannot be judged confidently yet."
+        )
     value = counts["reopened"] / max(counts["judged"], 1)
     return {
         "status": "measured",
@@ -274,7 +312,9 @@ def _recent_reopened_recommendations(calibration_history: list[dict]) -> list[di
         items.append(
             {
                 "repo": item.get("repo", ""),
-                "title": item.get("title") or item.get("item_id") or "Recommendation reopened",
+                "title": item.get("title")
+                or item.get("item_id")
+                or "Recommendation reopened",
                 "confidence_label": item.get("confidence_label", ""),
                 "summary": item.get("summary")
                 or "A recently judged recommendation reopened after an earlier positive signal.",
@@ -287,20 +327,30 @@ def _recent_reopened_recommendations(calibration_history: list[dict]) -> list[di
 
 def _recent_closed_actions(campaign_history: list[dict]) -> list[dict]:
     closed = []
-    ordered = sorted(campaign_history or [], key=lambda item: str(item.get("generated_at") or ""), reverse=True)
+    ordered = sorted(
+        campaign_history or [],
+        key=lambda item: str(item.get("generated_at") or ""),
+        reverse=True,
+    )
     seen: set[str] = set()
     for item in ordered:
         action_id = str(item.get("action_id") or "").strip()
         if not action_id or action_id in seen:
             continue
-        if str(item.get("lifecycle_state") or "") not in {"resolved", "cancelled", "closed"}:
+        if str(item.get("lifecycle_state") or "") not in {
+            "resolved",
+            "cancelled",
+            "closed",
+        }:
             continue
         seen.add(action_id)
         closed.append(
             {
                 "repo": item.get("repo", item.get("repo_id", "")),
                 "action_id": action_id,
-                "title": item.get("title") or item.get("summary") or "Managed action closed",
+                "title": item.get("title")
+                or item.get("summary")
+                or "Managed action closed",
                 "summary": item.get("closed_reason")
                 or item.get("summary")
                 or "A managed campaign action closed in the recent window.",
@@ -320,12 +370,17 @@ def _recent_regression_examples(
     for item in evidence_events or []:
         outcome = str(item.get("outcome") or "").strip()
         event_type = str(item.get("event_type") or "").strip()
-        if outcome not in {"reopened", "drifted"} and event_type not in {"open", "reopened"}:
+        if outcome not in {"reopened", "drifted"} and event_type not in {
+            "open",
+            "reopened",
+        }:
             continue
         examples.append(
             {
                 "repo": item.get("repo", item.get("repo_id", "")),
-                "title": item.get("title") or item.get("action_id") or "Recent regression",
+                "title": item.get("title")
+                or item.get("action_id")
+                or "Recent regression",
                 "summary": item.get("summary")
                 or item.get("drift_state")
                 or "A previously moving item reopened or drifted again.",
@@ -340,7 +395,9 @@ def _recent_regression_examples(
         examples.append(
             {
                 "repo": summary.get("primary_target", {}).get("repo", ""),
-                "title": summary.get("primary_target", {}).get("title", "Reopened operator attention"),
+                "title": summary.get("primary_target", {}).get(
+                    "title", "Reopened operator attention"
+                ),
                 "summary": summary.get("resolution_evidence_summary")
                 or "An attention item reopened after an earlier quiet or resolved state.",
             }
@@ -357,7 +414,9 @@ def _recent_regression_examples(
             {
                 "repo": item.get("repo", ""),
                 "title": item.get("title", "Recent regression"),
-                "summary": item.get("summary") or item.get("reason") or "A reviewed item regressed again in the recent window.",
+                "summary": item.get("summary")
+                or item.get("reason")
+                or "A reviewed item regressed again in the recent window.",
             }
         )
         if len(examples) == MAX_EXAMPLES:
@@ -377,12 +436,25 @@ def _portfolio_outcomes_summary(
     ):
         return "Operator outcomes need a little more history before closure and regression patterns can be judged confidently."
     parts = []
-    if closure_rate.get("status") == "measured" and closure_rate.get("value") is not None:
+    if (
+        closure_rate.get("status") == "measured"
+        and closure_rate.get("value") is not None
+    ):
         parts.append(f"Managed action closure is at {closure_rate['value']:.0%}")
-    if quiet_median.get("status") == "measured" and quiet_median.get("value") is not None:
-        parts.append(f"blocked and urgent pressure quiets in about {quiet_median['value']:.1f} run(s)")
-    if regression_rate.get("status") == "measured" and regression_rate.get("value") is not None:
-        parts.append(f"repeated regression is running at {regression_rate['value']:.0%}")
+    if (
+        quiet_median.get("status") == "measured"
+        and quiet_median.get("value") is not None
+    ):
+        parts.append(
+            f"blocked and urgent pressure quiets in about {quiet_median['value']:.1f} run(s)"
+        )
+    if (
+        regression_rate.get("status") == "measured"
+        and regression_rate.get("value") is not None
+    ):
+        parts.append(
+            f"repeated regression is running at {regression_rate['value']:.0%}"
+        )
     if not parts:
         return "Operator outcomes are recorded, but the current window is still too thin for a confident summary."
     return "; ".join(parts) + "."
@@ -398,9 +470,15 @@ def _operator_effectiveness_summary(
     ):
         return "Recommendation effectiveness needs more judged outcomes before the confidence calibration can be trusted."
     parts = []
-    if validation_rate.get("status") == "measured" and validation_rate.get("value") is not None:
+    if (
+        validation_rate.get("status") == "measured"
+        and validation_rate.get("value") is not None
+    ):
         parts.append(f"recommendation validation is at {validation_rate['value']:.0%}")
-    if noisy_guidance_rate.get("status") == "measured" and noisy_guidance_rate.get("value") is not None:
+    if (
+        noisy_guidance_rate.get("status") == "measured"
+        and noisy_guidance_rate.get("value") is not None
+    ):
         parts.append(f"guidance noise is at {noisy_guidance_rate['value']:.0%}")
     if not parts:
         return "Recommendation effectiveness is recorded, but the judged window is still too small for a confident read."

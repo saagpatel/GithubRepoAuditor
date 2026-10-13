@@ -8,8 +8,12 @@ from typing import Any
 from github_repo_auditor.excel_export import export_excel
 from github_repo_auditor.history import load_repo_score_history, load_trend_data
 from github_repo_auditor.models import AuditReport
-from github_repo_auditor.operator_approval_artifacts import write_approval_center_artifacts
-from github_repo_auditor.operator_control_center_artifacts import write_control_center_artifacts
+from github_repo_auditor.operator_approval_artifacts import (
+    write_approval_center_artifacts,
+)
+from github_repo_auditor.operator_control_center_artifacts import (
+    write_control_center_artifacts,
+)
 from github_repo_auditor.report_state import report_artifact_datetime
 from github_repo_auditor.reporter import (
     write_json_report,
@@ -40,28 +44,57 @@ def refresh_shared_artifacts_from_report(
     score_history = load_repo_score_history()
     export_excel(
         json_path,
-        output_dir / f"audit-dashboard-{report.username}-{report.generated_at.strftime('%Y-%m-%d')}.xlsx",
-        trend_data=trend_data, diff_data=diff_dict, score_history=score_history,
-        portfolio_profile=args.portfolio_profile, collection=args.collection,
-        excel_mode=args.excel_mode, truth_dir=output_dir,
+        output_dir
+        / f"audit-dashboard-{report.username}-{report.generated_at.strftime('%Y-%m-%d')}.xlsx",
+        trend_data=trend_data,
+        diff_data=diff_dict,
+        score_history=score_history,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+        excel_mode=args.excel_mode,
+        truth_dir=output_dir,
         reckoning_overlay=getattr(args, "reckoning_overlay", None),
     )
-    export_review_pack(report.to_dict(), output_dir, diff_data=diff_dict,
-                       portfolio_profile=args.portfolio_profile, collection=args.collection)
-    export_html_dashboard(report.to_dict(), output_dir, trend_data, score_history,
-                          diff_data=diff_dict, portfolio_profile=args.portfolio_profile,
-                          collection=args.collection)
+    export_review_pack(
+        report.to_dict(),
+        output_dir,
+        diff_data=diff_dict,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+    )
+    export_html_dashboard(
+        report.to_dict(),
+        output_dir,
+        trend_data,
+        score_history,
+        diff_data=diff_dict,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+    )
     artifact_generated_at = report_artifact_datetime(json_path, report.generated_at)
-    snapshot = {"operator_summary": report.operator_summary, "operator_queue": report.operator_queue}
-    control_json, control_md, weekly_json, weekly_md, _control_payload = write_control_center_artifacts(
-        report.to_dict(), snapshot, output_dir, username=report.username,
-        generated_at=artifact_generated_at, report_reference=str(json_path), diff_dict=diff_dict,
+    snapshot = {
+        "operator_summary": report.operator_summary,
+        "operator_queue": report.operator_queue,
+    }
+    control_json, control_md, weekly_json, weekly_md, _control_payload = (
+        write_control_center_artifacts(
+            report.to_dict(),
+            snapshot,
+            output_dir,
+            username=report.username,
+            generated_at=artifact_generated_at,
+            report_reference=str(json_path),
+            diff_dict=diff_dict,
+        )
     )
     report.operator_summary["control_center_reference"] = str(control_json)
     write_warehouse_snapshot(report, output_dir, json_path)
     return {
-        "json_path": json_path, "control_center_json": control_json,
-        "control_center_md": control_md, "weekly_command_center_json": weekly_json,
-        "weekly_command_center_md": weekly_md, "approval_center_json": approval_json,
+        "json_path": json_path,
+        "control_center_json": control_json,
+        "control_center_md": control_md,
+        "weekly_command_center_json": weekly_json,
+        "weekly_command_center_md": weekly_md,
+        "approval_center_json": approval_json,
         "approval_center_md": approval_md,
     }

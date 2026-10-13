@@ -161,14 +161,24 @@ def _parse_ahead_behind(repo: Path, upstream: str) -> tuple[int, int]:
         return 0, 0
 
 
-def read_git_state(repo: Path, *, workspace_root: Path, operating_repo: bool = False) -> GitRepoState:
+def read_git_state(
+    repo: Path, *, workspace_root: Path, operating_repo: bool = False
+) -> GitRepoState:
     dirty_count = len(
-        [line for line in _run_git(repo, ["status", "--porcelain=v1"]).splitlines() if line]
+        [
+            line
+            for line in _run_git(repo, ["status", "--porcelain=v1"]).splitlines()
+            if line
+        ]
     )
     branch = _run_git(repo, ["branch", "--show-current"]) or "DETACHED"
-    upstream = _run_git(repo, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    upstream = _run_git(
+        repo, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]
+    )
     ahead, behind = _parse_ahead_behind(repo, upstream)
-    remotes = sorted({line.strip() for line in _run_git(repo, ["remote"]).splitlines() if line})
+    remotes = sorted(
+        {line.strip() for line in _run_git(repo, ["remote"]).splitlines() if line}
+    )
     last_commit = _run_git(repo, ["log", "-1", "--format=%cI %h %s"])
     try:
         label = str(repo.relative_to(workspace_root))
@@ -188,7 +198,9 @@ def read_git_state(repo: Path, *, workspace_root: Path, operating_repo: bool = F
     )
 
 
-def _truth_counts(projects: list[dict[str, Any]], key_path: tuple[str, ...]) -> dict[str, int]:
+def _truth_counts(
+    projects: list[dict[str, Any]], key_path: tuple[str, ...]
+) -> dict[str, int]:
     counts: Counter[str] = Counter()
     for project in projects:
         value: Any = project
@@ -221,8 +233,12 @@ def load_truth_summary(truth_path: Path) -> dict[str, Any]:
         "warnings": data.get("warnings", []),
         "source_summary": data.get("source_summary", {}),
         "lifecycle_counts": _truth_counts(projects, ("declared", "lifecycle_state")),
-        "operating_path_counts": _truth_counts(projects, ("declared", "operating_path")),
-        "context_quality_counts": _truth_counts(projects, ("derived", "context_quality")),
+        "operating_path_counts": _truth_counts(
+            projects, ("declared", "operating_path")
+        ),
+        "context_quality_counts": _truth_counts(
+            projects, ("derived", "context_quality")
+        ),
         "risk_tier_counts": _truth_counts(projects, ("risk", "risk_tier")),
     }
 
@@ -232,26 +248,34 @@ def _state_counts(states: Iterable[GitRepoState]) -> dict[str, int]:
     return {
         "total": len(repos),
         "dirty": sum(1 for repo in repos if repo.dirty_count),
-        "non_main_or_detached": sum(1 for repo in repos if repo.branch not in {"main", "master"}),
+        "non_main_or_detached": sum(
+            1 for repo in repos if repo.branch not in {"main", "master"}
+        ),
         "no_upstream": sum(1 for repo in repos if not repo.upstream),
         "ahead_or_behind": sum(1 for repo in repos if repo.ahead or repo.behind),
     }
 
 
-def _active_working_set(states: list[GitRepoState], limit: int = 12) -> list[GitRepoState]:
+def _active_working_set(
+    states: list[GitRepoState], limit: int = 12
+) -> list[GitRepoState]:
     selected: dict[str, GitRepoState] = {}
     for repo in states:
-        if repo.operating_repo and (repo.label in PRIMARY_OPERATING_REPOS or repo.dirty_count):
+        if repo.operating_repo and (
+            repo.label in PRIMARY_OPERATING_REPOS or repo.dirty_count
+        ):
             selected[repo.path] = repo
-    for repo in sorted(states, key=lambda item: (-item.attention_score, item.label.lower())):
+    for repo in sorted(
+        states, key=lambda item: (-item.attention_score, item.label.lower())
+    ):
         if repo.attention_score <= 0:
             continue
         selected.setdefault(repo.path, repo)
         if len(selected) >= limit:
             break
-    return sorted(selected.values(), key=lambda item: (-item.attention_score, item.label.lower()))[
-        :limit
-    ]
+    return sorted(
+        selected.values(), key=lambda item: (-item.attention_score, item.label.lower())
+    )[:limit]
 
 
 def build_restart_packet(
@@ -261,10 +285,15 @@ def build_restart_packet(
     operating_repos: Iterable[Path] = DEFAULT_OPERATING_REPOS,
 ) -> dict[str, Any]:
     workspace_root = workspace_root.expanduser().resolve()
-    truth_path = (truth_path or workspace_root / "GithubRepoAuditor/output" / TRUTH_LATEST_FILENAME)
+    truth_path = (
+        truth_path
+        or workspace_root / "GithubRepoAuditor/output" / TRUTH_LATEST_FILENAME
+    )
     truth_path = truth_path.expanduser().resolve()
     operating_repo_paths = {
-        repo.expanduser().resolve() for repo in operating_repos if repo.expanduser().exists()
+        repo.expanduser().resolve()
+        for repo in operating_repos
+        if repo.expanduser().exists()
     }
     discovered = set(discover_git_repos(workspace_root))
     discovered.update(path for path in operating_repo_paths if (path / ".git").exists())
@@ -362,11 +391,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--workspace-root", type=Path, default=DEFAULT_WORKSPACE_ROOT)
     parser.add_argument("--truth-path", type=Path, default=None)
-    parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown")
-    parser.add_argument("--output", type=Path, default=None, help="Optional file to write")
+    parser.add_argument(
+        "--json", action="store_true", help="Emit JSON instead of Markdown"
+    )
+    parser.add_argument(
+        "--output", type=Path, default=None, help="Optional file to write"
+    )
     args = parser.parse_args(argv)
-    packet = build_restart_packet(workspace_root=args.workspace_root, truth_path=args.truth_path)
-    rendered = json.dumps(packet, indent=2, sort_keys=True) + "\n" if args.json else render_markdown(packet)
+    packet = build_restart_packet(
+        workspace_root=args.workspace_root, truth_path=args.truth_path
+    )
+    rendered = (
+        json.dumps(packet, indent=2, sort_keys=True) + "\n"
+        if args.json
+        else render_markdown(packet)
+    )
     if args.output:
         args.output.write_text(rendered)
     else:

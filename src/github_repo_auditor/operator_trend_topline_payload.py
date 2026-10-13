@@ -39,7 +39,9 @@ def build_resolution_trend_topline_payload(
         "reopened_attention_count": reopened_attention_count,
         "history_window_runs": history_window_runs,
         "quiet_streak_runs": quiet_streak_runs,
-        "aging_status": primary_target.get("aging_status", "fresh") if primary_target else "fresh",
+        "aging_status": primary_target.get("aging_status", "fresh")
+        if primary_target
+        else "fresh",
         "primary_target_reason": primary_target_reason,
         "primary_target_done_criteria": primary_target_done_criteria,
         "closure_guidance": closure_guidance,
@@ -51,10 +53,18 @@ def build_resolution_trend_topline_payload(
         "primary_target": primary_target,
         "resolution_targets": resolution_targets[:5],
         "trend_summary": trend_summary,
-        "primary_target_exception_status": recommendation_drift["primary_target_exception_status"],
-        "primary_target_exception_reason": recommendation_drift["primary_target_exception_reason"],
-        "recommendation_drift_status": recommendation_drift["recommendation_drift_status"],
-        "recommendation_drift_summary": recommendation_drift["recommendation_drift_summary"],
+        "primary_target_exception_status": recommendation_drift[
+            "primary_target_exception_status"
+        ],
+        "primary_target_exception_reason": recommendation_drift[
+            "primary_target_exception_reason"
+        ],
+        "recommendation_drift_status": recommendation_drift[
+            "recommendation_drift_status"
+        ],
+        "recommendation_drift_summary": recommendation_drift[
+            "recommendation_drift_summary"
+        ],
         "policy_flip_hotspots": recommendation_drift["policy_flip_hotspots"],
         "primary_target_exception_pattern_status": exception_learning[
             "primary_target_exception_pattern_status"
@@ -82,26 +92,34 @@ def build_resolution_trend_topline_payload(
         "primary_target_recovery_confidence_reasons": exception_retirement[
             "primary_target_recovery_confidence_reasons"
         ],
-        "recovery_confidence_summary": exception_retirement["recovery_confidence_summary"],
+        "recovery_confidence_summary": exception_retirement[
+            "recovery_confidence_summary"
+        ],
         "primary_target_exception_retirement_status": exception_retirement[
             "primary_target_exception_retirement_status"
         ],
         "primary_target_exception_retirement_reason": exception_retirement[
             "primary_target_exception_retirement_reason"
         ],
-        "exception_retirement_summary": exception_retirement["exception_retirement_summary"],
-        "retired_exception_hotspots": exception_retirement["retired_exception_hotspots"],
+        "exception_retirement_summary": exception_retirement[
+            "exception_retirement_summary"
+        ],
+        "retired_exception_hotspots": exception_retirement[
+            "retired_exception_hotspots"
+        ],
         "sticky_exception_hotspots": exception_retirement["sticky_exception_hotspots"],
         "exception_retirement_window_runs": exception_retirement[
             "exception_retirement_window_runs"
         ],
         "primary_target_policy_debt_status": primary_target.get(
-            "policy_debt_status", class_normalization["primary_target_policy_debt_status"]
+            "policy_debt_status",
+            class_normalization["primary_target_policy_debt_status"],
         )
         if primary_target
         else class_normalization["primary_target_policy_debt_status"],
         "primary_target_policy_debt_reason": primary_target.get(
-            "policy_debt_reason", class_normalization["primary_target_policy_debt_reason"]
+            "policy_debt_reason",
+            class_normalization["primary_target_policy_debt_reason"],
         )
         if primary_target
         else class_normalization["primary_target_policy_debt_reason"],
@@ -131,7 +149,9 @@ def build_resolution_trend_topline_payload(
         else class_normalization["trust_normalization_summary"],
         "policy_debt_hotspots": class_normalization["policy_debt_hotspots"],
         "normalized_class_hotspots": class_normalization["normalized_class_hotspots"],
-        "class_normalization_window_runs": class_normalization["class_normalization_window_runs"],
+        "class_normalization_window_runs": class_normalization[
+            "class_normalization_window_runs"
+        ],
         "primary_target_class_memory_freshness_status": class_memory_decay[
             "primary_target_class_memory_freshness_status"
         ],
@@ -146,8 +166,12 @@ def build_resolution_trend_topline_payload(
         ],
         "class_memory_summary": class_memory_decay["class_memory_summary"],
         "class_decay_summary": class_memory_decay["class_decay_summary"],
-        "stale_class_memory_hotspots": class_memory_decay["stale_class_memory_hotspots"],
-        "fresh_class_signal_hotspots": class_memory_decay["fresh_class_signal_hotspots"],
+        "stale_class_memory_hotspots": class_memory_decay[
+            "stale_class_memory_hotspots"
+        ],
+        "fresh_class_signal_hotspots": class_memory_decay[
+            "fresh_class_signal_hotspots"
+        ],
         "class_decay_window_runs": class_memory_decay["class_decay_window_runs"],
         "primary_target_weighted_class_support_score": class_trust_reweighting[
             "primary_target_weighted_class_support_score"
@@ -164,8 +188,14 @@ def build_resolution_trend_topline_payload(
         "primary_target_class_trust_reweight_reasons": class_trust_reweighting[
             "primary_target_class_trust_reweight_reasons"
         ],
-        "class_reweighting_summary": class_trust_reweighting["class_reweighting_summary"],
-        "supporting_class_hotspots": class_trust_reweighting["supporting_class_hotspots"],
+        "class_reweighting_summary": class_trust_reweighting[
+            "class_reweighting_summary"
+        ],
+        "supporting_class_hotspots": class_trust_reweighting[
+            "supporting_class_hotspots"
+        ],
         "caution_class_hotspots": class_trust_reweighting["caution_class_hotspots"],
-        "class_reweighting_window_runs": class_trust_reweighting["class_reweighting_window_runs"],
+        "class_reweighting_window_runs": class_trust_reweighting[
+            "class_reweighting_window_runs"
+        ],
     }

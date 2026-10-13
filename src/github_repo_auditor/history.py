@@ -32,10 +32,7 @@ def find_previous(current_name: str, history_dir: Path = HISTORY_DIR) -> Path | 
         return None
 
     reports = sorted(
-        [
-            f for f in history_dir.glob("audit-report-*.json")
-            if f.name != current_name
-        ],
+        [f for f in history_dir.glob("audit-report-*.json") if f.name != current_name],
         key=lambda f: f.stat().st_mtime,
         reverse=True,
     )
@@ -81,13 +78,15 @@ def load_trend_data(history_dir: Path = HISTORY_DIR, max_runs: int = 10) -> list
             )[:20]:
                 top_repos[audit["metadata"]["name"]] = audit["overall_score"]
 
-            trends.append({
-                "date": data.get("generated_at", "")[:10],
-                "average_score": data.get("average_score", 0),
-                "repos_audited": data.get("repos_audited", 0),
-                "tier_distribution": data.get("tier_distribution", {}),
-                "top_repos": top_repos,
-            })
+            trends.append(
+                {
+                    "date": data.get("generated_at", "")[:10],
+                    "average_score": data.get("average_score", 0),
+                    "repos_audited": data.get("repos_audited", 0),
+                    "tier_distribution": data.get("tier_distribution", {}),
+                    "top_repos": top_repos,
+                }
+            )
         except (json.JSONDecodeError, OSError, KeyError):
             continue
 
@@ -186,12 +185,14 @@ def load_language_trends(
             else:
                 category = "Hold"
 
-        trends.append({
-            "language": lang,
-            "repos_per_run": repos_per_run,
-            "current_count": current,
-            "category": category,
-        })
+        trends.append(
+            {
+                "language": lang,
+                "repos_per_run": repos_per_run,
+                "current_count": current,
+                "category": category,
+            }
+        )
 
     trends.sort(key=lambda t: t["current_count"], reverse=True)
     return trends
@@ -228,11 +229,13 @@ def load_complexity_trends(output_dir: Path) -> dict[str, list[dict]]:
                 details = result.get("details", {})
                 mi = details.get("avg_maintainability_index")
                 if mi is not None:
-                    trends.setdefault(repo_name, []).append({
-                        "mi": mi,
-                        "worst_cc": details.get("worst_cc_score", 0),
-                        "complex_count": details.get("complex_function_count", 0),
-                    })
+                    trends.setdefault(repo_name, []).append(
+                        {
+                            "mi": mi,
+                            "worst_cc": details.get("worst_cc_score", 0),
+                            "complex_count": details.get("complex_function_count", 0),
+                        }
+                    )
 
     return trends
 

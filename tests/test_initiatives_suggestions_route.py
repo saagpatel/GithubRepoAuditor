@@ -81,7 +81,9 @@ def client(output_dir: Path) -> TestClient:
 
 
 class TestInitiativesSuggestionsGet:
-    def test_no_portfolio_truth_returns_200_with_error(self, client: TestClient) -> None:
+    def test_no_portfolio_truth_returns_200_with_error(
+        self, client: TestClient
+    ) -> None:
         """GET /initiatives/suggestions with no portfolio-truth → 200 + error message."""
         resp = client.get("/initiatives/suggestions")
         assert resp.status_code == 200
@@ -94,7 +96,9 @@ class TestInitiativesSuggestionsGet:
         """GET with valid portfolio-truth → 200 with suggestion cards rendered."""
         from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
-        truth = _make_portfolio_truth([_bronze_repo("MyRepo"), _bronze_repo("OtherRepo")])
+        truth = _make_portfolio_truth(
+            [_bronze_repo("MyRepo"), _bronze_repo("OtherRepo")]
+        )
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
 
         fake_suggestions = [
@@ -245,7 +249,10 @@ class TestInitiativesAcceptPost:
             set_by="web",
         )
 
-        with patch("github_repo_auditor.suggest_initiatives.accept_suggestion", return_value=fake_initiative):
+        with patch(
+            "github_repo_auditor.suggest_initiatives.accept_suggestion",
+            return_value=fake_initiative,
+        ):
             resp = client.post(
                 "/initiatives/accept",
                 data={
@@ -325,7 +332,9 @@ class TestInitiativesAcceptPost:
         assert resp.status_code == 400
         assert "accept-error" in resp.text
 
-    def test_accept_writes_to_initiatives_json(self, output_dir: Path, client: TestClient) -> None:
+    def test_accept_writes_to_initiatives_json(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
         """Successful accept writes the initiative to initiatives.json."""
         truth = _make_portfolio_truth([_bronze_repo("PersistRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
@@ -365,7 +374,9 @@ class TestInitiativesAcceptPost:
             assert resp.status_code == 200
 
         data = json.loads((output_dir / "initiatives.json").read_text())
-        matching = [i for i in data["initiatives"] if i["repo_name"] == "IdempotentRepo"]
+        matching = [
+            i for i in data["initiatives"] if i["repo_name"] == "IdempotentRepo"
+        ]
         assert len(matching) == 1  # upserted, not duplicated
 
     def test_xss_repo_name_is_not_echoed_in_error(
@@ -406,7 +417,9 @@ class TestNavLink:
 
 
 class TestRequirementSourcesHints:
-    def _write_initiative(self, output_dir: Path, repo_name: str, target_tier: int) -> None:
+    def _write_initiative(
+        self, output_dir: Path, repo_name: str, target_tier: int
+    ) -> None:
         data = {
             "version": 1,
             "initiatives": [
@@ -440,7 +453,9 @@ class TestRequirementSourcesHints:
             requirement_sources=["proxy"],
         )
 
-        with patch("github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap):
+        with patch(
+            "github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap
+        ):
             resp = client.get("/initiatives/ProxyRepo/gap?target=2")
 
         assert resp.status_code == 200
@@ -464,7 +479,9 @@ class TestRequirementSourcesHints:
             requirement_sources=["strict"],
         )
 
-        with patch("github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap):
+        with patch(
+            "github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap
+        ):
             resp = client.get("/initiatives/StrictRepo/gap?target=2")
 
         assert resp.status_code == 200
@@ -492,7 +509,9 @@ class TestRequirementSourcesHints:
             requirement_sources=["proxy", "strict"],
         )
 
-        with patch("github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap):
+        with patch(
+            "github_repo_auditor.maturity_tiers.tier_gap", return_value=fake_gap
+        ):
             resp = client.get("/initiatives/HintRepo/gap?target=2")
 
         assert resp.status_code == 200
@@ -538,11 +557,16 @@ class TestInitiativesSuggestionsRouteCache:
 
         received_keys: list[str | None] = []
 
-        def _mock_gen(projects, target_tier=None, budget_usd=0.10, cache_key=None, **kw):
+        def _mock_gen(
+            projects, target_tier=None, budget_usd=0.10, cache_key=None, **kw
+        ):
             received_keys.append(cache_key)
             return fake_suggestions, 0.001
 
-        with patch("github_repo_auditor.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
+        with patch(
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
+            side_effect=_mock_gen,
+        ):
             resp = client.get("/initiatives/suggestions")
 
         assert resp.status_code == 200
@@ -571,18 +595,33 @@ class TestInitiativesSuggestionsRouteCache:
 
         received_keys: list[str | None] = []
 
-        def _mock_gen(projects, target_tier=None, budget_usd=0.10, cache_key=None, **kw):
+        def _mock_gen(
+            projects, target_tier=None, budget_usd=0.10, cache_key=None, **kw
+        ):
             received_keys.append(cache_key)
             return [fake_suggestion], 0.001
 
-        truth_v1 = {"generated_at": "2026-01-01T00:00:00", "projects": [_bronze_repo("DiffRepo")]}
-        truth_v2 = {"generated_at": "2026-02-01T00:00:00", "projects": [_bronze_repo("DiffRepo")]}
+        truth_v1 = {
+            "generated_at": "2026-01-01T00:00:00",
+            "projects": [_bronze_repo("DiffRepo")],
+        }
+        truth_v2 = {
+            "generated_at": "2026-02-01T00:00:00",
+            "projects": [_bronze_repo("DiffRepo")],
+        }
 
-        with patch("github_repo_auditor.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
-            (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth_v1))
+        with patch(
+            "github_repo_auditor.suggest_initiatives.generate_suggestions",
+            side_effect=_mock_gen,
+        ):
+            (output_dir / "portfolio-truth-latest.json").write_text(
+                json.dumps(truth_v1)
+            )
             resp1 = client.get("/initiatives/suggestions")
 
-            (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth_v2))
+            (output_dir / "portfolio-truth-latest.json").write_text(
+                json.dumps(truth_v2)
+            )
             resp2 = client.get("/initiatives/suggestions")
 
         assert resp1.status_code == 200
@@ -635,7 +674,9 @@ class TestDismissSuggestionRoute:
         """After dismissing a repo, GET /initiatives/suggestions excludes it."""
         from github_repo_auditor.suggest_initiatives import InitiativeSuggestion
 
-        truth = _make_portfolio_truth([_bronze_repo("DismissedRepo"), _bronze_repo("KeptRepo")])
+        truth = _make_portfolio_truth(
+            [_bronze_repo("DismissedRepo"), _bronze_repo("KeptRepo")]
+        )
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
 
         # Dismiss the repo

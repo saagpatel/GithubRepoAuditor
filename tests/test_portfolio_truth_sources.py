@@ -367,17 +367,31 @@ def test_live_nested_checkout_wins_identity_and_representation_over_archive() ->
     collisions: list[dict] = []
     head = "1" * 40
     archive = _p(
-        "Repo", "owner/Repo", path="_archive/Repo",
-        head=head, common_dir="/git/archive/.git",
+        "Repo",
+        "owner/Repo",
+        path="_archive/Repo",
+        head=head,
+        common_dir="/git/archive/.git",
     )
-    archive["group_entry"] = {"lifecycle_state": "archived", "operating_path": "archive"}
+    archive["group_entry"] = {
+        "lifecycle_state": "archived",
+        "operating_path": "archive",
+    }
     live = _p(
-        "Renamed", "owner/Repo", path="NestedProjects/Longer/Renamed",
-        head=head, common_dir="/git/live/.git",
+        "Renamed",
+        "owner/Repo",
+        path="NestedProjects/Longer/Renamed",
+        head=head,
+        common_dir="/git/live/.git",
     )
-    live["group_entry"] = {"lifecycle_state": "maintenance", "operating_path": "maintain"}
+    live["group_entry"] = {
+        "lifecycle_state": "maintenance",
+        "operating_path": "maintain",
+    }
 
-    result = _dedupe_checkouts_by_origin([archive, live], checkout_collisions=collisions)
+    result = _dedupe_checkouts_by_origin(
+        [archive, live], checkout_collisions=collisions
+    )
 
     assert result == [live]
     assert result[0]["name"] == "Renamed"
@@ -389,8 +403,11 @@ def test_archive_clone_beats_external_worktree_placeholder_as_representative() -
     from github_repo_auditor.portfolio_truth_sources import _checkout_representative
 
     archive = _p(
-        "Repo", "owner/Repo", path="_archive/Repo",
-        head="1" * 40, common_dir="/git/archive/.git",
+        "Repo",
+        "owner/Repo",
+        path="_archive/Repo",
+        head="1" * 40,
+        common_dir="/git/archive/.git",
     )
     placeholder = {
         "name": "external-worktree",
@@ -404,7 +421,9 @@ def test_archive_clone_beats_external_worktree_placeholder_as_representative() -
     assert _checkout_representative([archive, placeholder], "owner/Repo") is archive
 
 
-def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> None:
+def test_observed_checkout_supplies_evidence_without_replacing_basename_identity() -> (
+    None
+):
     collisions: list[dict] = []
     head = "1" * 40
     discovered = [
@@ -641,14 +660,8 @@ def test_ignore_predicate_matches_transient_dirs() -> None:
         == "preserved-artifacts"
     )
     assert workspace_exclusion_reason("sweep-reports") == "generated-reports"
-    assert (
-        workspace_exclusion_reason("_fable-worktrees")
-        == "linked-worktree-container"
-    )
-    assert (
-        workspace_exclusion_reason("_codex-worktrees")
-        == "linked-worktree-container"
-    )
+    assert workspace_exclusion_reason("_fable-worktrees") == "linked-worktree-container"
+    assert workspace_exclusion_reason("_codex-worktrees") == "linked-worktree-container"
     assert workspace_exclusion_reason("packets") is None
     assert workspace_exclusion_reason("packets", nested=True) == "nested-content"
     assert workspace_exclusion_reason("prompts", nested=True) == "nested-content"
@@ -667,8 +680,7 @@ def test_workspace_exclusion_reason_domain_matches_every_policy_branch() -> None
         ("repo-tmp-1776063720", False),
     )
     observed = {
-        workspace_exclusion_reason(name, nested=nested)
-        for name, nested in cases
+        workspace_exclusion_reason(name, nested=nested) for name, nested in cases
     }
 
     assert observed == WORKSPACE_EXCLUSION_REASONS
@@ -812,10 +824,7 @@ def test_discovery_observes_dirty_worktree_inside_excluded_container(
     assert collision["checkout_count"] == 2
     assert collision["full_clone_count"] == 1
     assert collision["selection"]["state"] == "unknown"
-    assert (
-        collision["selection"]["reason_code"]
-        == "linked_worktree_local_work_present"
-    )
+    assert collision["selection"]["reason_code"] == "linked_worktree_local_work_present"
     linked_evidence = next(
         item
         for item in collision["discarded_checkouts"]
@@ -876,8 +885,7 @@ def test_discovery_preserves_opaque_external_linked_worktree_evidence(
     assert collision["full_clone_count"] == 1
     assert collision["selection"]["state"] == "unknown"
     assert (
-        collision["selection"]["reason_code"]
-        == "external_linked_worktree_unobserved"
+        collision["selection"]["reason_code"] == "external_linked_worktree_unobserved"
     )
     external_evidence = next(
         item

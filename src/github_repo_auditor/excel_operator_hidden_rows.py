@@ -33,7 +33,10 @@ def build_operator_hidden_rows(
             "median_runs_to_quiet_after_escalation",
             portfolio_outcomes.get("median_runs_to_quiet_after_escalation", {}),
         ),
-        ("repeated_regression_rate", portfolio_outcomes.get("repeated_regression_rate", {})),
+        (
+            "repeated_regression_rate",
+            portfolio_outcomes.get("repeated_regression_rate", {}),
+        ),
         (
             "recommendation_validation_rate",
             operator_effectiveness.get("recommendation_validation_rate", {}),
@@ -67,7 +70,10 @@ def build_operator_hidden_rows(
             "recent_reopened_recommendations",
             operator_summary.get("recent_reopened_recommendations", []),
         ),
-        ("recent_regression_examples", operator_summary.get("recent_regression_examples", [])),
+        (
+            "recent_regression_examples",
+            operator_summary.get("recent_regression_examples", []),
+        ),
     ):
         for item in items[:3]:
             operator_outcome_rows.append(

@@ -12,19 +12,50 @@ if TYPE_CHECKING:
     from github_repo_auditor.github_client import GitHubClient
 
 # Languages considered "novel" for a personal portfolio — uncommon enough to signal curiosity
-NOVEL_LANGUAGES = frozenset({
-    "Rust", "Swift", "GDScript", "Elixir", "Zig", "Haskell", "OCaml",
-    "Nim", "Crystal", "Gleam", "Odin", "V", "Julia", "Lua",
-})
+NOVEL_LANGUAGES = frozenset(
+    {
+        "Rust",
+        "Swift",
+        "GDScript",
+        "Elixir",
+        "Zig",
+        "Haskell",
+        "OCaml",
+        "Nim",
+        "Crystal",
+        "Gleam",
+        "Odin",
+        "V",
+        "Julia",
+        "Lua",
+    }
+)
 
 # Asset file extensions that signal creative/ambitious projects
-ASSET_EXTENSIONS = frozenset({
-    ".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp",
-    ".mp3", ".wav", ".ogg", ".mp4",
-    ".glb", ".gltf", ".obj", ".fbx",
-    ".ttf", ".woff", ".woff2",
-    ".shader", ".gdshader", ".metal",
-})
+ASSET_EXTENSIONS = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".svg",
+        ".gif",
+        ".webp",
+        ".mp3",
+        ".wav",
+        ".ogg",
+        ".mp4",
+        ".glb",
+        ".gltf",
+        ".obj",
+        ".fbx",
+        ".ttf",
+        ".woff",
+        ".woff2",
+        ".shader",
+        ".gdshader",
+        ".metal",
+    }
+)
 
 
 class InterestAnalyzer(BaseAnalyzer):
@@ -189,8 +220,11 @@ def _score_ambition(repo_path: Path, metadata: RepoMetadata) -> tuple[float, dic
 
     # Multi-module structure (multiple top-level dirs with code)
     code_dirs = [
-        d for d in repo_path.iterdir()
-        if d.is_dir() and not d.name.startswith(".") and d.name not in ("node_modules", "vendor", "__pycache__")
+        d
+        for d in repo_path.iterdir()
+        if d.is_dir()
+        and not d.name.startswith(".")
+        and d.name not in ("node_modules", "vendor", "__pycache__")
     ]
     details["top_level_dirs"] = len(code_dirs)
     if len(code_dirs) >= 3:
@@ -222,14 +256,29 @@ def _score_ambition(repo_path: Path, metadata: RepoMetadata) -> tuple[float, dic
 
 def _estimate_loc(repo_path: Path, max_files: int = 200) -> int:
     """Quick LOC estimate from code files."""
-    code_exts = {".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".swift", ".java", ".c", ".cpp", ".gd"}
+    code_exts = {
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".rs",
+        ".go",
+        ".swift",
+        ".java",
+        ".c",
+        ".cpp",
+        ".gd",
+    }
     total = 0
     count = 0
     for path in repo_path.rglob("*"):
         if count >= max_files:
             break
         if path.is_file() and path.suffix in code_exts:
-            if any(part.startswith(".") or part == "node_modules" for part in path.parts):
+            if any(
+                part.startswith(".") or part == "node_modules" for part in path.parts
+            ):
                 continue
             try:
                 total += len(path.read_text(errors="replace").splitlines())
@@ -275,7 +324,11 @@ def _score_readme_storytelling(repo_path: Path) -> float:
                 content = readme.read_text(errors="replace")
                 if len(content) > 1000:
                     has_images = "![" in content and "](" in content
-                    has_diagrams = "```mermaid" in content or "```ascii" in content or "<svg" in content
+                    has_diagrams = (
+                        "```mermaid" in content
+                        or "```ascii" in content
+                        or "<svg" in content
+                    )
                     if has_images or has_diagrams:
                         return 0.10
                 return 0.0

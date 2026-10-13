@@ -31,13 +31,39 @@ def _metadata() -> RepoMetadata:
     )
 
 
-def _audit(*, dependency_details: dict | None = None, code_quality_details: dict | None = None, structure_details: dict | None = None, testing_score: float = 0.5) -> RepoAudit:
+def _audit(
+    *,
+    dependency_details: dict | None = None,
+    code_quality_details: dict | None = None,
+    structure_details: dict | None = None,
+    testing_score: float = 0.5,
+) -> RepoAudit:
     return RepoAudit(
         metadata=_metadata(),
         analyzer_results=[
-            AnalyzerResult("dependencies", 0.4, 1.0, [], dependency_details or {"manifests": [], "lockfiles": [], "dep_count": 0}),
-            AnalyzerResult("code_quality", 0.45, 1.0, [], code_quality_details or {"entry_point": "main.py", "total_loc": 100}),
-            AnalyzerResult("structure", 0.5, 1.0, [], structure_details or {"source_dirs": ["src"], "config_files": ["pyproject.toml"]}),
+            AnalyzerResult(
+                "dependencies",
+                0.4,
+                1.0,
+                [],
+                dependency_details
+                or {"manifests": [], "lockfiles": [], "dep_count": 0},
+            ),
+            AnalyzerResult(
+                "code_quality",
+                0.45,
+                1.0,
+                [],
+                code_quality_details or {"entry_point": "main.py", "total_loc": 100},
+            ),
+            AnalyzerResult(
+                "structure",
+                0.5,
+                1.0,
+                [],
+                structure_details
+                or {"source_dirs": ["src"], "config_files": ["pyproject.toml"]},
+            ),
             AnalyzerResult("testing", testing_score, 1.0, [], {}),
         ],
         overall_score=0.5,
@@ -115,7 +141,13 @@ def test_dependency_fragility_hotspot_scoring(tmp_path: Path):
 
     hotspots = build_implementation_hotspots(
         tmp_path,
-        _audit(dependency_details={"manifests": ["package.json"], "lockfiles": [], "dep_count": 180}),
+        _audit(
+            dependency_details={
+                "manifests": ["package.json"],
+                "lockfiles": [],
+                "dep_count": 180,
+            }
+        ),
     )
 
     assert any(item["category"] == "dependency-fragility" for item in hotspots)
@@ -155,7 +187,9 @@ def alpha(x):
 
     hotspots = build_implementation_hotspots(tmp_path, _audit())
 
-    assert any(item["scope"] == "module" and item["module"] == "src" for item in hotspots)
+    assert any(
+        item["scope"] == "module" and item["module"] == "src" for item in hotspots
+    )
 
 
 def test_scan_caps_skip_dirs_and_large_files(tmp_path: Path):
@@ -166,7 +200,10 @@ def test_scan_caps_skip_dirs_and_large_files(tmp_path: Path):
     huge_file = tmp_path / "src" / "huge.py"
     huge_file.parent.mkdir(parents=True, exist_ok=True)
     huge_file.write_text("# TODO: too large to scan\n" * 70000)
-    _write(tmp_path / "src" / "real.py", "# TODO: keep me\n# FIXME: still real\n\ndef run():\n    return True\n")
+    _write(
+        tmp_path / "src" / "real.py",
+        "# TODO: keep me\n# FIXME: still real\n\ndef run():\n    return True\n",
+    )
 
     hotspots = build_implementation_hotspots(tmp_path, _audit())
     paths = {item["path"] for item in hotspots}

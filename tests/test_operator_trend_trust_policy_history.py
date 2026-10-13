@@ -44,7 +44,11 @@ def test_trust_policy_exception_for_target_softens_flip_churn() -> None:
 
     status, reason, softened, softened_reason = trust_policy_exception_for_target(
         target,
-        {"policy_flip_count": 2, "class_policy_flip_count": 0, "strong_policy_failure_count": 0},
+        {
+            "policy_flip_count": 2,
+            "class_policy_flip_count": 0,
+            "strong_policy_failure_count": 0,
+        },
         {"confidence_validation_status": "healthy"},
         current_bucket=_recommendation_bucket(target),
         recommendation_bucket=_recommendation_bucket,

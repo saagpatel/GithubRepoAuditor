@@ -63,7 +63,8 @@ class TestPlanMerge:
     def test_happy_doc_only_fast_forward(self, tmp_path: Path):
         repo = _init_repo(tmp_path)
         _make_recon_branch(
-            repo, files={"README.md": "# reconciled\n", "DOC-RECONCILIATION.md": "log\n"}
+            repo,
+            files={"README.md": "# reconciled\n", "DOC-RECONCILIATION.md": "log\n"},
         )
         plan = merge.plan_merge(str(repo), BR)
         assert plan["action"] == "merge"
@@ -77,7 +78,9 @@ class TestPlanMerge:
 
     def test_skips_when_commit_touches_non_doc(self, tmp_path: Path):
         repo = _init_repo(tmp_path)
-        _make_recon_branch(repo, files={"README.md": "# r\n", "src/main.py": "print(1)\n"})
+        _make_recon_branch(
+            repo, files={"README.md": "# r\n", "src/main.py": "print(1)\n"}
+        )
         plan = merge.plan_merge(str(repo), BR)
         assert plan["action"] == "skip"
         assert plan["reason"] == "non-doc files in commit"
@@ -120,13 +123,23 @@ class TestMergeOne:
         assert r["action"] == "merged"
         # main fast-forwarded to the reconciliation commit
         main_tip = subprocess.run(
-            ["git", "-C", str(repo), "rev-parse", "main"], capture_output=True, text=True
+            ["git", "-C", str(repo), "rev-parse", "main"],
+            capture_output=True,
+            text=True,
         ).stdout.strip()
         assert main_tip == recon_tip
         # reconciliation branch deleted
         assert (
             subprocess.run(
-                ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"refs/heads/{BR}"],
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    f"refs/heads/{BR}",
+                ],
                 capture_output=True,
             ).returncode
             != 0
@@ -142,7 +155,15 @@ class TestMergeOne:
         # branch still exists, main untouched
         assert (
             subprocess.run(
-                ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"refs/heads/{BR}"],
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    f"refs/heads/{BR}",
+                ],
                 capture_output=True,
             ).returncode
             == 0

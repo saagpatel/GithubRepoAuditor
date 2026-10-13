@@ -103,7 +103,9 @@ def _latest_report_run_id(report_data: dict[str, Any]) -> str:
     return str(operator_summary.get("source_run_id") or report_data.get("run_id") or "")
 
 
-def _governance_actions_for_scope(report_data: dict[str, Any], scope: str) -> list[dict[str, Any]]:
+def _governance_actions_for_scope(
+    report_data: dict[str, Any], scope: str
+) -> list[dict[str, Any]]:
     preview = _mapping(report_data.get("governance_preview"))
     actions = _rows(preview.get("actions"))
     if not actions:
@@ -119,12 +121,18 @@ def _campaign_fingerprint(packet: dict[str, Any]) -> str:
         "campaign_type": str(packet.get("campaign_type") or ""),
         "recommended_target": str(packet.get("recommended_target") or "none"),
         "sync_mode": str(packet.get("sync_mode") or "reconcile"),
-        "blocker_types": sorted(str(item) for item in (packet.get("blocker_types") or [])),
+        "blocker_types": sorted(
+            str(item) for item in (packet.get("blocker_types") or [])
+        ),
         "rollback_status": str(packet.get("rollback_status") or "not-applicable"),
-        "action_ids": sorted(str(item.get("action_id") or "") for item in (packet.get("actions") or [])),
+        "action_ids": sorted(
+            str(item.get("action_id") or "") for item in (packet.get("actions") or [])
+        ),
         "top_repos": sorted(str(item) for item in (packet.get("top_repos") or [])),
     }
-    return hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True).encode("utf-8")
+    ).hexdigest()
 
 
 def _automation_eligible_action_count(packet: dict[str, Any]) -> int:
@@ -141,12 +149,16 @@ def _approval_record_index(history: list[dict[str, Any]]) -> dict[str, dict[str,
         if not approval_id:
             continue
         previous = grouped.get(approval_id)
-        if previous is None or str(item.get("approved_at") or "") > str(previous.get("approved_at") or ""):
+        if previous is None or str(item.get("approved_at") or "") > str(
+            previous.get("approved_at") or ""
+        ):
             grouped[approval_id] = item
     return grouped
 
 
-def _followup_event_groups(history: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def _followup_event_groups(
+    history: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in history:
         approval_id = str(item.get("approval_id") or "")
@@ -178,7 +190,9 @@ def _is_follow_up_eligible(state: str, *, has_matching: bool) -> bool:
     return has_matching and state in {"approved-manual", "applied"}
 
 
-def _follow_up_command(report_data: dict[str, Any], subject_type: str, subject_key: str) -> str:
+def _follow_up_command(
+    report_data: dict[str, Any], subject_type: str, subject_key: str
+) -> str:
     username = _username(report_data)
     if subject_type == "governance":
         return f"audit {username} --review-governance --governance-scope {subject_key}"
@@ -204,7 +218,10 @@ def _review_priority(item: dict[str, Any]) -> tuple[int, str]:
         priority_key = "applied"
     else:
         priority_key = "not-applicable"
-    return (FOLLOW_UP_STATE_PRIORITY.get(priority_key, 99), str(item.get("label") or ""))
+    return (
+        FOLLOW_UP_STATE_PRIORITY.get(priority_key, 99),
+        str(item.get("label") or ""),
+    )
 
 
 def _derive_follow_up_fields(
@@ -221,45 +238,39 @@ def _derive_follow_up_fields(
         (
             item
             for item in event_history
-            if str(item.get("fingerprint") or "") == str(record.get("fingerprint") or "")
+            if str(item.get("fingerprint") or "")
+            == str(record.get("fingerprint") or "")
         ),
         None,
     )
     approved_at = _parse_ts(record.get("approved_at"))
     reviewed_at = _parse_ts((matching_event or {}).get("reviewed_at")) or approved_at
-    cadence_days = int((matching_event or {}).get("cadence_days") or DEFAULT_FOLLOW_UP_CADENCE_DAYS)
+    cadence_days = int(
+        (matching_event or {}).get("cadence_days") or DEFAULT_FOLLOW_UP_CADENCE_DAYS
+    )
     next_due_at = (
         reviewed_at + timedelta(days=cadence_days)
-        if reviewed_at is not None and _is_follow_up_eligible(state, has_matching=has_matching)
+        if reviewed_at is not None
+        and _is_follow_up_eligible(state, has_matching=has_matching)
         else None
     )
     now = _parse_ts(report_data.get("generated_at")) or datetime.now(timezone.utc)
     due_soon_cutoff = now + timedelta(hours=DUE_SOON_HOURS)
     if state == "needs-reapproval":
         follow_up_state = "needs-reapproval"
-        follow_up_summary = (
-            f"{record.get('label', record.get('subject_key', 'Approval'))} needs re-approval before recurring follow-up timing matters again."
-        )
+        follow_up_summary = f"{record.get('label', record.get('subject_key', 'Approval'))} needs re-approval before recurring follow-up timing matters again."
     elif not _is_follow_up_eligible(state, has_matching=has_matching):
         follow_up_state = "not-applicable"
-        follow_up_summary = (
-            f"{record.get('label', record.get('subject_key', 'Approval'))} does not have recurring follow-up timing yet."
-        )
+        follow_up_summary = f"{record.get('label', record.get('subject_key', 'Approval'))} does not have recurring follow-up timing yet."
     elif next_due_at is not None and next_due_at <= now:
         follow_up_state = "overdue-follow-up"
-        follow_up_summary = (
-            f"{record.get('label', record.get('subject_key', 'Approval'))} is still approved, but its local follow-up review is overdue since {_format_due_text(next_due_at)}."
-        )
+        follow_up_summary = f"{record.get('label', record.get('subject_key', 'Approval'))} is still approved, but its local follow-up review is overdue since {_format_due_text(next_due_at)}."
     elif next_due_at is not None and next_due_at <= due_soon_cutoff:
         follow_up_state = "due-soon-follow-up"
-        follow_up_summary = (
-            f"{record.get('label', record.get('subject_key', 'Approval'))} stays approved, and its next local follow-up review is due by {_format_due_text(next_due_at)}."
-        )
+        follow_up_summary = f"{record.get('label', record.get('subject_key', 'Approval'))} stays approved, and its next local follow-up review is due by {_format_due_text(next_due_at)}."
     else:
         follow_up_state = "fresh"
-        follow_up_summary = (
-            f"{record.get('label', record.get('subject_key', 'Approval'))} was reviewed recently and does not need immediate follow-up."
-        )
+        follow_up_summary = f"{record.get('label', record.get('subject_key', 'Approval'))} was reviewed recently and does not need immediate follow-up."
 
     effective_summary = str(record.get("summary") or "")
     if follow_up_state in {"overdue-follow-up", "due-soon-follow-up"}:
@@ -269,10 +280,18 @@ def _derive_follow_up_fields(
         **record,
         "summary": effective_summary,
         "approval_summary": str(record.get("summary") or ""),
-        "last_reviewed_at": (matching_event or {}).get("reviewed_at", record.get("approved_at", "")),
-        "last_reviewed_by": (matching_event or {}).get("reviewed_by", record.get("approved_by", "")),
-        "follow_up_cadence_days": cadence_days if _is_follow_up_eligible(state, has_matching=has_matching) else 0,
-        "next_follow_up_due_at": next_due_at.isoformat() if next_due_at is not None else "",
+        "last_reviewed_at": (matching_event or {}).get(
+            "reviewed_at", record.get("approved_at", "")
+        ),
+        "last_reviewed_by": (matching_event or {}).get(
+            "reviewed_by", record.get("approved_by", "")
+        ),
+        "follow_up_cadence_days": cadence_days
+        if _is_follow_up_eligible(state, has_matching=has_matching)
+        else 0,
+        "next_follow_up_due_at": next_due_at.isoformat()
+        if next_due_at is not None
+        else "",
         "follow_up_state": follow_up_state,
         "follow_up_summary": follow_up_summary,
         "stale_approval": follow_up_state == "overdue-follow-up",
@@ -294,7 +313,10 @@ def _recent_apply_seen(
     for row in rows:
         if campaign_type and str(row.get("campaign_type") or "") != campaign_type:
             continue
-        if str(row.get("status") or "") in {"applied", "updated"} or str(row.get("reconciliation_outcome") or "") == "applied":
+        if (
+            str(row.get("status") or "") in {"applied", "updated"}
+            or str(row.get("reconciliation_outcome") or "") == "applied"
+        ):
             return True
     return False
 
@@ -330,9 +352,15 @@ def _governance_record(
     source_run_id = _latest_report_run_id(report_data)
     record = dict(latest_record or {})
     approval_ready = bool(actions)
-    apply_ready_after_approval = bool(sum(1 for item in actions if item.get("applyable")))
+    apply_ready_after_approval = bool(
+        sum(1 for item in actions if item.get("applyable"))
+    )
     blocked = summary.get("status") == "drifted" and not summary.get("needs_reapproval")
-    has_matching = bool(record and current_fingerprint and record.get("fingerprint") == current_fingerprint)
+    has_matching = bool(
+        record
+        and current_fingerprint
+        and record.get("fingerprint") == current_fingerprint
+    )
     has_approval = bool(record)
     needs_reapproval = bool(
         has_approval
@@ -365,11 +393,15 @@ def _governance_record(
         "Review fingerprint drift, approval age, and any governance drift notes.",
         "Keep external mutation separate from approval capture.",
     ]
-    review_command = f"audit {_username(report_data)} --approval-center --approval-view ready"
+    review_command = (
+        f"audit {_username(report_data)} --approval-center --approval-view ready"
+    )
     approval_command = f"audit {_username(report_data)} --approve-governance --governance-scope {scope}"
     manual_apply_command = ""
     if state == "needs-reapproval":
-        summary_line = f"Governance scope {scope} needs re-approval before any manual apply step."
+        summary_line = (
+            f"Governance scope {scope} needs re-approval before any manual apply step."
+        )
     elif state == "ready-for-review":
         summary_line = f"Governance scope {scope} is ready for review."
     elif state == "approved-manual":
@@ -436,15 +468,24 @@ def _campaign_record(
     if not eligible:
         return {}
 
-    reviewable_blockers = blocker_types.issubset({"governance-approval", "rollback-coverage"})
+    reviewable_blockers = blocker_types.issubset(
+        {"governance-approval", "rollback-coverage"}
+    )
     rollback_blocked = "rollback-coverage" in blocker_types
     automation_eligible_action_count = _automation_eligible_action_count(packet)
     has_actions = _int_value(packet.get("action_count")) > 0
-    approval_ready = reviewable_blockers and has_actions and not rollback_blocked and automation_eligible_action_count > 0
+    approval_ready = (
+        reviewable_blockers
+        and has_actions
+        and not rollback_blocked
+        and automation_eligible_action_count > 0
+    )
     apply_ready_after_approval = approval_ready
     fingerprint = _campaign_fingerprint(packet)
     record = dict(latest_record or {})
-    has_matching = bool(record and fingerprint and str(record.get("fingerprint") or "") == fingerprint)
+    has_matching = bool(
+        record and fingerprint and str(record.get("fingerprint") or "") == fingerprint
+    )
     has_approval = bool(record)
     needs_reapproval = bool(
         has_approval
@@ -454,7 +495,9 @@ def _campaign_record(
             and str(record.get("fingerprint") or "") != fingerprint
         )
     )
-    applied = has_matching and _recent_apply_seen(output_dir, _username(report_data), campaign_type=campaign_type)
+    applied = has_matching and _recent_apply_seen(
+        output_dir, _username(report_data), campaign_type=campaign_type
+    )
     if needs_reapproval:
         state = "needs-reapproval"
     elif not reviewable_blockers:
@@ -477,12 +520,18 @@ def _campaign_record(
         "Confirm the automation-eligible subset before any auto-apply dry run or live apply.",
         "Keep apply separate from approval capture.",
     ]
-    review_command = f"audit {_username(report_data)} --approval-center --approval-view ready"
-    approval_command = f"audit {_username(report_data)} --campaign {campaign_type} --approve-packet"
+    review_command = (
+        f"audit {_username(report_data)} --approval-center --approval-view ready"
+    )
+    approval_command = (
+        f"audit {_username(report_data)} --campaign {campaign_type} --approve-packet"
+    )
     manual_apply_command = ""
     if state == "not-applicable":
         approval_command = ""
-        manual_apply_command = str(automation.get("recommended_command") or packet.get("apply_command") or "")
+        manual_apply_command = str(
+            automation.get("recommended_command") or packet.get("apply_command") or ""
+        )
     elif state in {"approved-manual", "applied"}:
         manual_apply_command = str(packet.get("apply_command") or "")
     elif not approval_ready:
@@ -497,7 +546,9 @@ def _campaign_record(
         else:
             summary_line = f"{label} is ready for approval review and would still remain a manual apply decision afterward."
     elif state == "approved-manual":
-        summary_line = f"{label} is approved but still waits on an explicit manual apply step."
+        summary_line = (
+            f"{label} is approved but still waits on an explicit manual apply step."
+        )
     elif state == "blocked":
         summary_line = f"{label} is blocked by non-approval prerequisites, so approval alone cannot clear the path."
     elif state == "applied":
@@ -505,7 +556,9 @@ def _campaign_record(
     elif state == "not-applicable":
         summary_line = f"{label} is manual-apply only; no approval-center packet is required before the explicit apply decision."
     else:
-        summary_line = f"{label} does not currently participate in the approval workflow."
+        summary_line = (
+            f"{label} does not currently participate in the approval workflow."
+        )
 
     record_payload = {
         "approval_id": approval_id,
@@ -558,7 +611,9 @@ def _queue_approval(
             or record.get("follow_up_summary")
             or "No approval workflow is surfaced for this item yet."
         )
-        mapped["approval_line"] = f"{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {mapped['approval_summary']}"
+        mapped["approval_line"] = (
+            f"{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {mapped['approval_summary']}"
+        )
         enriched.append(mapped)
     return enriched
 
@@ -587,19 +642,31 @@ def _suppresses_campaign_review_item(
     follow_up_state = str(approval_record.get("follow_up_state") or "")
     if approval_state not in {"approved-manual", "applied"}:
         return False
-    return follow_up_state not in {"overdue-follow-up", "due-soon-follow-up", "needs-reapproval"}
+    return follow_up_state not in {
+        "overdue-follow-up",
+        "due-soon-follow-up",
+        "needs-reapproval",
+    }
 
 
 def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
-    actionable = [item for item in records if item.get("approval_state") != "not-applicable"]
+    actionable = [
+        item for item in records if item.get("approval_state") != "not-applicable"
+    ]
     counts = {
         state: sum(1 for item in records if item.get("approval_state") == state)
         for state in APPROVAL_STATE_PRIORITY
     }
     if not actionable:
-        manual_only = [item for item in records if item.get("approval_state") == "not-applicable"]
+        manual_only = [
+            item for item in records if item.get("approval_state") == "not-applicable"
+        ]
         if manual_only:
-            label = str(manual_only[0].get("label") or manual_only[0].get("subject_key") or "A campaign")
+            label = str(
+                manual_only[0].get("label")
+                or manual_only[0].get("subject_key")
+                or "A campaign"
+            )
             return {
                 "summary": f"No approval packet needs review; {label} is available only as an explicit manual apply decision.",
                 "counts": counts,
@@ -626,13 +693,17 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         else:
             summary = f"{label} is the strongest manual review candidate right now, but it is not ready for approval capture."
     elif follow_up_state == "due-soon-follow-up":
-        summary = f"{label} stays approved, but its next local follow-up review is due soon."
+        summary = (
+            f"{label} stays approved, but its next local follow-up review is due soon."
+        )
     elif state == "approved-manual":
         summary = f"{label} is already approved and now waits on an explicit manual apply step."
     elif state == "blocked":
         summary = f"{label} is blocked for reasons that approval alone cannot solve."
     else:
-        summary = f"{label} has already been applied and does not need a new approval yet."
+        summary = (
+            f"{label} has already been applied and does not need a new approval yet."
+        )
     return {
         "summary": summary,
         "counts": counts,
@@ -640,13 +711,19 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _next_review(records: list[dict[str, Any]]) -> dict[str, Any]:
-    actionable = [item for item in records if item.get("approval_state") != "not-applicable"]
+    actionable = [
+        item for item in records if item.get("approval_state") != "not-applicable"
+    ]
     if not actionable:
-        manual_only = [item for item in records if item.get("approval_state") == "not-applicable"]
+        manual_only = [
+            item for item in records if item.get("approval_state") == "not-applicable"
+        ]
         if manual_only:
             top = dict(manual_only[0])
             label = str(top.get("label") or top.get("subject_key") or "Campaign")
-            top["summary"] = f"No approval review is needed; {label} remains a separate explicit manual apply decision."
+            top["summary"] = (
+                f"No approval review is needed; {label} remains a separate explicit manual apply decision."
+            )
             return top
         return {"summary": "Stay local for now; no current approval needs review."}
     ordered = sorted(
@@ -660,20 +737,34 @@ def _next_review(records: list[dict[str, Any]]) -> dict[str, Any]:
     if state == "needs-reapproval":
         top["summary"] = f"Re-approve {label} before any manual apply step."
     elif follow_up_state == "overdue-follow-up":
-        top["summary"] = f"Review {label} next because its local follow-up review is overdue."
+        top["summary"] = (
+            f"Review {label} next because its local follow-up review is overdue."
+        )
     elif state == "ready-for-review":
         if top.get("approval_ready"):
-            top["summary"] = f"Review {label} next and decide whether to capture approval."
+            top["summary"] = (
+                f"Review {label} next and decide whether to capture approval."
+            )
         else:
-            top["summary"] = f"Review {label} next; do not capture approval until its blockers and automation scope are clear."
+            top["summary"] = (
+                f"Review {label} next; do not capture approval until its blockers and automation scope are clear."
+            )
     elif follow_up_state == "due-soon-follow-up":
-        top["summary"] = f"Review {label} next because its approved state needs a fresh local follow-up soon."
+        top["summary"] = (
+            f"Review {label} next because its approved state needs a fresh local follow-up soon."
+        )
     elif state == "approved-manual":
-        top["summary"] = f"{label} is approved; the next move is still an explicit manual apply."
+        top["summary"] = (
+            f"{label} is approved; the next move is still an explicit manual apply."
+        )
     elif state == "blocked":
-        top["summary"] = f"{label} is blocked; resolve the non-approval blockers before expecting approval to help."
+        top["summary"] = (
+            f"{label} is blocked; resolve the non-approval blockers before expecting approval to help."
+        )
     else:
-        top["summary"] = f"{label} has already been applied and does not need a fresh approval yet."
+        top["summary"] = (
+            f"{label} has already been applied and does not need a fresh approval yet."
+        )
     return top
 
 
@@ -761,26 +852,44 @@ def render_approval_center_markdown(payload: dict[str, Any]) -> str:
             lines.append("")
             continue
         for item in bucket:
-            lines.append(f"- {item.get('label', item.get('subject_key', 'Approval'))}: {item.get('summary', 'No approval summary is recorded yet.')}")
+            lines.append(
+                f"- {item.get('label', item.get('subject_key', 'Approval'))}: {item.get('summary', 'No approval summary is recorded yet.')}"
+            )
             if item.get("approval_command"):
                 lines.append(f"  - Approval command: `{item.get('approval_command')}`")
             if item.get("follow_up_command"):
-                lines.append(f"  - Follow-up command: `{item.get('follow_up_command')}`")
+                lines.append(
+                    f"  - Follow-up command: `{item.get('follow_up_command')}`"
+                )
             if item.get("manual_apply_command"):
-                lines.append(f"  - Manual apply command: `{item.get('manual_apply_command')}`")
+                lines.append(
+                    f"  - Manual apply command: `{item.get('manual_apply_command')}`"
+                )
             if item.get("approved_by"):
-                lines.append(f"  - Approved by: `{item.get('approved_by')}` at `{item.get('approved_at', '')}`")
+                lines.append(
+                    f"  - Approved by: `{item.get('approved_by')}` at `{item.get('approved_at', '')}`"
+                )
             if item.get("last_reviewed_by"):
-                lines.append(f"  - Last reviewed by: `{item.get('last_reviewed_by')}` at `{item.get('last_reviewed_at', '')}`")
+                lines.append(
+                    f"  - Last reviewed by: `{item.get('last_reviewed_by')}` at `{item.get('last_reviewed_at', '')}`"
+                )
             if item.get("next_follow_up_due_at"):
-                lines.append(f"  - Next follow-up due: `{item.get('next_follow_up_due_at')}`")
+                lines.append(
+                    f"  - Next follow-up due: `{item.get('next_follow_up_due_at')}`"
+                )
         lines.append("")
     return "\n".join(lines).strip() + "\n"
 
 
-def filter_approval_ledger(records: list[dict[str, Any]], approval_view: str) -> list[dict[str, Any]]:
+def filter_approval_ledger(
+    records: list[dict[str, Any]], approval_view: str
+) -> list[dict[str, Any]]:
     allowed = APPROVAL_VIEW_TO_STATES.get(approval_view, APPROVAL_VIEW_TO_STATES["all"])
-    return [item for item in records if str(item.get("approval_state") or "not-applicable") in allowed]
+    return [
+        item
+        for item in records
+        if str(item.get("approval_state") or "not-applicable") in allowed
+    ]
 
 
 def load_approval_ledger_bundle(
@@ -797,11 +906,17 @@ def load_approval_ledger_bundle(
     followup_by_id = _followup_event_groups(followup_history)
     packets = {
         str(item.get("campaign_type") or ""): item
-        for item in _rows(_mapping(report_data.get("operator_summary")).get("action_sync_packets") or report_data.get("action_sync_packets"))
+        for item in _rows(
+            _mapping(report_data.get("operator_summary")).get("action_sync_packets")
+            or report_data.get("action_sync_packets")
+        )
     }
     automation = {
         str(item.get("campaign_type") or ""): item
-        for item in _rows(_mapping(report_data.get("operator_summary")).get("action_sync_automation") or report_data.get("action_sync_automation"))
+        for item in _rows(
+            _mapping(report_data.get("operator_summary")).get("action_sync_automation")
+            or report_data.get("action_sync_automation")
+        )
     }
 
     records: list[dict[str, Any]] = []
@@ -841,16 +956,31 @@ def load_approval_ledger_bundle(
         "approval_ledger": ordered,
         "approval_workflow_summary": summary,
         "next_approval_review": next_review,
-        "top_ready_for_review_approvals": [item for item in ordered if item.get("approval_state") == "ready-for-review"][:5],
-        "top_needs_reapproval_approvals": [item for item in ordered if item.get("approval_state") == "needs-reapproval"][:5],
-        "top_overdue_approval_followups": [item for item in ordered if item.get("follow_up_state") == "overdue-follow-up"][:5],
-        "top_due_soon_approval_followups": [item for item in ordered if item.get("follow_up_state") == "due-soon-follow-up"][:5],
+        "top_ready_for_review_approvals": [
+            item for item in ordered if item.get("approval_state") == "ready-for-review"
+        ][:5],
+        "top_needs_reapproval_approvals": [
+            item for item in ordered if item.get("approval_state") == "needs-reapproval"
+        ][:5],
+        "top_overdue_approval_followups": [
+            item
+            for item in ordered
+            if item.get("follow_up_state") == "overdue-follow-up"
+        ][:5],
+        "top_due_soon_approval_followups": [
+            item
+            for item in ordered
+            if item.get("follow_up_state") == "due-soon-follow-up"
+        ][:5],
         "top_approved_manual_approvals": [
             item
             for item in ordered
             if item.get("approval_state") == "approved-manual"
-            and item.get("follow_up_state") not in {"overdue-follow-up", "due-soon-follow-up"}
+            and item.get("follow_up_state")
+            not in {"overdue-follow-up", "due-soon-follow-up"}
         ][:5],
-        "top_blocked_approvals": [item for item in ordered if item.get("approval_state") == "blocked"][:5],
+        "top_blocked_approvals": [
+            item for item in ordered if item.get("approval_state") == "blocked"
+        ][:5],
         "operator_queue": queue,
     }

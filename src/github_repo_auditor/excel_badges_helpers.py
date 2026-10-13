@@ -26,7 +26,9 @@ def build_badges_sheet_content(audits: list[dict[str, Any]]) -> dict[str, Any]:
         {
             "badge": badge,
             "count": count,
-            "portfolio_percent": f"{count / total_repos * 100:.0f}%" if total_repos else "0%",
+            "portfolio_percent": f"{count / total_repos * 100:.0f}%"
+            if total_repos
+            else "0%",
         }
         for badge, count in badge_counts.most_common()
     ]
@@ -35,11 +37,15 @@ def build_badges_sheet_content(audits: list[dict[str, Any]]) -> dict[str, Any]:
         "total_repos": total_repos,
         "total_badges": sum(badge_counts.values()),
         "distribution_rows": distribution_rows,
-        "achievement_rows": sorted(repo_badge_counts, key=lambda item: item[1], reverse=True)[:20],
+        "achievement_rows": sorted(
+            repo_badge_counts, key=lambda item: item[1], reverse=True
+        )[:20],
     }
 
 
-def build_badge_distribution_chart(ws: Any, *, start_row: int, end_row: int) -> BarChart:
+def build_badge_distribution_chart(
+    ws: Any, *, start_row: int, end_row: int
+) -> BarChart:
     chart = BarChart()
     chart.type = "bar"
     chart.title = "Badge Distribution"
@@ -131,7 +137,9 @@ def write_badges_sheet(
     )
 
     if content["distribution_rows"]:
-        ws.add_chart(build_badge_distribution_chart(ws, start_row=5, end_row=badge_end), "E4")
+        ws.add_chart(
+            build_badge_distribution_chart(ws, start_row=5, end_row=badge_end), "E4"
+        )
 
     board_row = badge_end + 3
     ws.cell(row=board_row, column=1, value="Achievement Board").font = section_font

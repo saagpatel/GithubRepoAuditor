@@ -2,6 +2,7 @@
 
 Generates a multi-section PDF report from audit data using fpdf2.
 """
+
 from __future__ import annotations
 
 import sys
@@ -9,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # ── FPDF subclass ──────────────────────────────────────────────────────
+
 
 def _make_pdf_class():
     """Factory to defer FPDF import so ImportError is handled gracefully."""
@@ -24,7 +26,12 @@ def _make_pdf_class():
         def header(self) -> None:
             self.set_font("Helvetica", "B", 9)
             self.set_text_color(100, 100, 100)
-            self.cell(0, 8, f"GitHub Portfolio Audit - {self._username}  |  {self._date}", align="R")
+            self.cell(
+                0,
+                8,
+                f"GitHub Portfolio Audit - {self._username}  |  {self._date}",
+                align="R",
+            )
             self.ln(2)
             self.set_draw_color(200, 200, 200)
             self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
@@ -45,19 +52,19 @@ def _make_pdf_class():
 
 _GRADE_COLOURS: dict[str, tuple[int, int, int]] = {
     "A+": (0, 150, 80),
-    "A":  (0, 160, 90),
-    "B":  (80, 160, 40),
-    "C":  (200, 160, 0),
-    "D":  (220, 100, 0),
-    "F":  (200, 40, 40),
+    "A": (0, 160, 90),
+    "B": (80, 160, 40),
+    "C": (200, 160, 0),
+    "D": (220, 100, 0),
+    "F": (200, 40, 40),
 }
 
 _TIER_COLOURS: dict[str, tuple[int, int, int]] = {
-    "shipped":    (0, 150, 80),
+    "shipped": (0, 150, 80),
     "functional": (80, 160, 40),
-    "wip":        (200, 160, 0),
-    "skeleton":   (220, 100, 0),
-    "abandoned":  (180, 60, 60),
+    "wip": (200, 160, 0),
+    "skeleton": (220, 100, 0),
+    "abandoned": (180, 60, 60),
 }
 
 
@@ -77,6 +84,7 @@ def _tier_colour(tier: str) -> tuple[int, int, int]:
 
 
 # ── Section builders ───────────────────────────────────────────────────
+
 
 def _title_page(pdf, data: dict, date_str: str) -> None:
     pdf.add_page()
@@ -293,9 +301,9 @@ def _quick_wins(pdf, data: dict) -> None:
     pdf.ln(10)
 
     _PRIORITY_COLOURS = {
-        "high":   (200, 40, 40),
+        "high": (200, 40, 40),
         "medium": (200, 140, 0),
-        "low":    (100, 160, 60),
+        "low": (100, 160, 60),
     }
 
     for item in backlog[:10]:
@@ -364,6 +372,7 @@ def _grade_chart(pdf, data: dict) -> None:
 
 
 # ── Public API ─────────────────────────────────────────────────────────
+
 
 def export_pdf_report(report_data: dict, output_dir: Path) -> "Path | None":
     """Generate a PDF audit report and write it to *output_dir*.

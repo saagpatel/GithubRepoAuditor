@@ -207,7 +207,9 @@ def score_repo(
     # Compute badges and suggestions
     audit.badges = compute_badges(audit)
     audit.next_badges = suggest_next_badges(audit)
-    from github_repo_auditor.implementation_hotspots import build_implementation_hotspots
+    from github_repo_auditor.implementation_hotspots import (
+        build_implementation_hotspots,
+    )
     from github_repo_auditor.portfolio_intelligence import (
         build_action_candidates,
         build_hotspots,

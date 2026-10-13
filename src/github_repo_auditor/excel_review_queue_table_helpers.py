@@ -97,9 +97,7 @@ REVIEW_QUEUE_CENTER_ALIGNED_COLUMNS = {
     41,
 }
 
-REVIEW_QUEUE_GUIDANCE = (
-    "Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last."
-)
+REVIEW_QUEUE_GUIDANCE = "Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last."
 
 
 def build_review_queue_table_rows(
@@ -140,9 +138,13 @@ def build_review_queue_table_rows(
                 f"{item.get('intent_alignment_reason', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
             ),
             item.get("scorecard", {}).get("maturity_level", "") or "—",
-            item.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
+            item.get(
+                "maturity_gap_summary", "No maturity gap summary is recorded yet."
+            ),
             last_movement,
-            item.get("follow_through_summary", "No follow-through evidence is recorded yet."),
+            item.get(
+                "follow_through_summary", "No follow-through evidence is recorded yet."
+            ),
             item.get(
                 "follow_through_next_checkpoint",
                 "Use the next run or linked artifact to confirm whether the recommendation moved.",

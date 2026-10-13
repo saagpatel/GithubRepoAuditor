@@ -93,7 +93,11 @@ def _make_audit(
     ]
     return RepoAudit(
         metadata=_make_meta(
-            name, description=description, topics=topics, language=language, pushed_at=pushed_at
+            name,
+            description=description,
+            topics=topics,
+            language=language,
+            pushed_at=pushed_at,
         ),
         analyzer_results=analyzer_results,
         overall_score=5.0,
@@ -271,12 +275,24 @@ class TestSearchRanking:
         """Index 5 repos with distinct docs."""
         idx = _make_index(tmp_path)
         audits = [
-            _make_audit("RustDB", description="a fast Rust database engine", language="Rust"),
-            _make_audit("PythonML", description="machine learning with Python", language="Python"),
-            _make_audit("SwiftUI", description="iOS SwiftUI design patterns", language="Swift"),
-            _make_audit("GoMicro", description="Go microservices framework", language="Go"),
             _make_audit(
-                "NodeAPI", description="Node.js REST API boilerplate", language="JavaScript"
+                "RustDB", description="a fast Rust database engine", language="Rust"
+            ),
+            _make_audit(
+                "PythonML",
+                description="machine learning with Python",
+                language="Python",
+            ),
+            _make_audit(
+                "SwiftUI", description="iOS SwiftUI design patterns", language="Swift"
+            ),
+            _make_audit(
+                "GoMicro", description="Go microservices framework", language="Go"
+            ),
+            _make_audit(
+                "NodeAPI",
+                description="Node.js REST API boilerplate",
+                language="JavaScript",
             ),
         ]
         idx.reindex(audits)
@@ -348,7 +364,11 @@ class TestVoyageEmbedder:
         with patch.dict("os.environ", {}, clear=True):
             if "VOYAGE_API_KEY" in __import__("os").environ:
                 pytest.skip("VOYAGE_API_KEY set in environment")
-            env = {k: v for k, v in __import__("os").environ.items() if k != "VOYAGE_API_KEY"}
+            env = {
+                k: v
+                for k, v in __import__("os").environ.items()
+                if k != "VOYAGE_API_KEY"
+            }
             with patch.dict("os.environ", env, clear=True):
                 with pytest.raises(RuntimeError, match="VOYAGE_API_KEY"):
                     VoyageEmbedder()
@@ -393,7 +413,10 @@ class TestVoyageEmbedder:
         with patch.dict("os.environ", {"VOYAGE_API_KEY": fake_key}):
             VoyageEmbedder().embed(["test"])
 
-        assert responses_lib.calls[0].request.headers["Authorization"] == f"Bearer {fake_key}"
+        assert (
+            responses_lib.calls[0].request.headers["Authorization"]
+            == f"Bearer {fake_key}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -435,26 +458,40 @@ class TestLocalEmbedder:
 
 
 class TestMissingDependencies:
-    def test_no_voyage_key_and_no_sentence_transformers_returns_none(self, tmp_path: Path) -> None:
+    def test_no_voyage_key_and_no_sentence_transformers_returns_none(
+        self, tmp_path: Path
+    ) -> None:
         """from_embedder_name should return None (not raise) when both paths fail."""
-        env = {k: v for k, v in __import__("os").environ.items() if k != "VOYAGE_API_KEY"}
+        env = {
+            k: v for k, v in __import__("os").environ.items() if k != "VOYAGE_API_KEY"
+        }
         with patch.dict("os.environ", env, clear=True):
             with patch.dict("sys.modules", {"sentence_transformers": None}):
-                result = SemanticIndex.from_embedder_name(tmp_path / "warehouse.db", "voyage")
+                result = SemanticIndex.from_embedder_name(
+                    tmp_path / "warehouse.db", "voyage"
+                )
         assert result is None
 
-    def test_from_embedder_name_voyage_missing_key_returns_none(self, tmp_path: Path) -> None:
-        env = {k: v for k, v in __import__("os").environ.items() if k != "VOYAGE_API_KEY"}
+    def test_from_embedder_name_voyage_missing_key_returns_none(
+        self, tmp_path: Path
+    ) -> None:
+        env = {
+            k: v for k, v in __import__("os").environ.items() if k != "VOYAGE_API_KEY"
+        }
         with patch.dict("os.environ", env, clear=True):
             result = SemanticIndex.from_embedder_name(tmp_path / "db.sqlite", "voyage")
         assert result is None
 
-    def test_from_embedder_name_local_missing_dep_returns_none(self, tmp_path: Path) -> None:
+    def test_from_embedder_name_local_missing_dep_returns_none(
+        self, tmp_path: Path
+    ) -> None:
         with patch.dict("sys.modules", {"sentence_transformers": None}):
             result = SemanticIndex.from_embedder_name(tmp_path / "db.sqlite", "local")
         assert result is None
 
-    def test_from_embedder_name_unknown_embedder_returns_none(self, tmp_path: Path) -> None:
+    def test_from_embedder_name_unknown_embedder_returns_none(
+        self, tmp_path: Path
+    ) -> None:
         result = SemanticIndex.from_embedder_name(tmp_path / "db.sqlite", "unknown")
         assert result is None
 
@@ -547,7 +584,9 @@ def _make_controlled_index(
     embedder = _ControlledEmbedder(vec_map)
     db = tmp_path / "warehouse.db"
     idx = SemanticIndex(db, embedder)
-    audits = [_make_audit(name, description=f"{vec_key} project") for name, vec_key in repos]
+    audits = [
+        _make_audit(name, description=f"{vec_key} project") for name, vec_key in repos
+    ]
     idx.reindex(audits)
     return idx
 
@@ -587,7 +626,9 @@ class TestFindNeighbors:
     def test_find_neighbors_results_sorted_by_distance(self, tmp_path: Path) -> None:
         """Results must be ascending by distance (most similar first)."""
         idx = _make_index(tmp_path)
-        audits = [_make_audit(f"Repo{i}", description=f"repo number {i}") for i in range(6)]
+        audits = [
+            _make_audit(f"Repo{i}", description=f"repo number {i}") for i in range(6)
+        ]
         idx.reindex(audits)
 
         neighbors = idx.find_neighbors("Repo0", k=4)
@@ -621,9 +662,13 @@ class TestFindDuplicateGroups:
 
         # Expect at least the concept-A group
         a_groups = [
-            g for g in groups if all(m in g.members for m in ["RepoAlpha", "RepoBeta", "RepoGamma"])
+            g
+            for g in groups
+            if all(m in g.members for m in ["RepoAlpha", "RepoBeta", "RepoGamma"])
         ]
-        assert len(a_groups) == 1, f"Expected a group with all 3 concept-A repos, got: {groups}"
+        assert len(a_groups) == 1, (
+            f"Expected a group with all 3 concept-A repos, got: {groups}"
+        )
         assert len(a_groups[0].members) == 3
 
     def test_threshold_filtering(self, tmp_path: Path) -> None:

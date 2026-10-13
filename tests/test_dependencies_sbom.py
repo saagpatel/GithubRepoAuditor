@@ -145,7 +145,9 @@ class TestGetDependencySbom:
         client = GitHubClient.__new__(GitHubClient)
         client.cache = None
 
-        with patch.object(client, "_fetch_json", side_effect=requests.ConnectionError("timeout")):
+        with patch.object(
+            client, "_fetch_json", side_effect=requests.ConnectionError("timeout")
+        ):
             result = client.get_dependency_sbom("owner", "myrepo")
 
         assert result["available"] is False
@@ -157,7 +159,9 @@ class TestGetDependencySbom:
         client = GitHubClient.__new__(GitHubClient)
         client.cache = None
 
-        with patch.object(client, "_fetch_json", return_value=_spdx_payload(packages=[])):
+        with patch.object(
+            client, "_fetch_json", return_value=_spdx_payload(packages=[])
+        ):
             result = client.get_dependency_sbom("owner", "myrepo")
 
         assert result["available"] is True
@@ -180,8 +184,16 @@ class TestDependenciesAnalyzerSbomSource:
             {
                 "available": True,
                 "packages": [
-                    {"name": "requests", "version": "2.31.0", "purl": "pkg:pypi/requests@2.31.0"},
-                    {"name": "click", "version": "8.0.0", "purl": "pkg:pypi/click@8.0.0"},
+                    {
+                        "name": "requests",
+                        "version": "2.31.0",
+                        "purl": "pkg:pypi/requests@2.31.0",
+                    },
+                    {
+                        "name": "click",
+                        "version": "8.0.0",
+                        "purl": "pkg:pypi/click@8.0.0",
+                    },
                 ],
                 "package_count": 2,
                 "spdx_version": "SPDX-2.3",
@@ -221,7 +233,9 @@ class TestDependenciesAnalyzerSbomSource:
         repo.mkdir()
         (repo / "requirements.txt").write_text("requests\nclick\nflask\n")
 
-        client = _make_mock_client({"available": False, "http_status": 403, "reason": "forbidden"})
+        client = _make_mock_client(
+            {"available": False, "http_status": 403, "reason": "forbidden"}
+        )
 
         result = DependenciesAnalyzer().analyze(
             repo, sbom_metadata, github_client=client, sbom_source="github"

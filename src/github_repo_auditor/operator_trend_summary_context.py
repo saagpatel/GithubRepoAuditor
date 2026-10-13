@@ -29,7 +29,8 @@ def build_trend_summary_context(
         {key for key in new_attention_keys if key in earlier_attention_keys}
     )
     new_blocked_attention = any(
-        current_attention.get(key, {}).get("lane") == "blocked" for key in new_attention_keys
+        current_attention.get(key, {}).get("lane") == "blocked"
+        for key in new_attention_keys
     )
     current_attention_count = len(current_attention_keys)
     previous_attention_count = len(previous_attention_keys)
@@ -63,7 +64,9 @@ def build_trend_summary_context(
             "reason": primary_target_reason,
             "done_criteria": primary_target_done_criteria,
             "closure_guidance": closure_guidance,
-            "recommendation_drift_status": recommendation_drift["recommendation_drift_status"],
+            "recommendation_drift_status": recommendation_drift[
+                "recommendation_drift_status"
+            ],
         }
     decision_memory = summary_decision_memory_fn(
         primary_target,

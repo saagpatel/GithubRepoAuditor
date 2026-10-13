@@ -1,4 +1,5 @@
 """Notion native dashboard page creation with linked database views."""
+
 from __future__ import annotations
 
 import sys
@@ -17,7 +18,9 @@ def create_notion_dashboard(
     """Create an Audit Dashboard page in Notion. Returns page ID or None."""
     parent_id = config.get("dashboard_parent_page_id", "")
     if not parent_id:
-        print("  dashboard_parent_page_id not set, skipping dashboard.", file=sys.stderr)
+        print(
+            "  dashboard_parent_page_id not set, skipping dashboard.", file=sys.stderr
+        )
         return None
 
     version = config.get("notion_version", DEFAULT_NOTION_VERSION)
@@ -49,7 +52,11 @@ def create_notion_dashboard(
     children.append(_heading_block("Top Repos", level=2))
 
     # Add top 10 repos as bullets
-    audits = sorted(report_data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)
+    audits = sorted(
+        report_data.get("audits", []),
+        key=lambda a: a.get("overall_score", 0),
+        reverse=True,
+    )
     for a in audits[:10]:
         name = a.get("metadata", {}).get("name", "")
         score = a.get("overall_score", 0)
@@ -71,7 +78,10 @@ def create_notion_dashboard(
         print(f"  Notion dashboard created: {page_id}", file=sys.stderr)
         return page_id
     if resp:
-        print(f"  Failed to create dashboard: {resp.status_code} {resp.text[:200]}", file=sys.stderr)
+        print(
+            f"  Failed to create dashboard: {resp.status_code} {resp.text[:200]}",
+            file=sys.stderr,
+        )
     return None
 
 
@@ -88,7 +98,9 @@ def _paragraph_block(text: str) -> dict:
     return {
         "object": "block",
         "type": "paragraph",
-        "paragraph": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
+        "paragraph": {
+            "rich_text": [{"type": "text", "text": {"content": text[:2000]}}]
+        },
     }
 
 
@@ -96,7 +108,9 @@ def _bullet_block(text: str) -> dict:
     return {
         "object": "block",
         "type": "bulleted_list_item",
-        "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": text}}]},
+        "bulleted_list_item": {
+            "rich_text": [{"type": "text", "text": {"content": text}}]
+        },
     }
 
 

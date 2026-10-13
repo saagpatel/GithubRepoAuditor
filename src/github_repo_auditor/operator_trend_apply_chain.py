@@ -47,19 +47,33 @@ def run_resolution_trend_apply_chain(
         "current_generated_at": current_generated_at,
         "confidence_calibration": confidence_calibration,
     }
-    recommendation_drift = apply_trust_policy_exceptions(resolution_targets, history, **kwargs)
-    exception_learning = apply_exception_pattern_learning(resolution_targets, history, **kwargs)
-    exception_retirement = apply_exception_retirement(resolution_targets, history, **kwargs)
-    class_normalization = apply_class_trust_normalization(resolution_targets, history, **kwargs)
+    recommendation_drift = apply_trust_policy_exceptions(
+        resolution_targets, history, **kwargs
+    )
+    exception_learning = apply_exception_pattern_learning(
+        resolution_targets, history, **kwargs
+    )
+    exception_retirement = apply_exception_retirement(
+        resolution_targets, history, **kwargs
+    )
+    class_normalization = apply_class_trust_normalization(
+        resolution_targets, history, **kwargs
+    )
     class_memory_decay = apply_class_memory_decay(resolution_targets, history, **kwargs)
-    class_trust_reweighting = apply_class_trust_reweighting(resolution_targets, history, **kwargs)
-    class_trust_momentum = apply_class_trust_momentum(resolution_targets, history, **kwargs)
+    class_trust_reweighting = apply_class_trust_reweighting(
+        resolution_targets, history, **kwargs
+    )
+    class_trust_momentum = apply_class_trust_momentum(
+        resolution_targets, history, **kwargs
+    )
     class_transition_resolution = apply_class_transition_resolution(
         resolution_targets, history, **kwargs
     )
     apply_transition_closure_confidence(resolution_targets, history, **kwargs)
-    pending_debt_freshness = apply_pending_debt_freshness_and_closure_forecast_reweighting(
-        resolution_targets, history, **kwargs
+    pending_debt_freshness = (
+        apply_pending_debt_freshness_and_closure_forecast_reweighting(
+            resolution_targets, history, **kwargs
+        )
     )
     closure_forecast_momentum = apply_closure_forecast_momentum_and_hysteresis(
         resolution_targets, history, **kwargs
@@ -67,8 +81,10 @@ def run_resolution_trend_apply_chain(
     closure_forecast_decay = apply_closure_forecast_freshness_and_decay(
         resolution_targets, history, **kwargs
     )
-    closure_forecast_recovery = apply_closure_forecast_refresh_recovery_and_reacquisition(
-        resolution_targets, history, **kwargs
+    closure_forecast_recovery = (
+        apply_closure_forecast_refresh_recovery_and_reacquisition(
+            resolution_targets, history, **kwargs
+        )
     )
     reacquisition_persistence = apply_reacquisition_persistence_and_recovery_churn(
         resolution_targets, history, **kwargs
@@ -88,14 +104,20 @@ def run_resolution_trend_apply_chain(
     reset_reentry_rebuild = apply_reset_reentry_refresh_recovery_and_rebuild(
         resolution_targets, history, **kwargs
     )
-    reset_reentry_rebuild_persistence = apply_reset_reentry_rebuild_persistence_and_churn(
-        resolution_targets, history, **kwargs
+    reset_reentry_rebuild_persistence = (
+        apply_reset_reentry_rebuild_persistence_and_churn(
+            resolution_targets, history, **kwargs
+        )
     )
-    reset_reentry_rebuild_freshness_decay = apply_reset_reentry_rebuild_freshness_and_reset(
-        resolution_targets, history, **kwargs
+    reset_reentry_rebuild_freshness_decay = (
+        apply_reset_reentry_rebuild_freshness_and_reset(
+            resolution_targets, history, **kwargs
+        )
     )
-    reset_reentry_rebuild_recovery = apply_reset_reentry_rebuild_refresh_recovery_and_reentry(
-        resolution_targets, history, **kwargs
+    reset_reentry_rebuild_recovery = (
+        apply_reset_reentry_rebuild_refresh_recovery_and_reentry(
+            resolution_targets, history, **kwargs
+        )
     )
     reset_reentry_rebuild_reentry_persistence = (
         apply_reset_reentry_rebuild_reentry_persistence_and_churn(
@@ -137,10 +159,8 @@ def run_resolution_trend_apply_chain(
             resolution_targets, history, **kwargs
         )
     )
-    reset_reentry_rebuild_reentry_restore_rerestore_recovery = (
-        apply_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_and_rererestore(
-            resolution_targets, history, **kwargs
-        )
+    reset_reentry_rebuild_reentry_restore_rerestore_recovery = apply_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_and_rererestore(
+        resolution_targets, history, **kwargs
     )
     reset_reentry_rebuild_reentry_restore_rererestore_persistence = (
         apply_reset_reentry_rebuild_reentry_restore_rererestore_persistence_and_churn(
@@ -152,10 +172,8 @@ def run_resolution_trend_apply_chain(
             resolution_targets, history, **kwargs
         )
     )
-    reset_reentry_rebuild_reentry_restore_rererestore_recovery = (
-        apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_and_rerererestore(
-            resolution_targets, history, **kwargs
-        )
+    reset_reentry_rebuild_reentry_restore_rererestore_recovery = apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_and_rerererestore(
+        resolution_targets, history, **kwargs
     )
     reset_reentry_rebuild_reentry_restore_rerererestore_persistence = (
         apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn(

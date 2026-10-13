@@ -119,7 +119,11 @@ def _detect_test_framework(repo_path: Path) -> str | None:
             pass
 
     # Python — check for pytest in requirements
-    for req_file in ("requirements.txt", "requirements-dev.txt", "test-requirements.txt"):
+    for req_file in (
+        "requirements.txt",
+        "requirements-dev.txt",
+        "test-requirements.txt",
+    ):
         req_path = repo_path / req_file
         if req_path.is_file():
             try:

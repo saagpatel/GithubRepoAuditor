@@ -9,20 +9,36 @@ from github_repo_auditor.scorer import letter_grade
 
 def _meta(name: str = "test") -> RepoMetadata:
     return RepoMetadata(
-        name=name, full_name=f"user/{name}", description=None,
-        language="Python", languages={}, private=False, fork=False,
-        archived=False, created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        name=name,
+        full_name=f"user/{name}",
+        description=None,
+        language="Python",
+        languages={},
+        private=False,
+        fork=False,
+        archived=False,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=0, forks=0, open_issues=0,
-        size_kb=100, html_url="", clone_url="", topics=[],
+        default_branch="main",
+        stars=0,
+        forks=0,
+        open_issues=0,
+        size_kb=100,
+        html_url="",
+        clone_url="",
+        topics=[],
     )
 
 
-def _audit(name: str, score: float, tier: str, dim_scores: dict[str, float] | None = None) -> RepoAudit:
+def _audit(
+    name: str, score: float, tier: str, dim_scores: dict[str, float] | None = None
+) -> RepoAudit:
     results = []
     for dim, s in (dim_scores or {}).items():
-        results.append(AnalyzerResult(dim, s, 1.0, [], {"config_files": ["x"], "total_loc": 100}))
+        results.append(
+            AnalyzerResult(dim, s, 1.0, [], {"config_files": ["x"], "total_loc": 100})
+        )
     return RepoAudit(
         metadata=_meta(name),
         analyzer_results=results,
@@ -44,11 +60,16 @@ class TestFindQuickWins:
 
     def test_actions_target_lowest_dimensions(self):
         audits = [
-            _audit("test-repo", 0.50, "wip", {"testing": 0.0, "cicd": 0.1, "readme": 0.9}),
+            _audit(
+                "test-repo", 0.50, "wip", {"testing": 0.0, "cicd": 0.1, "readme": 0.9}
+            ),
         ]
         wins = find_quick_wins(audits)
         assert len(wins) == 1
-        assert "testing" in wins[0]["actions"][0].lower() or "cicd" in wins[0]["actions"][0].lower()
+        assert (
+            "testing" in wins[0]["actions"][0].lower()
+            or "cicd" in wins[0]["actions"][0].lower()
+        )
 
     def test_shipped_repos_excluded(self):
         audits = [

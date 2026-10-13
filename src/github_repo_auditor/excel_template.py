@@ -16,7 +16,9 @@ PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 X14_NS = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
 XM_NS = "http://schemas.microsoft.com/office/excel/2006/main"
 SPARKLINE_URI = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}"
-SPARKLINE_WARNING_MESSAGE = "Sparkline Group extension is not supported and will be removed"
+SPARKLINE_WARNING_MESSAGE = (
+    "Sparkline Group extension is not supported and will be removed"
+)
 TREND_HISTORY_WINDOW = 12
 DEFAULT_TEMPLATE_PATH = (
     Path(__file__).resolve().parent / "assets" / "excel" / "analyst-template.xlsx"
@@ -73,7 +75,9 @@ def resolve_template_path(template_path: Path | None = None) -> Path:
     return path
 
 
-def copy_template_to_output(output_path: Path, template_path: Path | None = None) -> Path:
+def copy_template_to_output(
+    output_path: Path, template_path: Path | None = None
+) -> Path:
     source = resolve_template_path(template_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, output_path)
@@ -106,7 +110,10 @@ def inject_native_sparklines(workbook_path: Path, specs: list[SparklineSpec]) ->
         with NamedTemporaryFile(delete=False, suffix=".xlsx") as handle:
             temp_path = Path(handle.name)
 
-        with zipfile.ZipFile(workbook_path) as source_zip, zipfile.ZipFile(temp_path, "w") as target_zip:
+        with (
+            zipfile.ZipFile(workbook_path) as source_zip,
+            zipfile.ZipFile(temp_path, "w") as target_zip,
+        ):
             for item in source_zip.infolist():
                 data = updated_files.get(item.filename, source_zip.read(item.filename))
                 target_zip.writestr(item, data)
@@ -137,7 +144,9 @@ def _map_sheet_paths(source_zip: zipfile.ZipFile) -> dict[str, str]:
     return sheet_map
 
 
-def _inject_sparklines_into_sheet_xml(xml_bytes: bytes, specs: list[SparklineSpec]) -> bytes:
+def _inject_sparklines_into_sheet_xml(
+    xml_bytes: bytes, specs: list[SparklineSpec]
+) -> bytes:
     root = ET.fromstring(xml_bytes)
     ext_lst = root.find(f"{{{MAIN_NS}}}extLst")
     if ext_lst is None:
@@ -149,13 +158,31 @@ def _inject_sparklines_into_sheet_xml(xml_bytes: bytes, specs: list[SparklineSpe
 
     ext = ET.SubElement(ext_lst, f"{{{MAIN_NS}}}ext", {"uri": SPARKLINE_URI})
     spark_groups = ET.SubElement(ext, f"{{{X14_NS}}}sparklineGroups")
-    spark_group = ET.SubElement(spark_groups, f"{{{X14_NS}}}sparklineGroup", {"displayEmptyCellsAs": "gap"})
-    ET.SubElement(spark_group, f"{{{X14_NS}}}colorSeries", {"theme": "4", "tint": "-0.499984740745262"})
+    spark_group = ET.SubElement(
+        spark_groups, f"{{{X14_NS}}}sparklineGroup", {"displayEmptyCellsAs": "gap"}
+    )
+    ET.SubElement(
+        spark_group,
+        f"{{{X14_NS}}}colorSeries",
+        {"theme": "4", "tint": "-0.499984740745262"},
+    )
     ET.SubElement(spark_group, f"{{{X14_NS}}}colorNegative", {"theme": "5"})
     ET.SubElement(spark_group, f"{{{X14_NS}}}colorAxis", {"rgb": "FF000000"})
-    ET.SubElement(spark_group, f"{{{X14_NS}}}colorMarkers", {"theme": "4", "tint": "-0.499984740745262"})
-    ET.SubElement(spark_group, f"{{{X14_NS}}}colorFirst", {"theme": "4", "tint": "0.39997558519241921"})
-    ET.SubElement(spark_group, f"{{{X14_NS}}}colorLast", {"theme": "4", "tint": "0.39997558519241921"})
+    ET.SubElement(
+        spark_group,
+        f"{{{X14_NS}}}colorMarkers",
+        {"theme": "4", "tint": "-0.499984740745262"},
+    )
+    ET.SubElement(
+        spark_group,
+        f"{{{X14_NS}}}colorFirst",
+        {"theme": "4", "tint": "0.39997558519241921"},
+    )
+    ET.SubElement(
+        spark_group,
+        f"{{{X14_NS}}}colorLast",
+        {"theme": "4", "tint": "0.39997558519241921"},
+    )
     ET.SubElement(spark_group, f"{{{X14_NS}}}colorHigh", {"theme": "4"})
     ET.SubElement(spark_group, f"{{{X14_NS}}}colorLow", {"theme": "4"})
 

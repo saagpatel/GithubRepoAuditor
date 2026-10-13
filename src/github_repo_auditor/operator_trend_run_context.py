@@ -19,10 +19,14 @@ def build_resolution_run_context(
         for snapshot in recent_runs
         if snapshot["items"] or snapshot["has_attention"] is not None
     ]
-    current_snapshot = recent_runs[0] if recent_runs else {"items": {}, "has_attention": False}
+    current_snapshot = (
+        recent_runs[0] if recent_runs else {"items": {}, "has_attention": False}
+    )
     previous_snapshot = recent_runs[1] if len(recent_runs) > 1 else None
     current_attention = attention_items(current_snapshot)
-    previous_attention = attention_items(previous_snapshot or {"items": {}, "has_attention": False})
+    previous_attention = attention_items(
+        previous_snapshot or {"items": {}, "has_attention": False}
+    )
     current_attention_keys = set(current_attention)
     previous_attention_keys = set(previous_attention)
     earlier_attention_keys = (

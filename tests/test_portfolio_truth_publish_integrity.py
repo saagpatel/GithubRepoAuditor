@@ -36,16 +36,12 @@ def test_publish_journal_recovers_process_death_after_each_replacement(
     }
     backups = {
         path: (
-            publish_mod._stage_bytes(path, path.read_bytes())
-            if path.exists()
-            else None
+            publish_mod._stage_bytes(path, path.read_bytes()) if path.exists() else None
         )
         for path in targets
     }
     journal = output_dir / publish_mod._PUBLISH_JOURNAL_NAME
-    publish_mod._write_publish_journal(
-        journal, temp_files=staged, backups=backups
-    )
+    publish_mod._write_publish_journal(journal, temp_files=staged, backups=backups)
     for path in targets[:replaced_count]:
         staged[path].replace(path)
 

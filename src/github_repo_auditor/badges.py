@@ -11,9 +11,11 @@ BADGE_DEFS: list[tuple[str, callable, str]] = []
 
 def _def(name: str, hint: str):
     """Decorator to register a badge definition."""
+
     def decorator(fn):
         BADGE_DEFS.append((name, fn, hint))
         return fn
+
     return decorator
 
 
@@ -51,8 +53,17 @@ def _battle_tested(scores, details, audit):
 
 @_def("complete-package", "Bring all scoring dimensions above 0.5")
 def _complete_package(scores, details, audit):
-    core_dims = ["readme", "structure", "code_quality", "testing", "cicd",
-                 "dependencies", "activity", "documentation", "build_readiness"]
+    core_dims = [
+        "readme",
+        "structure",
+        "code_quality",
+        "testing",
+        "cicd",
+        "dependencies",
+        "activity",
+        "documentation",
+        "build_readiness",
+    ]
     return all(scores.get(d, 0) >= 0.5 for d in core_dims)
 
 
@@ -127,11 +138,13 @@ def suggest_next_badges(audit: RepoAudit, max_suggestions: int = 3) -> list[dict
         # Estimate gap based on the badge type
         gap = _estimate_gap(name, score_map, details_map, audit)
         if gap is not None and gap < 1.0:
-            suggestions.append({
-                "badge": name,
-                "action": hint,
-                "gap": round(gap, 2),
-            })
+            suggestions.append(
+                {
+                    "badge": name,
+                    "action": hint,
+                    "gap": round(gap, 2),
+                }
+            )
 
     suggestions.sort(key=lambda s: s["gap"])
     return suggestions[:max_suggestions]
@@ -146,19 +159,44 @@ def _estimate_gap(
     """Estimate how far a repo is from earning a badge (0.0 = almost there)."""
     gap_map = {
         "fully-tested": max(0, 0.8 - scores.get("testing", 0)),
-        "well-documented": max(0, 0.8 - scores.get("readme", 0)) + max(0, 0.5 - scores.get("documentation", 0)),
+        "well-documented": max(0, 0.8 - scores.get("readme", 0))
+        + max(0, 0.5 - scores.get("documentation", 0)),
         "ci-champion": max(0, 0.8 - scores.get("cicd", 0)),
         "dependency-disciplined": max(0, 0.8 - scores.get("dependencies", 0)),
-        "fresh": 0.0 if details.get("activity", {}).get("days_since_push", 999) <= 30 else 0.5,
-        "battle-tested": max(0, 0.8 - scores.get("testing", 0)) + (0.3 if details.get("testing", {}).get("test_file_count", 0) < 10 else 0),
-        "complete-package": sum(max(0, 0.5 - scores.get(d, 0)) for d in ["readme", "structure", "code_quality", "testing", "cicd", "dependencies", "activity", "documentation", "build_readiness"]),
-        "novel-tech": 0.0 if details.get("interest", {}).get("tech_novelty", 0) >= 0.15 else 0.5,
-        "storyteller": 0.0 if details.get("interest", {}).get("readme_storytelling", 0) > 0 else 0.3,
+        "fresh": 0.0
+        if details.get("activity", {}).get("days_since_push", 999) <= 30
+        else 0.5,
+        "battle-tested": max(0, 0.8 - scores.get("testing", 0))
+        + (0.3 if details.get("testing", {}).get("test_file_count", 0) < 10 else 0),
+        "complete-package": sum(
+            max(0, 0.5 - scores.get(d, 0))
+            for d in [
+                "readme",
+                "structure",
+                "code_quality",
+                "testing",
+                "cicd",
+                "dependencies",
+                "activity",
+                "documentation",
+                "build_readiness",
+            ]
+        ),
+        "novel-tech": 0.0
+        if details.get("interest", {}).get("tech_novelty", 0) >= 0.15
+        else 0.5,
+        "storyteller": 0.0
+        if details.get("interest", {}).get("readme_storytelling", 0) > 0
+        else 0.3,
         "community-ready": max(0, 0.6 - scores.get("community_profile", 0)),
-        "zero-debt": 0.0 if details.get("code_quality", {}).get("todo_density_per_1k", 999) < 1.0 else 0.2,
+        "zero-debt": 0.0
+        if details.get("code_quality", {}).get("todo_density_per_1k", 999) < 1.0
+        else 0.2,
         "actively-maintained": max(0, 0.8 - scores.get("activity", 0)),
         "built-to-ship": max(0, 0.6 - scores.get("build_readiness", 0)),
         "polyglot": 0.0 if len(audit.metadata.languages) >= 3 else 0.5,
-        "has-fans": 0.0 if (audit.metadata.stars > 0 or audit.metadata.forks > 0) else 0.8,
+        "has-fans": 0.0
+        if (audit.metadata.stars > 0 or audit.metadata.forks > 0)
+        else 0.8,
     }
     return gap_map.get(badge)

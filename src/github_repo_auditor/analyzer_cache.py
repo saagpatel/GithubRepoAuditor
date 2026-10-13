@@ -262,7 +262,9 @@ def reconcile(
             cached_dict = lookup(conn, repo_name, sha, analyzer_name, inputs_hash)
 
             if cached_dict is None:
-                missing_from_cache.append({"repo": repo_name, "analyzer": analyzer_name})
+                missing_from_cache.append(
+                    {"repo": repo_name, "analyzer": analyzer_name}
+                )
                 continue
 
             if _deep_equal(cached_dict, fresh_dict):
@@ -270,7 +272,11 @@ def reconcile(
             else:
                 diff_str = _diff_summary(cached_dict, fresh_dict)
                 divergent.append(
-                    {"repo": repo_name, "analyzer": analyzer_name, "diff_summary": diff_str}
+                    {
+                        "repo": repo_name,
+                        "analyzer": analyzer_name,
+                        "diff_summary": diff_str,
+                    }
                 )
 
     return {

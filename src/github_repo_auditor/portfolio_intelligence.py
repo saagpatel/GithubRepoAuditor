@@ -214,7 +214,9 @@ def _freshness_score(metadata: RepoMetadata, activity_details: dict) -> float:
     return _clamp(1.0 - min(days_since_push, 365) / 365)
 
 
-def _top_and_bottom_drivers(score_map: dict[str, float], dimensions: list[str]) -> tuple[list[str], list[str]]:
+def _top_and_bottom_drivers(
+    score_map: dict[str, float], dimensions: list[str]
+) -> tuple[list[str], list[str]]:
     pairs = [(dimension, score_map.get(dimension, 0.0)) for dimension in dimensions]
     ordered = sorted(pairs, key=lambda item: item[1], reverse=True)
     strongest = [f"{dimension}={score:.2f}" for dimension, score in ordered[:2]]
@@ -237,30 +239,42 @@ def compute_lens_scores(
 
     freshness = _freshness_score(metadata, activity_details)
     activity_score = score_map.get("activity", 0.0)
-    security_base = posture.get("score", score_map.get("security", max(0.25, score_map.get("dependencies", 0.0))))
+    security_base = posture.get(
+        "score",
+        score_map.get("security", max(0.25, score_map.get("dependencies", 0.0))),
+    )
     stars_signal = min(metadata.stars / 10.0, 1.0)
     release_count = activity_details.get("release_count", 0) or 0
     release_signal = min(release_count / 4.0, 1.0)
 
-    ship_readiness = _clamp(_weighted_blend(score_map, {
-        "readme": 0.10,
-        "structure": 0.12,
-        "code_quality": 0.15,
-        "testing": 0.22,
-        "cicd": 0.16,
-        "build_readiness": 0.18,
-        "documentation": 0.07,
-    }))
-    maintenance_health = _weighted_blend(score_map, {
-        "code_quality": 0.24,
-        "testing": 0.16,
-        "dependencies": 0.14,
-        "activity": 0.20,
-        "documentation": 0.12,
-        "community_profile": 0.14,
-    })
+    ship_readiness = _clamp(
+        _weighted_blend(
+            score_map,
+            {
+                "readme": 0.10,
+                "structure": 0.12,
+                "code_quality": 0.15,
+                "testing": 0.22,
+                "cicd": 0.16,
+                "build_readiness": 0.18,
+                "documentation": 0.07,
+            },
+        )
+    )
+    maintenance_health = _weighted_blend(
+        score_map,
+        {
+            "code_quality": 0.24,
+            "testing": 0.16,
+            "dependencies": 0.14,
+            "activity": 0.20,
+            "documentation": 0.12,
+            "community_profile": 0.14,
+        },
+    )
     maintenance_risk = _clamp(
-        1.0 - maintenance_health
+        1.0
+        - maintenance_health
         + (0.08 if metadata.archived else 0.0)
         + (0.08 if freshness < 0.25 else 0.0)
     )
@@ -298,7 +312,14 @@ def compute_lens_scores(
     )
     maintain_strong, maintain_weak = _top_and_bottom_drivers(
         score_map,
-        ["code_quality", "testing", "dependencies", "documentation", "community_profile", "activity"],
+        [
+            "code_quality",
+            "testing",
+            "dependencies",
+            "documentation",
+            "community_profile",
+            "activity",
+        ],
     )
     showcase_strong, showcase_weak = _top_and_bottom_drivers(
         score_map,
@@ -370,7 +391,12 @@ def _dimension_details(audit: RepoAudit) -> dict[str, dict]:
 
 
 def _next_tier_name(score: float) -> str | None:
-    ordered = [("skeleton", 0.15), ("wip", 0.35), ("functional", 0.55), ("shipped", 0.75)]
+    ordered = [
+        ("skeleton", 0.15),
+        ("wip", 0.35),
+        ("functional", 0.55),
+        ("shipped", 0.75),
+    ]
     for tier_name, threshold in ordered:
         if score < threshold:
             return tier_name
@@ -400,22 +426,28 @@ def build_action_candidates(audit: RepoAudit) -> list[dict]:
         action_text = hint["action"]
         rationale = f"{dimension} is currently scoring {score:.2f}, making it one of the biggest drags on this repo."
         if dimension == "security":
-            recommendation = next(iter(audit.security_posture.get("recommendations", [])), None)
+            recommendation = next(
+                iter(audit.security_posture.get("recommendations", [])), None
+            )
             if recommendation:
                 title = recommendation.get("title", title)
                 action_text = recommendation.get("why", action_text)
                 rationale = recommendation.get("why", rationale)
-        actions.append({
-            "key": dimension,
-            "title": title,
-            "action": action_text,
-            "lens": hint["lens"],
-            "effort": hint["effort"],
-            "confidence": confidence,
-            "expected_lens_delta": expected_delta,
-            "expected_tier_movement": f"Closer to {next_tier}" if next_tier else "Protect current tier",
-            "rationale": rationale,
-        })
+        actions.append(
+            {
+                "key": dimension,
+                "title": title,
+                "action": action_text,
+                "lens": hint["lens"],
+                "effort": hint["effort"],
+                "confidence": confidence,
+                "expected_lens_delta": expected_delta,
+                "expected_tier_movement": f"Closer to {next_tier}"
+                if next_tier
+                else "Protect current tier",
+                "rationale": rationale,
+            }
+        )
         if len(actions) == 4:
             break
 
@@ -429,58 +461,100 @@ def build_hotspots(audit: RepoAudit) -> list[dict]:
     testing = score_map.get("testing", 0.0)
     cicd = score_map.get("cicd", 0.0)
     code_quality = score_map.get("code_quality", 0.0)
-    security = audit.security_posture or {"score": score_map.get("security", 1.0), "secrets_found": 0}
+    security = audit.security_posture or {
+        "score": score_map.get("security", 1.0),
+        "secrets_found": 0,
+    }
     actions = audit.action_candidates or build_action_candidates(audit)
     top_action = actions[0]["title"] if actions else "Review repo posture"
     hotspots: list[dict] = []
 
     if activity_score >= 0.60 and min(testing, cicd, code_quality) <= 0.45:
-        severity = round(min(1.0, activity_score * 0.40 + (1.0 - min(testing, cicd, code_quality)) * 0.60), 3)
-        hotspots.append({
-            "category": "behavioral-risk",
-            "severity": severity,
-            "title": "High-churn weak foundation",
-            "summary": "Recent activity is landing on a weak base, which raises rework risk.",
-            "recommended_action": top_action,
-        })
+        severity = round(
+            min(
+                1.0,
+                activity_score * 0.40 + (1.0 - min(testing, cicd, code_quality)) * 0.60,
+            ),
+            3,
+        )
+        hotspots.append(
+            {
+                "category": "behavioral-risk",
+                "severity": severity,
+                "title": "High-churn weak foundation",
+                "summary": "Recent activity is landing on a weak base, which raises rework risk.",
+                "recommended_action": top_action,
+            }
+        )
 
     if audit.interest_score >= 0.45 and audit.overall_score < 0.55:
-        severity = round(min(1.0, audit.interest_score * 0.55 + (0.55 - audit.overall_score) * 0.75), 3)
-        hotspots.append({
-            "category": "finish-line",
-            "severity": severity,
-            "title": "Promising but under-finished",
-            "summary": "This repo has portfolio upside but is still incomplete enough to under-sell itself.",
-            "recommended_action": top_action,
-        })
+        severity = round(
+            min(1.0, audit.interest_score * 0.55 + (0.55 - audit.overall_score) * 0.75),
+            3,
+        )
+        hotspots.append(
+            {
+                "category": "finish-line",
+                "severity": severity,
+                "title": "Promising but under-finished",
+                "summary": "This repo has portfolio upside but is still incomplete enough to under-sell itself.",
+                "recommended_action": top_action,
+            }
+        )
 
     if security.get("score", 1.0) < 0.65 or security.get("secrets_found", 0) > 0:
-        severity = round(min(1.0, (1.0 - security.get("score", 1.0)) + security.get("secrets_found", 0) * 0.08), 3)
-        hotspots.append({
-            "category": "security-debt",
-            "severity": severity,
-            "title": "Security posture needs attention",
-            "summary": "Security signals are weak enough that the repo should be reviewed before it is promoted.",
-            "recommended_action": next(
-                (action["title"] for action in actions if action["lens"] == "security_posture"),
-                top_action,
+        severity = round(
+            min(
+                1.0,
+                (1.0 - security.get("score", 1.0))
+                + security.get("secrets_found", 0) * 0.08,
             ),
-        })
+            3,
+        )
+        hotspots.append(
+            {
+                "category": "security-debt",
+                "severity": severity,
+                "title": "Security posture needs attention",
+                "summary": "Security signals are weak enough that the repo should be reviewed before it is promoted.",
+                "recommended_action": next(
+                    (
+                        action["title"]
+                        for action in actions
+                        if action["lens"] == "security_posture"
+                    ),
+                    top_action,
+                ),
+            }
+        )
 
     days_since_push = activity_details.get("days_since_push")
     if (
         audit.completeness_tier in {"skeleton", "abandoned"}
         or "stale-2yr" in audit.flags
-        or (isinstance(days_since_push, int) and days_since_push > 365 and audit.interest_score < 0.25)
+        or (
+            isinstance(days_since_push, int)
+            and days_since_push > 365
+            and audit.interest_score < 0.25
+        )
     ):
-        severity = round(min(1.0, (1.0 - audit.overall_score) * 0.55 + max(0.0, 0.25 - audit.interest_score)), 3)
-        hotspots.append({
-            "category": "archive-candidate",
-            "severity": severity,
-            "title": "Archive review candidate",
-            "summary": "Low momentum and low strategic upside suggest this repo may be ready to retire or bundle elsewhere.",
-            "recommended_action": "Review for archive, consolidation, or explicit de-prioritization.",
-        })
+        severity = round(
+            min(
+                1.0,
+                (1.0 - audit.overall_score) * 0.55
+                + max(0.0, 0.25 - audit.interest_score),
+            ),
+            3,
+        )
+        hotspots.append(
+            {
+                "category": "archive-candidate",
+                "severity": severity,
+                "title": "Archive review candidate",
+                "summary": "Low momentum and low strategic upside suggest this repo may be ready to retire or bundle elsewhere.",
+                "recommended_action": "Review for archive, consolidation, or explicit de-prioritization.",
+            }
+        )
 
     hotspots.sort(key=lambda item: item["severity"], reverse=True)
     return hotspots[:3]
@@ -492,9 +566,21 @@ def _fallback_lens_value(audit: RepoAudit, lens_name: str) -> float:
     if lens_name == "showcase_value":
         return round(audit.overall_score * 0.5 + audit.interest_score * 0.5, 3)
     if lens_name == "security_posture":
-        return round(next((r.score for r in audit.analyzer_results if r.dimension == "security"), 0.0), 3)
+        return round(
+            next(
+                (r.score for r in audit.analyzer_results if r.dimension == "security"),
+                0.0,
+            ),
+            3,
+        )
     if lens_name == "momentum":
-        return round(next((r.score for r in audit.analyzer_results if r.dimension == "activity"), 0.0), 3)
+        return round(
+            next(
+                (r.score for r in audit.analyzer_results if r.dimension == "activity"),
+                0.0,
+            ),
+            3,
+        )
     return round(audit.overall_score, 3)
 
 
@@ -504,7 +590,9 @@ def build_portfolio_lens_summary(audits: list[RepoAudit]) -> dict[str, dict]:
         values: list[tuple[str, float]] = []
         for audit in audits:
             lens = audit.lenses.get(lens_name) if hasattr(audit, "lenses") else None
-            score = lens.get("score") if lens else _fallback_lens_value(audit, lens_name)
+            score = (
+                lens.get("score") if lens else _fallback_lens_value(audit, lens_name)
+            )
             values.append((audit.metadata.name, score))
         if not values:
             summary[lens_name] = {
@@ -534,31 +622,52 @@ def build_portfolio_hotspots(audits: list[RepoAudit]) -> list[dict]:
     hotspots: list[dict] = []
     for audit in audits:
         for hotspot in audit.hotspots:
-            hotspots.append({
-                "repo": audit.metadata.name,
-                "tier": audit.completeness_tier,
-                **hotspot,
-            })
+            hotspots.append(
+                {
+                    "repo": audit.metadata.name,
+                    "tier": audit.completeness_tier,
+                    **hotspot,
+                }
+            )
     hotspots.sort(key=lambda item: item["severity"], reverse=True)
     return hotspots[:12]
 
 
 def build_portfolio_security_posture(audits: list[RepoAudit]) -> dict:
-    posture_counts = Counter(audit.security_posture.get("label", "unknown") for audit in audits)
+    posture_counts = Counter(
+        audit.security_posture.get("label", "unknown") for audit in audits
+    )
     critical_repos = [
         audit.metadata.name
         for audit in audits
         if audit.security_posture.get("label") in {"critical", "at-risk"}
     ]
-    github_available = sum(1 for audit in audits if audit.security_posture.get("github", {}).get("provider_available"))
-    scorecard_available = sum(1 for audit in audits if audit.security_posture.get("scorecard", {}).get("available"))
-    code_alerts = sum(audit.security_posture.get("github", {}).get("code_scanning_alerts") or 0 for audit in audits)
-    secret_alerts = sum(audit.security_posture.get("github", {}).get("secret_scanning_alerts") or 0 for audit in audits)
+    github_available = sum(
+        1
+        for audit in audits
+        if audit.security_posture.get("github", {}).get("provider_available")
+    )
+    scorecard_available = sum(
+        1
+        for audit in audits
+        if audit.security_posture.get("scorecard", {}).get("available")
+    )
+    code_alerts = sum(
+        audit.security_posture.get("github", {}).get("code_scanning_alerts") or 0
+        for audit in audits
+    )
+    secret_alerts = sum(
+        audit.security_posture.get("github", {}).get("secret_scanning_alerts") or 0
+        for audit in audits
+    )
     return {
         "average_score": round(
-            sum(audit.security_posture.get("score", 0.0) for audit in audits) / len(audits),
+            sum(audit.security_posture.get("score", 0.0) for audit in audits)
+            / len(audits),
             3,
-        ) if audits else 0.0,
+        )
+        if audits
+        else 0.0,
         "labels": dict(posture_counts),
         "critical_repos": critical_repos[:10],
         "repos_with_secrets": [
@@ -568,7 +677,10 @@ def build_portfolio_security_posture(audits: list[RepoAudit]) -> dict:
         ],
         "provider_coverage": {
             "github": {"available_repos": github_available, "total_repos": len(audits)},
-            "scorecard": {"available_repos": scorecard_available, "total_repos": len(audits)},
+            "scorecard": {
+                "available_repos": scorecard_available,
+                "total_repos": len(audits),
+            },
         },
         "open_alerts": {
             "code_scanning": code_alerts,
@@ -580,34 +692,46 @@ def build_portfolio_security_posture(audits: list[RepoAudit]) -> dict:
 def build_default_collections(audits: list[RepoAudit]) -> dict[str, dict]:
     ranked_showcase = sorted(
         audits,
-        key=lambda audit: audit.lenses.get("showcase_value", {}).get("score", _fallback_lens_value(audit, "showcase_value")),
+        key=lambda audit: audit.lenses.get("showcase_value", {}).get(
+            "score", _fallback_lens_value(audit, "showcase_value")
+        ),
         reverse=True,
     )
     ranked_secure = sorted(
         audits,
-        key=lambda audit: audit.security_posture.get("score", _fallback_lens_value(audit, "security_posture")),
+        key=lambda audit: audit.security_posture.get(
+            "score", _fallback_lens_value(audit, "security_posture")
+        ),
     )
 
     finish_next: list[dict] = []
     archive_soon: list[dict] = []
     for audit in audits:
         next_tier = _next_tier_name(audit.overall_score)
-        if next_tier and next_tier != audit.completeness_tier and audit.overall_score >= TIER_THRESHOLDS.get(audit.completeness_tier, 0.0):
+        if (
+            next_tier
+            and next_tier != audit.completeness_tier
+            and audit.overall_score >= TIER_THRESHOLDS.get(audit.completeness_tier, 0.0)
+        ):
             gap = TIER_THRESHOLDS[next_tier] - audit.overall_score
             if 0 < gap <= 0.15:
-                finish_next.append({
-                    "name": audit.metadata.name,
-                    "reason": f"{gap:.3f} away from {next_tier}",
-                })
+                finish_next.append(
+                    {
+                        "name": audit.metadata.name,
+                        "reason": f"{gap:.3f} away from {next_tier}",
+                    }
+                )
         if (
             audit.completeness_tier in {"skeleton", "abandoned"}
             or "stale-2yr" in audit.flags
             or audit.lenses.get("showcase_value", {}).get("score", 0.0) < 0.30
         ):
-            archive_soon.append({
-                "name": audit.metadata.name,
-                "reason": "Low showcase value and/or low maintenance momentum.",
-            })
+            archive_soon.append(
+                {
+                    "name": audit.metadata.name,
+                    "reason": "Low showcase value and/or low maintenance momentum.",
+                }
+            )
 
     return {
         "showcase": {
@@ -615,7 +739,9 @@ def build_default_collections(audits: list[RepoAudit]) -> dict[str, dict]:
             "repos": [
                 {
                     "name": audit.metadata.name,
-                    "reason": audit.lenses.get("showcase_value", {}).get("summary", "Strong portfolio signal."),
+                    "reason": audit.lenses.get("showcase_value", {}).get(
+                        "summary", "Strong portfolio signal."
+                    ),
                 }
                 for audit in ranked_showcase[:8]
             ],
@@ -630,7 +756,9 @@ def build_default_collections(audits: list[RepoAudit]) -> dict[str, dict]:
                 {
                     "name": audit.metadata.name,
                     "reason": (
-                        audit.security_posture.get("recommendations", [{}])[0].get("title")
+                        audit.security_posture.get("recommendations", [{}])[0].get(
+                            "title"
+                        )
                         or audit.security_posture.get("label", "unknown")
                     ),
                 }
@@ -645,13 +773,15 @@ def build_default_collections(audits: list[RepoAudit]) -> dict[str, dict]:
 
 
 def build_scenario_summary(audits: list[RepoAudit]) -> dict:
-    grouped: dict[str, dict] = defaultdict(lambda: {
-        "title": "",
-        "lens": "",
-        "repo_count": 0,
-        "expected_lens_delta_total": 0.0,
-        "projected_tier_promotions": 0,
-    })
+    grouped: dict[str, dict] = defaultdict(
+        lambda: {
+            "title": "",
+            "lens": "",
+            "repo_count": 0,
+            "expected_lens_delta_total": 0.0,
+            "projected_tier_promotions": 0,
+        }
+    )
     current_shipped = sum(1 for audit in audits if audit.completeness_tier == "shipped")
 
     for audit in audits:
@@ -671,7 +801,9 @@ def build_scenario_summary(audits: list[RepoAudit]) -> dict:
                 "title": value["title"],
                 "lens": value["lens"],
                 "repo_count": value["repo_count"],
-                "average_expected_lens_delta": round(value["expected_lens_delta_total"] / value["repo_count"], 3),
+                "average_expected_lens_delta": round(
+                    value["expected_lens_delta_total"] / value["repo_count"], 3
+                ),
                 "projected_tier_promotions": value["projected_tier_promotions"],
             }
             for key, value in grouped.items()
@@ -681,8 +813,14 @@ def build_scenario_summary(audits: list[RepoAudit]) -> dict:
         reverse=True,
     )[:5]
 
-    projected_avg_delta = round(sum(item["average_expected_lens_delta"] for item in top_levers) * 0.08, 3) if top_levers else 0.0
-    projected_shipped_delta = sum(1 for item in top_levers if item["lens"] == "ship_readiness")
+    projected_avg_delta = (
+        round(sum(item["average_expected_lens_delta"] for item in top_levers) * 0.08, 3)
+        if top_levers
+        else 0.0
+    )
+    projected_shipped_delta = sum(
+        1 for item in top_levers if item["lens"] == "ship_readiness"
+    )
 
     return {
         "top_levers": top_levers,

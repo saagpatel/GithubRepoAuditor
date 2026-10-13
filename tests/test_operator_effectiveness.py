@@ -1,9 +1,19 @@
 from __future__ import annotations
 
-from github_repo_auditor.operator_effectiveness import build_operator_effectiveness_bundle
+from github_repo_auditor.operator_effectiveness import (
+    build_operator_effectiveness_bundle,
+)
 
 
-def _state(run_id: str, generated_at: str, blocked: int, urgent: int, *, reopened: int = 0, resolved: int = 0) -> dict:
+def _state(
+    run_id: str,
+    generated_at: str,
+    blocked: int,
+    urgent: int,
+    *,
+    reopened: int = 0,
+    resolved: int = 0,
+) -> dict:
     return {
         "run_id": run_id,
         "generated_at": generated_at,
@@ -70,7 +80,13 @@ def test_build_operator_effectiveness_bundle_computes_phase_84_metrics():
                 "summary": "RepoB reopened.",
             },
         ],
-        review_history=[{"repo": "RepoC", "title": "RepoC", "summary": "RepoC reopened after review."}],
+        review_history=[
+            {
+                "repo": "RepoC",
+                "title": "RepoC",
+                "summary": "RepoC reopened after review.",
+            }
+        ],
         evidence_events=[
             {
                 "repo": "RepoB",
@@ -90,7 +106,11 @@ def test_build_operator_effectiveness_bundle_computes_phase_84_metrics():
     assert outcomes["repeated_regression_rate"]["value"] == 0.5
     assert effectiveness["recommendation_validation_rate"]["value"] == 0.6
     assert effectiveness["noisy_guidance_rate"]["value"] == 0.2
-    assert bundle["high_pressure_queue_trend_status"] in {"quiet", "improving", "stable"}
+    assert bundle["high_pressure_queue_trend_status"] in {
+        "quiet",
+        "improving",
+        "stable",
+    }
     assert len(bundle["high_pressure_queue_history"]) <= 10
     assert bundle["recent_reopened_recommendations"][0]["repo"] == "RepoA"
     assert bundle["recent_closed_actions"][0]["repo"] == "RepoA"
@@ -106,7 +126,20 @@ def test_build_operator_effectiveness_bundle_handles_insufficient_evidence():
         evidence_events=[],
     )
 
-    assert bundle["portfolio_outcomes_summary"]["review_to_action_closure_rate"]["status"] == "insufficient-evidence"
-    assert bundle["portfolio_outcomes_summary"]["median_runs_to_quiet_after_escalation"]["status"] == "insufficient-evidence"
-    assert bundle["operator_effectiveness_summary"]["recommendation_validation_rate"]["status"] == "insufficient-evidence"
+    assert (
+        bundle["portfolio_outcomes_summary"]["review_to_action_closure_rate"]["status"]
+        == "insufficient-evidence"
+    )
+    assert (
+        bundle["portfolio_outcomes_summary"]["median_runs_to_quiet_after_escalation"][
+            "status"
+        ]
+        == "insufficient-evidence"
+    )
+    assert (
+        bundle["operator_effectiveness_summary"]["recommendation_validation_rate"][
+            "status"
+        ]
+        == "insufficient-evidence"
+    )
     assert bundle["high_pressure_queue_trend_status"] == "insufficient-evidence"

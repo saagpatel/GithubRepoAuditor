@@ -3,6 +3,7 @@
 Produces per-repo grade/tier badges for shipped+functional repos,
 portfolio-level badges, and an optional Gist upload for endpoint badges.
 """
+
 from __future__ import annotations
 
 import json
@@ -82,9 +83,20 @@ def _write_portfolio_badges(report_data: dict, badges_dir: Path) -> list[Path]:
 
     badges = [
         ("portfolio-grade", _make_shield_json("portfolio", grade, grade_color)),
-        ("portfolio-repos", _make_shield_json("repos audited", str(repos_audited), "blue")),
-        ("portfolio-shipped", _make_shield_json("shipped", str(shipped), "brightgreen")),
-        ("portfolio-avg-score", _make_shield_json("avg score", f"{avg_score:.2f}", GRADE_COLORS.get(avg_grade, "yellow"))),
+        (
+            "portfolio-repos",
+            _make_shield_json("repos audited", str(repos_audited), "blue"),
+        ),
+        (
+            "portfolio-shipped",
+            _make_shield_json("shipped", str(shipped), "brightgreen"),
+        ),
+        (
+            "portfolio-avg-score",
+            _make_shield_json(
+                "avg score", f"{avg_score:.2f}", GRADE_COLORS.get(avg_grade, "yellow")
+            ),
+        ),
     ]
 
     paths = []
@@ -145,9 +157,7 @@ def _write_badges_markdown(
 
     audits = report_data.get("audits", [])
     for tier in ["shipped", "functional"]:
-        tier_repos = [
-            a for a in audits if a.get("completeness_tier") == tier
-        ]
+        tier_repos = [a for a in audits if a.get("completeness_tier") == tier]
         if not tier_repos:
             continue
         tier_repos.sort(key=lambda a: a.get("overall_score", 0), reverse=True)
@@ -166,7 +176,9 @@ def _write_badges_markdown(
     if gist_urls:
         lines.append("## Endpoint Badges (auto-updating)")
         lines.append("")
-        lines.append("These badges update automatically when you re-run with `--upload-badges`.")
+        lines.append(
+            "These badges update automatically when you re-run with `--upload-badges`."
+        )
         lines.append("")
         for filename, raw_url in sorted(gist_urls.items()):
             label = filename.replace(".json", "")
@@ -179,7 +191,9 @@ def _write_badges_markdown(
     lines.append("Copy any badge markdown above into your GitHub README.")
     lines.append("")
     lines.append("```markdown")
-    lines.append(f"![portfolio]({_static_badge_url('portfolio', grade, GRADE_COLORS.get(grade, 'red'))})")
+    lines.append(
+        f"![portfolio]({_static_badge_url('portfolio', grade, GRADE_COLORS.get(grade, 'red'))})"
+    )
     lines.append("```")
     lines.append("")
 
@@ -268,11 +282,13 @@ def upload_badge_gist(
 
     # Build gist payload
     gist_files = {name: {"content": content} for name, content in json_files.items()}
-    payload = json.dumps({
-        "description": f"GitHub Portfolio Badges for {username}",
-        "public": True,
-        "files": gist_files,
-    })
+    payload = json.dumps(
+        {
+            "description": f"GitHub Portfolio Badges for {username}",
+            "public": True,
+            "files": gist_files,
+        }
+    )
 
     gist_id = _load_gist_id(output_dir, username)
 
@@ -281,7 +297,10 @@ def upload_badge_gist(
             # Update existing gist
             result = subprocess.run(
                 ["gh", "api", "-X", "PATCH", f"gists/{gist_id}", "--input", "-"],
-                input=payload, capture_output=True, text=True, timeout=30,
+                input=payload,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode != 0:
                 # Gist may have been deleted — fall back to create
@@ -291,7 +310,10 @@ def upload_badge_gist(
             # Create new gist
             result = subprocess.run(
                 ["gh", "api", "gists", "--input", "-"],
-                input=payload, capture_output=True, text=True, timeout=30,
+                input=payload,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
 
         if result.returncode != 0:

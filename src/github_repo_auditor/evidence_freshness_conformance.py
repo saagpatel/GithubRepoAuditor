@@ -64,7 +64,9 @@ def _parse_timestamp(value: object) -> tuple[datetime | None, str | None]:
         return None, "timestamp_unparseable"
     raw = value.strip()
     try:
-        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00").replace("z", "+00:00"))
+        parsed = datetime.fromisoformat(
+            raw.replace("Z", "+00:00").replace("z", "+00:00")
+        )
     except ValueError:
         return None, "timestamp_unparseable"
     if _EXPLICIT_TIMEZONE.search(raw) is None or parsed.tzinfo is None:
@@ -225,7 +227,9 @@ def build_vectors() -> dict[str, Any]:
             ),
             _case(
                 "future_one_ms_beyond_skew_tolerance",
-                generated_at=_iso(clock + timedelta(milliseconds=SKEW_TOLERANCE_MS + 1)),
+                generated_at=_iso(
+                    clock + timedelta(milliseconds=SKEW_TOLERANCE_MS + 1)
+                ),
             ),
             _case(
                 "unavailable_read_wins",

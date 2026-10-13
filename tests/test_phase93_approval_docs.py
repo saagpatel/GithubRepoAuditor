@@ -26,4 +26,7 @@ def test_docs_reflect_phase_93_approval_workflow_language() -> None:
     assert "--review-packet" in combined
     assert "overdue-follow-up" in combined
     assert "due-soon-follow-up" in combined
-    assert "it never auto-runs `--writeback-apply`" in combined or "it never auto-runs `--writeback-apply`" in combined.replace("—", "-")
+    assert (
+        "it never auto-runs `--writeback-apply`" in combined
+        or "it never auto-runs `--writeback-apply`" in combined.replace("—", "-")
+    )

@@ -168,9 +168,9 @@ def analyze_project_context(
     # title, not under an "## Overview" heading. If no summary heading matched, accept a
     # non-trivial lead paragraph from the primary file or the README.
     if not section_presence["project_summary"]:
-        section_presence["project_summary"] = _has_lead_summary(primary_text) or _has_lead_summary(
-            readme_text
-        )
+        section_presence["project_summary"] = _has_lead_summary(
+            primary_text
+        ) or _has_lead_summary(readme_text)
     missing_fields = [
         DERIVED_KEY_TO_LABEL[REQUIRED_FIELD_TO_DERIVED_KEY[field]]
         for field, present in section_presence.items()
@@ -179,7 +179,8 @@ def analyze_project_context(
     supporting_context_files = sorted(
         item
         for item in context_files
-        if Path(item).name in SUPPORTING_CONTEXT_FILES and Path(item).name != primary_context_file
+        if Path(item).name in SUPPORTING_CONTEXT_FILES
+        and Path(item).name != primary_context_file
     )
 
     if not primary_exists and not has_readme:
@@ -299,20 +300,26 @@ def _section_blocks(text: str) -> list[tuple[int, str, str]]:
             if blocks:
                 blocks[-1][2].append(line)
             continue
-        match = None if in_fenced_code else re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$", line)
+        match = (
+            None if in_fenced_code else re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$", line)
+        )
         if match:
             blocks.append((len(match.group(1)), _normalize_heading(match.group(2)), []))
             continue
         if blocks:
             blocks[-1][2].append(line)
-    return [(level, heading, "\n".join(lines).strip()) for level, heading, lines in blocks]
+    return [
+        (level, heading, "\n".join(lines).strip()) for level, heading, lines in blocks
+    ]
 
 
 def _normalize_heading(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
-def _heading_starts_with_alias(heading_words: list[str], alias_words: list[str]) -> bool:
+def _heading_starts_with_alias(
+    heading_words: list[str], alias_words: list[str]
+) -> bool:
     """True if the heading begins with the alias phrase (prefix-anchored match).
 
     Anchoring at the start keeps decorative trailing words ("Commands By Mode" ->
@@ -351,7 +358,8 @@ def _section_has_meaningful_content(
             continue
         heading_words = heading.split()
         matched = any(
-            _heading_starts_with_alias(heading_words, words) for words in alias_word_lists
+            _heading_starts_with_alias(heading_words, words)
+            for words in alias_word_lists
         )
         if matched and _is_nontrivial_text(_aggregated_block_text(blocks, index)):
             return True
@@ -380,7 +388,9 @@ def _lead_paragraph_text(text: str) -> str:
     """
     lead_lines: list[str] = []
     for line in text.splitlines():
-        if re.match(r"^#{2,}\s", line):  # first '## ...' (or deeper) heading ends the lead
+        if re.match(
+            r"^#{2,}\s", line
+        ):  # first '## ...' (or deeper) heading ends the lead
             break
         if re.match(r"^#\s", line):  # the H1 title line itself
             continue

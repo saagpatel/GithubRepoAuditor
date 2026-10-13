@@ -7,8 +7,20 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from github_repo_auditor.analyzer_cache import _deep_equal, _diff_summary, invalidate_repo, lookup, reconcile, stats, store
-from github_repo_auditor.analyzers import ALL_ANALYZERS, run_all_analyzers, run_with_cache
+from github_repo_auditor.analyzer_cache import (
+    _deep_equal,
+    _diff_summary,
+    invalidate_repo,
+    lookup,
+    reconcile,
+    stats,
+    store,
+)
+from github_repo_auditor.analyzers import (
+    ALL_ANALYZERS,
+    run_all_analyzers,
+    run_with_cache,
+)
 from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer
 from github_repo_auditor.analyzers.readme import ReadmeAnalyzer
 from github_repo_auditor.analyzers.structure import StructureAnalyzer
@@ -228,14 +240,18 @@ class TestReconcileEdges:
             "ok": True,
         }
 
-    def test_uses_pushed_at_as_sha_when_commit_map_is_missing(self, tmp_path: Path, monkeypatch):
+    def test_uses_pushed_at_as_sha_when_commit_map_is_missing(
+        self, tmp_path: Path, monkeypatch
+    ):
         repo = tmp_path / "repo"
         repo.mkdir()
         meta = _sample_metadata("repo")
         conn = _fresh_db()
         analyzer = _FakeAnalyzer("edge", "hashval")
         result = AnalyzerResult("edge", 1.0, 1.0, ["ok"], {"source": "fresh"})
-        store(conn, "repo", meta.pushed_at.isoformat(), "edge", "hashval", asdict(result))
+        store(
+            conn, "repo", meta.pushed_at.isoformat(), "edge", "hashval", asdict(result)
+        )
 
         def _fresh(path, metadata, conn=None):
             return [result]
@@ -266,7 +282,9 @@ class TestReconcileEdges:
         assert report["missing_from_cache"] == []
         assert report["ok"] is True
 
-    def test_fresh_run_exception_skips_repo_and_continues(self, tmp_path: Path, monkeypatch):
+    def test_fresh_run_exception_skips_repo_and_continues(
+        self, tmp_path: Path, monkeypatch
+    ):
         bad_repo = tmp_path / "bad"
         good_repo = tmp_path / "good"
         bad_repo.mkdir()
@@ -297,7 +315,9 @@ class TestReconcileEdges:
         assert report["missing_from_cache"] == [{"repo": "good", "analyzer": "edge"}]
         assert report["ok"] is True
 
-    def test_cache_inputs_hash_exception_skips_analyzer_pair(self, tmp_path: Path, monkeypatch):
+    def test_cache_inputs_hash_exception_skips_analyzer_pair(
+        self, tmp_path: Path, monkeypatch
+    ):
         repo = tmp_path / "repo"
         repo.mkdir()
         meta = _sample_metadata("repo")
@@ -333,7 +353,13 @@ class TestInvalidateRepo:
 
     def test_deletes_all_rows_for_repo(self):
         conn = _fresh_db()
-        payload = {"dimension": "x", "score": 0.0, "max_score": 1.0, "findings": [], "details": {}}
+        payload = {
+            "dimension": "x",
+            "score": 0.0,
+            "max_score": 1.0,
+            "findings": [],
+            "details": {},
+        }
         store(conn, "my-repo", "sha1", "readme", "h1", payload)
         store(conn, "my-repo", "sha1", "structure", "h2", payload)
         store(conn, "other-repo", "sha1", "readme", "h3", payload)
@@ -344,7 +370,13 @@ class TestInvalidateRepo:
 
     def test_returns_count(self):
         conn = _fresh_db()
-        payload = {"dimension": "x", "score": 0.0, "max_score": 1.0, "findings": [], "details": {}}
+        payload = {
+            "dimension": "x",
+            "score": 0.0,
+            "max_score": 1.0,
+            "findings": [],
+            "details": {},
+        }
         for i in range(5):
             store(conn, "target", f"sha{i}", "readme", f"hash{i}", payload)
         deleted = invalidate_repo(conn, "target")
@@ -365,7 +397,13 @@ class TestStats:
 
     def test_populated_db(self):
         conn = _fresh_db()
-        payload = {"dimension": "x", "score": 0.0, "max_score": 1.0, "findings": [], "details": {}}
+        payload = {
+            "dimension": "x",
+            "score": 0.0,
+            "max_score": 1.0,
+            "findings": [],
+            "details": {},
+        }
         store(conn, "repo-a", "sha1", "readme", "h1", payload)
         store(conn, "repo-a", "sha1", "structure", "h2", payload)
         store(conn, "repo-b", "sha1", "readme", "h3", payload)

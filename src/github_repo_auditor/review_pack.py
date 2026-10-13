@@ -14,7 +14,9 @@ def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
             continue
         _w(f"### {section.get('label', 'Weekly Story')}")
         _w("")
-        _w(f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}")
+        _w(
+            f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}"
+        )
         _w(
             f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}"
         )
@@ -23,7 +25,9 @@ def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
         if evidence_items:
             _w("- Evidence:")
             for item in evidence_items[:5]:
-                command = f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
+                command = (
+                    f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
+                )
                 _w(
                     f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}"
                 )
@@ -53,7 +57,9 @@ def export_review_pack(
 
     lines: list[str] = []
     _w = lines.append
-    weekly_pack = build_weekly_review_pack(report_data, diff_data, output_dir=output_dir)
+    weekly_pack = build_weekly_review_pack(
+        report_data, diff_data, output_dir=output_dir
+    )
 
     _w(f"# Review Pack: {username}")
     _w("")
@@ -185,17 +191,25 @@ def export_review_pack(
         _w(
             f"  Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
         )
-        _w(f"  {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
+        _w(
+            f"  {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}"
+        )
         _w(
             f"  Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}"
         )
         _w("  Evidence:")
         for evidence in item.get("evidence_strip", [])[:5]:
-            command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
+            command = (
+                f" [{evidence.get('command_hint')}]"
+                if evidence.get("command_hint")
+                else ""
+            )
             _w(
                 f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
             )
-        _w(f"  Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
+        _w(
+            f"  Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}"
+        )
         _w(
             f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
@@ -210,7 +224,9 @@ def export_review_pack(
     if weekly_pack.get("top_below_target_scorecard_items"):
         _w("- Scorecard Gaps:")
         for item in weekly_pack.get("top_below_target_scorecard_items", [])[:5]:
-            _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}")
+            _w(
+                f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}"
+            )
     _w(
         f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
     )
@@ -295,7 +311,11 @@ def export_review_pack(
         )
         _w("  Evidence:")
         for evidence in briefing.get("evidence_strip", [])[:5]:
-            command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
+            command = (
+                f" [{evidence.get('command_hint')}]"
+                if evidence.get("command_hint")
+                else ""
+            )
             _w(
                 f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
             )
@@ -325,7 +345,9 @@ def export_review_pack(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {(operator_summary.get('action_sync_summary') or {}).get('summary')}"
             )
         if operator_summary.get("next_action_sync_step"):
-            _w(f"- Next Action Sync Step: {operator_summary.get('next_action_sync_step')}")
+            _w(
+                f"- Next Action Sync Step: {operator_summary.get('next_action_sync_step')}"
+            )
         if (operator_summary.get("apply_readiness_summary") or {}).get("summary"):
             _w(
                 f"- Apply Packet: {(operator_summary.get('apply_readiness_summary') or {}).get('summary')}"
@@ -384,11 +406,15 @@ def export_review_pack(
             _w(
                 f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}"
             )
-            _w(f"  Why: {item.get('lane_reason', item.get('summary', 'Operator triage item.'))}")
+            _w(
+                f"  Why: {item.get('lane_reason', item.get('summary', 'Operator triage item.'))}"
+            )
             _w(
                 f"  {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}"
             )
-            _w(f"  Action: {item.get('recommended_action', 'Review the latest state.')}")
+            _w(
+                f"  Action: {item.get('recommended_action', 'Review the latest state.')}"
+            )
             _w(
                 f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}"
             )
@@ -444,7 +470,9 @@ def export_review_pack(
         _w("## Security")
         _w("")
         _w(f"- Average posture score: {security.get('average_score', 0):.2f}")
-        _w(f"- Critical repos: {', '.join(security.get('critical_repos', [])[:5]) or '—'}")
+        _w(
+            f"- Critical repos: {', '.join(security.get('critical_repos', [])[:5]) or '—'}"
+        )
         provider_coverage = security.get("provider_coverage", {})
         if provider_coverage:
             _w(
@@ -484,7 +512,9 @@ def export_review_pack(
         _w(
             f"- Projected average score delta: {projection.get('projected_average_score_delta', 0):+.3f}"
         )
-        _w(f"- Projected tier promotions: {projection.get('projected_tier_promotions', 0)}")
+        _w(
+            f"- Projected tier promotions: {projection.get('projected_tier_promotions', 0)}"
+        )
     _w("")
 
     governance_preview = report_data.get("security_governance_preview", [])
@@ -500,7 +530,9 @@ def export_review_pack(
 
     campaign_summary = report_data.get("campaign_summary", {})
     if campaign_summary:
-        github_projects = report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
+        github_projects = (
+            report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
+        )
         _w("## Next Actions")
         _w("")
         _w(
@@ -508,7 +540,9 @@ def export_review_pack(
         )
         _w(f"- Actions: {campaign_summary.get('action_count', 0)}")
         _w(f"- Repos: {campaign_summary.get('repo_count', 0)}")
-        _w(f"- Sync Mode: {report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile')}")
+        _w(
+            f"- Sync Mode: {report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile')}"
+        )
         _w(
             f"- Apply Packet: {(report_data.get('apply_readiness_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('apply_readiness_summary', {}) or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}"
         )
@@ -577,7 +611,9 @@ def export_review_pack(
         )
         _w(f"- Status: {governance_summary.get('status', 'preview')}")
         _w(f"- Approved: {'yes' if report_data.get('governance_approval') else 'no'}")
-        _w(f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}")
+        _w(
+            f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}"
+        )
         _w(
             f"- Drift Count: {governance_summary.get('drift_count', len(report_data.get('governance_drift', []) or []))}"
         )

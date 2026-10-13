@@ -10,7 +10,9 @@ LANE_LABELS = {
 }
 
 
-def render_control_center_markdown(snapshot: dict, username: str, generated_at: str) -> str:
+def render_control_center_markdown(
+    snapshot: dict, username: str, generated_at: str
+) -> str:
     summary = snapshot.get("operator_summary", {})
     setup_health = snapshot.get("operator_setup_health", {})
     lines = [
@@ -25,7 +27,9 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     if summary.get("source_run_id"):
         lines.append(f"*Source Run:* `{summary['source_run_id']}`")
     if summary.get("next_recommended_run_mode"):
-        lines.append(f"*Next Recommended Run:* `{summary['next_recommended_run_mode']}`")
+        lines.append(
+            f"*Next Recommended Run:* `{summary['next_recommended_run_mode']}`"
+        )
     if summary.get("watch_strategy"):
         lines.append(f"*Watch Strategy:* `{summary['watch_strategy']}`")
     if summary.get("watch_decision_summary"):
@@ -53,9 +57,9 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     if (summary.get("next_apply_candidate") or {}).get("preview_command") or (
         summary.get("next_apply_candidate") or {}
     ).get("apply_command"):
-        command_hint = (summary.get("next_apply_candidate") or {}).get("apply_command") or (
-            summary.get("next_apply_candidate") or {}
-        ).get("preview_command")
+        command_hint = (summary.get("next_apply_candidate") or {}).get(
+            "apply_command"
+        ) or (summary.get("next_apply_candidate") or {}).get("preview_command")
         lines.append(f"*Action Sync Command Hint:* `{command_hint}`")
     if (summary.get("campaign_outcomes_summary") or {}).get("summary"):
         lines.append(
@@ -108,13 +112,17 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     if summary.get("follow_through_summary"):
         lines.append(f"*Follow-Through:* {summary['follow_through_summary']}")
     if summary.get("follow_through_recovery_summary"):
-        lines.append(f"*Follow-Through Recovery:* {summary['follow_through_recovery_summary']}")
+        lines.append(
+            f"*Follow-Through Recovery:* {summary['follow_through_recovery_summary']}"
+        )
     if summary.get("follow_through_recovery_persistence_summary"):
         lines.append(
             f"*Recovery Persistence:* {summary['follow_through_recovery_persistence_summary']}"
         )
     if summary.get("follow_through_relapse_churn_summary"):
-        lines.append(f"*Relapse Churn:* {summary['follow_through_relapse_churn_summary']}")
+        lines.append(
+            f"*Relapse Churn:* {summary['follow_through_relapse_churn_summary']}"
+        )
     if summary.get("follow_through_recovery_freshness_summary"):
         lines.append(
             f"*Recovery Freshness:* {summary['follow_through_recovery_freshness_summary']}"
@@ -126,11 +134,17 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     if summary.get("primary_target"):
         target = summary["primary_target"]
         repo = f"{target.get('repo')}: " if target.get("repo") else ""
-        lines.append(f"*Primary Target:* {repo}{target.get('title', 'Operator target')}")
+        lines.append(
+            f"*Primary Target:* {repo}{target.get('title', 'Operator target')}"
+        )
     if summary.get("primary_target_reason"):
-        lines.append(f"*Why This Is The Top Target:* {summary['primary_target_reason']}")
+        lines.append(
+            f"*Why This Is The Top Target:* {summary['primary_target_reason']}"
+        )
     if summary.get("primary_target_done_criteria"):
-        lines.append(f"*What Counts As Done:* {summary['primary_target_done_criteria']}")
+        lines.append(
+            f"*What Counts As Done:* {summary['primary_target_done_criteria']}"
+        )
     if summary.get("closure_guidance"):
         lines.append(f"*Closure Guidance:* {summary['closure_guidance']}")
     if summary.get("primary_target_last_intervention"):
@@ -138,7 +152,9 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*What We Tried:* {_format_intervention(summary['primary_target_last_intervention'])}"
         )
     if summary.get("primary_target_resolution_evidence"):
-        lines.append(f"*Resolution Evidence:* {summary['primary_target_resolution_evidence']}")
+        lines.append(
+            f"*Resolution Evidence:* {summary['primary_target_resolution_evidence']}"
+        )
     if summary.get("primary_target_confidence_label"):
         lines.append(
             f"*Primary Target Confidence:* {summary['primary_target_confidence_label']} "
@@ -285,19 +301,27 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"{summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}"
         )
     if summary.get("exception_pattern_summary"):
-        lines.append(f"*Exception Pattern Summary:* {summary['exception_pattern_summary']}")
+        lines.append(
+            f"*Exception Pattern Summary:* {summary['exception_pattern_summary']}"
+        )
     if summary.get("exception_retirement_summary"):
-        lines.append(f"*Exception Retirement Summary:* {summary['exception_retirement_summary']}")
+        lines.append(
+            f"*Exception Retirement Summary:* {summary['exception_retirement_summary']}"
+        )
     if summary.get("policy_debt_summary"):
         lines.append(f"*Policy Debt Summary:* {summary['policy_debt_summary']}")
     if summary.get("trust_normalization_summary"):
-        lines.append(f"*Trust Normalization Summary:* {summary['trust_normalization_summary']}")
+        lines.append(
+            f"*Trust Normalization Summary:* {summary['trust_normalization_summary']}"
+        )
     if summary.get("class_memory_summary"):
         lines.append(f"*Class Memory Summary:* {summary['class_memory_summary']}")
     if summary.get("class_decay_summary"):
         lines.append(f"*Class Decay Summary:* {summary['class_decay_summary']}")
     if summary.get("class_reweighting_summary"):
-        lines.append(f"*Class Reweighting Summary:* {summary['class_reweighting_summary']}")
+        lines.append(
+            f"*Class Reweighting Summary:* {summary['class_reweighting_summary']}"
+        )
     if summary.get("class_momentum_summary"):
         lines.append(f"*Class Momentum Summary:* {summary['class_momentum_summary']}")
     if summary.get("class_reweight_stability_summary"):
@@ -317,7 +341,9 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Transition Closure Confidence Summary:* {summary['transition_closure_confidence_summary']}"
         )
     if summary.get("class_pending_debt_summary"):
-        lines.append(f"*Class Pending Debt Summary:* {summary['class_pending_debt_summary']}")
+        lines.append(
+            f"*Class Pending Debt Summary:* {summary['class_pending_debt_summary']}"
+        )
     if summary.get("class_pending_resolution_summary"):
         lines.append(
             f"*Class Pending Resolution Summary:* {summary['class_pending_resolution_summary']}"
@@ -327,13 +353,17 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Pending Debt Freshness Summary:* {summary['pending_debt_freshness_summary']}"
         )
     if summary.get("pending_debt_decay_summary"):
-        lines.append(f"*Pending Debt Decay Summary:* {summary['pending_debt_decay_summary']}")
+        lines.append(
+            f"*Pending Debt Decay Summary:* {summary['pending_debt_decay_summary']}"
+        )
     if summary.get("closure_forecast_reweighting_summary"):
         lines.append(
             f"*Closure Forecast Reweighting Summary:* {summary['closure_forecast_reweighting_summary']}"
         )
     if summary.get("recommendation_quality_summary"):
-        lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
+        lines.append(
+            f"*Recommendation Quality:* {summary['recommendation_quality_summary']}"
+        )
     if summary.get("confidence_validation_status"):
         lines.append(
             f"*Confidence Validation:* {summary.get('confidence_validation_status')} — "
@@ -370,7 +400,9 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Recent Regression Examples:* {_operator_outcome_examples_line(summary.get('recent_regression_examples') or [])}"
         )
     if summary.get("control_center_reference"):
-        lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
+        lines.append(
+            f"*Control Center Artifact:* `{summary['control_center_reference']}`"
+        )
     lines.append(
         f"*Setup Health:* {setup_health.get('status', 'unknown')} | "
         f"Errors: {setup_health.get('blocking_errors', 0)} | "
@@ -465,7 +497,9 @@ def _operator_outcome_examples_line(items: list[dict]) -> str:
     parts = []
     for item in items[:3]:
         repo = str(item.get("repo") or "").strip()
-        title = str(item.get("title") or item.get("action_id") or "Operator outcome").strip()
+        title = str(
+            item.get("title") or item.get("action_id") or "Operator outcome"
+        ).strip()
         label = f"{repo}: {title}" if repo else title
         parts.append(label)
     return "; ".join(parts)

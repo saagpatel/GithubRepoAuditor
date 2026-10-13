@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from github_repo_auditor.models import (
+    AnalyzerResult,
+    AuditReport,
+    RepoAudit,
+    RepoMetadata,
+)
 
 
 class TestRepoMetadata:
@@ -35,14 +40,25 @@ class TestRepoMetadata:
 
     def test_to_dict_serializes_datetimes(self):
         meta = RepoMetadata(
-            name="test", full_name="user/test", description=None,
-            language="Python", languages={}, private=False, fork=False,
+            name="test",
+            full_name="user/test",
+            description=None,
+            language="Python",
+            languages={},
+            private=False,
+            fork=False,
             archived=False,
             created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
             updated_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
             pushed_at=None,
-            default_branch="main", stars=0, forks=0, open_issues=0,
-            size_kb=0, html_url="", clone_url="", topics=[],
+            default_branch="main",
+            stars=0,
+            forks=0,
+            open_issues=0,
+            size_kb=0,
+            html_url="",
+            clone_url="",
+            topics=[],
         )
         d = meta.to_dict()
         assert isinstance(d["created_at"], str)
@@ -97,8 +113,11 @@ class TestRepoMetadata:
 class TestAnalyzerResult:
     def test_to_dict(self):
         r = AnalyzerResult(
-            dimension="readme", score=0.8, max_score=1.0,
-            findings=["Has README"], details={"exists": True},
+            dimension="readme",
+            score=0.8,
+            max_score=1.0,
+            findings=["Has README"],
+            details={"exists": True},
         )
         d = r.to_dict()
         assert d["score"] == 0.8
@@ -114,9 +133,9 @@ class TestAuditReport:
                 AnalyzerResult("activity", 0.6, 1.0, []),
             ],
             overall_score=0.7,
-                completeness_tier="functional",
-                flags=[],
-            )
+            completeness_tier="functional",
+            flags=[],
+        )
         report = AuditReport.from_audits(
             "user",
             [audit],
@@ -202,11 +221,16 @@ class TestAuditReport:
             },
         )
         report = AuditReport.from_audits("user", [audit], [], 1)
-        report.scorecards_summary = {"summary": "0 repos are on track and 1 is below target."}
+        report.scorecards_summary = {
+            "summary": "0 repos are on track and 1 is below target."
+        }
         report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
 
         data = report.to_dict()
 
         assert data["audits"][0]["scorecard"]["program"] == "maintain"
-        assert data["scorecards_summary"]["summary"] == "0 repos are on track and 1 is below target."
+        assert (
+            data["scorecards_summary"]["summary"]
+            == "0 repos are on track and 1 is below target."
+        )
         assert data["scorecard_programs"]["maintain"]["rule_count"] == 8

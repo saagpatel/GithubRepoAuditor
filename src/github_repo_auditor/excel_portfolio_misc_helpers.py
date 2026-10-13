@@ -95,9 +95,9 @@ def write_tech_stack_best_work(
 
     ws.cell(row=start_row, column=1, value="Best Work (Top 5)").font = section_font
     for row_number, name in enumerate(best_work, start_row + 1):
-        ws.cell(row=row_number, column=1, value=f"{row_number - start_row}. {name}").border = (
-            thin_border
-        )
+        ws.cell(
+            row=row_number, column=1, value=f"{row_number - start_row}. {name}"
+        ).border = thin_border
     return start_row + len(best_work)
 
 
@@ -161,8 +161,12 @@ def build_registry_content(reconciliation: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": f"Registry Reconciliation ({reconciliation.get('registry_total', 0)} projects)",
         "matched_rows": matched_rows,
-        "unmatched_github": list(reconciliation.get("on_github_not_registry", []) or []),
-        "unmatched_registry": list(reconciliation.get("in_registry_not_github", []) or []),
+        "unmatched_github": list(
+            reconciliation.get("on_github_not_registry", []) or []
+        ),
+        "unmatched_registry": list(
+            reconciliation.get("in_registry_not_github", []) or []
+        ),
     }
 
 
@@ -184,9 +188,9 @@ def write_registry_sections(
 
     if content["matched_rows"]:
         row = 3
-        ws.cell(row=row, column=1, value=f"Matched ({len(content['matched_rows'])})").font = (
-            subheader_font
-        )
+        ws.cell(
+            row=row, column=1, value=f"Matched ({len(content['matched_rows'])})"
+        ).font = subheader_font
         row += 1
         for col, header in enumerate(REGISTRY_MATCHED_HEADERS, 1):
             ws.cell(row=row, column=col, value=header)
@@ -278,7 +282,11 @@ def write_trends_sheet(
     ws["A1"].font = section_font
 
     if len(trend_data) < 2:
-        ws.cell(row=3, column=1, value="Run more audits to see trends (need 2+ historical runs)")
+        ws.cell(
+            row=3,
+            column=1,
+            value="Run more audits to see trends (need 2+ historical runs)",
+        )
         ws.cell(row=3, column=1).font = subtitle_font
         return 3
 
@@ -421,23 +429,32 @@ def build_tier_breakdown_sheet(
     auto_width(ws, len(TIER_BREAKDOWN_HEADERS), current_row)
 
 
-def build_repo_profile_matrix(audits: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[list[Any]]]:
+def build_repo_profile_matrix(
+    audits: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[list[Any]]]:
     ranked_audits = sorted(
         audits,
         key=lambda audit: audit.get("overall_score", 0),
         reverse=True,
     )[:20]
     rows: list[list[Any]] = []
-    for label, dimension in zip(REPO_PROFILE_RADAR_LABELS, REPO_PROFILE_RADAR_DIMS, strict=True):
+    for label, dimension in zip(
+        REPO_PROFILE_RADAR_LABELS, REPO_PROFILE_RADAR_DIMS, strict=True
+    ):
         row = [label]
         for audit in ranked_audits:
-            scores = {result["dimension"]: result["score"] for result in audit.get("analyzer_results", [])}
+            scores = {
+                result["dimension"]: result["score"]
+                for result in audit.get("analyzer_results", [])
+            }
             row.append(round(scores.get(dimension, 0), 2))
         rows.append(row)
     return ranked_audits, rows
 
 
-def write_repo_profile_matrix(ws, audits: list[dict[str, Any]], matrix_rows: list[list[Any]]) -> None:
+def write_repo_profile_matrix(
+    ws, audits: list[dict[str, Any]], matrix_rows: list[list[Any]]
+) -> None:
     for col_idx, audit in enumerate(audits, start=2):
         ws.cell(row=1, column=col_idx, value=audit["metadata"]["name"])
     for row_idx, row_values in enumerate(matrix_rows, start=2):
@@ -446,7 +463,9 @@ def write_repo_profile_matrix(ws, audits: list[dict[str, Any]], matrix_rows: lis
 
 
 def add_repo_profile_charts(ws, audits: list[dict[str, Any]]) -> None:
-    labels = Reference(ws, min_col=1, min_row=2, max_row=len(REPO_PROFILE_RADAR_DIMS) + 1)
+    labels = Reference(
+        ws, min_col=1, min_row=2, max_row=len(REPO_PROFILE_RADAR_DIMS) + 1
+    )
     chart_row = len(REPO_PROFILE_RADAR_DIMS) + 4
 
     for batch_start in range(0, min(len(audits), 20), 4):
@@ -501,5 +520,7 @@ def write_risk_summary_table(
         ws.cell(row=start_row + offset, column=2, value=count)
 
     max_row = start_row + len(rows)
-    add_table(ws, "tblRiskSummary", len(RISK_SUMMARY_HEADERS), max_row, start_row=start_row)
+    add_table(
+        ws, "tblRiskSummary", len(RISK_SUMMARY_HEADERS), max_row, start_row=start_row
+    )
     return max_row

@@ -1,15 +1,26 @@
 from __future__ import annotations
 
-from github_repo_auditor.notion_dashboard import _bullet_block, _divider_block, _heading_block, _paragraph_block
+from github_repo_auditor.notion_dashboard import (
+    _bullet_block,
+    _divider_block,
+    _heading_block,
+    _paragraph_block,
+)
 from github_repo_auditor.notion_registry import _extract_rich_text
-from github_repo_auditor.notion_sync import _render_audit_highlights, check_recommendation_followup
+from github_repo_auditor.notion_sync import (
+    _render_audit_highlights,
+    check_recommendation_followup,
+)
 
 
 class TestExtractRichText:
     def test_extracts_text(self):
         page = {
             "properties": {
-                "Next Move": {"type": "rich_text", "rich_text": [{"text": {"content": "Add tests"}}]},
+                "Next Move": {
+                    "type": "rich_text",
+                    "rich_text": [{"text": {"content": "Add tests"}}],
+                },
             },
         }
         assert _extract_rich_text(page, "Next Move") == "Add tests"
@@ -33,7 +44,12 @@ class TestDiffAwareHighlights:
         }
         diff = {
             "tier_changes": [
-                {"name": "RepoA", "direction": "promotion", "old_tier": "wip", "new_tier": "functional"},
+                {
+                    "name": "RepoA",
+                    "direction": "promotion",
+                    "old_tier": "wip",
+                    "new_tier": "functional",
+                },
             ],
         }
         md = _render_audit_highlights(report, diff, [])

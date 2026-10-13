@@ -185,7 +185,10 @@ class CostTracker:
         cost = _compute_cost(model, input_tokens, output_tokens)
 
         with self._lock:
-            if self._budget_usd is not None and (self._total_usd + cost) > self._budget_usd:
+            if (
+                self._budget_usd is not None
+                and (self._total_usd + cost) > self._budget_usd
+            ):
                 raise BudgetExceededError(
                     budget_usd=self._budget_usd,
                     current_usd=self._total_usd,
@@ -229,7 +232,9 @@ class CostTracker:
         and silently swallowed so they never crash an audit run.
         """
         if self._output_path is None:
-            logger.debug("llm_cost: no output_path configured, skipping telemetry write")
+            logger.debug(
+                "llm_cost: no output_path configured, skipping telemetry write"
+            )
             return
 
         with self._lock:
@@ -250,4 +255,6 @@ class CostTracker:
                 telemetry_file,
             )
         except Exception as exc:
-            logger.warning("llm_cost: failed to write telemetry to %s: %s", telemetry_file, exc)
+            logger.warning(
+                "llm_cost: failed to write telemetry to %s: %s", telemetry_file, exc
+            )

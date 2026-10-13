@@ -3,19 +3,35 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from github_repo_auditor.analyzers.security import SecurityAnalyzer, _find_dangerous_files, _scan_secrets
+from github_repo_auditor.analyzers.security import (
+    SecurityAnalyzer,
+    _find_dangerous_files,
+    _scan_secrets,
+)
 from github_repo_auditor.models import RepoMetadata
 
 
 def _meta(**overrides) -> RepoMetadata:
     defaults = dict(
-        name="test", full_name="user/test", description=None,
-        language="Python", languages={"Python": 5000}, private=False, fork=False,
-        archived=False, created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        name="test",
+        full_name="user/test",
+        description=None,
+        language="Python",
+        languages={"Python": 5000},
+        private=False,
+        fork=False,
+        archived=False,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=0, forks=0, open_issues=0,
-        size_kb=100, html_url="", clone_url="", topics=[],
+        default_branch="main",
+        stars=0,
+        forks=0,
+        open_issues=0,
+        size_kb=100,
+        html_url="",
+        clone_url="",
+        topics=[],
     )
     defaults.update(overrides)
     return RepoMetadata(**defaults)
@@ -25,7 +41,18 @@ def _write_fake_secret(tmp_path: Path, filename: str, pattern_type: str) -> None
     """Write a file containing a pattern that matches our secret regexes."""
     # Build the secret string dynamically to avoid triggering the hook
     if pattern_type == "private_key":
-        content = "KEY = " + '"""' + "-" * 5 + "BEGIN RSA PRIVATE KEY" + "-" * 5 + "\ndata\n" + "-" * 5 + "END RSA PRIVATE KEY" + "-" * 5 + '"""'
+        content = (
+            "KEY = "
+            + '"""'
+            + "-" * 5
+            + "BEGIN RSA PRIVATE KEY"
+            + "-" * 5
+            + "\ndata\n"
+            + "-" * 5
+            + "END RSA PRIVATE KEY"
+            + "-" * 5
+            + '"""'
+        )
     elif pattern_type == "generic_secret":
         content = 'password = "' + "x" * 32 + '"'
     else:
@@ -120,25 +147,21 @@ class TestSecretScanning:
         tests.mkdir(parents=True)
         hex_value = "0123456789abcdef" * 4
         (tests / "encryption.test.ts").write_text(
-            "const " + "secret = "
-            f"'{hex_value}';\n"
+            "const " + f"secret = '{hex_value}';\n"
         )
         found = _scan_secrets(tmp_path)
         assert found == []
 
     def test_ignores_source_string_split_across_lines(self, tmp_path):
         (tmp_path / "test_fixture.py").write_text(
-            '"const " + "secret = "\n'
-            "f\"'{hex_value}';\\n\"\n"
+            '"const " + "secret = "\nf"\'{hex_value}\';\\n"\n'
         )
         found = _scan_secrets(tmp_path)
         assert found == []
 
     def test_detects_real_looking_aws_key_outside_examples(self, tmp_path):
         aws_key = "AKIA" + "1234567890ABCDEF"
-        (tmp_path / "config.py").write_text(
-            f'AWS_KEY = "{aws_key}"\n'
-        )
+        (tmp_path / "config.py").write_text(f'AWS_KEY = "{aws_key}"\n')
         found = _scan_secrets(tmp_path)
         assert found == [("AWS Access Key", "config.py")]
 
@@ -148,7 +171,7 @@ class TestSecretScanning:
             'PGPASSWORD="${POSTGRES_PASSWORD:-change-me}"\n'
         )
         (tmp_path / "get_refresh_token.py").write_text(
-            'line = f\'VAS_YT_CLIENT_SECRET="{client_secret}"\'\n'
+            "line = f'VAS_YT_CLIENT_SECRET=\"{client_secret}\"'\n"
         )
         found = _scan_secrets(tmp_path)
         assert found == []
@@ -224,7 +247,9 @@ class TestSecurityAnalyzer:
         (tmp_path / "SECURITY.md").write_text("# Security Policy")
         (tmp_path / "project.godot").write_text("[application]\n")
 
-        result = SecurityAnalyzer().analyze(tmp_path, _meta(language="GDScript", languages={"GDScript": 5000}))
+        result = SecurityAnalyzer().analyze(
+            tmp_path, _meta(language="GDScript", languages={"GDScript": 5000})
+        )
 
         assert result.score == 1.0
         assert not result.details["dependabot_supported"]
@@ -234,7 +259,9 @@ class TestSecurityAnalyzer:
         (tmp_path / "SECURITY.md").write_text("# Security Policy")
         (tmp_path / "package.json").write_text('{"dependencies": {}}')
 
-        result = SecurityAnalyzer().analyze(tmp_path, _meta(language="TypeScript", languages={"TypeScript": 5000}))
+        result = SecurityAnalyzer().analyze(
+            tmp_path, _meta(language="TypeScript", languages={"TypeScript": 5000})
+        )
 
         assert result.score < 1.0
         assert result.details["dependabot_supported"]

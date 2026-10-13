@@ -17,20 +17,30 @@ HEATMAP_DIMENSIONS = [
     "community_profile",
     "interest",
 ]
-HEATMAP_HEADERS = ["Repo", "Grade", "Overall"] + [dimension.replace("_", " ").title() for dimension in HEATMAP_DIMENSIONS]
+HEATMAP_HEADERS = ["Repo", "Grade", "Overall"] + [
+    dimension.replace("_", " ").title() for dimension in HEATMAP_DIMENSIONS
+]
 
 
 def build_heatmap_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
-    sorted_audits = sorted(audits, key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    sorted_audits = sorted(
+        audits, key=lambda audit: audit.get("overall_score", 0), reverse=True
+    )
     rows: list[list[Any]] = []
     for audit in sorted_audits:
-        score_map = {result["dimension"]: result["score"] for result in audit.get("analyzer_results", [])}
+        score_map = {
+            result["dimension"]: result["score"]
+            for result in audit.get("analyzer_results", [])
+        }
         rows.append(
             [
                 audit["metadata"]["name"],
                 audit.get("grade", "F"),
                 round(audit.get("overall_score", 0), 2),
-                *[round(score_map.get(dimension, 0), 2) for dimension in HEATMAP_DIMENSIONS],
+                *[
+                    round(score_map.get(dimension, 0), 2)
+                    for dimension in HEATMAP_DIMENSIONS
+                ],
             ]
         )
     return rows

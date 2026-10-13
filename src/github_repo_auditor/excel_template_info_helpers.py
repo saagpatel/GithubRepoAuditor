@@ -40,12 +40,16 @@ def build_template_info_rows(
         ("Review Open Count", counts["open"]),
         ("Review Deferred Count", counts["deferred"]),
         ("Review Resolved Count", counts["resolved"]),
-        ("Campaign Action Count", data.get("campaign_summary", {}).get("action_count", 0)),
+        (
+            "Campaign Action Count",
+            data.get("campaign_summary", {}).get("action_count", 0),
+        ),
         ("Campaign Repo Count", data.get("campaign_summary", {}).get("repo_count", 0)),
         (
             "Governance Ready Count",
             data.get("governance_preview", {}).get(
-                "applyable_count", len(data.get("security_governance_preview", []) or [])
+                "applyable_count",
+                len(data.get("security_governance_preview", []) or []),
             ),
         ),
         ("Governance Drift Count", len(data.get("governance_drift", []) or [])),

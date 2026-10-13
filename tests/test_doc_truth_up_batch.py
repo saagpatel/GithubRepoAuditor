@@ -197,7 +197,9 @@ class TestRunBatch:
             )
             return {"project_key": t["project_key"], "status": "ran"}
 
-        batch.run_batch(targets, "PROMPT", "SETT", "haiku", 999, "docs/truth-up-z", 2, runner=fake)
+        batch.run_batch(
+            targets, "PROMPT", "SETT", "haiku", 999, "docs/truth-up-z", 2, runner=fake
+        )
         assert seen == {
             "prompt": "PROMPT",
             "settings": "SETT",

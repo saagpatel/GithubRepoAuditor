@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-COMPARE_REPO_HEADERS = ["Repo", "Score Delta", "Tier Change", "Security", "Hotspots", "Collections"]
+COMPARE_REPO_HEADERS = [
+    "Repo",
+    "Score Delta",
+    "Tier Change",
+    "Security",
+    "Hotspots",
+    "Collections",
+]
 SCENARIO_PLANNER_HEADERS = [
     "Lever",
     "Lens",
@@ -53,7 +60,10 @@ def build_scenario_planner_rows(preview: dict[str, Any]) -> dict[str, Any]:
     projection = preview.get("portfolio_projection", {})
     projection_rows = [
         ("Selected Repos", projection.get("selected_repo_count", 0)),
-        ("Projected Avg Score Delta", projection.get("projected_average_score_delta", 0.0)),
+        (
+            "Projected Avg Score Delta",
+            projection.get("projected_average_score_delta", 0.0),
+        ),
         ("Projected Promotions", projection.get("projected_tier_promotions", 0)),
     ]
     return {
@@ -161,7 +171,8 @@ def write_scenario_planner_sections(
     for row, values in enumerate(content["lever_rows"], start_row + 1):
         for col, value in enumerate(values, 1):
             style_data_cell(
-                ws.cell(row=row, column=col, value=value), "center" if col >= 3 else "left"
+                ws.cell(row=row, column=col, value=value),
+                "center" if col >= 3 else "left",
             )
 
     summary_row = max(start_row + 2, len(content["lever_rows"]) + start_row + 2)

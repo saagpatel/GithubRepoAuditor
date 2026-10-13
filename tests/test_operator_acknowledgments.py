@@ -111,8 +111,12 @@ def test_directional_signature_unknown_type_returns_details_fingerprint():
 
 
 def test_directional_signature_unknown_type_fingerprint_changes_with_details():
-    a = _make_change(change_type="hotspot-change", details={"new_primary": "x", "new_count": 1})
-    b = _make_change(change_type="hotspot-change", details={"new_primary": "y", "new_count": 1})
+    a = _make_change(
+        change_type="hotspot-change", details={"new_primary": "x", "new_count": 1}
+    )
+    b = _make_change(
+        change_type="hotspot-change", details={"new_primary": "y", "new_count": 1}
+    )
     assert directional_signature(a) != directional_signature(b)
 
 
@@ -154,7 +158,9 @@ def test_is_change_acknowledged_matches_same_signature():
 
 
 def test_is_change_acknowledged_rejects_regression_in_opposite_direction():
-    healthy_change = _make_change(details={"old_label": "watch", "new_label": "healthy"})
+    healthy_change = _make_change(
+        details={"old_label": "watch", "new_label": "healthy"}
+    )
     ack = build_acknowledgment_record(healthy_change, reviewer="alice", note="reviewed")
 
     regression = _make_change(details={"old_label": "healthy", "new_label": "watch"})

@@ -1,4 +1,5 @@
 """Notion as registry source — query Local Portfolio Projects to reconcile against audits."""
+
 from __future__ import annotations
 
 import sys
@@ -30,7 +31,9 @@ def load_notion_registry(config_dir: Path = Path("config")) -> dict[str, str] | 
 
     db_id = config.get("projects_data_source_id", "")
     if not db_id:
-        print("  projects_data_source_id not set in notion-config.json", file=sys.stderr)
+        print(
+            "  projects_data_source_id not set in notion-config.json", file=sys.stderr
+        )
         return None
 
     version = config.get("notion_version", DEFAULT_NOTION_VERSION)
@@ -52,7 +55,9 @@ def load_notion_registry(config_dir: Path = Path("config")) -> dict[str, str] | 
         for page in data.get("results", []):
             name = _extract_title(page)
             if name:
-                status = _extract_first_select(page, "Current State", "Status") or "active"
+                status = (
+                    _extract_first_select(page, "Current State", "Status") or "active"
+                )
                 projects[name] = _normalize_status(status)
 
         if not data.get("has_more"):
@@ -97,7 +102,9 @@ def _extract_first_select(page: dict, *prop_names: str) -> str:
     return ""
 
 
-def load_notion_project_context(config_dir: Path = Path("config")) -> dict[str, dict] | None:
+def load_notion_project_context(
+    config_dir: Path = Path("config"),
+) -> dict[str, dict] | None:
     """Load project context from Notion for two-way sync.
 
     Returns {repo_name: {portfolio_call, momentum, current_state, next_move}} or None.
@@ -132,9 +139,15 @@ def load_notion_project_context(config_dir: Path = Path("config")) -> dict[str, 
             name = _extract_title(page)
             if name:
                 context[name] = {
-                    "portfolio_call": _extract_first_select(page, "Portfolio Call", "Verdict"),
-                    "momentum": _extract_first_select(page, "Momentum", "Pipeline Stage"),
-                    "current_state": _extract_first_select(page, "Current State", "Status"),
+                    "portfolio_call": _extract_first_select(
+                        page, "Portfolio Call", "Verdict"
+                    ),
+                    "momentum": _extract_first_select(
+                        page, "Momentum", "Pipeline Stage"
+                    ),
+                    "current_state": _extract_first_select(
+                        page, "Current State", "Status"
+                    ),
                     "next_move": _extract_first_rich_text(page, "Next Move", "Notes"),
                 }
 

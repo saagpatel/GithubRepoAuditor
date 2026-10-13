@@ -1,18 +1,44 @@
 """Cross-repo similarity detection via file content hashing."""
+
 from __future__ import annotations
 
 import hashlib
 from pathlib import Path
 
-SKIP_DIRS = frozenset({
-    ".git", "node_modules", "vendor", "__pycache__", ".venv",
-    "venv", ".tox", "dist", "build", ".next",
-})
+SKIP_DIRS = frozenset(
+    {
+        ".git",
+        "node_modules",
+        "vendor",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".tox",
+        "dist",
+        "build",
+        ".next",
+    }
+)
 
-CODE_EXTENSIONS = frozenset({
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".swift",
-    ".java", ".c", ".cpp", ".h", ".rb", ".php", ".gd",
-})
+CODE_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".rs",
+        ".go",
+        ".swift",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".rb",
+        ".php",
+        ".gd",
+    }
+)
 
 
 def compute_file_hashes(repo_path: Path, max_files: int = 200) -> set[str]:
@@ -70,12 +96,14 @@ def find_similar_repos(
 
             overlap = len(shared) / smaller
             if overlap >= threshold:
-                similar.append({
-                    "repo_a": a,
-                    "repo_b": b,
-                    "overlap_pct": round(overlap * 100, 1),
-                    "shared_files": len(shared),
-                })
+                similar.append(
+                    {
+                        "repo_a": a,
+                        "repo_b": b,
+                        "overlap_pct": round(overlap * 100, 1),
+                        "shared_files": len(shared),
+                    }
+                )
 
     similar.sort(key=lambda s: s["overlap_pct"], reverse=True)
     return similar
@@ -102,17 +130,31 @@ def classify_similarity(
     b_archived = meta_b.get("archived", False)
     a_size = meta_a.get("size_kb", 0)
     b_size = meta_b.get("size_kb", 0)
-    same_lang = meta_a.get("language") == meta_b.get("language") and meta_a.get("language")
+    same_lang = meta_a.get("language") == meta_b.get("language") and meta_a.get(
+        "language"
+    )
 
     if overlap > 90 and (a_fork or b_fork):
         result["classification"] = "fork_candidate"
-        result["suggestion"] = f"Consider archiving the fork — {repo_a if a_fork else repo_b} appears to be a fork"
-    elif overlap > 60 and not a_archived and not b_archived and a_size < 5000 and b_size < 5000:
+        result["suggestion"] = (
+            f"Consider archiving the fork — {repo_a if a_fork else repo_b} appears to be a fork"
+        )
+    elif (
+        overlap > 60
+        and not a_archived
+        and not b_archived
+        and a_size < 5000
+        and b_size < 5000
+    ):
         result["classification"] = "merge_candidate"
-        result["suggestion"] = f"Consider merging {repo_a} and {repo_b} into a single repo"
+        result["suggestion"] = (
+            f"Consider merging {repo_a} and {repo_b} into a single repo"
+        )
     elif 50 <= overlap <= 80 and same_lang:
         result["classification"] = "shared_boilerplate"
-        result["suggestion"] = f"Extract shared boilerplate from {repo_a} and {repo_b} into a template"
+        result["suggestion"] = (
+            f"Extract shared boilerplate from {repo_a} and {repo_b} into a template"
+        )
     else:
         result["classification"] = "similar"
         result["suggestion"] = f"{repo_a} and {repo_b} share {overlap:.0f}% of files"

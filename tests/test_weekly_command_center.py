@@ -533,7 +533,9 @@ def test_security_posture_names_pending_coverage_beside_all_clear() -> None:
     }
     digest = _digest_for(portfolio_truth)
     assert digest["security_posture"]["pending_coverage_count"] == 1
-    assert digest["security_posture"]["pending_coverage_repositories"] == ["saagpatel/StaleC"]
+    assert digest["security_posture"]["pending_coverage_repositories"] == [
+        "saagpatel/StaleC"
+    ]
 
     rendered = render_weekly_command_center_markdown(digest)
     assert "All 2 admitted repos are clear" in rendered
@@ -544,7 +546,9 @@ def test_security_posture_names_pending_coverage_beside_all_clear() -> None:
 
 
 def test_security_posture_has_no_pending_line_without_pending_repos() -> None:
-    portfolio_truth = {"projects": [_security_project("CleanA", "baseline", _sec(True, 0, 0))]}
+    portfolio_truth = {
+        "projects": [_security_project("CleanA", "baseline", _sec(True, 0, 0))]
+    }
     digest = _digest_for(portfolio_truth)
     assert digest["security_posture"]["pending_coverage_count"] == 0
     assert "PENDING" not in render_weekly_command_center_markdown(digest)

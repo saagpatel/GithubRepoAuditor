@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from github_repo_auditor.report_enrichment import build_risk_lookup, build_weekly_review_pack
+from github_repo_auditor.report_enrichment import (
+    build_risk_lookup,
+    build_weekly_review_pack,
+)
 
 
 def _make_report() -> dict:
@@ -53,7 +56,10 @@ def _make_truth(elevated: int = 2, moderate: int = 1, baseline: int = 3) -> dict
         projects.append(
             {
                 "identity": {"display_name": f"BaselineRepo{i}"},
-                "risk": {"risk_tier": "baseline", "risk_summary": "No elevated risk factors."},
+                "risk": {
+                    "risk_tier": "baseline",
+                    "risk_summary": "No elevated risk factors.",
+                },
             }
         )
     return {"schema_version": "0.4.0", "projects": projects}
