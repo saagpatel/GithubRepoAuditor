@@ -316,6 +316,9 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "ccusage",
         "manipulable-library",
         "gpt_rag",
+        # Both the local-path row and the canonical GitHub row must agree.
+        "OrbitMechanic",
+        "saagpatel/OrbitMechanics",
     ):
         entry = catalog["repos"][repo_name.lower()]
         assert entry["lifecycle_state"] == "archived"

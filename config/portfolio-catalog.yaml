@@ -257,15 +257,15 @@ repos:
   saagpatel/OrbitMechanics:
     owner: d
     purpose: browser orbital-mechanics puzzle game with real Newtonian physics and handcrafted levels
-    lifecycle_state: active
+    lifecycle_state: archived
     criticality: medium
     review_cadence: weekly
-    operating_path: maintain
+    operating_path: archive
     category: fun
     tool_provenance: claude-code
     maturity_program: maintain
     target_maturity: operating
-    notes: Canonical GitHub repo identity; local checkout remains OrbitMechanic.
+    notes: Canonical GitHub repo identity; local checkout remains OrbitMechanic. Archived on GitHub 2026-10-12.
   saagpatel/operant:
     owner: d
     purpose: operating-agent calibration benchmark for evaluating agent decision quality and orchestration judgment
