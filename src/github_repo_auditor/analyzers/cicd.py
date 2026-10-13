@@ -104,7 +104,9 @@ def _has_build_scripts(repo_path: Path) -> bool:
         return True
     if (repo_path / "Podfile").is_file():  # CocoaPods
         return True
-    if (repo_path / "project.yml").is_file() or (repo_path / "project.yaml").is_file():  # XcodeGen
+    if (repo_path / "project.yml").is_file() or (
+        repo_path / "project.yaml"
+    ).is_file():  # XcodeGen
         return True
 
     return False

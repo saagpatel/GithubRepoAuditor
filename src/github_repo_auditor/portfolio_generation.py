@@ -114,7 +114,9 @@ def _terminal_observed_in_order(
     security receipts carry microseconds, so a terminal written in the same
     second as the receipt (the normal case for a fast collector) compares at
     second granularity; anything a full second earlier is still refused."""
-    return produced_at.replace(microsecond=0) <= terminal_observed <= now.astimezone(UTC)
+    return (
+        produced_at.replace(microsecond=0) <= terminal_observed <= now.astimezone(UTC)
+    )
 
 
 def _instant_text(value: datetime) -> str:
@@ -131,7 +133,9 @@ def _read_regular(path: Path, *, label: str) -> bytes:
     try:
         return path.read_bytes()
     except OSError as exc:
-        raise PortfolioGenerationError(f"could not read {label}: {path}: {exc}") from exc
+        raise PortfolioGenerationError(
+            f"could not read {label}: {path}: {exc}"
+        ) from exc
 
 
 def _read_object(path: Path, *, label: str) -> dict[str, Any]:
@@ -245,7 +249,9 @@ def load_producer_binding(
         evidence = load_producer_evidence(receipt_path)
         verify_evidence_still_current(repo_root, evidence)
     except (OSError, TypeError, ValueError) as exc:
-        raise PortfolioGenerationError(f"producer receipt is not current: {exc}") from exc
+        raise PortfolioGenerationError(
+            f"producer receipt is not current: {exc}"
+        ) from exc
     if evidence.repository != expected_repository:
         raise PortfolioGenerationError(
             "producer receipt repository mismatch: "
@@ -289,7 +295,9 @@ def load_security_binding(
             now=now,
         )
     except (OSError, SecurityCoverageError) as exc:
-        raise PortfolioGenerationError(f"security receipt is not admissible: {exc}") from exc
+        raise PortfolioGenerationError(
+            f"security receipt is not admissible: {exc}"
+        ) from exc
     if loaded.receipt_state != "fresh":
         raise PortfolioGenerationError("security receipt is stale")
     if loaded.receipt_id is None or loaded.content_sha256 is None:
@@ -303,13 +311,13 @@ def load_security_binding(
         raise PortfolioGenerationError("security receipt producer is missing")
     repository = producer_payload.get("repository")
     if not isinstance(repository, str) or not repository:
-        raise PortfolioGenerationError("security receipt producer repository is missing")
+        raise PortfolioGenerationError(
+            "security receipt producer repository is missing"
+        )
     terminal_bytes = _read_regular(
         terminal_receipt_path, label="security terminal receipt"
     )
-    terminal = _read_object(
-        terminal_receipt_path, label="security terminal receipt"
-    )
+    terminal = _read_object(terminal_receipt_path, label="security terminal receipt")
     if (
         terminal.get("schema") != "AutomationTerminalStateV1"
         or terminal.get("state") != "succeeded"
@@ -323,7 +331,9 @@ def load_security_binding(
         "com.d.github-security-coverage",
         "com.d.github-security-coverage.rehearsal",
     }:
-        raise PortfolioGenerationError("security terminal automation identity is invalid")
+        raise PortfolioGenerationError(
+            "security terminal automation identity is invalid"
+        )
     destination = terminal.get("destination_readback")
     if not isinstance(destination, dict) or destination.get("verified") is not True:
         raise PortfolioGenerationError("security terminal destination is not verified")
@@ -477,7 +487,10 @@ def verify_generation_dir(
         manifest = json.loads(manifest_bytes)
     except json.JSONDecodeError as exc:
         raise PortfolioGenerationError("generation manifest is invalid JSON") from exc
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != MANIFEST_SCHEMA:
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != MANIFEST_SCHEMA
+    ):
         raise PortfolioGenerationError("generation manifest schema mismatch")
     if set(manifest) != {
         "schema_version",
@@ -500,7 +513,11 @@ def verify_generation_dir(
         raise PortfolioGenerationError("generation id mismatch")
     if generation_dir.name != generation_id:
         raise PortfolioGenerationError("generation directory identity mismatch")
-    core = {key: value for key, value in manifest.items() if key not in {"generation_id", "content_identity_sha256"}}
+    core = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"generation_id", "content_identity_sha256"}
+    }
     identity = _sha256(_canonical_bytes(core))
     if manifest.get("content_identity_sha256") != identity:
         raise PortfolioGenerationError("generation content identity mismatch")
@@ -532,7 +549,9 @@ def verify_generation_dir(
         content = _read_regular(generation_dir / name, label=f"artifact {name}")
         if len(content) != record.get("size_bytes"):
             raise PortfolioGenerationError(f"artifact size mismatch: {name}")
-        if _sha256(content) != _validate_sha256(record.get("sha256"), field=f"artifact {name} sha256"):
+        if _sha256(content) != _validate_sha256(
+            record.get("sha256"), field=f"artifact {name} sha256"
+        ):
             raise PortfolioGenerationError(f"artifact hash mismatch: {name}")
     return manifest, manifest_sha256
 
@@ -621,7 +640,9 @@ def _validate_staged_truth_security(
 def read_pointer(root: Path, *, validate_generations: bool = True) -> dict[str, Any]:
     payload = _read_object(root / POINTER_NAME, label="portfolio generation pointer")
     if set(payload) != {"schema_version", "current", "previous", "updated_at"}:
-        raise PortfolioGenerationError("portfolio generation pointer fields are invalid")
+        raise PortfolioGenerationError(
+            "portfolio generation pointer fields are invalid"
+        )
     if payload.get("schema_version") != POINTER_SCHEMA:
         raise PortfolioGenerationError("portfolio generation pointer schema mismatch")
     current = _pointer_entry(payload.get("current"), field="current")
@@ -629,7 +650,9 @@ def read_pointer(root: Path, *, validate_generations: bool = True) -> dict[str, 
     if current is None:
         raise PortfolioGenerationError("portfolio generation pointer has no current")
     if previous is not None and previous == current:
-        raise PortfolioGenerationError("current and previous pointer entries are identical")
+        raise PortfolioGenerationError(
+            "current and previous pointer entries are identical"
+        )
     _parse_instant(payload.get("updated_at"), field="pointer updated_at")
     normalized = {
         "schema_version": POINTER_SCHEMA,
@@ -707,7 +730,9 @@ def publish_generation(
         try:
             sources = {artifact.name: artifact.source for artifact in artifacts}
             for record in records:
-                content = _read_regular(sources[record["name"]], label=f"artifact {record['name']}")
+                content = _read_regular(
+                    sources[record["name"]], label=f"artifact {record['name']}"
+                )
                 if _sha256(content) != record["sha256"]:
                     raise PortfolioGenerationError(
                         f"artifact changed after admission: {record['name']}"
@@ -745,7 +770,9 @@ def publish_generation(
             }
             previous_entry = prior_pointer["current"] if prior_pointer else None
             if previous_entry == current_entry:
-                previous_entry = prior_pointer.get("previous") if prior_pointer else None
+                previous_entry = (
+                    prior_pointer.get("previous") if prior_pointer else None
+                )
             pointer = {
                 "schema_version": POINTER_SCHEMA,
                 "current": current_entry,
@@ -771,7 +798,9 @@ def publish_generation(
             _crash_if_requested("after_pointer_replaced")
             resolved = resolve_current(root)
             if resolved.generation_id != generation_id:
-                raise PortfolioGenerationError("portfolio generation pointer readback mismatch")
+                raise PortfolioGenerationError(
+                    "portfolio generation pointer readback mismatch"
+                )
             _crash_if_requested("after_readback")
             return resolved
         finally:
@@ -781,11 +810,15 @@ def publish_generation(
                 stage_parent.rmdir()
 
 
-def swap_current_previous(root: Path, *, updated_at: datetime | None = None) -> dict[str, Any]:
+def swap_current_previous(
+    root: Path, *, updated_at: datetime | None = None
+) -> dict[str, Any]:
     with writer_lock(root):
         pointer = read_pointer(root, validate_generations=True)
         if pointer["previous"] is None:
-            raise PortfolioGenerationError("no previous portfolio generation is available")
+            raise PortfolioGenerationError(
+                "no previous portfolio generation is available"
+            )
         swapped = {
             "schema_version": POINTER_SCHEMA,
             "current": pointer["previous"],
@@ -794,8 +827,13 @@ def swap_current_previous(root: Path, *, updated_at: datetime | None = None) -> 
         }
         _atomic_json(root / POINTER_NAME, swapped)
         readback = read_pointer(root, validate_generations=True)
-        if readback["current"] != swapped["current"] or readback["previous"] != swapped["previous"]:
-            raise PortfolioGenerationError("portfolio generation rollback readback mismatch")
+        if (
+            readback["current"] != swapped["current"]
+            or readback["previous"] != swapped["previous"]
+        ):
+            raise PortfolioGenerationError(
+                "portfolio generation rollback readback mismatch"
+            )
         return readback
 
 
@@ -809,11 +847,15 @@ def _artifact_argument(value: str) -> ArtifactInput:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage coherent portfolio generations")
+    parser = argparse.ArgumentParser(
+        description="Manage coherent portfolio generations"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     publish = subparsers.add_parser("publish")
     publish.add_argument("--root", type=Path, required=True)
-    publish.add_argument("--artifact", action="append", type=_artifact_argument, required=True)
+    publish.add_argument(
+        "--artifact", action="append", type=_artifact_argument, required=True
+    )
     publish.add_argument("--producer-receipt", type=Path, required=True)
     publish.add_argument("--producer-repo-root", type=Path, required=True)
     publish.add_argument("--expected-repository", required=True)
@@ -894,7 +936,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(json.dumps(result.__dict__, default=str, sort_keys=True))
         elif args.command == "verify":
-            print(json.dumps(resolve_current(args.root).__dict__, default=str, sort_keys=True))
+            print(
+                json.dumps(
+                    resolve_current(args.root).__dict__, default=str, sort_keys=True
+                )
+            )
         else:
             print(json.dumps(swap_current_previous(args.root), sort_keys=True))
     except PortfolioGenerationError as exc:

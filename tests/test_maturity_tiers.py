@@ -467,7 +467,10 @@ def test_release_count_absent_falls_back_to_proxy():
         "derived": {
             **repo["derived"],
             "context_quality": "strong",  # proxy passes shipped check
-            "context_files": ["README.md", "LICENSE"],  # required for Gold LICENSE check
+            "context_files": [
+                "README.md",
+                "LICENSE",
+            ],  # required for Gold LICENSE check
         },
         "risk": {**repo["risk"], "risk_factors": [], "doctor_gap": False},
     }
@@ -585,7 +588,9 @@ def test_pre_sprint8_tier_gap_sources_all_proxy():
     repo = _minimal_repo()
     gap = tier_gap(repo, target=3)
     for src in gap.requirement_sources:
-        assert src == "proxy", f"Expected all sources 'proxy' for pre-Sprint-8, got {src!r}"
+        assert src == "proxy", (
+            f"Expected all sources 'proxy' for pre-Sprint-8, got {src!r}"
+        )
 
 
 # 16. Sprint-8 full platinum repo → no missing requirements

@@ -280,10 +280,13 @@ def build_template_sparkline_specs(
     specs: list[Any] = []
     extended_score_history = extend_score_history_with_current(data, score_history)
     row_map = {
-        repo_name: index + 2 for index, repo_name in enumerate(extended_score_history.keys())
+        repo_name: index + 2
+        for index, repo_name in enumerate(extended_score_history.keys())
     }
     audits_sorted = sorted(
-        data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True
+        data.get("audits", []),
+        key=lambda audit: audit.get("overall_score", 0),
+        reverse=True,
     )
 
     for offset, audit in enumerate(audits_sorted, 2):

@@ -61,7 +61,9 @@ def set_autofilter(ws, max_col: int, max_row: int, start_row: int = 1) -> None:
     ws.auto_filter.ref = f"A{start_row}:{get_column_letter(max_col)}{max_row}"
 
 
-def add_table(ws, table_name: str, max_col: int, max_row: int, start_row: int = 1) -> None:
+def add_table(
+    ws, table_name: str, max_col: int, max_row: int, start_row: int = 1
+) -> None:
     """Attach a structured table to hidden sheets and a plain filter to visible ones."""
     if max_row <= start_row:
         return
@@ -138,7 +140,9 @@ def apply_visible_sheet_profile(
 
 def reorder_workbook_sheets(wb: Workbook, *, preferred_order: list[str]) -> None:
     order_index = {name: index for index, name in enumerate(preferred_order)}
-    wb._sheets.sort(key=lambda ws: (order_index.get(ws.title, len(preferred_order)), ws.title))
+    wb._sheets.sort(
+        key=lambda ws: (order_index.get(ws.title, len(preferred_order)), ws.title)
+    )
     if "Index" in wb.sheetnames:
         wb.active = wb.sheetnames.index("Index")
 

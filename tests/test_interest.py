@@ -18,14 +18,27 @@ from github_repo_auditor.models import RepoMetadata
 
 def _meta(**overrides) -> RepoMetadata:
     from datetime import datetime, timezone
+
     defaults = dict(
-        name="test", full_name="user/test", description=None,
-        language="Python", languages={"Python": 5000}, private=False, fork=False,
-        archived=False, created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        name="test",
+        full_name="user/test",
+        description=None,
+        language="Python",
+        languages={"Python": 5000},
+        private=False,
+        fork=False,
+        archived=False,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=0, forks=0, open_issues=0,
-        size_kb=100, html_url="", clone_url="", topics=[],
+        default_branch="main",
+        stars=0,
+        forks=0,
+        open_issues=0,
+        size_kb=100,
+        html_url="",
+        clone_url="",
+        topics=[],
     )
     defaults.update(overrides)
     return RepoMetadata(**defaults)
@@ -39,14 +52,20 @@ class TestDescriptionScoring:
         assert _score_description(_meta(description="A short desc")) == 0.0
 
     def test_medium_description(self):
-        score = _score_description(_meta(description="A medium-length project description that explains what this does"))
+        score = _score_description(
+            _meta(
+                description="A medium-length project description that explains what this does"
+            )
+        )
         assert score >= 0.10
 
     def test_long_unique_description(self):
-        score = _score_description(_meta(
-            name="MyApp",
-            description="Interactive animated explainer tracing a dollar through the US banking system with ACH and Fedwire"
-        ))
+        score = _score_description(
+            _meta(
+                name="MyApp",
+                description="Interactive animated explainer tracing a dollar through the US banking system with ACH and Fedwire",
+            )
+        )
         assert score >= 0.15
 
     def test_analyze_reports_rich_project_description(self, tmp_repo):
@@ -149,21 +168,25 @@ class TestAnalyzeCommitBursts:
 class TestRecencyBonus:
     def test_recent_push_gets_max(self):
         from datetime import datetime, timedelta, timezone
+
         meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=30))
         assert _score_recency(meta) == 0.05
 
     def test_medium_age_gets_partial(self):
         from datetime import datetime, timedelta, timezone
+
         meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=150))
         assert _score_recency(meta) == 0.03
 
     def test_within_year_gets_small(self):
         from datetime import datetime, timedelta, timezone
+
         meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=300))
         assert _score_recency(meta) == 0.01
 
     def test_old_push_no_bonus(self):
         from datetime import datetime, timedelta, timezone
+
         meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=500))
         assert _score_recency(meta) == 0.0
 
@@ -174,7 +197,10 @@ class TestRecencyBonus:
 
 class TestTechNovelty:
     def test_novel_language_scores(self, tmp_repo):
-        meta = _meta(language="Rust", languages={"Rust": 5000, "TypeScript": 3000, "Python": 1000})
+        meta = _meta(
+            language="Rust",
+            languages={"Rust": 5000, "TypeScript": 3000, "Python": 1000},
+        )
         result = InterestAnalyzer().analyze(tmp_repo, meta)
         # Rust is novel + 3 languages = multi-language
         assert result.score >= 0.20
@@ -217,7 +243,9 @@ class TestProjectAmbition:
 
     def test_large_loc_repo_gets_ambition_bonus(self, tmp_repo):
         baseline_loc = _estimate_loc(tmp_repo)
-        (tmp_repo / "main.py").write_text("\n".join(f"line_{i} = {i}" for i in range(1001)))
+        (tmp_repo / "main.py").write_text(
+            "\n".join(f"line_{i} = {i}" for i in range(1001))
+        )
         score, details = _score_ambition(tmp_repo, _meta())
         assert details["estimated_loc"] == baseline_loc + 1001
         assert score >= 0.10
@@ -299,7 +327,8 @@ class TestReadmeStorytelling:
     def test_long_readme_with_images(self, tmp_repo):
         (tmp_repo / "README.md").write_text(
             "# Amazing Project\n\n"
-            "This is a long and detailed description. " * 30
+            "This is a long and detailed description. "
+            * 30
             + "\n\n![screenshot](./screenshot.png)\n"
         )
         result = InterestAnalyzer().analyze(tmp_repo, _meta())

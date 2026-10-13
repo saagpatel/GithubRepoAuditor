@@ -70,12 +70,8 @@ def tmp_repo(tmp_path: Path) -> Path:
     # Tests
     tests = repo / "tests"
     tests.mkdir()
-    (tests / "test_main.py").write_text(
-        "def test_main():\n    assert True\n"
-    )
-    (tests / "test_utils.py").write_text(
-        "def test_utils():\n    assert True\n"
-    )
+    (tests / "test_main.py").write_text("def test_main():\n    assert True\n")
+    (tests / "test_utils.py").write_text("def test_utils():\n    assert True\n")
 
     # Config
     (repo / "pyproject.toml").write_text(
@@ -126,7 +122,7 @@ def swift_repo(tmp_path: Path) -> Path:
     )
     (sources / "ContentView.swift").write_text(
         "import SwiftUI\n\nstruct ContentView: View {\n"
-        "    var body: some View { Text(\"Hello\") }\n}\n"
+        '    var body: some View { Text("Hello") }\n}\n'
     )
 
     # Tests
@@ -148,7 +144,7 @@ def xctest_repo(tmp_path: Path) -> Path:
     repo.mkdir()
     (repo / "Package.swift").write_text(
         "// swift-tools-version:5.9\nimport PackageDescription\n"
-        "let package = Package(name: \"MyLib\")\n"
+        'let package = Package(name: "MyLib")\n'
     )
     tests = repo / "Tests" / "MyLibTests"
     tests.mkdir(parents=True)

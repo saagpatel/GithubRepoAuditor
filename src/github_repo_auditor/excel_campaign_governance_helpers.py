@@ -76,7 +76,12 @@ def build_campaign_sheet_content(
     ]
     return {
         "summary_rows": [
-            ("Campaign", summary.get("label", summary.get("campaign_type", "No active campaign"))),
+            (
+                "Campaign",
+                summary.get(
+                    "label", summary.get("campaign_type", "No active campaign")
+                ),
+            ),
             ("Request State", request_state),
             ("Row State", row_state),
             ("Profile", summary.get("portfolio_profile", "default")),
@@ -119,7 +124,9 @@ def build_governance_controls_content(
             [
                 item.get("repo", ""),
                 item.get("title", ""),
-                display_operator_state(operator_state or item.get("priority", "medium")),
+                display_operator_state(
+                    operator_state or item.get("priority", "medium")
+                ),
                 item.get("expected_posture_lift", 0.0),
                 item.get("effort", ""),
                 item.get("source", ""),
@@ -129,7 +136,10 @@ def build_governance_controls_content(
 
     return {
         "summary_rows": [
-            ("Status", display_operator_state(governance_summary.get("status", "preview"))),
+            (
+                "Status",
+                display_operator_state(governance_summary.get("status", "preview")),
+            ),
             (
                 "Selected View",
                 governance_summary.get(
@@ -143,8 +153,14 @@ def build_governance_controls_content(
                     governance_summary.get("approval_status", "preview-only")
                 ),
             ),
-            ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
-            ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
+            (
+                "Needs Re-Approval",
+                "yes" if governance_summary.get("needs_reapproval") else "no",
+            ),
+            (
+                "Rollback Available",
+                governance_summary.get("rollback_available_count", 0),
+            ),
             (
                 "Headline",
                 governance_summary.get(
@@ -197,8 +213,12 @@ def write_campaign_table(
         apply_zebra_stripes(ws, start_row + 1, max_row, len(CAMPAIGN_HEADERS))
         add_table(ws, "tblCampaignView", len(CAMPAIGN_HEADERS), max_row, start_row)
     else:
-        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=8)
-        ws.cell(row=start_row + 1, column=1, value=empty_message).alignment = wrap_alignment
+        ws.merge_cells(
+            start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=8
+        )
+        ws.cell(
+            row=start_row + 1, column=1, value=empty_message
+        ).alignment = wrap_alignment
         ws.cell(row=start_row + 1, column=1).font = subtitle_font
     return max_row
 
@@ -265,7 +285,9 @@ def build_writeback_audit_content(results: list[dict[str, Any]]) -> dict[str, An
     created = sum(1 for result in results if result.get("status") == "created")
     updated = sum(1 for result in results if result.get("status") == "updated")
     closed = sum(1 for result in results if result.get("status") == "closed")
-    rollback_ready = sum(1 for result in results if result.get("before") not in ({}, None, []))
+    rollback_ready = sum(
+        1 for result in results if result.get("before") not in ({}, None, [])
+    )
     return {
         "summary_rows": [
             ("Writeback Rows", len(results)),
@@ -314,10 +336,20 @@ def write_writeback_audit_table(
     max_row = len(table_rows) + start_row
     if table_rows:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(WRITEBACK_AUDIT_HEADERS))
-        add_table(ws, "tblWritebackAudit", len(WRITEBACK_AUDIT_HEADERS), max_row, start_row=start_row)
+        add_table(
+            ws,
+            "tblWritebackAudit",
+            len(WRITEBACK_AUDIT_HEADERS),
+            max_row,
+            start_row=start_row,
+        )
     else:
-        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=6)
-        ws.cell(row=start_row + 1, column=1, value=empty_message).alignment = wrap_alignment
+        ws.merge_cells(
+            start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=6
+        )
+        ws.cell(
+            row=start_row + 1, column=1, value=empty_message
+        ).alignment = wrap_alignment
         ws.cell(row=start_row + 1, column=1).font = subtitle_font
     return max_row
 
@@ -411,7 +443,9 @@ def write_governance_controls_table(
 
     max_row = len(preview_rows) + start_row
     if preview_rows:
-        apply_zebra_stripes(ws, start_row + 1, max_row, len(GOVERNANCE_CONTROLS_HEADERS))
+        apply_zebra_stripes(
+            ws, start_row + 1, max_row, len(GOVERNANCE_CONTROLS_HEADERS)
+        )
         add_table(
             ws,
             "tblGovernanceControls",
@@ -420,8 +454,12 @@ def write_governance_controls_table(
             start_row=start_row,
         )
     else:
-        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=7)
-        ws.cell(row=start_row + 1, column=1, value=empty_message).alignment = wrap_alignment
+        ws.merge_cells(
+            start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=7
+        )
+        ws.cell(
+            row=start_row + 1, column=1, value=empty_message
+        ).alignment = wrap_alignment
         ws.cell(row=start_row + 1, column=1).font = subtitle_font
     return max_row
 

@@ -111,7 +111,9 @@ def _bronze_repo(name: str = "Wavelength") -> dict:
     return {
         "identity": {"display_name": name, "has_git": True},
         "derived": {
-            "last_meaningful_activity_at": (date.today() - timedelta(days=50)).isoformat(),
+            "last_meaningful_activity_at": (
+                date.today() - timedelta(days=50)
+            ).isoformat(),
             "activity_status": "active",
             "context_quality": "weak",
             "context_files": ["README.md"],
@@ -157,7 +159,9 @@ class TestEmptyState:
 
 class TestOnTrackLane:
     def test_on_track_initiative_row_present(self, tmp_path):
-        initiatives = [_make_initiative("Wavelength", target_tier=3, deadline=_future(60))]
+        initiatives = [
+            _make_initiative("Wavelength", target_tier=3, deadline=_future(60))
+        ]
         projects = [_bronze_repo("Wavelength")]
         wb, ws = _build_sheet(initiatives, projects=projects, tmp_path=tmp_path)
 
@@ -170,7 +174,9 @@ class TestOnTrackLane:
         )
 
     def test_on_track_lane_header_present(self, tmp_path):
-        initiatives = [_make_initiative("Wavelength", target_tier=3, deadline=_future(60))]
+        initiatives = [
+            _make_initiative("Wavelength", target_tier=3, deadline=_future(60))
+        ]
         wb, ws = _build_sheet(initiatives, tmp_path=tmp_path)
 
         all_values = [ws.cell(r, 1).value for r in range(1, ws.max_row + 1)]
@@ -179,7 +185,9 @@ class TestOnTrackLane:
         )
 
     def test_columns_header_present(self, tmp_path):
-        initiatives = [_make_initiative("Wavelength", target_tier=3, deadline=_future(60))]
+        initiatives = [
+            _make_initiative("Wavelength", target_tier=3, deadline=_future(60))
+        ]
         wb, ws = _build_sheet(initiatives, tmp_path=tmp_path)
 
         all_values = []
@@ -187,7 +195,9 @@ class TestOnTrackLane:
             all_values.extend(str(v) for v in row if v)
 
         assert any("REPO" in v for v in all_values), "Expected REPO column header"
-        assert any("DEADLINE" in v for v in all_values), "Expected DEADLINE column header"
+        assert any("DEADLINE" in v for v in all_values), (
+            "Expected DEADLINE column header"
+        )
 
 
 class TestMixedStatuses:
@@ -233,18 +243,24 @@ class TestMixedStatuses:
 
 class TestTabColor:
     def test_tab_color_red_for_overdue(self, tmp_path):
-        initiatives = [_make_initiative("OverdueRepo", target_tier=2, deadline=_past(5))]
+        initiatives = [
+            _make_initiative("OverdueRepo", target_tier=2, deadline=_past(5))
+        ]
         wb, ws = _build_sheet(initiatives, tmp_path=tmp_path)
         # Red tab for overdue
         tab_color = ws.sheet_properties.tabColor
         assert tab_color is not None
-        color_val = str(tab_color.rgb if hasattr(tab_color, "rgb") else tab_color.value or "")
+        color_val = str(
+            tab_color.rgb if hasattr(tab_color, "rgb") else tab_color.value or ""
+        )
         assert "DC2626" in color_val.upper() or color_val != "", (
             f"Expected red tab color for overdue, got: {tab_color!r}"
         )
 
     def test_tab_color_set_for_on_track(self, tmp_path):
-        initiatives = [_make_initiative("OnTrackRepo", target_tier=2, deadline=_future(60))]
+        initiatives = [
+            _make_initiative("OnTrackRepo", target_tier=2, deadline=_future(60))
+        ]
         wb, ws = _build_sheet(initiatives, tmp_path=tmp_path)
         tab_color = ws.sheet_properties.tabColor
         # Any non-None tab color is acceptable; just verify it was set
@@ -268,7 +284,8 @@ class TestFormatMissingRequirements:
         result = _format_missing_requirements(gap)
         assert "readme" in result
         assert (
-            "(approx.)" not in result.split("readme")[0] + result.split("readme")[1].split(";")[0]
+            "(approx.)"
+            not in result.split("readme")[0] + result.split("readme")[1].split(";")[0]
         )
         assert "ci (approx.)" in result
 

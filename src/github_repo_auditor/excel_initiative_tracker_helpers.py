@@ -21,7 +21,12 @@ from github_repo_auditor.initiatives import (
     initiatives_path,
     load_initiatives,
 )
-from github_repo_auditor.maturity_tiers import TierGap, compute_tier, tier_gap, tier_name
+from github_repo_auditor.maturity_tiers import (
+    TierGap,
+    compute_tier,
+    tier_gap,
+    tier_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +110,13 @@ def _build_rows(
     today: date,
 ) -> dict[str, list[tuple[str, str, str, str, str, str, str]]]:
     """Build a dict[status → list[row tuples]]."""
-    repo_map: dict[str, dict] = {p.get("identity", {}).get("display_name", ""): p for p in projects}
+    repo_map: dict[str, dict] = {
+        p.get("identity", {}).get("display_name", ""): p for p in projects
+    }
 
-    lanes: dict[str, list[tuple[str, str, str, str, str, str, str]]] = {s: [] for s in _LANE_ORDER}
+    lanes: dict[str, list[tuple[str, str, str, str, str, str, str]]] = {
+        s: [] for s in _LANE_ORDER
+    }
 
     for initiative in initiatives:
         # Skip closed initiatives

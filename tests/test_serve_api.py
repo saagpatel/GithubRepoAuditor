@@ -70,7 +70,9 @@ def test_health_ok(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 def test_report_returns_serialized_report(client: TestClient) -> None:
     report = ApiOnlyReport(username="octocat", audits=[])
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only", return_value=report
+    ) as mock_audit:
         resp = client.get("/api/report/octocat")
 
         assert resp.status_code == 200
@@ -86,7 +88,9 @@ def test_report_returns_serialized_report(client: TestClient) -> None:
 
 def test_report_passes_validated_username(client: TestClient) -> None:
     report = ApiOnlyReport(username="octocat", audits=[])
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only", return_value=report
+    ) as mock_audit:
         resp = client.get("/api/report/octocat")
 
     assert resp.status_code == 200
@@ -109,7 +113,10 @@ def test_invalid_username_returns_422(client: TestClient, bad: str) -> None:
 # Error mapping
 # ---------------------------------------------------------------------------
 def test_unknown_user_returns_404(client: TestClient) -> None:
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", side_effect=_http_error(404)):
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only",
+        side_effect=_http_error(404),
+    ):
         resp = client.get("/api/report/ghost")
     assert resp.status_code == 404
 
@@ -122,20 +129,29 @@ def test_rate_limited_403_with_zero_quota_returns_429(client: TestClient) -> Non
 
 
 def test_rate_limited_429_returns_429(client: TestClient) -> None:
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", side_effect=_http_error(429)):
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only",
+        side_effect=_http_error(429),
+    ):
         resp = client.get("/api/report/octocat")
     assert resp.status_code == 429
 
 
 def test_forbidden_403_without_quota_header_returns_403(client: TestClient) -> None:
     # A 403 that is NOT rate-limiting (e.g. private resource) stays a 403, not 429.
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", side_effect=_http_error(403)):
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only",
+        side_effect=_http_error(403),
+    ):
         resp = client.get("/api/report/octocat")
     assert resp.status_code == 403
 
 
 def test_upstream_error_returns_502(client: TestClient) -> None:
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", side_effect=_http_error(500)):
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only",
+        side_effect=_http_error(500),
+    ):
         resp = client.get("/api/report/octocat")
     assert resp.status_code == 502
 
@@ -165,7 +181,9 @@ def test_scan_is_capped_at_max_repos(client: TestClient) -> None:
     from github_repo_auditor.serve.api import MAX_REPOS_CAP
 
     report = ApiOnlyReport(username="octocat", audits=[])
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only", return_value=report
+    ) as mock_audit:
         # No per-request repo knob — a stray query param is ignored and the
         # server always bounds the scan at MAX_REPOS_CAP.
         resp = client.get("/api/report/octocat?max_repos=9999")
@@ -180,7 +198,9 @@ def test_scan_is_capped_at_max_repos(client: TestClient) -> None:
 def test_cors_allows_frontend_origin(client: TestClient) -> None:
     report = ApiOnlyReport(username="octocat", audits=[])
     origin = "http://localhost:3000"
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", return_value=report):
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only", return_value=report
+    ):
         resp = client.get("/api/report/octocat", headers={"Origin": origin})
     assert resp.status_code == 200
     assert resp.headers.get("access-control-allow-origin") == origin
@@ -212,7 +232,9 @@ def test_cors_origins_reads_env(monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 def test_cache_hit_skips_second_scan(client: TestClient) -> None:
     report = ApiOnlyReport(username="octocat", audits=[])
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only", return_value=report
+    ) as mock_audit:
         first = client.get("/api/report/octocat")
         second = client.get("/api/report/octocat")
 
@@ -229,7 +251,9 @@ def test_rate_limit_returns_429_past_limit(tmp_path, monkeypatch) -> None:
     local_client = _make_client(tmp_path)
 
     report = ApiOnlyReport(username="octocat", audits=[])
-    with patch("github_repo_auditor.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+    with patch(
+        "github_repo_auditor.serve.api.audit_user_api_only", return_value=report
+    ) as mock_audit:
         codes = [local_client.get("/api/report/octocat").status_code for _ in range(3)]
     assert codes == [200, 200, 429]
     # The 2nd request was a cache hit but still consumed throttle budget, so the

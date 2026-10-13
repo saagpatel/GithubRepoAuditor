@@ -61,24 +61,48 @@ def _build_queue_rows(queue: list[dict]) -> list[list[object]]:
                 item.get("follow_through_recovery_reacquisition_status", ""),
                 item.get("follow_through_recovery_reacquisition_summary", ""),
                 item.get("follow_through_recovery_reacquisition_reason", ""),
-                item.get("follow_through_recovery_reacquisition_durability_age_runs", 0),
+                item.get(
+                    "follow_through_recovery_reacquisition_durability_age_runs", 0
+                ),
                 item.get("follow_through_recovery_reacquisition_durability_status", ""),
-                item.get("follow_through_recovery_reacquisition_durability_summary", ""),
+                item.get(
+                    "follow_through_recovery_reacquisition_durability_summary", ""
+                ),
                 item.get("follow_through_recovery_reacquisition_durability_reason", ""),
-                item.get("follow_through_recovery_reacquisition_consolidation_status", ""),
-                item.get("follow_through_recovery_reacquisition_consolidation_summary", ""),
-                item.get("follow_through_recovery_reacquisition_consolidation_reason", ""),
+                item.get(
+                    "follow_through_recovery_reacquisition_consolidation_status", ""
+                ),
+                item.get(
+                    "follow_through_recovery_reacquisition_consolidation_summary", ""
+                ),
+                item.get(
+                    "follow_through_recovery_reacquisition_consolidation_reason", ""
+                ),
                 item.get("follow_through_reacquisition_softening_decay_age_runs", 0),
                 item.get("follow_through_reacquisition_softening_decay_status", ""),
                 item.get("follow_through_reacquisition_softening_decay_summary", ""),
                 item.get("follow_through_reacquisition_softening_decay_reason", ""),
-                item.get("follow_through_reacquisition_confidence_retirement_status", ""),
-                item.get("follow_through_reacquisition_confidence_retirement_summary", ""),
-                item.get("follow_through_reacquisition_confidence_retirement_reason", ""),
-                item.get("follow_through_reacquisition_revalidation_recovery_age_runs", 0),
-                item.get("follow_through_reacquisition_revalidation_recovery_status", ""),
-                item.get("follow_through_reacquisition_revalidation_recovery_summary", ""),
-                item.get("follow_through_reacquisition_revalidation_recovery_reason", ""),
+                item.get(
+                    "follow_through_reacquisition_confidence_retirement_status", ""
+                ),
+                item.get(
+                    "follow_through_reacquisition_confidence_retirement_summary", ""
+                ),
+                item.get(
+                    "follow_through_reacquisition_confidence_retirement_reason", ""
+                ),
+                item.get(
+                    "follow_through_reacquisition_revalidation_recovery_age_runs", 0
+                ),
+                item.get(
+                    "follow_through_reacquisition_revalidation_recovery_status", ""
+                ),
+                item.get(
+                    "follow_through_reacquisition_revalidation_recovery_summary", ""
+                ),
+                item.get(
+                    "follow_through_reacquisition_revalidation_recovery_reason", ""
+                ),
                 item.get("catalog_line", ""),
                 item.get("operating_path_line", ""),
                 item.get("intent_alignment", ""),
@@ -151,7 +175,9 @@ def _build_repo_rollup_rows(queue: list[dict]) -> list[list[object]]:
         ),
     ):
         primary_kind = (
-            record["kind_counts"].most_common(1)[0][0] if record["kind_counts"] else "review"
+            record["kind_counts"].most_common(1)[0][0]
+            if record["kind_counts"]
+            else "review"
         )
         repo_rows.append(
             [

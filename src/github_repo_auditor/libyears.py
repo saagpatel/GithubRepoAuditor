@@ -42,7 +42,12 @@ def compute_libyears(
         deps.extend(_parse_pyproject_deps(repo_path / "pyproject.toml"))
 
     if not deps:
-        return {"total_libyears": None, "dep_count": 0, "freshness_score": None, "dependency_names": []}
+        return {
+            "total_libyears": None,
+            "dep_count": 0,
+            "freshness_score": None,
+            "dependency_names": [],
+        }
 
     total_libyears = 0.0
     checked = 0
@@ -68,9 +73,13 @@ def compute_libyears(
     return {
         "total_libyears": round(total_libyears, 1),
         "dep_count_checked": checked,
-        "freshness_score": max(0.0, freshness_score) if freshness_score is not None else None,
+        "freshness_score": max(0.0, freshness_score)
+        if freshness_score is not None
+        else None,
         "dependency_names": [name for name, _, _ in deps],
-        "dep_versions": [(name, version, ecosystem) for name, version, ecosystem in deps],
+        "dep_versions": [
+            (name, version, ecosystem) for name, version, ecosystem in deps
+        ],
     }
 
 
@@ -178,7 +187,9 @@ def _fetch_cached(url: str, cache: ResponseCache | None) -> dict | None:
             return cached
 
     try:
-        resp = requests.get(url, timeout=10, headers={"User-Agent": "github-repo-auditor"})
+        resp = requests.get(
+            url, timeout=10, headers={"User-Agent": "github-repo-auditor"}
+        )
         if resp.status_code != 200:
             return None
         data = resp.json()
@@ -229,7 +240,9 @@ def _pypi_dep_age(name: str, version: str, cache: ResponseCache | None) -> float
     return None
 
 
-def _crates_dep_age(name: str, version: str, cache: ResponseCache | None) -> float | None:
+def _crates_dep_age(
+    name: str, version: str, cache: ResponseCache | None
+) -> float | None:
     """Get age of a crates.io package version."""
     data = _fetch_cached(f"{CRATES_REGISTRY}/{name}", cache)
     if not data or "versions" not in data:

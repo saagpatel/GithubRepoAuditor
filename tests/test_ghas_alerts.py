@@ -1,4 +1,5 @@
 """Tests for GitHub Advanced Security (GHAS) alert fetcher."""
+
 from __future__ import annotations
 
 import json
@@ -12,6 +13,7 @@ from github_repo_auditor.ghas_alerts import fetch_ghas_alerts, format_ghas_summa
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_audit(repo_name: str, owner: str = "octocat") -> dict:
     """Build a minimal audit dict."""
@@ -58,6 +60,7 @@ def _http_error(status: int) -> requests.HTTPError:
 # Happy path — one repo, all three endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestFetchGhasAlertsHappyPath:
     def test_dependabot_counts_per_severity(self) -> None:
         alerts = [
@@ -67,11 +70,13 @@ class TestFetchGhasAlertsHappyPath:
             {"security_advisory": {"severity": "medium"}},
             {"security_advisory": {"severity": "low"}},
         ]
-        session = _mock_session_get({
-            "dependabot": alerts,
-            "code-scanning": [],
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": alerts,
+                "code-scanning": [],
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("my-repo")],
             token="tok",
@@ -85,11 +90,13 @@ class TestFetchGhasAlertsHappyPath:
         assert dep["available"] is True
 
     def test_code_scanning_available_true_with_zero_alerts(self) -> None:
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": [],
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": [],
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("clean-repo")],
             token="tok",
@@ -102,11 +109,13 @@ class TestFetchGhasAlertsHappyPath:
 
     def test_secret_scanning_open_count(self) -> None:
         secrets = [{}, {}, {}]  # 3 open alerts
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": [],
-            "secret-scanning": secrets,
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": [],
+                "secret-scanning": secrets,
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("leaky-repo")],
             token="tok",
@@ -120,6 +129,7 @@ class TestFetchGhasAlertsHappyPath:
 # ---------------------------------------------------------------------------
 # 403 / 404 handling
 # ---------------------------------------------------------------------------
+
 
 class TestUnavailableEndpoints:
     def test_403_sets_available_false_no_exception(self) -> None:
@@ -158,6 +168,7 @@ class TestUnavailableEndpoints:
 # ---------------------------------------------------------------------------
 # Pagination
 # ---------------------------------------------------------------------------
+
 
 class TestPagination:
     def test_multi_page_dependabot_aggregated(self) -> None:
@@ -210,6 +221,7 @@ class TestPagination:
 # Cache hit path
 # ---------------------------------------------------------------------------
 
+
 class TestCacheIntegration:
     def test_cache_hit_skips_api_calls(self, tmp_path: Path) -> None:
         from github_repo_auditor.cache import ResponseCache
@@ -217,8 +229,20 @@ class TestCacheIntegration:
         cache = ResponseCache(cache_dir=tmp_path / ".cache", ttl=21600)
         audit = _make_audit("cached-repo")
         expected = {
-            "dependabot": {"critical": 5, "high": 2, "medium": 0, "low": 0, "available": True},
-            "code_scanning": {"critical": 1, "high": 0, "warning": 0, "note": 0, "available": True},
+            "dependabot": {
+                "critical": 5,
+                "high": 2,
+                "medium": 0,
+                "low": 0,
+                "available": True,
+            },
+            "code_scanning": {
+                "critical": 1,
+                "high": 0,
+                "warning": 0,
+                "note": 0,
+                "available": True,
+            },
             "secret_scanning": {"open": 0, "available": True},
         }
         # Prime the cache manually
@@ -240,17 +264,20 @@ class TestCacheIntegration:
 # Severity bucketing — code scanning
 # ---------------------------------------------------------------------------
 
+
 class TestCodeScanningBucketing:
     def test_error_severity_bucketed_to_high(self) -> None:
         cs_alerts = [
             {"rule": {"severity": "error"}},
             {"rule": {"severity": "error"}},
         ]
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": cs_alerts,
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": cs_alerts,
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("scan-repo")],
             token="tok",
@@ -266,11 +293,13 @@ class TestCodeScanningBucketing:
             {"rule": {"severity": "low"}},
             {"rule": {"severity": "low"}},
         ]
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": cs_alerts,
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": cs_alerts,
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("warn-repo")],
             token="tok",
@@ -286,11 +315,13 @@ class TestCodeScanningBucketing:
             {"rule": {"severity": "error", "security_severity_level": "medium"}},
             {"rule": {"severity": "error", "security_severity_level": "low"}},
         ]
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": cs_alerts,
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": cs_alerts,
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("scorecard-repo")],
             token="tok",
@@ -302,11 +333,13 @@ class TestCodeScanningBucketing:
 
     def test_note_severity_preserved(self) -> None:
         cs_alerts = [{"rule": {"severity": "note"}}]
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": cs_alerts,
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": cs_alerts,
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("note-repo")],
             token="tok",
@@ -319,13 +352,16 @@ class TestCodeScanningBucketing:
 # Empty repo — all zero, available True
 # ---------------------------------------------------------------------------
 
+
 class TestEmptyRepo:
     def test_zero_alerts_all_available(self) -> None:
-        session = _mock_session_get({
-            "dependabot": [],
-            "code-scanning": [],
-            "secret-scanning": [],
-        })
+        session = _mock_session_get(
+            {
+                "dependabot": [],
+                "code-scanning": [],
+                "secret-scanning": [],
+            }
+        )
         result = fetch_ghas_alerts(
             [_make_audit("empty-repo")],
             token="tok",
@@ -344,6 +380,7 @@ class TestEmptyRepo:
 # No token — early return
 # ---------------------------------------------------------------------------
 
+
 class TestNoToken:
     def test_no_token_returns_empty(self, capsys) -> None:
         result = fetch_ghas_alerts([_make_audit("some-repo")], token=None)
@@ -356,6 +393,7 @@ class TestNoToken:
 # format_ghas_summary
 # ---------------------------------------------------------------------------
 
+
 class TestFormatGhasSummary:
     def test_empty_returns_no_alerts_message(self) -> None:
         msg = format_ghas_summary({})
@@ -364,13 +402,37 @@ class TestFormatGhasSummary:
     def test_populated_shows_all_categories(self) -> None:
         alerts = {
             "foo": {
-                "dependabot": {"critical": 8, "high": 3, "medium": 1, "low": 0, "available": True},
-                "code_scanning": {"critical": 2, "high": 1, "warning": 4, "note": 0, "available": True},
+                "dependabot": {
+                    "critical": 8,
+                    "high": 3,
+                    "medium": 1,
+                    "low": 0,
+                    "available": True,
+                },
+                "code_scanning": {
+                    "critical": 2,
+                    "high": 1,
+                    "warning": 4,
+                    "note": 0,
+                    "available": True,
+                },
                 "secret_scanning": {"open": 2, "available": True},
             },
             "bar": {
-                "dependabot": {"critical": 5, "high": 1, "medium": 0, "low": 0, "available": True},
-                "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0, "available": True},
+                "dependabot": {
+                    "critical": 5,
+                    "high": 1,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
+                "code_scanning": {
+                    "critical": 0,
+                    "high": 0,
+                    "warning": 0,
+                    "note": 0,
+                    "available": True,
+                },
                 "secret_scanning": {"open": 0, "available": True},
             },
         }
@@ -384,13 +446,37 @@ class TestFormatGhasSummary:
     def test_top_repos_sorted_by_critical_desc(self) -> None:
         alerts = {
             "low-risk": {
-                "dependabot": {"critical": 1, "high": 0, "medium": 0, "low": 0, "available": True},
-                "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0, "available": True},
+                "dependabot": {
+                    "critical": 1,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
+                "code_scanning": {
+                    "critical": 0,
+                    "high": 0,
+                    "warning": 0,
+                    "note": 0,
+                    "available": True,
+                },
                 "secret_scanning": {"open": 0, "available": True},
             },
             "high-risk": {
-                "dependabot": {"critical": 10, "high": 0, "medium": 0, "low": 0, "available": True},
-                "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0, "available": True},
+                "dependabot": {
+                    "critical": 10,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
+                "code_scanning": {
+                    "critical": 0,
+                    "high": 0,
+                    "warning": 0,
+                    "note": 0,
+                    "available": True,
+                },
                 "secret_scanning": {"open": 0, "available": True},
             },
         }
@@ -402,13 +488,26 @@ class TestFormatGhasSummary:
 # CLI integration — fetch_ghas_alerts called and output file written
 # ---------------------------------------------------------------------------
 
+
 class TestCliIntegration:
     def test_ghas_flag_calls_fetch_and_writes_json(self, tmp_path: Path) -> None:
         """When --ghas-alerts is set, fetch_ghas_alerts is called and writes output JSON."""
         ghas_result = {
             "my-repo": {
-                "dependabot": {"critical": 1, "high": 0, "medium": 0, "low": 0, "available": True},
-                "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0, "available": True},
+                "dependabot": {
+                    "critical": 1,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
+                "code_scanning": {
+                    "critical": 0,
+                    "high": 0,
+                    "warning": 0,
+                    "note": 0,
+                    "available": True,
+                },
                 "secret_scanning": {"open": 0, "available": True},
             }
         }
@@ -438,4 +537,7 @@ class TestCliIntegration:
         assert "ghas_alerts" in audit_flow_source
         assert "vuln_check" in audit_flow_source
         # The block condition should include both flags joined by OR
-        assert 'getattr(args, "ghas_alerts"' in audit_flow_source or "args.ghas_alerts" in audit_flow_source
+        assert (
+            'getattr(args, "ghas_alerts"' in audit_flow_source
+            or "args.ghas_alerts" in audit_flow_source
+        )

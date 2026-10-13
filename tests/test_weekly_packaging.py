@@ -27,15 +27,47 @@ def test_finalize_weekly_pack_adds_story_and_compact_explainability() -> None:
         "approval_workflow_summary": "Governance: all is the strongest approval review candidate right now.",
         "next_approval_review": "Review Governance: all next.",
         "follow_through_checkpoint_summary": "Use the next run to confirm the packet still matches.",
-        "top_preview_ready_campaigns": [{"label": "Security Review", "reason": "1 action is ready for preview.", "recommended_target": "all"}],
-        "top_ready_to_apply_packets": [
-            {"label": "Security Review", "summary": "Preview first, then reassess apply.", "preview_command": "audit testuser --campaign security-review --writeback-target all"}
+        "top_preview_ready_campaigns": [
+            {
+                "label": "Security Review",
+                "reason": "1 action is ready for preview.",
+                "recommended_target": "all",
+            }
         ],
-        "top_monitor_now_campaigns": [{"label": "Security Review", "summary": "Still inside the short monitoring window."}],
-        "top_proven_campaigns": [{"label": "Security Review", "summary": "Recent outcomes are proven."}],
-        "top_improving_repos": [{"repo": "RepoA", "summary": "Improving after intervention."}],
-        "top_preview_safe_campaigns": [{"label": "Security Review", "summary": "Preview is the strongest safe automation posture.", "recommended_command": "audit testuser --campaign security-review --writeback-target all"}],
-        "top_ready_for_review_approvals": [{"label": "Governance: all", "subject_key": "all", "summary": "Governance scope all is ready for review.", "approval_command": "audit testuser --approve-governance --governance-scope all"}],
+        "top_ready_to_apply_packets": [
+            {
+                "label": "Security Review",
+                "summary": "Preview first, then reassess apply.",
+                "preview_command": "audit testuser --campaign security-review --writeback-target all",
+            }
+        ],
+        "top_monitor_now_campaigns": [
+            {
+                "label": "Security Review",
+                "summary": "Still inside the short monitoring window.",
+            }
+        ],
+        "top_proven_campaigns": [
+            {"label": "Security Review", "summary": "Recent outcomes are proven."}
+        ],
+        "top_improving_repos": [
+            {"repo": "RepoA", "summary": "Improving after intervention."}
+        ],
+        "top_preview_safe_campaigns": [
+            {
+                "label": "Security Review",
+                "summary": "Preview is the strongest safe automation posture.",
+                "recommended_command": "audit testuser --campaign security-review --writeback-target all",
+            }
+        ],
+        "top_ready_for_review_approvals": [
+            {
+                "label": "Governance: all",
+                "subject_key": "all",
+                "summary": "Governance scope all is ready for review.",
+                "approval_command": "audit testuser --approve-governance --governance-scope all",
+            }
+        ],
         "top_attention": [
             {
                 "repo": "RepoA",
@@ -68,10 +100,22 @@ def test_finalize_weekly_pack_adds_story_and_compact_explainability() -> None:
 
     assert finalized["weekly_story_v1"]["version"] == 1
     assert finalized["weekly_story_v1"]["section_order"][0] == "weekly-priority"
-    assert finalized["weekly_story_v1"]["sections"][1]["reason_codes"] == ["action-sync", "readiness"]
-    assert finalized["top_attention"][0]["why_it_won"] == "Approval review is now the clean next step."
-    assert finalized["top_attention"][0]["evidence_strip"][2]["safe_posture"] == "bounded-command"
-    assert finalized["repo_briefings"][0]["next_step"] == "Start with RepoA in src/core.py."
+    assert finalized["weekly_story_v1"]["sections"][1]["reason_codes"] == [
+        "action-sync",
+        "readiness",
+    ]
+    assert (
+        finalized["top_attention"][0]["why_it_won"]
+        == "Approval review is now the clean next step."
+    )
+    assert (
+        finalized["top_attention"][0]["evidence_strip"][2]["safe_posture"]
+        == "bounded-command"
+    )
+    assert (
+        finalized["repo_briefings"][0]["next_step"]
+        == "Start with RepoA in src/core.py."
+    )
     assert finalized["repo_briefings"][0]["evidence_strip"][2]["command_hint"] == (
         "audit testuser --campaign security-review --writeback-target all"
     )
@@ -101,16 +145,23 @@ def test_finalize_weekly_pack_prefers_overdue_follow_up_in_approval_section() ->
     finalized = finalize_weekly_pack(weekly_pack)
 
     approval_section = next(
-        section for section in finalized["weekly_story_v1"]["sections"] if section["id"] == "approval-workflow"
+        section
+        for section in finalized["weekly_story_v1"]["sections"]
+        if section["id"] == "approval-workflow"
     )
     assert approval_section["state"] == "overdue-follow-up"
     assert approval_section["evidence_items"][0]["command_hint"] == (
         "audit testuser --review-governance --governance-scope all"
     )
-    assert approval_section["evidence_items"][0]["safe_posture"] == "local-follow-up-review"
+    assert (
+        approval_section["evidence_items"][0]["safe_posture"]
+        == "local-follow-up-review"
+    )
 
 
-def test_finalize_weekly_pack_prefers_overlay_reason_codes_and_evidence_for_weekly_priority() -> None:
+def test_finalize_weekly_pack_prefers_overlay_reason_codes_and_evidence_for_weekly_priority() -> (
+    None
+):
     weekly_pack = {
         "portfolio_headline": "Portfolio headline",
         "what_to_do_this_week": "Review Governance: all next and decide whether the approval still matches the packet.",
@@ -119,7 +170,11 @@ def test_finalize_weekly_pack_prefers_overlay_reason_codes_and_evidence_for_week
         "trust_actionability_summary": "Trust is stable enough for a local review step.",
         "weekly_priority_headline": "Governance: all is the strongest approval review candidate right now.",
         "weekly_priority_next_step": "Review Governance: all next and decide whether the approval still matches the packet.",
-        "weekly_priority_reason_codes": ["approval-aware-scheduling", "approval-workflow", "needs-reapproval"],
+        "weekly_priority_reason_codes": [
+            "approval-aware-scheduling",
+            "approval-workflow",
+            "needs-reapproval",
+        ],
         "weekly_priority_evidence_items": [
             {
                 "label": "Needs Re-Approval: Governance: all",
@@ -136,9 +191,18 @@ def test_finalize_weekly_pack_prefers_overlay_reason_codes_and_evidence_for_week
     finalized = finalize_weekly_pack(weekly_pack)
 
     weekly_priority = next(
-        section for section in finalized["weekly_story_v1"]["sections"] if section["id"] == "weekly-priority"
+        section
+        for section in finalized["weekly_story_v1"]["sections"]
+        if section["id"] == "weekly-priority"
     )
     assert weekly_priority["headline"] == weekly_pack["weekly_priority_headline"]
     assert weekly_priority["next_step"] == weekly_pack["weekly_priority_next_step"]
-    assert weekly_priority["reason_codes"] == ["approval-aware-scheduling", "approval-workflow", "needs-reapproval"]
-    assert weekly_priority["evidence_items"][0]["label"] == "Needs Re-Approval: Governance: all"
+    assert weekly_priority["reason_codes"] == [
+        "approval-aware-scheduling",
+        "approval-workflow",
+        "needs-reapproval",
+    ]
+    assert (
+        weekly_priority["evidence_items"][0]["label"]
+        == "Needs Re-Approval: Governance: all"
+    )

@@ -24,7 +24,12 @@ from github_repo_auditor.baseline_context import (
     normalize_scoring_profile,
 )
 from github_repo_auditor.cache import ResponseCache
-from github_repo_auditor.cli_output import create_progress, print_info, print_status, print_warning
+from github_repo_auditor.cli_output import (
+    create_progress,
+    print_info,
+    print_status,
+    print_warning,
+)
 from github_repo_auditor.cloner import clone_workspace
 from github_repo_auditor.control_center_presentation import (
     _normal_audit_next_step_hint,
@@ -32,16 +37,25 @@ from github_repo_auditor.control_center_presentation import (
 from github_repo_auditor.github_client import GitHubClient
 from github_repo_auditor.models import AuditReport, RepoAudit, RepoMetadata
 from github_repo_auditor.recurring_review import FULL_REFRESH_DAYS
-from github_repo_auditor.report_enrichment import build_run_change_counts, build_run_change_summary
+from github_repo_auditor.report_enrichment import (
+    build_run_change_counts,
+    build_run_change_summary,
+)
 from github_repo_auditor.report_state import (
     audit_from_dict as _audit_from_dict,
     load_latest_report as _load_latest_report,
     report_from_dict as _report_from_dict,
 )
-from github_repo_auditor.report_operating_paths import apply_operating_paths as _apply_operating_paths
-from github_repo_auditor.report_portfolio_catalog import apply_portfolio_catalog as _apply_portfolio_catalog
+from github_repo_auditor.report_operating_paths import (
+    apply_operating_paths as _apply_operating_paths,
+)
+from github_repo_auditor.report_portfolio_catalog import (
+    apply_portfolio_catalog as _apply_portfolio_catalog,
+)
 from github_repo_auditor.report_scorecards import apply_scorecards as _apply_scorecards
-from github_repo_auditor.report_operator_state import enrich_report_with_operator_state as _enrich_report_with_operator_state
+from github_repo_auditor.report_operator_state import (
+    enrich_report_with_operator_state as _enrich_report_with_operator_state,
+)
 from github_repo_auditor.reporter import (
     write_json_report,
     write_markdown_report,
@@ -50,6 +64,7 @@ from github_repo_auditor.reporter import (
 )
 from github_repo_auditor.scorer import score_repo
 from github_repo_auditor.terminology import ACTION_SYNC_CANONICAL_LABELS
+
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
@@ -61,40 +76,16 @@ _SCORING_PROFILE_RESERVED_KEYS = frozenset(
 class ScoringProfile(dict[str, float]):
     """Flat profile weights plus optional scoring-constant overrides."""
 
-    def __init__(self, weights: dict[str, float], *, overrides: dict[str, object]) -> None:
+    def __init__(
+        self, weights: dict[str, float], *, overrides: dict[str, object]
+    ) -> None:
         super().__init__(weights)
         self.overrides = overrides
-CLI_MODE_GUIDE = """GitHub portfolio operating system with four product modes:
-  First Run     setup, baseline creation, first workbook, first control-center read
-  Weekly Review normal workbook-first operator loop
-  Deep Dive     repo-level drilldown and investigation
-  Action Sync   campaign, writeback, GitHub Projects, and Notion mirroring
 
-Recommended defaults:
-  - Start with --doctor before the first real run
-  - Prefer --excel-mode standard for the stable workbook path
-  - Use --control-center for read-only daily triage
-  - Treat campaigns, writeback, catalog overrides, scorecards overrides, and GitHub Projects as advanced workflows"""
-CLI_MODE_EXAMPLES = """Subcommands: run, triage, report, serve
-  Run `audit run --help`, `audit triage --help`, or `audit report --help` for flags.
 
-Subcommand form (preferred):
-  audit run   <github-username> --html
-  audit run   <github-username> --repos <repo-name>
-  audit triage <github-username> --control-center
-  audit triage <github-username> --approval-center
-  audit report <github-username> --portfolio-truth
-  audit report <github-username> --campaign security-review --writeback-target github
-  audit security-gate --output-dir output
-  audit serve  [--port 8080]
-
-Legacy flat form (deprecated, still supported):
-  audit <github-username> --doctor
-  audit <github-username> --html
-  audit <github-username> --control-center
-  audit <github-username> --campaign security-review --writeback-target all --github-projects"""
 def _date_str(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d")
+
 
 def _filter_repos(
     repos: list[RepoMetadata],
@@ -109,6 +100,7 @@ def _filter_repos(
     if skip_archived:
         filtered = [r for r in filtered if not r.archived]
     return filtered
+
 
 def _write_json(
     username: str,
@@ -127,7 +119,9 @@ def _write_json(
         tier_dist: dict[str, int] = {}
         for a in audits:
             tier_dist[a.completeness_tier] = tier_dist.get(a.completeness_tier, 0) + 1
-        avg_score = sum(a.overall_score for a in audits) / len(audits) if audits else 0.0
+        avg_score = (
+            sum(a.overall_score for a in audits) / len(audits) if audits else 0.0
+        )
 
         report = {
             "username": username,
@@ -154,6 +148,7 @@ def _write_json(
 
     return output_path
 
+
 def _print_verbose(audit: RepoAudit) -> None:
     """Print per-dimension score breakdown for a repo."""
     print(f"\n  {'─' * 50}", file=sys.stderr)
@@ -173,6 +168,7 @@ def _print_verbose(audit: RepoAudit) -> None:
         for finding in r.findings[:3]:
             print(f"      · {finding}", file=sys.stderr)
 
+
 def _resolve_repo_names(repos_arg: list[str]) -> list[str]:
     """Extract repo names from URLs or bare names."""
     names = []
@@ -189,14 +185,22 @@ def _resolve_repo_names(repos_arg: list[str]) -> list[str]:
             seen.add(name)
     return names
 
+
 def _normalize_profile_name(profile_name: str | None) -> str:
     return normalize_scoring_profile(profile_name)
 
+
 def _run_main_audit_cycle(args, config_inspection) -> None:
-    from github_repo_auditor.diagnostics import format_preflight_summary, run_diagnostics, should_block_run
+    from github_repo_auditor.diagnostics import (
+        format_preflight_summary,
+        run_diagnostics,
+        should_block_run,
+    )
 
     if args.preflight_mode != "off":
-        preflight = run_diagnostics(args, config_inspection=config_inspection, full=False)
+        preflight = run_diagnostics(
+            args, config_inspection=config_inspection, full=False
+        )
         setattr(args, "_preflight_summary", preflight.to_preflight_summary())
         print_info(format_preflight_summary(preflight))
         if preflight.status != "ok":
@@ -240,7 +244,9 @@ def _run_main_audit_cycle(args, config_inspection) -> None:
             custom_weights=custom_weights,
             scoring_profile_name=scoring_profile_name,
             watch_plan=getattr(args, "_watch_plan", None),
-            latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+            latest_trusted_baseline=getattr(
+                args, "_latest_trusted_watch_baseline", None
+            ),
         )
         return
 
@@ -254,7 +260,9 @@ def _run_main_audit_cycle(args, config_inspection) -> None:
             custom_weights=custom_weights,
             scoring_profile_name=scoring_profile_name,
             watch_plan=getattr(args, "_watch_plan", None),
-            latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+            latest_trusted_baseline=getattr(
+                args, "_latest_trusted_watch_baseline", None
+            ),
         )
         return
 
@@ -274,7 +282,9 @@ def _run_main_audit_cycle(args, config_inspection) -> None:
                     # Skip corrupt resume entries and continue with the rest.
                     pass
             if resumed_audits:
-                print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
+                print_info(
+                    f"Resumed {len(resumed_audits)} previously completed repo(s)"
+                )
                 repos = [r for r in repos if r.name not in resumed_names]
 
     runtime_stats: dict[str, float] = {}
@@ -312,15 +322,21 @@ def _run_main_audit_cycle(args, config_inspection) -> None:
             portfolio_baseline_size=len(repos),
             run_mode="full",
             watch_plan=getattr(args, "_watch_plan", None),
-            latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+            latest_trusted_baseline=getattr(
+                args, "_latest_trusted_watch_baseline", None
+            ),
             full_refresh_interval_days=FULL_REFRESH_DAYS,
         )
         report.preflight_summary = getattr(args, "_preflight_summary", {})
         report.runtime_breakdown = runtime_stats
         _apply_requested_reconciliation(report, args, audits)
-        outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
+        outputs = _write_report_outputs(
+            report, args, output_dir, client=client, cache=cache
+        )
         _print_output_summary(
-            f"Audited {report.repos_audited} repos for {report.username}", report, outputs
+            f"Audited {report.repos_audited} repos for {report.username}",
+            report,
+            outputs,
         )
 
         if getattr(args, "create_issues", False):
@@ -368,6 +384,7 @@ def _run_main_audit_cycle(args, config_inspection) -> None:
         f"  Output: {raw_path}",
     )
 
+
 def _run_watch_mode(args, config_inspection) -> None:
     from github_repo_auditor.recurring_review import choose_watch_plan
     from github_repo_auditor.watch import run_watch_loop
@@ -382,7 +399,9 @@ def _run_watch_mode(args, config_inspection) -> None:
         original_incremental = args.incremental
         original_repos = args.repos
         setattr(args, "_watch_plan", watch_plan)
-        setattr(args, "_latest_trusted_watch_baseline", watch_plan.latest_trusted_baseline)
+        setattr(
+            args, "_latest_trusted_watch_baseline", watch_plan.latest_trusted_baseline
+        )
         try:
             args.incremental = watch_plan.mode == "incremental"
             args.repos = None
@@ -393,7 +412,10 @@ def _run_watch_mode(args, config_inspection) -> None:
 
     run_watch_loop(_run_watch_once, interval=args.watch_interval)
 
-def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:
+
+def _fetch_repo_metadata(
+    args, client: GitHubClient
+) -> tuple[list[RepoMetadata], list[dict]]:
     if args.graphql and args.token:
         from github_repo_auditor.graphql_client import bulk_fetch_repos
 
@@ -408,15 +430,22 @@ def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata]
                 meta = RepoMetadata.from_api_response(repo_data, languages=langs)
                 all_repos.append(meta)
             except Exception as exc:
-                errors.append({"repo": repo_data.get("full_name", "?"), "error": str(exc)})
+                errors.append(
+                    {"repo": repo_data.get("full_name", "?"), "error": str(exc)}
+                )
         print_info(f"GraphQL: {len(all_repos)} repos fetched")
         return all_repos, errors
 
     return client.get_repo_metadata(args.username)
 
-def _print_filter_summary(all_repos: list[RepoMetadata], repos: list[RepoMetadata], args) -> None:
+
+def _print_filter_summary(
+    all_repos: list[RepoMetadata], repos: list[RepoMetadata], args
+) -> None:
     forks_excluded = sum(1 for r in all_repos if r.fork) if args.skip_forks else 0
-    archived_excluded = sum(1 for r in all_repos if r.archived) if args.skip_archived else 0
+    archived_excluded = (
+        sum(1 for r in all_repos if r.archived) if args.skip_archived else 0
+    )
     skipped = len(all_repos) - len(repos)
     if skipped:
         parts = []
@@ -424,15 +453,26 @@ def _print_filter_summary(all_repos: list[RepoMetadata], repos: list[RepoMetadat
             parts.append(f"{forks_excluded} forks")
         if archived_excluded:
             parts.append(f"{archived_excluded} archived")
-        print_info(f"Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})")
+        print_info(
+            f"Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})"
+        )
+
 
 def _compute_portfolio_lang_freq(repos: list[RepoMetadata]) -> dict[str, float]:
     lang_counts = Counter(repo.language for repo in repos if repo.language)
-    return {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
+    return (
+        {lang: count / len(repos) for lang, count in lang_counts.items()}
+        if repos
+        else {}
+    )
 
-def _portfolio_lang_freq_for_filtered_baseline(repos: list[RepoMetadata]) -> dict[str, float]:
+
+def _portfolio_lang_freq_for_filtered_baseline(
+    repos: list[RepoMetadata],
+) -> dict[str, float]:
     """Compute novelty baseline from the full filtered portfolio, never only the rerun subset."""
     return _compute_portfolio_lang_freq(repos)
+
 
 def _analysis_worker_count(args) -> int:
     """Return the bounded repo-analysis worker count for this run."""
@@ -446,7 +486,9 @@ def _analysis_worker_count(args) -> int:
     try:
         requested = int(raw_value)
     except (TypeError, ValueError):
-        print_warning("Invalid analysis worker count; using the reliable single-worker default.")
+        print_warning(
+            "Invalid analysis worker count; using the reliable single-worker default."
+        )
         return DEFAULT_ANALYSIS_WORKERS
 
     if requested < 1:
@@ -463,13 +505,16 @@ def _analysis_worker_count(args) -> int:
 
     return requested
 
+
 def _use_analysis_progress(workers: int) -> bool:
     """Use rich progress only when it can render visibly for the operator."""
     return workers > 1 and sys.stderr.isatty()
 
+
 def _use_analyzer_cache(args, workers: int) -> bool:
     """Use the SQLite analyzer cache only for single-worker analysis."""
     return not getattr(args, "no_analyzer_cache", False) and workers == 1
+
 
 def _select_target_repos(
     target_names: list[str], repos: list[RepoMetadata]
@@ -487,6 +532,7 @@ def _select_target_repos(
             missing.append(name)
 
     return selected, missing
+
 
 def _analyze_repos(
     repos: list[RepoMetadata],
@@ -526,7 +572,9 @@ def _analyze_repos(
         import sqlite3 as _sqlite3
 
         from github_repo_auditor.warehouse import WAREHOUSE_FILENAME
-        from github_repo_auditor.warehouse import _ensure_schema as _warehouse_ensure_schema
+        from github_repo_auditor.warehouse import (
+            _ensure_schema as _warehouse_ensure_schema,
+        )
 
         _output_dir = Path(getattr(args, "output_dir", "output"))
         _db_path = _output_dir / WAREHOUSE_FILENAME
@@ -565,7 +613,9 @@ def _analyze_repos(
     # ── Optional async enrichment prefetch ───────────────────────────────────
     _fetch_mode: str = getattr(args, "fetch_mode", "sync")
     if _fetch_mode == "async" and repos:
-        from github_repo_auditor.github_client_async import fetch_enrichment_sync as _async_prefetch
+        from github_repo_auditor.github_client_async import (
+            fetch_enrichment_sync as _async_prefetch,
+        )
 
         _fetch_workers: int = max(1, getattr(args, "fetch_workers", 10))
         print_info(
@@ -574,7 +624,9 @@ def _analyze_repos(
         )
         _prefetch_start = perf_counter()
         try:
-            _repo_pairs = [(r.full_name.split("/")[0], r.name) for r in repos if "/" in r.full_name]
+            _repo_pairs = [
+                (r.full_name.split("/")[0], r.name) for r in repos if "/" in r.full_name
+            ]
             _async_prefetch(
                 _repo_pairs,
                 token=client.token,
@@ -582,7 +634,9 @@ def _analyze_repos(
                 cache=client.cache,
             )
             _prefetch_elapsed = perf_counter() - _prefetch_start
-            print_info(f"Async enrichment prefetch complete in {_prefetch_elapsed:.1f}s.")
+            print_info(
+                f"Async enrichment prefetch complete in {_prefetch_elapsed:.1f}s."
+            )
             if runtime_stats is not None:
                 runtime_stats["async_prefetch_seconds"] = round(_prefetch_elapsed, 3)
         except Exception as _prefetch_err:
@@ -604,10 +658,13 @@ def _analyze_repos(
             runtime_stats["clone_fetch_seconds"] = round(clone_seconds, 3)
         print_info(f"Cloned {len(cloned)}/{len(repos)} repos. Analyzing...")
         analyzable = [
-            (index, repo_meta, cloned.get(repo_meta.name)) for index, repo_meta in enumerate(repos)
+            (index, repo_meta, cloned.get(repo_meta.name))
+            for index, repo_meta in enumerate(repos)
         ]
         analyzable = [
-            (index, repo_meta, repo_path) for index, repo_meta, repo_path in analyzable if repo_path
+            (index, repo_meta, repo_path)
+            for index, repo_meta, repo_path in analyzable
+            if repo_path
         ]
         workers = min(requested_workers, max(1, len(analyzable)))
         if workers == 1:
@@ -661,7 +718,10 @@ def _analyze_repos(
             else:
                 with ThreadPoolExecutor(max_workers=workers) as executor:
                     futures = {
-                        executor.submit(_analyze_one, repo_meta, repo_path): (index, repo_meta.name)
+                        executor.submit(_analyze_one, repo_meta, repo_path): (
+                            index,
+                            repo_meta.name,
+                        )
                         for index, repo_meta, repo_path in analyzable
                     }
                     finished = 0
@@ -688,9 +748,13 @@ def _analyze_repos(
             _repo_path_map: dict[str, object] = {
                 repo_meta.name: cloned.get(repo_meta.name) for repo_meta in repos
             }
-            _repo_meta_map: dict[str, object] = {repo_meta.name: repo_meta for repo_meta in repos}
+            _repo_meta_map: dict[str, object] = {
+                repo_meta.name: repo_meta for repo_meta in repos
+            }
             _sha_map: dict[str, str] = {
-                repo_meta.name: (repo_meta.pushed_at.isoformat() if repo_meta.pushed_at else "")
+                repo_meta.name: (
+                    repo_meta.pushed_at.isoformat() if repo_meta.pushed_at else ""
+                )
                 for repo_meta in repos
             }
 
@@ -728,7 +792,9 @@ def _analyze_repos(
                 import json as _json
 
                 _stamp = _dt.date.today().isoformat()
-                _report_path = _output_dir_r / f"cache-reconcile-{args.username}-{_stamp}.json"
+                _report_path = (
+                    _output_dir_r / f"cache-reconcile-{args.username}-{_stamp}.json"
+                )
                 try:
                     _report_path.write_text(
                         _json.dumps(_reconcile_report, indent=2), encoding="utf-8"
@@ -748,9 +814,16 @@ def _analyze_repos(
         sys.exit(1)
     return audits
 
-def _apply_requested_reconciliation(report: AuditReport, args, audits: list[RepoAudit]) -> None:
+
+def _apply_requested_reconciliation(
+    report: AuditReport, args, audits: list[RepoAudit]
+) -> None:
     if args.registry:
-        from github_repo_auditor.registry_parser import parse_registry, reconcile, sync_new_repos
+        from github_repo_auditor.registry_parser import (
+            parse_registry,
+            reconcile,
+            sync_new_repos,
+        )
 
         registry = parse_registry(args.registry)
         report.reconciliation = reconcile(registry, audits)
@@ -783,6 +856,7 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
                 f"{len(report.reconciliation.matched)} matched"
             )
 
+
 def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> None:
     if not isinstance(report.governance_preview, dict):
         report.governance_preview = {}
@@ -800,7 +874,9 @@ def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> 
         if isinstance(report.governance_results, dict)
         else []
     )
-    drift_rows = report.governance_drift if isinstance(report.governance_drift, list) else []
+    drift_rows = (
+        report.governance_drift if isinstance(report.governance_drift, list) else []
+    )
 
     if governance_view == "ready":
         filtered_preview = [item for item in preview_actions if item.get("applyable")]
@@ -816,7 +892,9 @@ def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> 
         report.governance_drift = drift_rows
         report.governance_results = {
             **report.governance_results,
-            "results": [item for item in result_rows if item.get("status") == "drifted"],
+            "results": [
+                item for item in result_rows if item.get("status") == "drifted"
+            ],
         }
         return
 
@@ -829,8 +907,11 @@ def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> 
     if governance_view == "applied":
         report.governance_results = {
             **report.governance_results,
-            "results": [item for item in result_rows if item.get("status") == "applied"],
+            "results": [
+                item for item in result_rows if item.get("status") == "applied"
+            ],
         }
+
 
 def _apply_ops_writeback(
     report: AuditReport, args, client: GitHubClient | None, output_dir: Path
@@ -841,8 +922,14 @@ def _apply_ops_writeback(
     github_projects_config = None
     operator_context: dict[str, dict] = {}
     if getattr(args, "github_projects", False):
-        from github_repo_auditor.github_projects import load_github_projects_config, operator_context_by_repo
-        from github_repo_auditor.operator_control_center import build_operator_snapshot, normalize_review_state
+        from github_repo_auditor.github_projects import (
+            load_github_projects_config,
+            operator_context_by_repo,
+        )
+        from github_repo_auditor.operator_control_center import (
+            build_operator_snapshot,
+            normalize_review_state,
+        )
 
         github_projects_config = load_github_projects_config(
             Path(args.github_projects_config)
@@ -861,7 +948,9 @@ def _apply_ops_writeback(
             output_dir=output_dir,
             triage_view="all",
         )
-        operator_context = operator_context_by_repo(operator_snapshot.get("operator_queue", []))
+        operator_context = operator_context_by_repo(
+            operator_snapshot.get("operator_queue", [])
+        )
 
     from github_repo_auditor.notion_sync import sync_campaign_actions
     from github_repo_auditor.ops_writeback import (
@@ -873,7 +962,10 @@ def _apply_ops_writeback(
         build_writeback_preview,
         summarize_writeback_results,
     )
-    from github_repo_auditor.warehouse import load_campaign_history, load_latest_campaign_state
+    from github_repo_auditor.warehouse import (
+        load_campaign_history,
+        load_latest_campaign_state,
+    )
 
     previous_state = load_latest_campaign_state(output_dir, args.campaign)
     campaign_summary, actions = build_campaign_bundle(
@@ -955,6 +1047,7 @@ def _apply_ops_writeback(
     historical_entries = load_campaign_history(output_dir, args.campaign, limit=20)
     report.campaign_history = report.action_runs + historical_entries[:20]
 
+
 def _write_report_outputs(
     report: AuditReport,
     args,
@@ -1000,11 +1093,13 @@ def _write_report_outputs(
         )
         diff_dict = diff.to_dict()
         diff_md_path = (
-            output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
+            output_dir
+            / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
         )
         diff_md_path.write_text(format_diff_markdown(diff))
         diff_json_path = (
-            output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
+            output_dir
+            / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
         )
         diff_json_path.write_text(json.dumps(diff_dict, indent=2))
         print_info(
@@ -1035,7 +1130,8 @@ def _write_report_outputs(
     workbook_start = perf_counter()
     excel_path = export_excel(
         json_path,
-        output_dir / f"audit-dashboard-{report.username}-{_date_str(report.generated_at)}.xlsx",
+        output_dir
+        / f"audit-dashboard-{report.username}-{_date_str(report.generated_at)}.xlsx",
         trend_data=trend_data,
         diff_data=diff_dict,
         score_history=score_history,
@@ -1045,7 +1141,9 @@ def _write_report_outputs(
         truth_dir=output_dir,
         reckoning_overlay=getattr(args, "reckoning_overlay", None),
     )
-    report.runtime_breakdown["workbook_build_seconds"] = round(perf_counter() - workbook_start, 3)
+    report.runtime_breakdown["workbook_build_seconds"] = round(
+        perf_counter() - workbook_start, 3
+    )
     md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)
     pcc_path = write_pcc_export(report, output_dir)
     raw_path = write_raw_metadata(report, output_dir)
@@ -1058,17 +1156,23 @@ def _write_report_outputs(
     if archive and write_json:
         archive_report(json_path)
     if save_fingerprint_data:
-        save_fingerprints(report_data["audits"], output_dir / ".audit-fingerprints.json")
-    report.runtime_breakdown["report_output_seconds"] = round(perf_counter() - output_start, 3)
+        save_fingerprints(
+            report_data["audits"], output_dir / ".audit-fingerprints.json"
+        )
+    report.runtime_breakdown["report_output_seconds"] = round(
+        perf_counter() - output_start, 3
+    )
 
     badge_info = ""
     if args.badges:
-        from github_repo_auditor.badge_export import _write_badges_markdown, export_badges, upload_badge_gist
+        from github_repo_auditor.badge_export import (
+            _write_badges_markdown,
+            export_badges,
+            upload_badge_gist,
+        )
 
         badge_result = export_badges(report_data, output_dir)
-        badge_info = (
-            f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
-        )
+        badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
         if args.upload_badges:
             gist_urls = upload_badge_gist(output_dir / "badges", report.username)
             if gist_urls:
@@ -1076,8 +1180,14 @@ def _write_report_outputs(
 
     notion_info = ""
     if args.notion:
-        from github_repo_auditor.notion_client import get_notion_token, load_notion_config
-        from github_repo_auditor.notion_export import _load_project_map, export_notion_events
+        from github_repo_auditor.notion_client import (
+            get_notion_token,
+            load_notion_config,
+        )
+        from github_repo_auditor.notion_export import (
+            _load_project_map,
+            export_notion_events,
+        )
         from github_repo_auditor.notion_sync import (
             check_recommendation_followup,
             create_audit_action_requests,
@@ -1103,14 +1213,18 @@ def _write_report_outputs(
 
                 quick_wins = find_quick_wins(report.audits)
                 project_map = _load_project_map(Path("config"))
-                create_recommendation_run(report_data, quick_wins, sync_token, sync_config)
+                create_recommendation_run(
+                    report_data, quick_wins, sync_token, sync_config
+                )
                 create_audit_action_requests(
                     report_data.get("audits", []),
                     project_map,
                     sync_token,
                     sync_config,
                 )
-                patch_weekly_review(report_data, diff_dict, quick_wins, sync_token, sync_config)
+                patch_weekly_review(
+                    report_data, diff_dict, quick_wins, sync_token, sync_config
+                )
                 create_audit_history_entry(report_data, sync_token, sync_config)
                 patch_project_completeness_cards(
                     report_data.get("audits", []),
@@ -1172,30 +1286,42 @@ def _write_report_outputs(
         review_pack_info = f"\n    {review_pack_result['review_pack_path']}"
 
     if args.auto_archive:
-        from github_repo_auditor.archive_candidates import export_archive_report, find_archive_candidates
+        from github_repo_auditor.archive_candidates import (
+            export_archive_report,
+            find_archive_candidates,
+        )
 
         candidates = find_archive_candidates(score_history)
         if candidates:
-            archive_result = export_archive_report(candidates, report.username, output_dir)
+            archive_result = export_archive_report(
+                candidates, report.username, output_dir
+            )
             print_info(
                 f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}"
             )
 
     if getattr(args, "vuln_check", False):
-        from github_repo_auditor.vuln_check import check_vulnerabilities, format_vuln_summary
+        from github_repo_auditor.vuln_check import (
+            check_vulnerabilities,
+            format_vuln_summary,
+        )
 
         vulns = check_vulnerabilities(report_data.get("audits", []), cache=cache)
         print_info(format_vuln_summary(vulns))
         if vulns:
             vuln_path = (
-                output_dir / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
+                output_dir
+                / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
             )
             vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
             print_info(f"Vulnerability report: {vuln_path}")
 
     if getattr(args, "ghas_alerts", False) or getattr(args, "vuln_check", False):
         from github_repo_auditor.ghas_alert_details import fetch_dependabot_details
-        from github_repo_auditor.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
+        from github_repo_auditor.ghas_alerts import (
+            fetch_ghas_alerts,
+            format_ghas_summary,
+        )
 
         ghas_token: str | None = getattr(args, "token", None) or None
         ghas_data = fetch_ghas_alerts(
@@ -1217,13 +1343,17 @@ def _write_report_outputs(
         print_info(format_ghas_summary(ghas_data))
         if ghas_data:
             ghas_path = (
-                output_dir / f"ghas-alerts-{report.username}-{_date_str(report.generated_at)}.json"
+                output_dir
+                / f"ghas-alerts-{report.username}-{_date_str(report.generated_at)}.json"
             )
             ghas_path.write_text(json.dumps(ghas_data, indent=2, default=str))
             print_info(f"GHAS alerts report: {ghas_path}")
 
     if getattr(args, "ossf_scorecard", False):
-        from github_repo_auditor.ossf_scorecard import fetch_ossf_scorecards, format_ossf_summary
+        from github_repo_auditor.ossf_scorecard import (
+            fetch_ossf_scorecards,
+            format_ossf_summary,
+        )
 
         ossf_data = fetch_ossf_scorecards(
             report_data.get("audits", []),
@@ -1242,7 +1372,8 @@ def _write_report_outputs(
 
         print_info(format_ossf_summary(ossf_data))
         ossf_path = (
-            output_dir / f"ossf-scorecard-{report.username}-{_date_str(report.generated_at)}.json"
+            output_dir
+            / f"ossf-scorecard-{report.username}-{_date_str(report.generated_at)}.json"
         )
         ossf_path.write_text(json.dumps(ossf_data, indent=2, default=str))
         print_info(f"OSSF Scorecard report: {ossf_path}")
@@ -1320,6 +1451,7 @@ def _write_report_outputs(
         "cache_info": cache_info,
     }
 
+
 def _ensure_partial_run_baseline_compatible(
     existing_report_data: dict | None, current_context: dict
 ) -> bool:
@@ -1349,6 +1481,7 @@ def _ensure_partial_run_baseline_compatible(
     )
     return False
 
+
 def _print_output_summary(
     headline: str,
     report: AuditReport,
@@ -1375,9 +1508,13 @@ def _print_output_summary(
         f"{outputs['review_pack_info']}",
     )
     if report.campaign_outcomes_summary.get("summary"):
-        print_info(f"Post-apply monitoring: {report.campaign_outcomes_summary.get('summary')}")
+        print_info(
+            f"Post-apply monitoring: {report.campaign_outcomes_summary.get('summary')}"
+        )
     if report.next_monitoring_step.get("summary"):
-        print_info(f"Next monitoring step: {report.next_monitoring_step.get('summary')}")
+        print_info(
+            f"Next monitoring step: {report.next_monitoring_step.get('summary')}"
+        )
     if report.campaign_tuning_summary.get("summary"):
         print_info(f"Campaign tuning: {report.campaign_tuning_summary.get('summary')}")
     if report.next_tuned_campaign.get("summary"):
@@ -1389,12 +1526,19 @@ def _print_output_summary(
             f"Historical portfolio intelligence: {report.intervention_ledger_summary.get('summary')}"
         )
     if report.next_historical_focus.get("summary"):
-        print_info(f"Next historical focus: {report.next_historical_focus.get('summary')}")
+        print_info(
+            f"Next historical focus: {report.next_historical_focus.get('summary')}"
+        )
     if report.automation_guidance_summary.get("summary"):
-        print_info(f"Automation guidance: {report.automation_guidance_summary.get('summary')}")
+        print_info(
+            f"Automation guidance: {report.automation_guidance_summary.get('summary')}"
+        )
     if report.next_safe_automation_step.get("summary"):
-        print_info(f"Next safe automation step: {report.next_safe_automation_step.get('summary')}")
+        print_info(
+            f"Next safe automation step: {report.next_safe_automation_step.get('summary')}"
+        )
     print_info(_normal_audit_next_step_hint(report.username))
+
 
 def _run_targeted_audit(
     args,
@@ -1426,7 +1570,10 @@ def _run_targeted_audit(
     run_errors = list(errors)
     for name in missing:
         run_errors.append(
-            {"repo": f"{args.username}/{name}", "error": "Repo not found in fetched metadata"}
+            {
+                "repo": f"{args.username}/{name}",
+                "error": "Repo not found in fetched metadata",
+            }
         )
         print_warning(f"Repo not found: {name}")
 
@@ -1439,7 +1586,9 @@ def _run_targeted_audit(
         scoring_profile=scoring_profile_name,
         portfolio_baseline_size=len(filtered_repos),
     )
-    if not _ensure_partial_run_baseline_compatible(existing_report_data, baseline_context):
+    if not _ensure_partial_run_baseline_compatible(
+        existing_report_data, baseline_context
+    ):
         return
 
     portfolio_lang_freq = _portfolio_lang_freq_for_filtered_baseline(filtered_repos)
@@ -1456,7 +1605,9 @@ def _run_targeted_audit(
         return
 
     # Load existing audits from the latest report so we can merge into them
-    existing_audits = existing_report_data.get("audits", []) if existing_report_data else []
+    existing_audits = (
+        existing_report_data.get("audits", []) if existing_report_data else []
+    )
     if existing_report_path:
         print_info(
             f"Merging into {existing_report_path.name} ({len(existing_audits)} existing repos)"
@@ -1515,6 +1666,7 @@ def _run_targeted_audit(
         outputs,
     )
 
+
 def _regenerate_outputs_from_latest_report(
     args,
     output_dir: Path,
@@ -1557,6 +1709,7 @@ def _regenerate_outputs_from_latest_report(
         f"{outputs['review_pack_info']}",
     )
 
+
 def _run_incremental_audit(
     args,
     client: GitHubClient,
@@ -1583,7 +1736,9 @@ def _run_incremental_audit(
         print_info(f"Usage: python -m github_repo_auditor {args.username}")
         return
 
-    repos = _filter_repos(all_repos, skip_forks=args.skip_forks, skip_archived=args.skip_archived)
+    repos = _filter_repos(
+        all_repos, skip_forks=args.skip_forks, skip_archived=args.skip_archived
+    )
 
     # Compare current pushed_at timestamps against stored fingerprints
     changed: list[str] = []
@@ -1615,7 +1770,9 @@ def _run_incremental_audit(
         watch_state = build_watch_state(
             args,
             scoring_profile=scoring_profile_name,
-            portfolio_baseline_size=existing_report_data.get("portfolio_baseline_size", len(repos)),
+            portfolio_baseline_size=existing_report_data.get(
+                "portfolio_baseline_size", len(repos)
+            ),
             run_mode="incremental",
             watch_plan=effective_watch_plan,
             latest_trusted_baseline=latest_trusted_baseline,
@@ -1651,7 +1808,10 @@ def _run_incremental_audit(
         latest_trusted_baseline=latest_trusted_baseline,
     )
 
-def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | None, str]:
+
+def _load_scoring_profile(
+    profile_name: str | None,
+) -> tuple[dict[str, float] | None, str]:
     normalized = _normalize_profile_name(profile_name)
     if not profile_name:
         return None, normalized
@@ -1670,6 +1830,7 @@ def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | 
     print_warning(f"Scoring profile not found: {profile_path}")
     return None, normalized
 
+
 def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
     """Print a Rich table of repos that would be audited, then return."""
     from datetime import timezone
@@ -1684,7 +1845,9 @@ def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
         return
 
     console = Console(stderr=True)
-    table = Table(title=f"[dry-run] {len(repos)} repos would be audited", show_lines=False)
+    table = Table(
+        title=f"[dry-run] {len(repos)} repos would be audited", show_lines=False
+    )
     table.add_column("Name")
     table.add_column("Language")
     table.add_column("Size (KB)", justify="right")
@@ -1711,9 +1874,14 @@ def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
 
     console.print(table)
     est_mb = total_kb / 1024
-    console.print(f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]")
+    console.print(
+        f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]"
+    )
 
-def _maybe_run_reindex(report: "AuditReport", warehouse_path: Path, args: object) -> None:
+
+def _maybe_run_reindex(
+    report: "AuditReport", warehouse_path: Path, args: object
+) -> None:
     """Run semantic reindex after audit.  Skips gracefully if deps missing."""
     from github_repo_auditor.semantic_index import SemanticIndex, _run_reindex
 

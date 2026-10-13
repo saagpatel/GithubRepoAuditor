@@ -96,7 +96,9 @@ class TestFetchDependabotDetails:
                 )
             ]
         )
-        result = fetch_dependabot_details([_make_audit("my-repo")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("my-repo")], token="tok", session=session
+        )
         assert "my-repo" in result
         details = result["my-repo"]
         assert len(details) == 1
@@ -112,7 +114,9 @@ class TestFetchDependabotDetails:
     def test_missing_fields_return_none_not_keyerror(self) -> None:
         """Completely bare alert dict — no KeyError, all detail fields are None."""
         session = _mock_session_dep([{}])
-        result = fetch_dependabot_details([_make_audit("bare-repo")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("bare-repo")], token="tok", session=session
+        )
         d = result["bare-repo"][0]
         assert d["package"] is None
         assert d["ecosystem"] is None
@@ -126,18 +130,28 @@ class TestFetchDependabotDetails:
         alert = _make_dep_alert()
         del alert["security_vulnerability"]["first_patched_version"]
         session = _mock_session_dep([alert])
-        result = fetch_dependabot_details([_make_audit("repo")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("repo")], token="tok", session=session
+        )
         assert result["repo"][0]["first_patched_version"] is None
 
     def test_severity_fallback_to_vulnerability_field(self) -> None:
         """When security_advisory.severity absent, falls back to security_vulnerability.severity."""
         alert = {
             "security_advisory": {},
-            "security_vulnerability": {"severity": "medium", "first_patched_version": None},
-            "dependency": {"package": {"name": "pkg", "ecosystem": "pip"}, "scope": "runtime"},
+            "security_vulnerability": {
+                "severity": "medium",
+                "first_patched_version": None,
+            },
+            "dependency": {
+                "package": {"name": "pkg", "ecosystem": "pip"},
+                "scope": "runtime",
+            },
         }
         session = _mock_session_dep([alert])
-        result = fetch_dependabot_details([_make_audit("repo")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("repo")], token="tok", session=session
+        )
         assert result["repo"][0]["severity"] == "medium"
 
     def test_http_error_expected_status_returns_empty_list_no_crash(self) -> None:
@@ -147,7 +161,9 @@ class TestFetchDependabotDetails:
         resp.status_code = 403
         exc = requests.HTTPError(response=resp)
         session.get.side_effect = exc
-        result = fetch_dependabot_details([_make_audit("private")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("private")], token="tok", session=session
+        )
         assert result["private"] == []
 
     def test_http_error_unexpected_status_returns_empty_list_no_crash(self) -> None:
@@ -157,14 +173,18 @@ class TestFetchDependabotDetails:
         resp.status_code = 500
         exc = requests.HTTPError(response=resp)
         session.get.side_effect = exc
-        result = fetch_dependabot_details([_make_audit("flaky")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("flaky")], token="tok", session=session
+        )
         assert result["flaky"] == []
 
     def test_generic_exception_returns_empty_list_no_crash(self) -> None:
         """Any unexpected exception → repo gets empty list, no exception propagated."""
         session = MagicMock(spec=requests.Session)
         session.get.side_effect = RuntimeError("network exploded")
-        result = fetch_dependabot_details([_make_audit("broken")], token="tok", session=session)
+        result = fetch_dependabot_details(
+            [_make_audit("broken")], token="tok", session=session
+        )
         assert result["broken"] == []
 
     def test_no_token_returns_empty_dict(self) -> None:
@@ -211,9 +231,13 @@ class TestFetchDependabotDetails:
         )
         for call_args in except_logger_calls:
             # No %-formatting with a second argument
-            assert "%" not in call_args, f"Found %-format in except logger: {call_args!r}"
+            assert "%" not in call_args, (
+                f"Found %-format in except logger: {call_args!r}"
+            )
             # No .format() chaining
-            assert ".format(" not in call_args, f"Found .format() in except logger: {call_args!r}"
+            assert ".format(" not in call_args, (
+                f"Found .format() in except logger: {call_args!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +271,13 @@ def _ghas(repo: str, details: list[dict]) -> dict:
     """Build a minimal ghas_data entry for one repo with flat detail dicts."""
     return {
         repo: {
-            "dependabot": {"critical": 0, "high": 0, "medium": 0, "low": 0, "available": True},
+            "dependabot": {
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+                "available": True,
+            },
             "dependabot_details": details,
         }
     }
@@ -274,7 +304,8 @@ class TestBurndownFiltering:
     def test_no_fix_excluded(self) -> None:
         """Alert with first_patched_version=None must be excluded."""
         data = _ghas(
-            "repo", [_flat(scope="runtime", severity="critical", first_patched_version=None)]
+            "repo",
+            [_flat(scope="runtime", severity="critical", first_patched_version=None)],
         )
         report = build_security_burndown(data)
         assert report.distinct_advisories == 0
@@ -311,7 +342,13 @@ class TestBurndownFiltering:
         """Entries missing the key (old counts-only files) are skipped gracefully."""
         data = {
             "repo": {
-                "dependabot": {"critical": 5, "high": 0, "medium": 0, "low": 0, "available": True},
+                "dependabot": {
+                    "critical": 5,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
             }
         }
         report = build_security_burndown(data)
@@ -424,8 +461,14 @@ class TestBurndownGrouping:
             "manifest_path": "package.json",
         }
         data = {
-            "repo-x": {"dependabot": {}, "dependabot_details": [{**base, "severity": "critical"}]},
-            "repo-y": {"dependabot": {}, "dependabot_details": [{**base, "severity": "high"}]},
+            "repo-x": {
+                "dependabot": {},
+                "dependabot_details": [{**base, "severity": "critical"}],
+            },
+            "repo-y": {
+                "dependabot": {},
+                "dependabot_details": [{**base, "severity": "high"}],
+            },
         }
         report = build_security_burndown(data)
         assert report.distinct_advisories == 1
@@ -461,8 +504,18 @@ class TestBurndownRanking:
     def test_critical_before_high(self) -> None:
         data = self._build_data(
             [
-                {"repo": "r1", "package": "a-pkg", "severity": "high", "ghsa_id": "GHSA-high"},
-                {"repo": "r2", "package": "b-pkg", "severity": "critical", "ghsa_id": "GHSA-crit"},
+                {
+                    "repo": "r1",
+                    "package": "a-pkg",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-high",
+                },
+                {
+                    "repo": "r2",
+                    "package": "b-pkg",
+                    "severity": "critical",
+                    "ghsa_id": "GHSA-crit",
+                },
             ]
         )
         report = build_security_burndown(data)
@@ -473,10 +526,30 @@ class TestBurndownRanking:
         """Among same severity, more-repos entry comes first."""
         data = self._build_data(
             [
-                {"repo": "r1", "package": "pkg-a", "severity": "high", "ghsa_id": "GHSA-wide"},
-                {"repo": "r2", "package": "pkg-a", "severity": "high", "ghsa_id": "GHSA-wide"},
-                {"repo": "r3", "package": "pkg-a", "severity": "high", "ghsa_id": "GHSA-wide"},
-                {"repo": "r4", "package": "pkg-b", "severity": "high", "ghsa_id": "GHSA-narrow"},
+                {
+                    "repo": "r1",
+                    "package": "pkg-a",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-wide",
+                },
+                {
+                    "repo": "r2",
+                    "package": "pkg-a",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-wide",
+                },
+                {
+                    "repo": "r3",
+                    "package": "pkg-a",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-wide",
+                },
+                {
+                    "repo": "r4",
+                    "package": "pkg-b",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-narrow",
+                },
             ]
         )
         report = build_security_burndown(data)
@@ -488,8 +561,18 @@ class TestBurndownRanking:
         """When severity and repo-count tie, sort by package name ascending."""
         data = self._build_data(
             [
-                {"repo": "r1", "package": "zebra", "severity": "high", "ghsa_id": "GHSA-z"},
-                {"repo": "r2", "package": "alpha", "severity": "high", "ghsa_id": "GHSA-a"},
+                {
+                    "repo": "r1",
+                    "package": "zebra",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-z",
+                },
+                {
+                    "repo": "r2",
+                    "package": "alpha",
+                    "severity": "high",
+                    "ghsa_id": "GHSA-a",
+                },
             ]
         )
         report = build_security_burndown(data)
@@ -663,7 +746,13 @@ class TestBurndownRoundTrip:
         """Build + render on a mixed dataset produces valid markdown."""
         ghas_data = {
             "IncidentWorkbench": {
-                "dependabot": {"critical": 2, "high": 1, "medium": 0, "low": 0, "available": True},
+                "dependabot": {
+                    "critical": 2,
+                    "high": 1,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
                 "dependabot_details": [
                     {
                         "package": "axios",
@@ -686,7 +775,13 @@ class TestBurndownRoundTrip:
                 ],
             },
             "IncidentWorkbench-statuspage": {
-                "dependabot": {"critical": 1, "high": 0, "medium": 0, "low": 0, "available": True},
+                "dependabot": {
+                    "critical": 1,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
                 "dependabot_details": [
                     {
                         "package": "axios",
@@ -700,7 +795,13 @@ class TestBurndownRoundTrip:
                 ],
             },
             "my-api": {
-                "dependabot": {"critical": 0, "high": 1, "medium": 0, "low": 0, "available": True},
+                "dependabot": {
+                    "critical": 0,
+                    "high": 1,
+                    "medium": 0,
+                    "low": 0,
+                    "available": True,
+                },
                 "dependabot_details": [
                     {
                         "package": "requests",

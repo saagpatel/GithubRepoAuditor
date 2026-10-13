@@ -43,7 +43,9 @@ def _make_packet(
     )
 
 
-def _seed_sections(output_dir: Path, packet: DraftReadmePacket | None = None) -> list[str]:
+def _seed_sections(
+    output_dir: Path, packet: DraftReadmePacket | None = None
+) -> list[str]:
     """Write packet sections to ledger, return list of approval_ids."""
     if packet is None:
         packet = _make_packet()
@@ -98,7 +100,9 @@ class TestSplitReadmeSections:
         assert result[1][0] == "Usage"
 
     def test_h2_inside_code_fence_is_ignored(self) -> None:
-        text = "## Real Heading\nsome text\n```\n## Not a heading\ncode\n```\nmore text\n"
+        text = (
+            "## Real Heading\nsome text\n```\n## Not a heading\ncode\n```\nmore text\n"
+        )
         result = split_readme_sections(text)
         # Only "Real Heading" should split — the fenced one should be ignored
         assert len(result) == 1
@@ -129,7 +133,9 @@ class TestWriteSectionPackets:
 
             records = load_approval_records(output_dir, "", limit=500)
             section_records = [
-                r for r in records if r.get("approval_subject_type") == "draft-readme-section"
+                r
+                for r in records
+                if r.get("approval_subject_type") == "draft-readme-section"
             ]
             assert len(section_records) == 3
 
@@ -142,10 +148,13 @@ class TestWriteSectionPackets:
 
             records = load_approval_records(output_dir, "", limit=500)
             section_records = [
-                r for r in records if r.get("approval_subject_type") == "draft-readme-section"
+                r
+                for r in records
+                if r.get("approval_subject_type") == "draft-readme-section"
             ]
             assert all(
-                r["approval_subject_type"] == "draft-readme-section" for r in section_records
+                r["approval_subject_type"] == "draft-readme-section"
+                for r in section_records
             )
 
     def test_distinct_approval_ids_shared_packet_id(self) -> None:
@@ -158,7 +167,9 @@ class TestWriteSectionPackets:
 
             records = load_approval_records(output_dir, "", limit=500)
             section_records = [
-                r for r in records if r.get("approval_subject_type") == "draft-readme-section"
+                r
+                for r in records
+                if r.get("approval_subject_type") == "draft-readme-section"
             ]
             approval_ids = [r["approval_id"] for r in section_records]
             assert len(set(approval_ids)) == 3  # all distinct
@@ -206,7 +217,9 @@ class TestApproveSection:
 
     def test_approve_nonexistent_raises_value_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            with pytest.raises(ValueError, match="no draft-readme-section record found"):
+            with pytest.raises(
+                ValueError, match="no draft-readme-section record found"
+            ):
                 approve_section("drs-doesnotexist", Path(tmp))
 
 
@@ -226,7 +239,9 @@ class TestRejectSection:
 
     def test_reject_nonexistent_raises_value_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            with pytest.raises(ValueError, match="no draft-readme-section record found"):
+            with pytest.raises(
+                ValueError, match="no draft-readme-section record found"
+            ):
                 reject_section("drs-doesnotexist", Path(tmp), reason="x")
 
 
@@ -286,7 +301,9 @@ class TestLoadApprovedSectionedPackets:
             assert result == {}
 
     def test_all_terminal_packet_returned(self) -> None:
-        packet = _make_packet(proposed_readme="## A\nbody A\n## B\nbody B\n## C\nbody C\n")
+        packet = _make_packet(
+            proposed_readme="## A\nbody A\n## B\nbody B\n## C\nbody C\n"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             record_ids = _seed_sections(output_dir, packet)
@@ -409,7 +426,9 @@ class TestCounterMath:
 
             records = load_approval_records(output_dir, "", limit=500)
             sections = [
-                r for r in records if r.get("approval_subject_type") == "draft-readme-section"
+                r
+                for r in records
+                if r.get("approval_subject_type") == "draft-readme-section"
             ]
             approved = sum(1 for s in sections if s.get("state") == "approved")
             rejected = sum(1 for s in sections if s.get("state") == "rejected")
@@ -430,10 +449,14 @@ class TestDraftSectionsRoutes:
 
         from github_repo_auditor.serve.app import create_app  # noqa: E402
 
-        return TestClient(create_app(output_dir=output_dir), raise_server_exceptions=True)
+        return TestClient(
+            create_app(output_dir=output_dir), raise_server_exceptions=True
+        )
 
     def test_get_draft_sections_200(self) -> None:
-        packet = _make_packet(proposed_readme="## Install\npip install foo\n## Usage\nrun\n")
+        packet = _make_packet(
+            proposed_readme="## Install\npip install foo\n## Usage\nrun\n"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             _seed_sections(output_dir, packet)

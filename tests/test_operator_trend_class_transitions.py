@@ -176,7 +176,12 @@ def test_target_class_transition_history_tracks_pending_support_strengthening() 
 
 
 def test_target_class_transition_history_marks_reversal_after_pending_caution() -> None:
-    target = {"repo": "RepoB", "title": "Stabilize setup", "lane": "blocked", "kind": "setup"}
+    target = {
+        "repo": "RepoB",
+        "title": "Stabilize setup",
+        "lane": "blocked",
+        "kind": "setup",
+    }
     transition_events = [
         {
             "class_key": "blocked:setup",

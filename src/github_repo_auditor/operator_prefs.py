@@ -74,11 +74,18 @@ def detect_suppressions(
     # Normalise records into (action_type, target_context, decision, timestamp) tuples
     normalised: list[tuple[str, str, str, str]] = []
     for rec in approval_records:
-        action_type = str(rec.get("action_type") or rec.get("approval_subject_type") or "").strip()
-        target_context = str(rec.get("target_context") or rec.get("subject_key") or "*").strip()
+        action_type = str(
+            rec.get("action_type") or rec.get("approval_subject_type") or ""
+        ).strip()
+        target_context = str(
+            rec.get("target_context") or rec.get("subject_key") or "*"
+        ).strip()
         decision = str(rec.get("decision") or "").strip().lower()
         timestamp = str(
-            rec.get("timestamp") or rec.get("approved_at") or rec.get("reviewed_at") or ""
+            rec.get("timestamp")
+            or rec.get("approved_at")
+            or rec.get("reviewed_at")
+            or ""
         ).strip()
 
         if not action_type or decision not in {"approved", "rejected"}:

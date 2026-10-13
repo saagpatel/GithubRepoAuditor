@@ -124,11 +124,15 @@ class ProducerEvidence:
         try:
             parsed_verified_at = datetime.fromisoformat(verified_at)
         except ValueError as exc:
-            raise ValueError("Producer evidence verified_at is not valid ISO-8601.") from exc
+            raise ValueError(
+                "Producer evidence verified_at is not valid ISO-8601."
+            ) from exc
         if parsed_verified_at.tzinfo is None:
             raise ValueError("Producer evidence verified_at must include a timezone.")
         if len(commit) != 40 or any(char not in "0123456789abcdef" for char in commit):
-            raise ValueError("Producer evidence commit must be a lowercase 40-character SHA.")
+            raise ValueError(
+                "Producer evidence commit must be a lowercase 40-character SHA."
+            )
         if payload["worktree_clean"] is not True:
             raise ValueError("Producer evidence must declare a clean worktree.")
         if payload["dirty_path_count"] != 0:
@@ -352,7 +356,9 @@ def _git(repo_root: Path, *args: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate canonical GHRA producer identity.")
+    parser = argparse.ArgumentParser(
+        description="Validate canonical GHRA producer identity."
+    )
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--expected-repository", required=True)
     parser.add_argument("--expected-ref", required=True)

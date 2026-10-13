@@ -13,7 +13,15 @@ if TYPE_CHECKING:
 
 # Common entry points by language
 ENTRY_POINTS: dict[str | None, list[str]] = {
-    "Python": ["main.py", "app.py", "src/main.py", "src/app.py", "__main__.py", "src/__main__.py", "manage.py"],
+    "Python": [
+        "main.py",
+        "app.py",
+        "src/main.py",
+        "src/app.py",
+        "__main__.py",
+        "src/__main__.py",
+        "manage.py",
+    ],
     "JavaScript": ["index.js", "src/index.js", "app.js", "src/app.js", "server.js"],
     "TypeScript": ["index.ts", "src/index.ts", "app.ts", "src/app.ts", "src/main.ts"],
     "Rust": ["src/main.rs", "src/lib.rs"],
@@ -27,18 +35,42 @@ ENTRY_POINTS: dict[str | None, list[str]] = {
 
 # Additional patterns that work across languages
 GENERIC_ENTRY_PATTERNS = [
-    "App.tsx", "App.jsx", "src/App.tsx", "src/App.jsx",
-    "index.html", "src/index.html",
+    "App.tsx",
+    "App.jsx",
+    "src/App.tsx",
+    "src/App.jsx",
+    "index.html",
+    "src/index.html",
 ]
 
 VENDORED_DIRS = {"node_modules", "vendor", "third_party", "bower_components"}
 
 # Extensions to scan for TODOs
-CODE_EXTENSIONS = frozenset({
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".java",
-    ".swift", ".rb", ".c", ".cpp", ".h", ".cs", ".kt", ".scala",
-    ".sh", ".lua", ".ex", ".exs", ".zig",
-})
+CODE_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".rs",
+        ".go",
+        ".java",
+        ".swift",
+        ".rb",
+        ".c",
+        ".cpp",
+        ".h",
+        ".cs",
+        ".kt",
+        ".scala",
+        ".sh",
+        ".lua",
+        ".ex",
+        ".exs",
+        ".zig",
+    }
+)
 
 TODO_PATTERN = re.compile(r"\b(TODO|FIXME|HACK|XXX)\b", re.IGNORECASE)
 
@@ -119,12 +151,16 @@ class CodeQualityAnalyzer(BaseAnalyzer):
                 findings.append("Commit messages could be more descriptive")
 
             # Conventional commit detection
-            messages = [c.get("commit", {}).get("message", "").split("\n")[0] for c in commits]
+            messages = [
+                c.get("commit", {}).get("message", "").split("\n")[0] for c in commits
+            ]
             conv = _classify_commits(messages)
             details.update(conv)
             if conv["conventional_ratio"] > 0.5:
                 score = min(1.0, score + 0.05)
-                findings.append(f"Conventional commits: {conv['conventional_ratio']:.0%}")
+                findings.append(
+                    f"Conventional commits: {conv['conventional_ratio']:.0%}"
+                )
 
             # PR closure ratio (metadata, not scored)
             prs = github_client.get_pull_requests(owner, metadata.name)
@@ -143,7 +179,9 @@ class CodeQualityAnalyzer(BaseAnalyzer):
             if radon_data:
                 details.update(radon_data)
                 if radon_data.get("avg_maintainability_index", 0) > 20:
-                    findings.append(f"Maintainability: {radon_data['avg_maintainability_index']:.0f}/100")
+                    findings.append(
+                        f"Maintainability: {radon_data['avg_maintainability_index']:.0f}/100"
+                    )
 
         return self._result(score, findings, details)
 
@@ -208,7 +246,16 @@ def _count_todos(repo_path: Path, max_files: int = 500) -> tuple[int, int]:
 
 def _has_type_definitions(repo_path: Path, language: str | None) -> bool:
     """Check if the project uses type definitions."""
-    if language in ("TypeScript", "Rust", "Go", "Java", "Swift", "C#", "Kotlin", "Scala"):
+    if language in (
+        "TypeScript",
+        "Rust",
+        "Go",
+        "Java",
+        "Swift",
+        "C#",
+        "Kotlin",
+        "Scala",
+    ):
         return True
 
     # TypeScript files present in JS projects
@@ -327,7 +374,10 @@ def _radon_analysis(repo_path: Path, max_files: int = 50) -> dict | None:
     for py_file in repo_path.rglob("*.py"):
         if files_analyzed >= max_files:
             break
-        if any(part.startswith(".") or part in ("node_modules", "vendor", "__pycache__") for part in py_file.parts):
+        if any(
+            part.startswith(".") or part in ("node_modules", "vendor", "__pycache__")
+            for part in py_file.parts
+        ):
             continue
         try:
             source = py_file.read_text(errors="replace")

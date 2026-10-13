@@ -1,4 +1,5 @@
 """Unicode sparkline rendering for score history visualization."""
+
 from __future__ import annotations
 
 BARS = "▁▂▃▄▅▆▇█"

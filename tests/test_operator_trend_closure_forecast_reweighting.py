@@ -12,10 +12,14 @@ def _target_class_key(item: dict) -> str:
 
 
 def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return bool(target.get("local_noise") or history_meta.get("current_transition_reversed"))
+    return bool(
+        target.get("local_noise") or history_meta.get("current_transition_reversed")
+    )
 
 
-def test_apply_closure_forecast_reweighting_control_softens_confirmation_when_noise_blocks_it() -> None:
+def test_apply_closure_forecast_reweighting_control_softens_confirmation_when_noise_blocks_it() -> (
+    None
+):
     updates = apply_closure_forecast_reweighting_control(
         {
             "class_transition_age_runs": 2,
@@ -46,7 +50,9 @@ def test_apply_closure_forecast_reweighting_control_softens_confirmation_when_no
     assert updates[2] == "hold"
 
 
-def test_apply_closure_forecast_reweighting_control_clears_low_confidence_support_on_fresh_debt() -> None:
+def test_apply_closure_forecast_reweighting_control_clears_low_confidence_support_on_fresh_debt() -> (
+    None
+):
     updates = apply_closure_forecast_reweighting_control(
         {
             "class_transition_age_runs": 4,
@@ -81,7 +87,9 @@ def test_apply_closure_forecast_reweighting_control_clears_low_confidence_suppor
     assert updates[7] == "verify-first"
 
 
-def test_pending_debt_freshness_hotspots_prefers_highest_stale_and_fresh_groups() -> None:
+def test_pending_debt_freshness_hotspots_prefers_highest_stale_and_fresh_groups() -> (
+    None
+):
     stale_hotspots = pending_debt_freshness_hotspots(
         [
             {

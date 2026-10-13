@@ -65,10 +65,14 @@ STRUCTURE_ENTRY_FILES = (
     "Program.cs",
     "Package.swift",
 )
-BRANCH_KEYWORD_PATTERN = re.compile(r"\b(if|elif|else|for|while|try|except|case|match|with)\b")
+BRANCH_KEYWORD_PATTERN = re.compile(
+    r"\b(if|elif|else|for|while|try|except|case|match|with)\b"
+)
 
 
-def build_implementation_hotspots(repo_path: Path | None, audit: RepoAudit) -> list[dict]:
+def build_implementation_hotspots(
+    repo_path: Path | None, audit: RepoAudit
+) -> list[dict]:
     if repo_path is None or not repo_path.exists():
         return []
 
@@ -94,16 +98,28 @@ def build_portfolio_implementation_hotspots(audits: list[RepoAudit]) -> list[dic
     items: list[dict] = []
     for audit in audits:
         for hotspot in audit.implementation_hotspots:
-            items.append({"repo": audit.metadata.name, "tier": audit.completeness_tier, **hotspot})
+            items.append(
+                {
+                    "repo": audit.metadata.name,
+                    "tier": audit.completeness_tier,
+                    **hotspot,
+                }
+            )
     items.sort(key=lambda item: float(item.get("pressure_score", 0.0)), reverse=True)
     return items[:20]
 
 
 def build_implementation_hotspots_summary(audits: list[RepoAudit]) -> dict:
     portfolio_items = build_portfolio_implementation_hotspots(audits)
-    repos_with_hotspots = [audit.metadata.name for audit in audits if audit.implementation_hotspots]
-    suggestion_counts = Counter(item.get("suggestion_type", "refactor") for item in portfolio_items)
-    category_counts = Counter(item.get("category", "unknown") for item in portfolio_items)
+    repos_with_hotspots = [
+        audit.metadata.name for audit in audits if audit.implementation_hotspots
+    ]
+    suggestion_counts = Counter(
+        item.get("suggestion_type", "refactor") for item in portfolio_items
+    )
+    category_counts = Counter(
+        item.get("category", "unknown") for item in portfolio_items
+    )
     if not portfolio_items:
         summary = "No meaningful implementation hotspots are currently surfaced."
     else:
@@ -132,7 +148,9 @@ def build_implementation_hotspots_summary(audits: list[RepoAudit]) -> dict:
     }
 
 
-def _python_complexity_candidates(repo_path: Path, *, max_files: int = 60) -> list[dict]:
+def _python_complexity_candidates(
+    repo_path: Path, *, max_files: int = 60
+) -> list[dict]:
     candidates: list[dict] = []
     files_analyzed = 0
     for py_file in repo_path.rglob("*.py"):
@@ -175,7 +193,11 @@ def _todo_density_candidates(repo_path: Path, *, max_files: int = 160) -> list[d
     candidates: list[dict] = []
     files_scanned = 0
     for path in repo_path.rglob("*"):
-        if files_scanned >= max_files or not path.is_file() or path.suffix not in CODE_EXTENSIONS:
+        if (
+            files_scanned >= max_files
+            or not path.is_file()
+            or path.suffix not in CODE_EXTENSIONS
+        ):
             continue
         if _should_skip(path, repo_path):
             continue
@@ -220,7 +242,11 @@ def _security_candidates(repo_path: Path) -> list[dict]:
 
     for rel_path in dangerous_files:
         rel_path_str = str(rel_path)
-        score = 0.82 if Path(rel_path_str).suffix in {".pem", ".key", ".p12", ".pfx"} else 0.75
+        score = (
+            0.82
+            if Path(rel_path_str).suffix in {".pem", ".key", ".p12", ".pfx"}
+            else 0.75
+        )
         candidates.append(
             _build_hotspot(
                 scope="file",
@@ -299,14 +325,20 @@ def _dependency_candidates(repo_path: Path, audit: RepoAudit) -> list[dict]:
 def _structure_candidates(repo_path: Path, audit: RepoAudit) -> list[dict]:
     score_map = _dimension_scores(audit)
     details_map = _dimension_details(audit)
-    ship_readiness = audit.lenses.get("ship_readiness", {}).get("score", audit.overall_score)
+    ship_readiness = audit.lenses.get("ship_readiness", {}).get(
+        "score", audit.overall_score
+    )
     structure_details = details_map.get("structure", {})
     code_quality_details = details_map.get("code_quality", {})
     testing_score = score_map.get("testing", 0.0)
     candidates: list[dict] = []
 
     if ship_readiness < 0.55 and not code_quality_details.get("entry_point"):
-        target = _first_existing(repo_path, structure_details.get("source_dirs") or []) or _first_existing(repo_path, structure_details.get("config_files") or []) or "."
+        target = (
+            _first_existing(repo_path, structure_details.get("source_dirs") or [])
+            or _first_existing(repo_path, structure_details.get("config_files") or [])
+            or "."
+        )
         candidates.append(
             _build_hotspot(
                 scope="module",
@@ -322,7 +354,10 @@ def _structure_candidates(repo_path: Path, audit: RepoAudit) -> list[dict]:
         )
 
     if ship_readiness < 0.55 and testing_score < 0.45:
-        target = _first_existing(repo_path, structure_details.get("source_dirs") or []) or "."
+        target = (
+            _first_existing(repo_path, structure_details.get("source_dirs") or [])
+            or "."
+        )
         candidates.append(
             _build_hotspot(
                 scope="module",
@@ -353,16 +388,22 @@ def _aggregate_module_candidates(candidates: list[dict]) -> list[dict]:
         if len(items) < 2:
             continue
         categories = Counter(str(item.get("category", "")) for item in items)
-        suggestion_types = Counter(str(item.get("suggestion_type", "")) for item in items)
+        suggestion_types = Counter(
+            str(item.get("suggestion_type", "")) for item in items
+        )
         top_item = max(items, key=lambda item: float(item.get("pressure_score", 0.0)))
-        avg_score = sum(float(item.get("pressure_score", 0.0)) for item in items) / len(items)
+        avg_score = sum(float(item.get("pressure_score", 0.0)) for item in items) / len(
+            items
+        )
         aggregated.append(
             _build_hotspot(
                 scope="module",
                 path=module,
                 module=module,
                 category=categories.most_common(1)[0][0],
-                pressure_score=round(min(1.0, avg_score + min(0.12, len(items) * 0.03)), 3),
+                pressure_score=round(
+                    min(1.0, avg_score + min(0.12, len(items) * 0.03)), 3
+                ),
                 suggestion_type=suggestion_types.most_common(1)[0][0],
                 why_it_matters=(
                     f"{module} is accumulating pressure from multiple files, so it is a better cleanup boundary than tackling one symptom in isolation."
@@ -391,7 +432,10 @@ def _dedupe_hotspots(items: list[dict], *, limit: int) -> list[dict]:
 
 
 def _dimension_scores(audit: RepoAudit) -> dict[str, float]:
-    scores = {result.dimension: float(result.score or 0.0) for result in audit.analyzer_results}
+    scores = {
+        result.dimension: float(result.score or 0.0)
+        for result in audit.analyzer_results
+    }
     security_score = audit.security_posture.get("score")
     if security_score is not None:
         scores["security"] = float(security_score or 0.0)
@@ -399,7 +443,10 @@ def _dimension_scores(audit: RepoAudit) -> dict[str, float]:
 
 
 def _dimension_details(audit: RepoAudit) -> dict[str, dict]:
-    return {result.dimension: dict(result.details or {}) for result in audit.analyzer_results}
+    return {
+        result.dimension: dict(result.details or {})
+        for result in audit.analyzer_results
+    }
 
 
 def _python_complexity_metrics(source: str) -> dict[str, float]:
@@ -416,7 +463,9 @@ def _python_complexity_metrics(source: str) -> dict[str, float]:
         worst = max(worst, int(block.complexity))
         if block.complexity >= 10:
             complex_blocks += 1
-    pressure = min(1.0, 0.22 + min(worst, 25) * 0.04 + complex_blocks * 0.12 + total * 0.004)
+    pressure = min(
+        1.0, 0.22 + min(worst, 25) * 0.04 + complex_blocks * 0.12 + total * 0.004
+    )
     return {
         "worst_complexity": worst,
         "complex_blocks": complex_blocks,
@@ -426,10 +475,16 @@ def _python_complexity_metrics(source: str) -> dict[str, float]:
 
 def _fallback_python_complexity_metrics(source: str) -> dict[str, float]:
     lines = source.splitlines()
-    function_boundaries = [index for index, line in enumerate(lines, 1) if line.lstrip().startswith("def ")]
+    function_boundaries = [
+        index for index, line in enumerate(lines, 1) if line.lstrip().startswith("def ")
+    ]
     worst_span = 0
     for idx, start in enumerate(function_boundaries):
-        end = function_boundaries[idx + 1] if idx + 1 < len(function_boundaries) else len(lines) + 1
+        end = (
+            function_boundaries[idx + 1]
+            if idx + 1 < len(function_boundaries)
+            else len(lines) + 1
+        )
         span = end - start
         worst_span = max(worst_span, span)
     branch_hits = len(BRANCH_KEYWORD_PATTERN.findall(source))

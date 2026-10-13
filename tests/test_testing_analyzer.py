@@ -9,9 +9,13 @@ from github_repo_auditor.analyzers.testing import TestingAnalyzer
 
 
 class TestTestingAnalyzer:
-    def test_find_test_files_caps_results_at_500(self, tmp_path: Path, sample_metadata) -> None:
+    def test_find_test_files_caps_results_at_500(
+        self, tmp_path: Path, sample_metadata
+    ) -> None:
         for index in range(501):
-            (tmp_path / f"case_{index}_test.py").write_text("def test_case():\n    assert True\n")
+            (tmp_path / f"case_{index}_test.py").write_text(
+                "def test_case():\n    assert True\n"
+            )
 
         result = TestingAnalyzer().analyze(tmp_path, sample_metadata)
 
@@ -62,7 +66,9 @@ class TestTestingAnalyzer:
         assert result.details["framework"] == "pytest"
         assert "Test framework: pytest" in result.findings
 
-    def test_detects_unittest_from_pyproject(self, tmp_path: Path, sample_metadata) -> None:
+    def test_detects_unittest_from_pyproject(
+        self, tmp_path: Path, sample_metadata
+    ) -> None:
         (tmp_path / "pyproject.toml").write_text("[tool.unittest]\n")
 
         result = TestingAnalyzer().analyze(tmp_path, sample_metadata)
@@ -84,9 +90,11 @@ class TestTestingAnalyzer:
         assert result.details["framework"] == "pytest"
         assert "Test framework: pytest" in result.findings
 
-    def test_detects_cargo_dev_dependencies(self, tmp_path: Path, sample_metadata) -> None:
+    def test_detects_cargo_dev_dependencies(
+        self, tmp_path: Path, sample_metadata
+    ) -> None:
         (tmp_path / "Cargo.toml").write_text(
-            "[package]\nname = \"demo\"\n\n[dev-dependencies]\npretty_assertions = \"1\"\n"
+            '[package]\nname = "demo"\n\n[dev-dependencies]\npretty_assertions = "1"\n'
         )
 
         result = TestingAnalyzer().analyze(tmp_path, sample_metadata)
@@ -95,7 +103,9 @@ class TestTestingAnalyzer:
         assert result.details["framework"] == "cargo-test"
         assert "Test framework: cargo-test" in result.findings
 
-    def test_detects_go_test_files_without_config(self, tmp_path: Path, sample_metadata) -> None:
+    def test_detects_go_test_files_without_config(
+        self, tmp_path: Path, sample_metadata
+    ) -> None:
         (tmp_path / "math_test.go").write_text("package demo\n")
 
         result = TestingAnalyzer().analyze(tmp_path, sample_metadata)

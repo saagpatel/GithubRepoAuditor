@@ -63,10 +63,7 @@ class TestCodeQualityAnalyzer:
         self, tmp_path: Path
     ) -> None:
         (tmp_path / "main.py").write_text(
-            "# TODO: one\n"
-            "# FIXME: two\n"
-            "# HACK: three\n"
-            "print('tiny project')\n"
+            "# TODO: one\n# FIXME: two\n# HACK: three\nprint('tiny project')\n"
         )
         (tmp_path / "vendor").mkdir()
         client = _fake_github_client(
@@ -151,8 +148,12 @@ class TestCodeQualityAnalyzer:
 
 
 class TestEntryPointDetection:
-    def test_detects_generic_entry_point_for_unknown_language(self, tmp_path: Path) -> None:
-        (tmp_path / "App.tsx").write_text("export default function App() { return null; }\n")
+    def test_detects_generic_entry_point_for_unknown_language(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "App.tsx").write_text(
+            "export default function App() { return null; }\n"
+        )
 
         assert _find_entry_point(tmp_path, "Elixir") == "App.tsx"
 
@@ -180,7 +181,9 @@ class TestTodoCounting:
     def test_counts_todo_markers_and_skips_hidden_and_vendored_files(
         self, tmp_path: Path
     ) -> None:
-        (tmp_path / "app.py").write_text("# TODO: counted\nprint('x')\n# xxx counted too\n")
+        (tmp_path / "app.py").write_text(
+            "# TODO: counted\nprint('x')\n# xxx counted too\n"
+        )
         hidden = tmp_path / ".cache"
         hidden.mkdir()
         (hidden / "ignored.py").write_text("# TODO: ignored\n")
@@ -227,13 +230,18 @@ class TestTodoCounting:
 
 
 class TestTypeDefinitionDetection:
-    @pytest.mark.parametrize("language", ["TypeScript", "Rust", "Go", "Java", "Swift", "C#", "Kotlin", "Scala"])
+    @pytest.mark.parametrize(
+        "language",
+        ["TypeScript", "Rust", "Go", "Java", "Swift", "C#", "Kotlin", "Scala"],
+    )
     def test_strongly_typed_languages_count_as_typed(
         self, tmp_path: Path, language: str
     ) -> None:
         assert _has_type_definitions(tmp_path, language) is True
 
-    def test_typescript_file_counts_as_types_outside_node_modules(self, tmp_path: Path) -> None:
+    def test_typescript_file_counts_as_types_outside_node_modules(
+        self, tmp_path: Path
+    ) -> None:
         (tmp_path / "index.ts").write_text("export const value: number = 1;\n")
         node_modules = tmp_path / "node_modules" / "pkg"
         node_modules.mkdir(parents=True)
@@ -282,11 +290,12 @@ class TestVendoredDetection:
         assert "vendor/ committed" in issues
         assert "third_party/ committed" in issues
         assert "bower_components/ committed" in issues
-        assert any(issue.startswith("Large file:") and issue.endswith("(976KB)") for issue in issues)
+        assert any(
+            issue.startswith("Large file:") and issue.endswith("(976KB)")
+            for issue in issues
+        )
 
-    def test_detect_vendored_skips_hidden_files(
-        self, tmp_path: Path
-    ) -> None:
+    def test_detect_vendored_skips_hidden_files(self, tmp_path: Path) -> None:
         hidden = tmp_path / ".hidden"
         hidden.mkdir()
         (hidden / "large.bin").write_bytes(b"x" * 1_000_001)
@@ -321,7 +330,9 @@ class TestCommitMessageHelpers:
     def test_score_commit_messages_handles_empty_input(self) -> None:
         assert _score_commit_messages([]) == (0.5, "No commits available")
 
-    def test_score_commit_messages_uses_first_line_and_filters_lazy_messages(self) -> None:
+    def test_score_commit_messages_uses_first_line_and_filters_lazy_messages(
+        self,
+    ) -> None:
         commits = [
             _commit("feat: add durable cache\n\nExpanded body"),
             _commit("wip"),

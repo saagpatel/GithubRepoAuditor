@@ -7,11 +7,17 @@ from pathlib import Path
 from typing import Any
 
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
-from github_repo_auditor.report_contracts import RiskLookupEntry, RiskPosture, TopElevatedEntry
+from github_repo_auditor.report_contracts import (
+    RiskLookupEntry,
+    RiskPosture,
+    TopElevatedEntry,
+)
 from github_repo_auditor.scoring_dimensions import display_dimension
 from github_repo_auditor.terminology import ACTION_SYNC_CANONICAL_LABELS
 from github_repo_auditor.weekly_packaging import finalize_weekly_pack
-from github_repo_auditor.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
+from github_repo_auditor.weekly_scheduling_overlay import (
+    apply_weekly_scheduling_overlay,
+)
 
 logger = logging.getLogger(__name__)
 

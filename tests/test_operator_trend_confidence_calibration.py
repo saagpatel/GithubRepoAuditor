@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from github_repo_auditor.operator_trend_confidence_calibration import build_confidence_calibration
+from github_repo_auditor.operator_trend_confidence_calibration import (
+    build_confidence_calibration,
+)
 
 
 def _queue_identity(item: dict) -> str:
@@ -35,7 +37,9 @@ def _run(
     }
 
 
-def test_build_confidence_calibration_marks_healthy_when_high_confidence_validates() -> None:
+def test_build_confidence_calibration_marks_healthy_when_high_confidence_validates() -> (
+    None
+):
     target_a = {"repo": "RepoA", "title": "Fix A", "lane": "blocked"}
     target_b = {"repo": "RepoB", "title": "Fix B", "lane": "blocked"}
     target_c = {"repo": "RepoC", "title": "Fix C", "lane": "blocked"}
@@ -69,8 +73,12 @@ def test_build_confidence_calibration_marks_noisy_when_reopens_repeat() -> None:
     history = [
         _run("run-1", "2026-02-01T00:00:00Z", target=target_a, queue=[target_a]),
         _run("run-2", "2026-02-02T00:00:00Z", target=target_b, queue=[target_b]),
-        _run("run-3", "2026-02-03T00:00:00Z", target=target_c, queue=[target_a, target_c]),
-        _run("run-4", "2026-02-04T00:00:00Z", target=target_d, queue=[target_b, target_d]),
+        _run(
+            "run-3", "2026-02-03T00:00:00Z", target=target_c, queue=[target_a, target_c]
+        ),
+        _run(
+            "run-4", "2026-02-04T00:00:00Z", target=target_d, queue=[target_b, target_d]
+        ),
         _run("run-5", "2026-02-05T00:00:00Z", target=None, queue=[target_c]),
         _run("run-6", "2026-02-06T00:00:00Z", target=None, queue=[target_d]),
     ]

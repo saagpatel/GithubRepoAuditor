@@ -34,7 +34,9 @@ def _run_tier_gaps_export_mode(args) -> None:
     projects = truth.get("projects", [])
     target_override = getattr(args, "tier_gaps_target", None)
     if target_override is not None and target_override not in (2, 3, 4):
-        print_warning(f"Invalid --tier-gaps-target {target_override}; must be 2, 3, or 4.")
+        print_warning(
+            f"Invalid --tier-gaps-target {target_override}; must be 2, 3, or 4."
+        )
         sys.exit(2)
 
     gaps: list[dict] = []
@@ -72,6 +74,7 @@ def _run_tier_gaps_export_mode(args) -> None:
         }
         print(json.dumps(envelope, indent=2))
 
+
 def _print_tier_gaps_markdown(gaps: list[dict]) -> None:
     """Human-readable tier-gap table (Arc G S12.4)."""
     if not gaps:
@@ -82,11 +85,16 @@ def _print_tier_gaps_markdown(gaps: list[dict]) -> None:
     print("| REPO | CURRENT → TARGET | MISSING | SOURCE |")
     print("|------|------------------|---------|--------|")
     for g in gaps:
-        missing = ", ".join(g["missing_requirements"]) if g["missing_requirements"] else "—"
-        sources = ", ".join(g["requirement_sources"]) if g["requirement_sources"] else "—"
+        missing = (
+            ", ".join(g["missing_requirements"]) if g["missing_requirements"] else "—"
+        )
+        sources = (
+            ", ".join(g["requirement_sources"]) if g["requirement_sources"] else "—"
+        )
         print(
             f"| {g['repo_name']} | {g['current_tier_name']} → {g['target_tier_name']} | {missing} | {sources} |"
         )
+
 
 def _run_tier_recalibration_report_mode(args) -> None:
     """Generate tier distribution report and flag bunching (Arc H A4)."""
@@ -126,6 +134,7 @@ def _run_tier_recalibration_report_mode(args) -> None:
     else:
         print_info("No bunching detected — tier distribution looks healthy.")
 
+
 def _run_context_triage_mode(args) -> None:
     """Run context quality triage across the portfolio (Arc H B1)."""
     from datetime import date, datetime, timezone
@@ -160,7 +169,9 @@ def _run_context_triage_mode(args) -> None:
         name = identity.get("display_name") or project.get("name", "")
         repo_keys.extend(key for key in (project_key, name) if key)
     catalog_scores = (
-        validate_catalog(catalog_path, sorted(set(repo_keys))) if catalog_path.exists() else {}
+        validate_catalog(catalog_path, sorted(set(repo_keys)))
+        if catalog_path.exists()
+        else {}
     )
 
     enriched: list[dict] = []

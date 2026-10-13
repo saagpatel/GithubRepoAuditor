@@ -14,7 +14,11 @@ def _cli_imports(path: Path) -> list[str]:
     violations: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            violations.extend(alias.name for alias in node.names if alias.name == "github_repo_auditor.cli")
+            violations.extend(
+                alias.name
+                for alias in node.names
+                if alias.name == "github_repo_auditor.cli"
+            )
         elif isinstance(node, ast.ImportFrom):
             if node.module == "github_repo_auditor.cli":
                 violations.append("from github_repo_auditor.cli")

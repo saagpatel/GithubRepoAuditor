@@ -15,7 +15,9 @@ from github_repo_auditor.portfolio_repository_state import (
     _select_remote_default_worktree,
     observe_repository_state,
 )
-from github_repo_auditor.portfolio_truth_validate import _validate_repository_state_shape
+from github_repo_auditor.portfolio_truth_validate import (
+    _validate_repository_state_shape,
+)
 
 
 def _git(path: Path, *args: str) -> str:
@@ -125,9 +127,7 @@ def test_configured_local_reuses_one_worktree_observation(
         call_count += 1
         return observation
 
-    monkeypatch.setattr(
-        repository_state, "_observe_working_tree", changing_observation
-    )
+    monkeypatch.setattr(repository_state, "_observe_working_tree", changing_observation)
     observed_at = datetime(2026, 7, 12, tzinfo=UTC)
     state = observe_repository_state(
         repo,
@@ -165,8 +165,7 @@ def test_local_branch_upstream_is_observed_and_divergence_fails_closed(
     assert state["local"]["upstream_remote"] == "."
     assert state["state"] == "unknown"
     assert (
-        state["reason_code"]
-        == "nonstandard_upstream_requires_remote_default_evidence"
+        state["reason_code"] == "nonstandard_upstream_requires_remote_default_evidence"
     )
     _validate_repository_state_shape(
         state,
@@ -221,8 +220,7 @@ def test_branch_tracking_different_local_slash_branch_is_unknown(
     assert state["local"]["upstream_branch"] == "feature/foo"
     assert state["local"]["upstream_remote"] == "."
     assert (
-        state["reason_code"]
-        == "nonstandard_upstream_requires_remote_default_evidence"
+        state["reason_code"] == "nonstandard_upstream_requires_remote_default_evidence"
     )
 
 
@@ -238,9 +236,7 @@ def test_remote_slash_branch_preserves_display_and_exact_branch(
     _git(repo, "config", "branch.feature/foo.remote", remote_name)
     _git(repo, "config", "branch.feature/foo.merge", "refs/heads/feature/foo")
     expected_upstream = f"{remote_name}/feature/foo"
-    assert _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}") == (
-        expected_upstream
-    )
+    assert _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}") == (expected_upstream)
 
     observed_at = datetime(2026, 7, 12, tzinfo=UTC)
     state = observe_repository_state(repo, observed_at=observed_at)
@@ -349,9 +345,9 @@ def test_unborn_linked_worktree_normalizes_zero_head_and_validates(
     )
 
     tampered = deepcopy(state)
-    next(
-        item for item in tampered["worktrees"] if item["path"] == str(orphan)
-    )["head"] = raw_head
+    next(item for item in tampered["worktrees"] if item["path"] == str(orphan))[
+        "head"
+    ] = raw_head
     with pytest.raises(ValueError, match="worktree 1"):
         _validate_repository_state_shape(
             tampered,

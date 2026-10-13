@@ -19,7 +19,9 @@ def validate_cli_mode_args(args, error) -> CliModeState:
         )
 
     portfolio_truth_mode = bool(getattr(args, "portfolio_truth", False))
-    portfolio_context_recovery_mode = bool(getattr(args, "portfolio_context_recovery", False))
+    portfolio_context_recovery_mode = bool(
+        getattr(args, "portfolio_context_recovery", False)
+    )
     apply_context_recovery = bool(getattr(args, "apply_context_recovery", False))
     context_recovery_limit = getattr(args, "context_recovery_limit", None)
 
@@ -97,7 +99,9 @@ def validate_cli_mode_args(args, error) -> CliModeState:
             "--approve-governance and --review-governance are separate local actions; run one at a time."
         )
     if args.approve_packet and args.review_packet:
-        error("--approve-packet and --review-packet are separate local actions; run one at a time.")
+        error(
+            "--approve-packet and --review-packet are separate local actions; run one at a time."
+        )
     if args.approval_center and (
         args.campaign
         or args.writeback_target
@@ -112,7 +116,10 @@ def validate_cli_mode_args(args, error) -> CliModeState:
             "--approval-center is the read-only approval view. Remove campaign, writeback, or approval-capture flags."
         )
     if args.control_center and (
-        args.campaign or args.writeback_target or args.writeback_apply or args.github_projects
+        args.campaign
+        or args.writeback_target
+        or args.writeback_apply
+        or args.github_projects
     ):
         error(
             "--control-center is the read-only Weekly Review entrypoint. Remove campaign/writeback flags or run a normal audit for Action Sync."

@@ -48,19 +48,25 @@ def _ledger_record(campaign_type: str, state: str = "approved-manual") -> dict:
 
 
 def test_trust_bar_index_trusted_portfolio_eligible_baseline_passes():
-    snapshot = {"projects": [_project("Alpha", automation_eligible=True, risk_tier="baseline")]}
+    snapshot = {
+        "projects": [_project("Alpha", automation_eligible=True, risk_tier="baseline")]
+    }
     index = build_trust_bar_index(snapshot, "trusted")
     assert index["Alpha"] is True
 
 
 def test_trust_bar_index_not_automation_eligible_fails():
-    snapshot = {"projects": [_project("Beta", automation_eligible=False, risk_tier="baseline")]}
+    snapshot = {
+        "projects": [_project("Beta", automation_eligible=False, risk_tier="baseline")]
+    }
     index = build_trust_bar_index(snapshot, "trusted")
     assert index["Beta"] is False
 
 
 def test_trust_bar_index_elevated_risk_fails():
-    snapshot = {"projects": [_project("Gamma", automation_eligible=True, risk_tier="elevated")]}
+    snapshot = {
+        "projects": [_project("Gamma", automation_eligible=True, risk_tier="elevated")]
+    }
     index = build_trust_bar_index(snapshot, "trusted")
     assert index["Gamma"] is False
 

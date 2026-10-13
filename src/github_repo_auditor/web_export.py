@@ -109,7 +109,9 @@ def export_html_dashboard(
     for _name, _entry in _risk_lookup.items():
         _tier_counts[_entry["risk_tier"]] = _tier_counts.get(_entry["risk_tier"], 0) + 1
         if _entry["risk_tier"] == "elevated":
-            _top_elevated.append({"repo": _name, "risk_summary": _entry["risk_summary"]})
+            _top_elevated.append(
+                {"repo": _name, "risk_summary": _entry["risk_summary"]}
+            )
     _risk_posture: dict = (
         {
             "elevated_count": _tier_counts.get("elevated", 0),
@@ -133,9 +135,9 @@ def export_html_dashboard(
         risk_lookup=_risk_lookup,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime(
-        "%Y-%m-%d"
-    )
+    date = report_data.get("generated_at", "")[:10] or datetime.now(
+        timezone.utc
+    ).strftime("%Y-%m-%d")
     username = report_data.get("username", "unknown")
     html_path = output_dir / f"dashboard-{username}-{date}.html"
     html_path.write_text(html)
@@ -350,7 +352,9 @@ def _operator_section(data: dict) -> str:
     queue_pressure_summary = build_queue_pressure_summary(data)
     top_recommendation_summary = build_top_recommendation_summary(data)
     trust_actionability_summary = build_trust_actionability_summary(data)
-    run_change_summary = data.get("run_change_summary") or build_run_change_summary(None)
+    run_change_summary = data.get("run_change_summary") or build_run_change_summary(
+        None
+    )
     counts = summary.get("counts", {})
     rows = []
     for item in queue[:8]:
@@ -358,7 +362,9 @@ def _operator_section(data: dict) -> str:
         links = item.get("links") or []
         artifact = links[0].get("url", "") if links else ""
         artifact_label = artifact or no_linked_artifact_summary()
-        last_movement = build_last_movement_label(item, data.get("review_summary") or {})
+        last_movement = build_last_movement_label(
+            item, data.get("review_summary") or {}
+        )
         rows.append(
             "<li>"
             f"<strong>[{escape(item.get('lane_label', item.get('lane', 'ready')))}]</strong> {repo}{escape(item.get('title', 'Triage item'))}"
@@ -398,7 +404,9 @@ def _operator_section(data: dict) -> str:
         f"{escape(change.get('summary', change.get('kind', 'change')))}</li>"
         for change in recent_changes[:4]
     )
-    intervention_label = _intervention_label(summary.get("primary_target_last_intervention") or {})
+    intervention_label = _intervention_label(
+        summary.get("primary_target_last_intervention") or {}
+    )
     return f"""
     <div class="section">
       <h2>Operator Control Center</h2>
@@ -634,7 +642,9 @@ def _weekly_story_evidence_list(items: list[dict]) -> str:
         return "<li>No supporting evidence is currently surfaced.</li>"
     rows = []
     for item in items[:5]:
-        command = f" [{escape(item.get('command_hint'))}]" if item.get("command_hint") else ""
+        command = (
+            f" [{escape(item.get('command_hint'))}]" if item.get("command_hint") else ""
+        )
         rows.append(
             f"<li><strong>{escape(item.get('label', 'Item'))}</strong> — {escape(item.get('summary', 'No evidence summary is recorded yet.'))}{command}</li>"
         )
@@ -1020,7 +1030,9 @@ def _repo_table(
 
     collection_options = ['<option value="all">All Collections</option>']
     for item in analyst_context["collection_summary"]:
-        selected = " selected" if analyst_context["collection_name"] == item["name"] else ""
+        selected = (
+            " selected" if analyst_context["collection_name"] == item["name"] else ""
+        )
         collection_options.append(
             f'<option value="{escape(item["name"], quote=True)}"{selected}>{escape(item["name"])}</option>'
         )
@@ -1107,7 +1119,9 @@ def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
 
 def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
     counts = report_data.get("run_change_counts") or build_run_change_counts(diff_data)
-    summary = report_data.get("run_change_summary") or build_run_change_summary(diff_data)
+    summary = report_data.get("run_change_summary") or build_run_change_summary(
+        diff_data
+    )
     weekly_pack = build_weekly_review_pack(report_data, diff_data)
     weekly_reason = resolve_weekly_story_value(
         weekly_pack,
@@ -1159,7 +1173,9 @@ def _compare_section(diff_data: dict | None) -> str:
 
     lens_rows = []
     for lens_name, delta in diff_data.get("lens_deltas", {}).items():
-        lens_rows.append(f"<tr><td>{escape(lens_name)}</td><td class='num'>{delta:+.3f}</td></tr>")
+        lens_rows.append(
+            f"<tr><td>{escape(lens_name)}</td><td class='num'>{delta:+.3f}</td></tr>"
+        )
     mover_rows = []
     for change in diff_data.get("repo_changes", [])[:8]:
         mover_rows.append(
@@ -1193,7 +1209,9 @@ def _campaign_section(report_data: dict) -> str:
     summary = report_data.get("campaign_summary", {})
     if not summary:
         return ""
-    github_projects = report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
+    github_projects = (
+        report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
+    )
     rows = []
     for item in report_data.get("writeback_preview", {}).get("repos", [])[:10]:
         topic_count = len(item.get("topics", []))
@@ -1254,9 +1272,7 @@ def _writeback_results_section(report_data: dict) -> str:
         )
     drift_markup = ""
     if drift_rows:
-        drift_markup = (
-            f'<div class="meta-line"><strong>Managed drift:</strong> {len(drift_rows)}</div>'
-        )
+        drift_markup = f'<div class="meta-line"><strong>Managed drift:</strong> {len(drift_rows)}</div>'
     return f"""
     <div class="section">
       <h2>Writeback Results</h2>
@@ -1351,8 +1367,15 @@ def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
         if not lang_dist:
             return ""
         trends = [
-            {"language": lang, "current_count": count, "category": "Hold", "repos_per_run": [count]}
-            for lang, count in sorted(lang_dist.items(), key=lambda x: x[1], reverse=True)[:15]
+            {
+                "language": lang,
+                "current_count": count,
+                "category": "Hold",
+                "repos_per_run": [count],
+            }
+            for lang, count in sorted(
+                lang_dist.items(), key=lambda x: x[1], reverse=True
+            )[:15]
         ]
 
     rows = []

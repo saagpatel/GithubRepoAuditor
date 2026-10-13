@@ -303,7 +303,9 @@ def test_security_gate_cli_json_exits_zero_on_clear_snapshot(tmp_path, capsys) -
     }
 
 
-def test_security_gate_cli_marks_unbounded_freshness_unchecked(tmp_path, capsys) -> None:
+def test_security_gate_cli_marks_unbounded_freshness_unchecked(
+    tmp_path, capsys
+) -> None:
     (tmp_path / "portfolio-truth-latest.json").write_text(
         json.dumps(
             {

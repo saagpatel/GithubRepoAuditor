@@ -123,11 +123,14 @@ def narrow_candidates(
                             break
             return ordered[:max_repos]
         except Exception as exc:  # noqa: BLE001
-            logger.warning("narrow_candidates: semantic search failed (%s) — using fallback", exc)
+            logger.warning(
+                "narrow_candidates: semantic search failed (%s) — using fallback", exc
+            )
 
     # Alphabetical fallback
     sorted_repos = sorted(
-        repo_by_name.values(), key=lambda r: str(r.get("repo_name") or r.get("name") or "")
+        repo_by_name.values(),
+        key=lambda r: str(r.get("repo_name") or r.get("name") or ""),
     )
     return sorted_repos[:max_repos]
 
@@ -252,18 +255,24 @@ def generate_action_for_repo(
         if start >= 0 and end > start:
             parsed = json.loads(text[start:end])
     except (json.JSONDecodeError, ValueError) as exc:
-        logger.warning("plan_campaign: malformed JSON from provider for %s: %s", repo_name, exc)
+        logger.warning(
+            "plan_campaign: malformed JSON from provider for %s: %s", repo_name, exc
+        )
         return None
 
     if parsed is None:
-        logger.warning("plan_campaign: no JSON found in provider response for %s", repo_name)
+        logger.warning(
+            "plan_campaign: no JSON found in provider response for %s", repo_name
+        )
         return None
 
     if not parsed.get("qualifies"):
         return None
 
     raw_action_type = str(parsed.get("action_type") or "pending_human_action")
-    action_type = raw_action_type if raw_action_type in ACTION_TYPES else "pending_human_action"
+    action_type = (
+        raw_action_type if raw_action_type in ACTION_TYPES else "pending_human_action"
+    )
     if action_type != raw_action_type:
         logger.warning(
             "plan_campaign: unknown action_type %r for %s — forcing pending_human_action",
@@ -330,7 +339,9 @@ def generate_plan(
     llm_model_name = model
     if cost_tracker is not None:
         records = cost_tracker.records()
-        campaign_records = [r for r in records if "plan-campaign" in getattr(r, "feature", "")]
+        campaign_records = [
+            r for r in records if "plan-campaign" in getattr(r, "feature", "")
+        ]
         if campaign_records:
             last = campaign_records[-1]
             llm_provider_name = getattr(last, "provider", "unknown")
@@ -500,7 +511,9 @@ def load_approved_campaign_plans(warehouse_path: Path) -> list[CampaignPlanPacke
                 llm_provider=str(record.get("llm_provider") or ""),
                 llm_model=str(record.get("llm_model") or ""),
                 llm_cost_usd=float(record.get("llm_cost_usd") or 0.0),
-                generated_at=str(record.get("generated_at") or record.get("approved_at") or ""),
+                generated_at=str(
+                    record.get("generated_at") or record.get("approved_at") or ""
+                ),
             )
         except (TypeError, ValueError) as exc:
             logger.warning(
@@ -511,7 +524,9 @@ def load_approved_campaign_plans(warehouse_path: Path) -> list[CampaignPlanPacke
             continue
 
         if not packet.goal:
-            logger.debug("load_approved_campaign_plans: skipping packet with empty goal")
+            logger.debug(
+                "load_approved_campaign_plans: skipping packet with empty goal"
+            )
             continue
 
         packets.append(packet)
@@ -521,7 +536,10 @@ def load_approved_campaign_plans(warehouse_path: Path) -> list[CampaignPlanPacke
 
 def mark_campaign_applied(packet: CampaignPlanPacket, output_dir: Path) -> None:
     """Update the ledger record state from 'approved-manual' to 'applied'."""
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
     record_id = _packet_record_id(packet)
@@ -559,17 +577,23 @@ def approve_action(packet_id: str, action_idx: int, output_dir: Path) -> None:
     Raises ValueError if the packet is not found.
     Raises IndexError if action_idx is out of range.
     """
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
     matching = [
         r
         for r in records
-        if r.get("approval_id") == packet_id and r.get("approval_subject_type") == "campaign-plan"
+        if r.get("approval_id") == packet_id
+        and r.get("approval_subject_type") == "campaign-plan"
     ]
 
     if not matching:
-        raise ValueError(f"approve_action: no campaign-plan record found for id={packet_id!r}")
+        raise ValueError(
+            f"approve_action: no campaign-plan record found for id={packet_id!r}"
+        )
 
     for record in matching:
         actions: list[dict] = list(record.get("actions") or [])
@@ -580,7 +604,9 @@ def approve_action(packet_id: str, action_idx: int, output_dir: Path) -> None:
             )
         updated_actions = [dict(a) for a in actions]
         updated_actions[action_idx]["state"] = "approved"
-        updated_actions[action_idx]["decided_at"] = datetime.now(timezone.utc).isoformat()
+        updated_actions[action_idx]["decided_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
         # Clear any prior rejection reason
         updated_actions[action_idx]["rejected_reason"] = None
 
@@ -589,23 +615,31 @@ def approve_action(packet_id: str, action_idx: int, output_dir: Path) -> None:
         save_approval_record(output_dir, updated)
 
 
-def reject_action(packet_id: str, action_idx: int, output_dir: Path, reason: str = "") -> None:
+def reject_action(
+    packet_id: str, action_idx: int, output_dir: Path, reason: str = ""
+) -> None:
     """Set state='rejected', rejected_reason=reason, decided_at=now on actions[action_idx].
 
     Raises ValueError if the packet is not found.
     Raises IndexError if action_idx is out of range.
     """
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
     matching = [
         r
         for r in records
-        if r.get("approval_id") == packet_id and r.get("approval_subject_type") == "campaign-plan"
+        if r.get("approval_id") == packet_id
+        and r.get("approval_subject_type") == "campaign-plan"
     ]
 
     if not matching:
-        raise ValueError(f"reject_action: no campaign-plan record found for id={packet_id!r}")
+        raise ValueError(
+            f"reject_action: no campaign-plan record found for id={packet_id!r}"
+        )
 
     for record in matching:
         actions: list[dict] = list(record.get("actions") or [])
@@ -617,7 +651,9 @@ def reject_action(packet_id: str, action_idx: int, output_dir: Path, reason: str
         updated_actions = [dict(a) for a in actions]
         updated_actions[action_idx]["state"] = "rejected"
         updated_actions[action_idx]["rejected_reason"] = reason or None
-        updated_actions[action_idx]["decided_at"] = datetime.now(timezone.utc).isoformat()
+        updated_actions[action_idx]["decided_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         updated = dict(record)
         updated["actions"] = updated_actions
@@ -674,7 +710,10 @@ def dispatch_action(
         enable_dependabot                     → (False, "handler not yet implemented")
       pending_human_action                    → (False, "manual review required")
     """
-    from github_repo_auditor.repo_improver import apply_metadata_updates, apply_readme_updates
+    from github_repo_auditor.repo_improver import (
+        apply_metadata_updates,
+        apply_readme_updates,
+    )
 
     action_type = action.action_type
 
@@ -703,11 +742,15 @@ def dispatch_action(
         results = apply_metadata_updates(client, owner, [update], dry_run=False)  # type: ignore[arg-type]
         if results:
             r = results[0]
-            actions_ok = [a for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")]
+            actions_ok = [
+                a for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
+            ]
             if actions_ok:
                 return True, f"{action_type} applied to {action.repo_name}"
             # No actions dispatched — likely unsupported field (e.g. archive via REST)
-            errors = [str(a.get("error", "")) for a in r.get("actions", []) if a.get("error")]
+            errors = [
+                str(a.get("error", "")) for a in r.get("actions", []) if a.get("error")
+            ]
             err_msg = "; ".join(errors) if errors else "no actions executed"
             return False, f"{action_type} failed for {action.repo_name}: {err_msg}"
         return (
@@ -722,10 +765,14 @@ def dispatch_action(
         results = apply_metadata_updates(client, owner, [update_t], dry_run=False)  # type: ignore[arg-type]
         if results:
             r = results[0]
-            actions_ok = [a for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")]
+            actions_ok = [
+                a for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
+            ]
             if actions_ok:
                 return True, f"add_topics applied to {action.repo_name}: {topics}"
-            errors = [str(a.get("error", "")) for a in r.get("actions", []) if a.get("error")]
+            errors = [
+                str(a.get("error", "")) for a in r.get("actions", []) if a.get("error")
+            ]
             err_msg = "; ".join(errors) if errors else "no actions executed"
             return False, f"add_topics failed for {action.repo_name}: {err_msg}"
         return (

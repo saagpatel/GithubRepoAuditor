@@ -6,7 +6,12 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from github_repo_auditor.models import (
+    AnalyzerResult,
+    AuditReport,
+    RepoAudit,
+    RepoMetadata,
+)
 from github_repo_auditor.registry_parser import RegistryReconciliation
 
 

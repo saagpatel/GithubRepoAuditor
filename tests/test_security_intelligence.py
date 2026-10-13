@@ -55,7 +55,9 @@ class _FakeGitHubClient:
     def get_repo_security_and_analysis(self, owner: str, repo: str) -> dict:
         return {
             "available": True,
-            "data": {"security_and_analysis": {"secret_scanning": {"status": "enabled"}}},
+            "data": {
+                "security_and_analysis": {"secret_scanning": {"status": "enabled"}}
+            },
         }
 
     def get_secret_scanning_alert_count(self, owner: str, repo: str) -> dict:
@@ -97,7 +99,9 @@ class _ContextualHighCodeScanningClient(_FakeGitHubClient):
 
 
 def test_build_security_posture_local_only():
-    posture = build_security_posture(_make_metadata(), _make_results(), None, security_offline=True)
+    posture = build_security_posture(
+        _make_metadata(), _make_results(), None, security_offline=True
+    )
 
     assert posture["local"]["available"] is True
     assert posture["github"]["provider_available"] is False
@@ -117,7 +121,10 @@ def test_build_security_posture_merges_github_signals():
     assert posture["github"]["provider_available"] is True
     assert posture["github"]["sbom_exportable"] is True
     assert posture["github"]["code_scanning_alerts"] == 2
-    assert any(item["key"] == "review-code-scanning-alerts" for item in posture["recommendations"])
+    assert any(
+        item["key"] == "review-code-scanning-alerts"
+        for item in posture["recommendations"]
+    )
 
 
 def test_build_security_posture_downgrades_warning_only_code_scanning_alerts():
@@ -130,7 +137,9 @@ def test_build_security_posture_downgrades_warning_only_code_scanning_alerts():
     )
 
     recommendation = next(
-        item for item in posture["recommendations"] if item["key"] == "review-code-scanning-alerts"
+        item
+        for item in posture["recommendations"]
+        if item["key"] == "review-code-scanning-alerts"
     )
 
     assert posture["github"]["code_scanning_high_alerts"] == 0
@@ -149,7 +158,9 @@ def test_build_security_posture_downgrades_contextual_scorecard_high_alerts():
     )
 
     recommendation = next(
-        item for item in posture["recommendations"] if item["key"] == "review-code-scanning-alerts"
+        item
+        for item in posture["recommendations"]
+        if item["key"] == "review-code-scanning-alerts"
     )
 
     assert posture["github"]["code_scanning_high_alerts"] == 2
@@ -196,7 +207,9 @@ def test_build_security_posture_skips_dependabot_recommendation_without_supporte
     )
 
     assert posture["dependabot_supported"] is False
-    assert not any(item["key"] == "add-dependabot-config" for item in posture["recommendations"])
+    assert not any(
+        item["key"] == "add-dependabot-config" for item in posture["recommendations"]
+    )
 
 
 def test_build_security_posture_keeps_dependabot_recommendation_for_supported_ecosystem():
@@ -217,7 +230,11 @@ def test_build_security_posture_keeps_dependabot_recommendation_for_supported_ec
         )
     ]
 
-    posture = build_security_posture(_make_metadata(), results, None, security_offline=True)
+    posture = build_security_posture(
+        _make_metadata(), results, None, security_offline=True
+    )
 
     assert posture["dependabot_supported_ecosystems"] == ["npm"]
-    assert any(item["key"] == "add-dependabot-config" for item in posture["recommendations"])
+    assert any(
+        item["key"] == "add-dependabot-config" for item in posture["recommendations"]
+    )

@@ -6,7 +6,14 @@ from typing import Any
 
 from openpyxl.styles import Font
 
-CHANGES_TIER_HEADERS = ["Repo", "Old Tier", "New Tier", "Old Score", "New Score", "Direction"]
+CHANGES_TIER_HEADERS = [
+    "Repo",
+    "Old Tier",
+    "New Tier",
+    "Old Score",
+    "New Score",
+    "Direction",
+]
 CHANGES_SCORE_HEADERS = ["Repo", "Old Score", "New Score", "Delta"]
 CHANGES_MATERIAL_HEADERS = ["Repo", "Type", "Severity", "Title"]
 
@@ -16,8 +23,12 @@ def build_changes_sheet_content(
     diff_data: dict[str, Any],
 ) -> dict[str, Any]:
     tier_changes = diff_data.get("tier_changes", [])
-    promotions = [change for change in tier_changes if change.get("direction") == "promotion"]
-    demotions = [change for change in tier_changes if change.get("direction") == "demotion"]
+    promotions = [
+        change for change in tier_changes if change.get("direction") == "promotion"
+    ]
+    demotions = [
+        change for change in tier_changes if change.get("direction") == "demotion"
+    ]
     score_changes = [
         change
         for change in diff_data.get("score_changes", [])
@@ -26,9 +37,9 @@ def build_changes_sheet_content(
     material_rows: list[dict[str, Any]] = []
     material_by_type: dict[str, list[dict[str, Any]]] = {}
     for material_change in data.get("material_changes", []):
-        material_by_type.setdefault(material_change.get("change_type", "other"), []).append(
-            material_change
-        )
+        material_by_type.setdefault(
+            material_change.get("change_type", "other"), []
+        ).append(material_change)
     for change_type in sorted(material_by_type):
         for item in material_by_type[change_type][:30]:
             material_rows.append(
@@ -63,7 +74,9 @@ def build_changes_sheet_content(
                 "new_score": round(change.get("new_score", 0), 3),
                 "delta": round(change.get("delta", 0), 4),
             }
-            for change in sorted(score_changes, key=lambda item: item.get("delta", 0), reverse=True)
+            for change in sorted(
+                score_changes, key=lambda item: item.get("delta", 0), reverse=True
+            )
         ],
         "material_rows": material_rows,
     }
@@ -202,7 +215,9 @@ def build_changes_sheet(
     auto_width(ws, 8, row)
 
 
-def _style_changes_highlight(cell: Any, *, highlight_kind: str, column: int, value: Any) -> None:
+def _style_changes_highlight(
+    cell: Any, *, highlight_kind: str, column: int, value: Any
+) -> None:
     if highlight_kind == "direction" and column == 6:
         if value == "promotion":
             cell.font = Font("Calibri", 10, bold=True, color="166534")

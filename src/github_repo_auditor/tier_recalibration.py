@@ -1,5 +1,6 @@
 # src/github_repo_auditor/tier_recalibration.py
 """Tier distribution report for maturity recalibration (Arc H A4)."""
+
 from __future__ import annotations
 
 from typing import Any

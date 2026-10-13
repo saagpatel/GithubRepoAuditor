@@ -1,4 +1,5 @@
 """Archive candidate detection — finds repos consistently scoring below threshold."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,11 +21,13 @@ def find_archive_candidates(
             continue
         last_n = scores[-min_consecutive:]
         if all(s < threshold for s in last_n):
-            candidates.append({
-                "name": name,
-                "last_scores": [round(s, 3) for s in last_n],
-                "current_score": round(scores[-1], 3),
-            })
+            candidates.append(
+                {
+                    "name": name,
+                    "last_scores": [round(s, 3) for s in last_n],
+                    "current_score": round(scores[-1], 3),
+                }
+            )
 
     candidates.sort(key=lambda c: c["current_score"])
     return candidates
@@ -45,7 +48,9 @@ def export_archive_report(
     ]
 
     if not candidates:
-        lines.append("No repos meet the archive criteria (scored below 0.15 for 3+ consecutive runs).")
+        lines.append(
+            "No repos meet the archive criteria (scored below 0.15 for 3+ consecutive runs)."
+        )
     else:
         lines.append("| Repo | Last Scores | Command |")
         lines.append("|------|-------------|---------|")

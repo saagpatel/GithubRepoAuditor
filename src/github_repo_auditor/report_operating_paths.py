@@ -32,7 +32,9 @@ def apply_operating_paths(report: AuditReport) -> AuditReport:
         }
         if audit.scorecard:
             audit.portfolio_catalog["scorecard"] = dict(audit.scorecard)
-    audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+    audit_lookup = {
+        audit.metadata.name: audit.portfolio_catalog for audit in report.audits
+    }
     for item in report.operator_queue:
         repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
         catalog_entry = audit_lookup.get(repo_name, {})

@@ -17,6 +17,7 @@ Code-scanning severity bucketing:
   warning    → warning
   note       → note
 """
+
 from __future__ import annotations
 
 import json
@@ -92,7 +93,9 @@ def _paginate(
     return results
 
 
-def _make_session(token: str | None, session: requests.Session | None) -> requests.Session:
+def _make_session(
+    token: str | None, session: requests.Session | None
+) -> requests.Session:
     """Return a configured requests.Session with GitHub auth and retry."""
     if session is not None:
         return session
@@ -101,11 +104,13 @@ def _make_session(token: str | None, session: requests.Session | None) -> reques
     from urllib3.util import Retry
 
     s = requests.Session()
-    s.headers.update({
-        "Accept": "application/vnd.github.v3+json",
-        "User-Agent": "github-repo-auditor/0.1",
-        "X-GitHub-Api-Version": "2026-03-10",
-    })
+    s.headers.update(
+        {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "github-repo-auditor/0.1",
+            "X-GitHub-Api-Version": "2026-03-10",
+        }
+    )
     if token:
         s.headers["Authorization"] = f"token {token}"
 
@@ -158,7 +163,12 @@ def _fetch_dependabot_counts(
             )
         return base
     except Exception as exc:
-        logger.warning("Unexpected error fetching Dependabot alerts for %s/%s: %s", owner, repo, exc)
+        logger.warning(
+            "Unexpected error fetching Dependabot alerts for %s/%s: %s",
+            owner,
+            repo,
+            exc,
+        )
         return base
 
 
@@ -178,9 +188,7 @@ def _fetch_code_scanning_counts(
         for alert in alerts:
             rule = alert.get("rule", {}) if isinstance(alert, dict) else {}
             raw_severity = (
-                rule.get("security_severity_level")
-                or rule.get("severity")
-                or ""
+                rule.get("security_severity_level") or rule.get("severity") or ""
             ).lower()
             bucket = _CODE_SCANNING_BUCKET.get(raw_severity)
             if bucket and bucket in base:
@@ -191,7 +199,10 @@ def _fetch_code_scanning_counts(
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
             logger.debug(
-                "Code scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
+                "Code scanning alerts unavailable for %s/%s (HTTP %s)",
+                owner,
+                repo,
+                status,
             )
         else:
             logger.warning(
@@ -200,7 +211,10 @@ def _fetch_code_scanning_counts(
         return base
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching code scanning alerts for %s/%s: %s", owner, repo, exc
+            "Unexpected error fetching code scanning alerts for %s/%s: %s",
+            owner,
+            repo,
+            exc,
         )
         return base
 
@@ -222,7 +236,10 @@ def _fetch_secret_scanning_counts(
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
             logger.debug(
-                "Secret scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
+                "Secret scanning alerts unavailable for %s/%s (HTTP %s)",
+                owner,
+                repo,
+                status,
             )
         else:
             logger.warning(
@@ -231,7 +248,10 @@ def _fetch_secret_scanning_counts(
         return base
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching secret scanning alerts for %s/%s: %s", owner, repo, exc
+            "Unexpected error fetching secret scanning alerts for %s/%s: %s",
+            owner,
+            repo,
+            exc,
         )
         return base
 
@@ -288,7 +308,9 @@ def fetch_ghas_alerts(
         }
 
         if cache:
-            cache.put(cache_key, _GHAS_CACHE_PARAMS, json.dumps(repo_result, default=str))
+            cache.put(
+                cache_key, _GHAS_CACHE_PARAMS, json.dumps(repo_result, default=str)
+            )
 
         results[repo_name] = repo_result
 

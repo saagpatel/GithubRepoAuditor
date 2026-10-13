@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from github_repo_auditor.notion_client import query_notion_collection, query_page_by_title
+from github_repo_auditor.notion_client import (
+    query_notion_collection,
+    query_page_by_title,
+)
 from github_repo_auditor.notion_sync import (
     ELIGIBLE_TIERS,
     FLAG_TO_ACTION,
@@ -18,6 +21,12 @@ from github_repo_auditor.notion_sync import (
 )
 
 
+def _notion_response(payload):
+    response = MagicMock(status_code=200)
+    response.json.return_value = payload
+    return response
+
+
 class TestRenderQuickWins:
     def test_empty_wins(self):
         md = _render_quick_wins_markdown([], "2026-03-29")
@@ -25,8 +34,13 @@ class TestRenderQuickWins:
 
     def test_with_wins(self):
         wins = [
-            {"name": "RepoA", "current_tier": "wip", "next_tier": "functional",
-             "gap": 0.03, "actions": ["Add tests (testing=0.2)"]},
+            {
+                "name": "RepoA",
+                "current_tier": "wip",
+                "next_tier": "functional",
+                "gap": 0.03,
+                "actions": ["Add tests (testing=0.2)"],
+            },
         ]
         md = _render_quick_wins_markdown(wins, "2026-03-29")
         assert "RepoA" in md
@@ -35,8 +49,13 @@ class TestRenderQuickWins:
 
     def test_limits_to_10(self):
         wins = [
-            {"name": f"Repo{i}", "current_tier": "wip", "next_tier": "functional",
-             "gap": 0.01 * i, "actions": []}
+            {
+                "name": f"Repo{i}",
+                "current_tier": "wip",
+                "next_tier": "functional",
+                "gap": 0.01 * i,
+                "actions": [],
+            }
             for i in range(15)
         ]
         md = _render_quick_wins_markdown(wins, "2026-03-29")
@@ -65,7 +84,12 @@ class TestRenderAuditHighlights:
         }
         diff = {
             "tier_changes": [
-                {"name": "RepoX", "direction": "promotion", "old_tier": "wip", "new_tier": "functional"},
+                {
+                    "name": "RepoX",
+                    "direction": "promotion",
+                    "old_tier": "wip",
+                    "new_tier": "functional",
+                },
             ],
         }
         md = _render_audit_highlights(report, diff, [])
@@ -95,7 +119,11 @@ class TestRenderAuditHighlights:
                 "counts": {"blocked": 1, "urgent": 2, "ready": 3, "deferred": 4},
             },
             "operator_queue": [
-                {"repo": "RepoZ", "title": "RepoZ drift needs review", "recommended_action": "Inspect the managed issue."}
+                {
+                    "repo": "RepoZ",
+                    "title": "RepoZ drift needs review",
+                    "recommended_action": "Inspect the managed issue.",
+                }
             ],
         }
         md = _render_audit_highlights(report, None, [])
@@ -118,17 +146,43 @@ class TestChunkText:
 class TestWeeklyReviewManagedSection:
     def test_detects_existing_managed_section_block_ids(self):
         blocks = [
-            {"id": "a", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "intro"}]}},
-            {"id": "b", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]}},
-            {"id": "c", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "body"}]}},
-            {"id": "d", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]}},
+            {
+                "id": "a",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"plain_text": "intro"}]},
+            },
+            {
+                "id": "b",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]
+                },
+            },
+            {
+                "id": "c",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"plain_text": "body"}]},
+            },
+            {
+                "id": "d",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]
+                },
+            },
         ]
         assert _managed_section_block_ids(blocks) == ["b", "c", "d"]
 
     def test_builds_weekly_review_section_with_markers(self):
         blocks = _build_weekly_review_section_blocks("hello world")
-        assert blocks[0]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
-        assert blocks[-1]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-END-AUDIT-HIGHLIGHTS]"
+        assert (
+            blocks[0]["paragraph"]["rich_text"][0]["text"]["content"]
+            == "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
+        )
+        assert (
+            blocks[-1]["paragraph"]["rich_text"][0]["text"]["content"]
+            == "[GHRA-END-AUDIT-HIGHLIGHTS]"
+        )
 
     def test_patch_weekly_review_replaces_existing_managed_section(self):
         query_resp = MagicMock()
@@ -139,9 +193,25 @@ class TestWeeklyReviewManagedSection:
         children_resp.status_code = 200
         children_resp.json.return_value = {
             "results": [
-                {"id": "old-start", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]}},
-                {"id": "old-body", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "old body"}]}},
-                {"id": "old-end", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]}},
+                {
+                    "id": "old-start",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]
+                    },
+                },
+                {
+                    "id": "old-body",
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"plain_text": "old body"}]},
+                },
+                {
+                    "id": "old-end",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]
+                    },
+                },
             ]
         }
 
@@ -149,10 +219,50 @@ class TestWeeklyReviewManagedSection:
         archive_resp.status_code = 200
         append_resp = MagicMock()
         append_resp.status_code = 200
+        verify_resp = MagicMock()
+        verify_resp.status_code = 200
+        expected_children = _build_weekly_review_section_blocks(
+            _render_audit_highlights(
+                {
+                    "generated_at": "2026-03-29T00:00:00Z",
+                    "portfolio_grade": "B",
+                    "average_score": 0.72,
+                    "tier_distribution": {"shipped": 8, "functional": 4},
+                },
+                None,
+                [],
+            )
+        )
+        verify_resp.json.return_value = {
+            "results": [
+                {
+                    "id": f"new-{index}",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "plain_text": item["paragraph"]["rich_text"][0]["text"][
+                                    "content"
+                                ]
+                            }
+                        ]
+                    },
+                }
+                for index, item in enumerate(expected_children)
+            ]
+        }
 
         with patch(
             "github_repo_auditor.notion_sync._notion_request",
-            side_effect=[query_resp, children_resp, archive_resp, archive_resp, archive_resp, append_resp],
+            side_effect=[
+                query_resp,
+                children_resp,
+                append_resp,
+                verify_resp,
+                archive_resp,
+                archive_resp,
+                archive_resp,
+            ],
         ) as notion_request:
             result = patch_weekly_review(
                 {
@@ -168,15 +278,205 @@ class TestWeeklyReviewManagedSection:
             )
 
         assert result is True
-        archive_calls = notion_request.call_args_list[2:5]
+        append_call = notion_request.call_args_list[2]
+        verify_call = notion_request.call_args_list[3]
+        archive_calls = notion_request.call_args_list[4:7]
+        assert append_call.args[1] == "/blocks/weekly-page/children"
+        assert verify_call.args[1] == "/blocks/weekly-page/children"
         assert [call.args[1] for call in archive_calls] == [
             "/blocks/old-start",
             "/blocks/old-body",
             "/blocks/old-end",
         ]
-        appended_children = notion_request.call_args_list[-1].args[4]["children"]
-        assert appended_children[0]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
-        assert appended_children[-1]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-END-AUDIT-HIGHLIGHTS]"
+        appended_children = append_call.args[4]["children"]
+        assert (
+            appended_children[0]["paragraph"]["rich_text"][0]["text"]["content"]
+            == "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
+        )
+        assert (
+            appended_children[-1]["paragraph"]["rich_text"][0]["text"]["content"]
+            == "[GHRA-END-AUDIT-HIGHLIGHTS]"
+        )
+
+    def test_reports_partial_archive_when_archive_response_is_missing(self, capsys):
+        query_resp = _notion_response({"results": [{"id": "weekly-page"}]})
+        children_resp = _notion_response({"results": []})
+        append_resp = MagicMock(status_code=200)
+        verify_resp = _notion_response({"results": []})
+
+        with (
+            patch(
+                "github_repo_auditor.notion_sync._managed_section_block_ids",
+                return_value=["old-block"],
+            ),
+            patch(
+                "github_repo_auditor.notion_sync._weekly_section_is_present",
+                return_value=True,
+            ),
+            patch(
+                "github_repo_auditor.notion_sync._notion_request",
+                side_effect=[query_resp, children_resp, append_resp, verify_resp, None],
+            ) as notion_request,
+            patch("github_repo_auditor.notion_sync.time.sleep"),
+        ):
+            result = patch_weekly_review(
+                {}, None, [], "token", {"weekly_reviews_db_id": "weekly-db"}
+            )
+
+        assert result is False
+        assert notion_request.call_args_list[-1].args[1] == "/blocks/old-block"
+        assert "New weekly review section is verified" in capsys.readouterr().err
+
+    def test_does_not_treat_preexisting_duplicate_sections_as_new_append(self, capsys):
+        report = {
+            "generated_at": "2026-03-29T00:00:00Z",
+            "portfolio_grade": "B",
+            "average_score": 0.72,
+            "tier_distribution": {"shipped": 8, "functional": 4},
+        }
+        expected = _build_weekly_review_section_blocks(
+            _render_audit_highlights(report, None, [])
+        )
+        old_blocks = [
+            {
+                "id": f"old-{index}",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "plain_text": item["paragraph"]["rich_text"][0]["text"][
+                                "content"
+                            ]
+                        }
+                    ]
+                },
+            }
+            for index, item in enumerate(expected)
+        ]
+        duplicate_blocks = [
+            {**block, "id": block["id"].replace("old-", "duplicate-")}
+            for block in old_blocks
+        ]
+        preexisting_blocks = old_blocks + duplicate_blocks
+        responses = [
+            _notion_response({"results": [{"id": "weekly-page"}]}),
+            _notion_response({"results": preexisting_blocks}),
+            MagicMock(status_code=200),
+            _notion_response({"results": preexisting_blocks}),
+        ]
+        with patch(
+            "github_repo_auditor.notion_sync._notion_request", side_effect=responses
+        ) as notion_request:
+            result = patch_weekly_review(
+                report, None, [], "token", {"weekly_reviews_db_id": "weekly-db"}
+            )
+
+        assert result is False
+        assert notion_request.call_count == 4
+        assert "new section was not verified" in capsys.readouterr().err
+
+    def test_verifies_new_section_after_paginating_children(self):
+        report = {
+            "generated_at": "2026-03-29T00:00:00Z",
+            "portfolio_grade": "B",
+            "average_score": 0.72,
+            "tier_distribution": {"shipped": 8, "functional": 4},
+        }
+        expected = _build_weekly_review_section_blocks(
+            _render_audit_highlights(report, None, [])
+        )
+        old_blocks = [
+            {
+                "id": "old-start",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]
+                },
+            },
+            {
+                "id": "old-body",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"plain_text": "old body"}]},
+            },
+            {
+                "id": "old-end",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]
+                },
+            },
+        ]
+        new_blocks = [
+            {
+                "id": f"new-{index}",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "plain_text": item["paragraph"]["rich_text"][0]["text"][
+                                "content"
+                            ]
+                        }
+                    ]
+                },
+            }
+            for index, item in enumerate(expected)
+        ]
+        responses = [
+            _notion_response({"results": [{"id": "weekly-page"}]}),
+            _notion_response(
+                {"results": old_blocks, "has_more": True, "next_cursor": "initial-next"}
+            ),
+            _notion_response({"results": [{"id": "other"}], "has_more": False}),
+            MagicMock(status_code=200),
+            _notion_response(
+                {"results": old_blocks, "has_more": True, "next_cursor": "verify-next"}
+            ),
+            _notion_response({"results": new_blocks, "has_more": False}),
+            MagicMock(status_code=200),
+            MagicMock(status_code=200),
+            MagicMock(status_code=200),
+        ]
+        with patch(
+            "github_repo_auditor.notion_sync._notion_request", side_effect=responses
+        ) as notion_request:
+            result = patch_weekly_review(
+                report, None, [], "token", {"weekly_reviews_db_id": "weekly-db"}
+            )
+
+        assert result is True
+        verify_page_two = notion_request.call_args_list[5]
+        assert (
+            verify_page_two.args[1]
+            == "/blocks/weekly-page/children?start_cursor=verify-next"
+        )
+        assert [call.args[1] for call in notion_request.call_args_list[6:]] == [
+            "/blocks/old-start",
+            "/blocks/old-body",
+            "/blocks/old-end",
+        ]
+
+    def test_incomplete_verification_pagination_preserves_old_section(self, capsys):
+        query_resp = _notion_response({"results": [{"id": "weekly-page"}]})
+        initial_resp = _notion_response({"results": [], "has_more": False})
+        append_resp = MagicMock(status_code=200)
+        verify_resp = _notion_response(
+            {"results": [], "has_more": True, "next_cursor": "more"}
+        )
+        with (
+            patch("github_repo_auditor.notion_sync.MAX_WEEKLY_REVIEW_CHILD_PAGES", 1),
+            patch(
+                "github_repo_auditor.notion_sync._notion_request",
+                side_effect=[query_resp, initial_resp, append_resp, verify_resp],
+            ) as notion_request,
+        ):
+            result = patch_weekly_review(
+                {}, None, [], "token", {"weekly_reviews_db_id": "weekly-db"}
+            )
+
+        assert result is False
+        assert notion_request.call_count == 4
+        assert "verification pagination failed" in capsys.readouterr().err
 
 
 class TestFlagMapping:
@@ -214,7 +514,7 @@ class TestExtractAuditData:
         event = {
             "occurredAt": "2026-03-29",
             "status": "C",
-            "rawExcerpt": "{\"overall_score\": 0.75, \"interest_score\": 0.2, \"badges\": [\"fresh\"]}",
+            "rawExcerpt": '{"overall_score": 0.75, "interest_score": 0.2, "badges": ["fresh"]}',
         }
         data = _extract_audit_data(event)
         assert data["grade"] == "C"
@@ -226,7 +526,7 @@ class TestExtractAuditData:
         event = {
             "occurredAt": "2026-03-29",
             "status": "F",
-            "rawExcerpt": "{\"overall_score\": 0.75,",
+            "rawExcerpt": '{"overall_score": 0.75,',
         }
         data = _extract_audit_data(event)
         assert data["grade"] == "F"
@@ -237,8 +537,12 @@ class TestExtractAuditData:
 
 class TestCampaignActionSync:
     def test_fails_soft_without_token(self, monkeypatch):
-        monkeypatch.setattr("github_repo_auditor.notion_sync.get_notion_token", lambda: "")
-        results, refs, drift = sync_campaign_actions([], {"campaign_type": "security-review"}, apply=True)
+        monkeypatch.setattr(
+            "github_repo_auditor.notion_sync.get_notion_token", lambda: ""
+        )
+        results, refs, drift = sync_campaign_actions(
+            [], {"campaign_type": "security-review"}, apply=True
+        )
         assert results[0]["status"] == "skipped"
         assert refs == {}
         assert drift == []
@@ -260,7 +564,9 @@ class TestCheckRecommendationFollowup:
         assert result == {"checked": 0}
 
     def test_returns_zero_when_api_fails(self):
-        with patch("github_repo_auditor.notion_sync._notion_request", return_value=None):
+        with patch(
+            "github_repo_auditor.notion_sync._notion_request", return_value=None
+        ):
             result = check_recommendation_followup(
                 self._report(["RepoA"], [0.5]),
                 "token",
@@ -273,7 +579,9 @@ class TestCheckRecommendationFollowup:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": []}
 
-        with patch("github_repo_auditor.notion_sync._notion_request", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.notion_sync._notion_request", return_value=mock_resp
+        ):
             result = check_recommendation_followup(
                 self._report(["RepoA"], [0.5]),
                 "token",
@@ -294,13 +602,18 @@ class TestCheckRecommendationFollowup:
                 {
                     "type": "paragraph",
                     "paragraph": {
-                        "rich_text": [{"plain_text": "RepoA needs improvement, RepoB also listed"}]
+                        "rich_text": [
+                            {"plain_text": "RepoA needs improvement, RepoB also listed"}
+                        ]
                     },
                 }
             ]
         }
 
-        with patch("github_repo_auditor.notion_sync._notion_request", side_effect=[query_resp, blocks_resp]):
+        with patch(
+            "github_repo_auditor.notion_sync._notion_request",
+            side_effect=[query_resp, blocks_resp],
+        ):
             result = check_recommendation_followup(
                 self._report(["RepoA", "RepoB", "RepoC"], [0.6, 0.4, 0.0]),
                 "token",
@@ -318,7 +631,10 @@ class TestCheckRecommendationFollowup:
         query_resp.status_code = 200
         query_resp.json.return_value = {"results": [{"id": "page-abc"}]}
 
-        with patch("github_repo_auditor.notion_sync._notion_request", side_effect=[query_resp, None]):
+        with patch(
+            "github_repo_auditor.notion_sync._notion_request",
+            side_effect=[query_resp, None],
+        ):
             result = check_recommendation_followup(
                 self._report(["RepoA"], [0.5]),
                 "token",
@@ -333,7 +649,9 @@ class TestQueryPageByTitle:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": [{"id": "page-xyz"}]}
 
-        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.notion_client.notion_request", return_value=mock_resp
+        ):
             result = query_page_by_title("db123", "My Project", "token")
 
         assert result == "page-xyz"
@@ -343,13 +661,17 @@ class TestQueryPageByTitle:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": []}
 
-        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.notion_client.notion_request", return_value=mock_resp
+        ):
             result = query_page_by_title("db123", "Nonexistent", "token")
 
         assert result is None
 
     def test_returns_none_when_api_fails(self):
-        with patch("github_repo_auditor.notion_client.notion_request", return_value=None):
+        with patch(
+            "github_repo_auditor.notion_client.notion_request", return_value=None
+        ):
             result = query_page_by_title("db123", "Any Title", "token")
 
         assert result is None
@@ -358,7 +680,9 @@ class TestQueryPageByTitle:
         mock_resp = MagicMock()
         mock_resp.status_code = 404
 
-        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.notion_client.notion_request", return_value=mock_resp
+        ):
             result = query_page_by_title("db123", "Any Title", "token")
 
         assert result is None
@@ -368,7 +692,9 @@ class TestQueryPageByTitle:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"results": [{"id": "page-abc"}]}
 
-        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp) as mock_req:
+        with patch(
+            "github_repo_auditor.notion_client.notion_request", return_value=mock_resp
+        ) as mock_req:
             query_page_by_title("db123", "My Title", "token", title_property="Title")
             call_body = mock_req.call_args[0][4]  # body is 5th positional arg
             assert call_body["filter"]["property"] == "Title"
@@ -379,8 +705,12 @@ class TestQueryNotionCollection:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
 
-        with patch("github_repo_auditor.notion_client.notion_request", return_value=mock_resp) as mock_req:
-            result = query_notion_collection("collection-123", "token", body={"page_size": 1})
+        with patch(
+            "github_repo_auditor.notion_client.notion_request", return_value=mock_resp
+        ) as mock_req:
+            result = query_notion_collection(
+                "collection-123", "token", body={"page_size": 1}
+            )
 
         assert result is mock_resp
         assert mock_req.call_args[0][1] == "/data_sources/collection-123/query"

@@ -7,14 +7,18 @@ from github_repo_auditor.operator_trend_transition_closure import (
 
 
 def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return bool(target.get("local_noise") or history_meta.get("current_transition_reversed"))
+    return bool(
+        target.get("local_noise") or history_meta.get("current_transition_reversed")
+    )
 
 
 def _clamp_round(value: float, lower: float, upper: float) -> float:
     return round(max(lower, min(upper, value)), 2)
 
 
-def test_transition_closure_confidence_marks_confirm_soon_when_signal_is_strong() -> None:
+def test_transition_closure_confidence_marks_confirm_soon_when_signal_is_strong() -> (
+    None
+):
     target = {
         "class_reweight_transition_status": "pending-support",
         "class_transition_health_status": "building",
@@ -44,7 +48,9 @@ def test_transition_closure_confidence_marks_confirm_soon_when_signal_is_strong(
     assert "Recent class momentum is still aligned" in reasons[1]
 
 
-def test_transition_closure_confidence_marks_blocked_when_support_signal_reverses_with_noise() -> None:
+def test_transition_closure_confidence_marks_blocked_when_support_signal_reverses_with_noise() -> (
+    None
+):
     target = {
         "class_reweight_transition_status": "pending-support",
         "class_transition_health_status": "holding",
@@ -72,10 +78,14 @@ def test_transition_closure_confidence_marks_blocked_when_support_signal_reverse
     assert score == 0.05
     assert label == "low"
     assert outcome == "blocked"
-    assert any("overriding positive class strengthening" in reason for reason in reasons)
+    assert any(
+        "overriding positive class strengthening" in reason for reason in reasons
+    )
 
 
-def test_apply_transition_closure_control_clears_low_confidence_pending_support() -> None:
+def test_apply_transition_closure_control_clears_low_confidence_pending_support() -> (
+    None
+):
     updates = apply_transition_closure_control(
         {
             "pre_class_normalization_trust_policy": "verify-first",
@@ -103,7 +113,9 @@ def test_apply_transition_closure_control_clears_low_confidence_pending_support(
     assert updates[10] == "candidate"
 
 
-def test_apply_transition_closure_control_leaves_non_triggered_state_unchanged() -> None:
+def test_apply_transition_closure_control_leaves_non_triggered_state_unchanged() -> (
+    None
+):
     updates = apply_transition_closure_control(
         {},
         trust_policy="act-with-review",

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from github_repo_auditor.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
+from github_repo_auditor.weekly_scheduling_overlay import (
+    apply_weekly_scheduling_overlay,
+)
 
 
 def _base_weekly_pack() -> dict:
@@ -27,7 +29,9 @@ def _operator_summary(*, blocked: int = 0, urgent: int = 0) -> dict:
         (0, 1),
     ],
 )
-def test_overlay_is_suppressed_by_blocked_or_urgent_pressure(blocked: int, urgent: int) -> None:
+def test_overlay_is_suppressed_by_blocked_or_urgent_pressure(
+    blocked: int, urgent: int
+) -> None:
     weekly_pack = {
         **_base_weekly_pack(),
         "top_needs_reapproval_approvals": [
@@ -39,10 +43,15 @@ def test_overlay_is_suppressed_by_blocked_or_urgent_pressure(blocked: int, urgen
         ],
     }
 
-    updated = apply_weekly_scheduling_overlay(weekly_pack, _operator_summary(blocked=blocked, urgent=urgent))
+    updated = apply_weekly_scheduling_overlay(
+        weekly_pack, _operator_summary(blocked=blocked, urgent=urgent)
+    )
 
     assert updated["what_to_do_this_week"] == "Protect the current queue winner first."
-    assert updated["queue_pressure_summary"] == "Urgent queue pressure still needs operator attention."
+    assert (
+        updated["queue_pressure_summary"]
+        == "Urgent queue pressure still needs operator attention."
+    )
     assert "weekly_priority_reason_codes" not in updated
 
 
@@ -102,17 +111,23 @@ def test_overlay_prioritizes_allowed_approval_buckets(
     assert updated["what_to_do_this_week"] == weekly_pack["next_approval_review"]
     assert updated["queue_pressure_summary"] == weekly_pack["approval_workflow_summary"]
     assert updated["top_recommendation_summary"] == weekly_pack["next_approval_review"]
-    assert updated["next_best_workflow_step"].startswith("Open the standard workbook first, then review Governance")
+    assert updated["next_best_workflow_step"].startswith(
+        "Open the standard workbook first, then review Governance"
+    )
     assert updated["weekly_priority_reason_codes"] == [
         "approval-aware-scheduling",
         "approval-workflow",
         expected_state,
     ]
     assert updated["weekly_priority_evidence_items"][0]["command_hint"] == command_text
-    assert updated["weekly_priority_evidence_items"][0]["safe_posture"] == expected_posture
+    assert (
+        updated["weekly_priority_evidence_items"][0]["safe_posture"] == expected_posture
+    )
 
 
-def test_overlay_preserves_current_decision_when_only_non_winning_approval_states_exist() -> None:
+def test_overlay_preserves_current_decision_when_only_non_winning_approval_states_exist() -> (
+    None
+):
     weekly_pack = {
         **_base_weekly_pack(),
         "top_approved_manual_approvals": [
@@ -133,5 +148,8 @@ def test_overlay_preserves_current_decision_when_only_non_winning_approval_state
     updated = apply_weekly_scheduling_overlay(weekly_pack, _operator_summary())
 
     assert updated["what_to_do_this_week"] == "Protect the current queue winner first."
-    assert updated["top_recommendation_summary"] == "Protect the current queue winner first."
+    assert (
+        updated["top_recommendation_summary"]
+        == "Protect the current queue winner first."
+    )
     assert "weekly_priority_evidence_items" not in updated

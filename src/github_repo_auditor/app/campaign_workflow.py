@@ -45,7 +45,9 @@ def _run_campaign_from_ledger_mode(args) -> None:
     print_info(f"campaign-from-ledger: {len(packets)} approved packet(s) to {verb}.")
 
     for packet in packets:
-        print_info(f"  packet goal: {packet.goal[:80]!r} ({len(packet.actions)} actions)")
+        print_info(
+            f"  packet goal: {packet.goal[:80]!r} ({len(packet.actions)} actions)"
+        )
 
         action_results: list[tuple[bool, str]] = []
         for action in packet.actions:
@@ -54,7 +56,9 @@ def _run_campaign_from_ledger_mode(args) -> None:
             action_state = getattr(action, "state", "pending") or "pending"
             if action_state != "approved":
                 skip_label = "rejected" if action_state == "rejected" else "pending"
-                print_info(f"    [skip:{skip_label}] {action.action_type} {action.repo_name}")
+                print_info(
+                    f"    [skip:{skip_label}] {action.action_type} {action.repo_name}"
+                )
                 action_results.append((True, f"skipped ({skip_label})"))
                 continue
 
@@ -74,7 +78,9 @@ def _run_campaign_from_ledger_mode(args) -> None:
                     dry_run=False,
                 )
                 status = "ok" if ok else "FAIL"
-                print_info(f"    [{status}] {action.action_type} {action.repo_name}: {msg}")
+                print_info(
+                    f"    [{status}] {action.action_type} {action.repo_name}: {msg}"
+                )
                 action_results.append((ok, msg))
 
         if dry_run:
@@ -84,7 +90,8 @@ def _run_campaign_from_ledger_mode(args) -> None:
         # 7B.5 — only mark applied when every action is terminal (approved+applied or rejected).
         # If any action is still pending, leave as approved-manual for the operator to revisit.
         has_pending = any(
-            (getattr(a, "state", "pending") or "pending") == "pending" for a in packet.actions
+            (getattr(a, "state", "pending") or "pending") == "pending"
+            for a in packet.actions
         )
         if has_pending:
             print_info(
@@ -101,13 +108,19 @@ def _run_campaign_from_ledger_mode(args) -> None:
             (ok, msg)
             for (ok, msg), action in zip(action_results, packet.actions)
             if action.action_type
-            not in ("pending_human_action", "add_license", "add_codeowners", "enable_dependabot")
+            not in (
+                "pending_human_action",
+                "add_license",
+                "add_codeowners",
+                "enable_dependabot",
+            )
             and (getattr(action, "state", "pending") or "pending") != "rejected"
         ]
         unsupported_results = [
             (ok, msg)
             for (ok, msg), action in zip(action_results, packet.actions)
-            if action.action_type in ("add_license", "add_codeowners", "enable_dependabot")
+            if action.action_type
+            in ("add_license", "add_codeowners", "enable_dependabot")
         ]
 
         # Unimplemented-handler actions are expected failures — don't penalise the packet
@@ -127,13 +140,20 @@ def _run_campaign_from_ledger_mode(args) -> None:
                 f"  packet kept approved-manual — {len(failed_supported)} failure(s): {error_summary[:120]}"
             )
 
+
 def _run_plan_campaign_mode(args) -> None:
     """Dispatch for --plan-campaign: generate a goal-driven campaign plan packet."""
-    from github_repo_auditor.approval_ledger import default_approval_reviewer as _default_reviewer
+    from github_repo_auditor.approval_ledger import (
+        default_approval_reviewer as _default_reviewer,
+    )
     from github_repo_auditor.llm_cost import BudgetExceededError, CostTracker
     from github_repo_auditor.narrative import _resolve_provider
     from github_repo_auditor.operator_prefs import load_prefs, prefs_path
-    from github_repo_auditor.plan_campaign import generate_plan, narrow_candidates, write_packet_to_ledger
+    from github_repo_auditor.plan_campaign import (
+        generate_plan,
+        narrow_candidates,
+        write_packet_to_ledger,
+    )
     from github_repo_auditor.warehouse import WAREHOUSE_FILENAME
 
     output_dir = Path(args.output_dir)
@@ -187,7 +207,9 @@ def _run_plan_campaign_mode(args) -> None:
 
     # ── Cost tracker ──────────────────────────────────────────────────────────
     budget_usd = getattr(args, "max_llm_spend", None)
-    cost_tracker: CostTracker = CostTracker(budget_usd=budget_usd, output_path=output_dir)
+    cost_tracker: CostTracker = CostTracker(
+        budget_usd=budget_usd, output_path=output_dir
+    )
 
     # ── Operator prefs ────────────────────────────────────────────────────────
     pref_file = prefs_path(output_dir)
@@ -201,7 +223,9 @@ def _run_plan_campaign_mode(args) -> None:
         max_repos=max_repos,
     )
     if not candidates:
-        print_info("No candidate repos found. Check that portfolio-truth-latest.json has data.")
+        print_info(
+            "No candidate repos found. Check that portfolio-truth-latest.json has data."
+        )
         return
 
     # ── Generate plan ─────────────────────────────────────────────────────────
@@ -217,7 +241,10 @@ def _run_plan_campaign_mode(args) -> None:
             prefs=prefs,
         )
     except BudgetExceededError as exc:
-        print(f"\nERROR: LLM budget exceeded during campaign planning: {exc}", file=sys.stderr)
+        print(
+            f"\nERROR: LLM budget exceeded during campaign planning: {exc}",
+            file=sys.stderr,
+        )
         return
 
     # ── Persist packet to ledger ──────────────────────────────────────────────
@@ -225,7 +252,9 @@ def _run_plan_campaign_mode(args) -> None:
 
     cost_tracker.write_telemetry()
 
-    pending_count = sum(1 for a in packet.actions if a.action_type == "pending_human_action")
+    pending_count = sum(
+        1 for a in packet.actions if a.action_type == "pending_human_action"
+    )
     print_info(
         f"Goal: {goal}. "
         f"Considered {packet.candidate_count}. "
@@ -235,11 +264,14 @@ def _run_plan_campaign_mode(args) -> None:
         f"Packet ID: {record_id}."
     )
 
+
 def _run_draft_readmes_mode(args) -> None:
     """Dispatch for --draft-readmes: generate LLM-authored README draft packets."""
     import sys
 
-    from github_repo_auditor.approval_ledger import default_approval_reviewer as _default_reviewer
+    from github_repo_auditor.approval_ledger import (
+        default_approval_reviewer as _default_reviewer,
+    )
     from github_repo_auditor.draft_readmes import (
         build_context,
         generate_draft,
@@ -355,12 +387,18 @@ def _run_draft_readmes_mode(args) -> None:
 
         try:
             packet = generate_draft(
-                repo, context=context, provider=provider, model=model, cost_tracker=cost_tracker
+                repo,
+                context=context,
+                provider=provider,
+                model=model,
+                cost_tracker=cost_tracker,
             )
             packets.append(packet)
             print_info(f"  drafted {repo_name} ({packet.diff_summary})")
         except BudgetExceededError as exc:
-            print(f"\nERROR: LLM budget exceeded at {repo_name}: {exc}", file=sys.stderr)
+            print(
+                f"\nERROR: LLM budget exceeded at {repo_name}: {exc}", file=sys.stderr
+            )
             skipped_budget = len(repo_names) - len(packets) - skipped_suppressed - 1
             break
         except Exception as exc:  # noqa: BLE001

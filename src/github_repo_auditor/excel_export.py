@@ -47,7 +47,9 @@ from github_repo_auditor.excel_all_repos_helpers import ALL_REPOS_HEADERS
 from github_repo_auditor.excel_all_repos_helpers import (
     apply_all_repos_postprocessing as _apply_all_repos_postprocessing,
 )
-from github_repo_auditor.excel_all_repos_helpers import build_all_repo_rows as _build_all_repo_rows
+from github_repo_auditor.excel_all_repos_helpers import (
+    build_all_repo_rows as _build_all_repo_rows,
+)
 from github_repo_auditor.excel_all_repos_helpers import (
     build_all_repos_workbook_sheet as _build_all_repos_workbook_sheet,
 )
@@ -171,7 +173,9 @@ from github_repo_auditor.excel_dashboard_helpers import (
 from github_repo_auditor.excel_dashboard_helpers import (
     write_dashboard_visual_sections as _write_dashboard_visual_sections,
 )
-from github_repo_auditor.excel_detail_helpers import apply_lane_row_fill as _apply_lane_row_fill
+from github_repo_auditor.excel_detail_helpers import (
+    apply_lane_row_fill as _apply_lane_row_fill,
+)
 from github_repo_auditor.excel_executive_summary_helpers import (
     build_executive_operator_context as _build_executive_operator_context,
 )
@@ -209,8 +213,12 @@ from github_repo_auditor.excel_hidden_data_content_helpers import (
 from github_repo_auditor.excel_hidden_data_content_helpers import (
     build_hidden_data_sheets as _build_hidden_data_sheets_helper,
 )
-from github_repo_auditor.excel_hidden_data_rows import build_core_hidden_rows as _build_core_hidden_rows
-from github_repo_auditor.excel_hidden_sheet_writer import write_hidden_data_tables as _write_hidden_data_tables
+from github_repo_auditor.excel_hidden_data_rows import (
+    build_core_hidden_rows as _build_core_hidden_rows,
+)
+from github_repo_auditor.excel_hidden_sheet_writer import (
+    write_hidden_data_tables as _write_hidden_data_tables,
+)
 from github_repo_auditor.excel_hotspot_sheet_helpers import (
     IMPLEMENTATION_HOTSPOTS_HEADERS,
 )
@@ -271,9 +279,15 @@ from github_repo_auditor.excel_ledger_sheet_helpers import (
 from github_repo_auditor.excel_ledger_sheet_helpers import (
     write_review_history_table as _write_review_history_table,
 )
-from github_repo_auditor.excel_navigation_helpers import build_navigation as _build_navigation
-from github_repo_auditor.excel_navigation_helpers import inject_sheet_navigation as _inject_sheet_navigation
-from github_repo_auditor.excel_operator_hidden_rows import build_operator_hidden_rows as _build_operator_hidden_rows
+from github_repo_auditor.excel_navigation_helpers import (
+    build_navigation as _build_navigation,
+)
+from github_repo_auditor.excel_navigation_helpers import (
+    inject_sheet_navigation as _inject_sheet_navigation,
+)
+from github_repo_auditor.excel_operator_hidden_rows import (
+    build_operator_hidden_rows as _build_operator_hidden_rows,
+)
 from github_repo_auditor.excel_operator_outcomes_helpers import (
     build_operator_outcomes_content as _build_operator_outcomes_content,
 )
@@ -399,13 +413,21 @@ from github_repo_auditor.excel_quick_wins_helpers import (
 from github_repo_auditor.excel_quick_wins_helpers import (
     write_quick_wins_sheet as _write_quick_wins_sheet,
 )
-from github_repo_auditor.excel_repo_data_helpers import repo_detail_rows as _repo_detail_rows
-from github_repo_auditor.excel_repo_data_helpers import run_change_rows as _run_change_rows
+from github_repo_auditor.excel_repo_data_helpers import (
+    repo_detail_rows as _repo_detail_rows,
+)
+from github_repo_auditor.excel_repo_data_helpers import (
+    run_change_rows as _run_change_rows,
+)
 from github_repo_auditor.excel_repo_detail_helpers import (
     build_repo_detail_sheet as _build_repo_detail_sheet,
 )
-from github_repo_auditor.excel_report_helpers import display_operator_state as _display_operator_state
-from github_repo_auditor.excel_report_helpers import generate_narrative as _generate_narrative
+from github_repo_auditor.excel_report_helpers import (
+    display_operator_state as _display_operator_state,
+)
+from github_repo_auditor.excel_report_helpers import (
+    generate_narrative as _generate_narrative,
+)
 from github_repo_auditor.excel_review_queue_helpers import (
     build_review_queue_sheet_content as _build_review_queue_sheet_content,
 )
@@ -468,21 +490,33 @@ from github_repo_auditor.excel_security_sheet_helpers import (
 from github_repo_auditor.excel_security_sheet_helpers import (
     build_security_debt_sheet as _build_security_debt_sheet,
 )
-from github_repo_auditor.excel_security_sheet_helpers import build_security_sheet as _build_security_sheet
+from github_repo_auditor.excel_security_sheet_helpers import (
+    build_security_sheet as _build_security_sheet,
+)
 from github_repo_auditor.excel_security_sheet_helpers import (
     build_security_sheet_rows as _build_security_sheet_rows,
 )
 from github_repo_auditor.excel_security_sheet_helpers import (
     build_supply_chain_rows as _build_supply_chain_rows,
 )
-from github_repo_auditor.excel_security_sheet_helpers import build_supply_chain_sheet as _build_supply_chain_sheet
+from github_repo_auditor.excel_security_sheet_helpers import (
+    build_supply_chain_sheet as _build_supply_chain_sheet,
+)
 from github_repo_auditor.excel_security_sheet_helpers import (
     write_security_table as _write_security_table,
 )
-from github_repo_auditor.excel_sheet_layout_helpers import set_sheet_header as _set_sheet_header
-from github_repo_auditor.excel_sheet_layout_helpers import write_instruction_banner as _write_instruction_banner
-from github_repo_auditor.excel_sheet_layout_helpers import write_key_value_block as _write_key_value_block
-from github_repo_auditor.excel_sheet_layout_helpers import write_ranked_list as _write_ranked_list
+from github_repo_auditor.excel_sheet_layout_helpers import (
+    set_sheet_header as _set_sheet_header,
+)
+from github_repo_auditor.excel_sheet_layout_helpers import (
+    write_instruction_banner as _write_instruction_banner,
+)
+from github_repo_auditor.excel_sheet_layout_helpers import (
+    write_key_value_block as _write_key_value_block,
+)
+from github_repo_auditor.excel_sheet_layout_helpers import (
+    write_ranked_list as _write_ranked_list,
+)
 from github_repo_auditor.excel_styles import (
     CENTER,
     GRADE_COLORS,
@@ -536,15 +570,27 @@ from github_repo_auditor.excel_timeline_helpers import (
 from github_repo_auditor.excel_timeline_helpers import (
     extend_score_history_with_current as _extend_score_history_with_current,
 )
-from github_repo_auditor.excel_timeline_helpers import review_status_counts as _review_status_counts
+from github_repo_auditor.excel_timeline_helpers import (
+    review_status_counts as _review_status_counts,
+)
 from github_repo_auditor.excel_workbook_helpers import add_table as _add_table
-from github_repo_auditor.excel_workbook_helpers import clear_worksheet as _clear_worksheet
-from github_repo_auditor.excel_workbook_helpers import configure_sheet_view as _configure_sheet_view
-from github_repo_auditor.excel_workbook_helpers import get_or_create_sheet as _get_or_create_sheet
+from github_repo_auditor.excel_workbook_helpers import (
+    clear_worksheet as _clear_worksheet,
+)
+from github_repo_auditor.excel_workbook_helpers import (
+    configure_sheet_view as _configure_sheet_view,
+)
+from github_repo_auditor.excel_workbook_helpers import (
+    get_or_create_sheet as _get_or_create_sheet,
+)
 from github_repo_auditor.excel_workbook_helpers import set_autofilter as _set_autofilter
-from github_repo_auditor.excel_workbook_helpers import set_defined_name as _set_defined_name
+from github_repo_auditor.excel_workbook_helpers import (
+    set_defined_name as _set_defined_name,
+)
 from github_repo_auditor.excel_workbook_helpers import sheet_location as _sheet_location
-from github_repo_auditor.excel_workbook_rollups import build_workbook_rollups as _build_workbook_rollups
+from github_repo_auditor.excel_workbook_rollups import (
+    build_workbook_rollups as _build_workbook_rollups,
+)
 from github_repo_auditor.history import load_trend_data
 from github_repo_auditor.report_enrichment import (
     build_maturity_gap_summary,
@@ -822,7 +868,9 @@ def _build_tech_stack(wb: Workbook, data: dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None) -> None:
+def _build_trends(
+    wb: Workbook, data: dict, trend_data: list[dict] | None = None
+) -> None:
     ws = _get_or_create_sheet(wb, "Trends")
     ws.sheet_properties.tabColor = "311B92"
     _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
@@ -1170,7 +1218,9 @@ def _join_outcome_examples(items: list[dict]) -> str:
     labels = []
     for item in items[:3]:
         repo = str(item.get("repo") or "").strip()
-        title = str(item.get("title") or item.get("action_id") or "Operator outcome").strip()
+        title = str(
+            item.get("title") or item.get("action_id") or "Operator outcome"
+        ).strip()
         labels.append(f"{repo}: {title}" if repo else title)
     return "; ".join(labels)
 
@@ -1509,7 +1559,9 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
     )
 
 
-def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard") -> None:
+def _build_review_queue(
+    wb: Workbook, data: dict, *, excel_mode: str = "standard"
+) -> None:
     _build_review_queue_workbook_sheet(
         wb,
         data,

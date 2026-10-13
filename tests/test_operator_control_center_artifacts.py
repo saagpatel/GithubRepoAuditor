@@ -16,8 +16,12 @@ def _stub_artifact_dependencies(tmp_path, monkeypatch, *, weekly_digest=None):
     json_path = tmp_path / "control.json"
     md_path = tmp_path / "control.md"
     weekly_writes = []
-    monkeypatch.setattr(artifacts, "control_center_paths", lambda *_args: (json_path, md_path))
-    monkeypatch.setattr(artifacts, "load_latest_portfolio_truth", lambda *_args: (None, {}))
+    monkeypatch.setattr(
+        artifacts, "control_center_paths", lambda *_args: (json_path, md_path)
+    )
+    monkeypatch.setattr(
+        artifacts, "load_latest_portfolio_truth", lambda *_args: (None, {})
+    )
     monkeypatch.setattr(
         artifacts,
         "build_weekly_command_center_digest",
@@ -28,19 +32,30 @@ def _stub_artifact_dependencies(tmp_path, monkeypatch, *, weekly_digest=None):
         weekly_writes.append(True)
         return tmp_path / "weekly.json", tmp_path / "weekly.md"
 
-    monkeypatch.setattr(artifacts, "write_weekly_command_center_artifacts", write_weekly)
+    monkeypatch.setattr(
+        artifacts, "write_weekly_command_center_artifacts", write_weekly
+    )
     return json_path, md_path, weekly_writes
 
 
-def test_control_center_artifacts_reject_credential_payload_before_writing(tmp_path, monkeypatch):
+def test_control_center_artifacts_reject_credential_payload_before_writing(
+    tmp_path, monkeypatch
+):
     json_path, md_path, weekly_writes = _stub_artifact_dependencies(
         tmp_path, monkeypatch
     )
-    monkeypatch.setattr(artifacts, "control_center_artifact_payload", lambda *_args: {"token": "secret"})
+    monkeypatch.setattr(
+        artifacts, "control_center_artifact_payload", lambda *_args: {"token": "secret"}
+    )
 
     with pytest.raises(ValueError, match="must not persist credential fields"):
         artifacts.write_control_center_artifacts(
-            {}, {}, tmp_path, username="user", generated_at=datetime.now(timezone.utc), report_reference="report"
+            {},
+            {},
+            tmp_path,
+            username="user",
+            generated_at=datetime.now(timezone.utc),
+            report_reference="report",
         )
 
     assert not json_path.exists()
@@ -86,7 +101,9 @@ def test_control_center_artifacts_redact_opaque_sensitive_free_text_before_writi
         weekly_digests.append(kwargs["digest"])
         return tmp_path / "weekly.json", tmp_path / "weekly.md"
 
-    monkeypatch.setattr(artifacts, "write_weekly_command_center_artifacts", write_weekly)
+    monkeypatch.setattr(
+        artifacts, "write_weekly_command_center_artifacts", write_weekly
+    )
 
     result = artifacts.write_control_center_artifacts(
         {},

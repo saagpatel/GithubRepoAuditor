@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from github_repo_auditor.action_sync_packets import EXECUTION_PRIORITY
-from github_repo_auditor.action_sync_readiness import CAMPAIGN_DISPLAY_ORDER, READINESS_PRIORITY
+from github_repo_auditor.action_sync_readiness import (
+    CAMPAIGN_DISPLAY_ORDER,
+    READINESS_PRIORITY,
+)
 from github_repo_auditor.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 AUTOMATION_PRIORITY = {
@@ -137,7 +140,9 @@ def _automation_reason(
     execution_state = str(packet.get("execution_state") or "stay-local")
     monitoring_state = str(monitoring.get("monitoring_state") or "no-recent-apply")
     if posture == "approval-first":
-        return "Approval review is the only remaining blocker before any execution step."
+        return (
+            "Approval review is the only remaining blocker before any execution step."
+        )
     if posture == "manual-only":
         if historical_statuses & HISTORICAL_MANUAL_STATUSES:
             return "Cross-run repo history still shows relapse or persistent pressure."
@@ -218,7 +223,9 @@ def _posture(
 
 def _sort_key(record: dict[str, Any]) -> tuple[int, int, int, int, int]:
     return (
-        AUTOMATION_PRIORITY.get(str(record.get("automation_posture") or "quiet-safe"), 99),
+        AUTOMATION_PRIORITY.get(
+            str(record.get("automation_posture") or "quiet-safe"), 99
+        ),
         READINESS_PRIORITY.get(str(record.get("readiness_stage") or "idle"), 99),
         EXECUTION_PRIORITY.get(str(record.get("execution_state") or "stay-local"), 99),
         -int(record.get("action_count", 0) or 0),
@@ -269,9 +276,12 @@ def _queue_automation(
         mapped = dict(item)
         campaign_type = str(mapped.get("suggested_campaign") or "").strip()
         automation = automation_by_campaign.get(campaign_type, {})
-        mapped["automation_posture"] = str(automation.get("automation_posture") or "manual-only")
+        mapped["automation_posture"] = str(
+            automation.get("automation_posture") or "manual-only"
+        )
         mapped["automation_summary"] = str(
-            automation.get("summary") or "Automation Guidance: keep this item human-led for now."
+            automation.get("summary")
+            or "Automation Guidance: keep this item human-led for now."
         )
         mapped["automation_command"] = str(automation.get("recommended_command") or "")
         mapped["automation_line"] = (
@@ -293,7 +303,8 @@ def build_action_sync_automation_bundle(
     readiness_by_campaign = {
         str(item.get("campaign_type") or ""): dict(item)
         for item in (
-            (readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns") or []
+            (readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns")
+            or []
         )
     }
     packets_by_campaign = {
@@ -333,14 +344,19 @@ def build_action_sync_automation_bundle(
             "label": label,
             "readiness_stage": str(readiness.get("readiness_stage") or "idle"),
             "execution_state": str(packet.get("execution_state") or "stay-local"),
-            "monitoring_state": str(monitoring.get("monitoring_state") or "no-recent-apply"),
+            "monitoring_state": str(
+                monitoring.get("monitoring_state") or "no-recent-apply"
+            ),
             "automation_posture": posture,
             "automation_reason": reason,
             "review_required": _review_required(posture, packet, monitoring, history),
             "recommended_command": command,
             "recommended_follow_up": follow_up,
-            "requires_approval": posture == "approval-first" or bool(packet.get("approvals_required")),
-            "action_count": int(packet.get("action_count", readiness.get("action_count", 0)) or 0),
+            "requires_approval": posture == "approval-first"
+            or bool(packet.get("approvals_required")),
+            "action_count": int(
+                packet.get("action_count", readiness.get("action_count", 0)) or 0
+            ),
             "summary": _summary(label, posture, reason, command, follow_up),
         }
         records.append(record)
@@ -350,7 +366,9 @@ def build_action_sync_automation_bundle(
     if next_safe:
         next_safe["summary"] = _next_safe_summary(next_safe)
 
-    automation_by_campaign = {str(item.get("campaign_type") or ""): item for item in records}
+    automation_by_campaign = {
+        str(item.get("campaign_type") or ""): item for item in records
+    }
     return {
         "action_sync_automation": records,
         "automation_guidance_summary": _guidance_summary(records),
@@ -362,10 +380,14 @@ def build_action_sync_automation_bundle(
             item for item in ordered if item.get("automation_posture") == "apply-manual"
         ][:3],
         "top_approval_first_campaigns": [
-            item for item in ordered if item.get("automation_posture") == "approval-first"
+            item
+            for item in ordered
+            if item.get("automation_posture") == "approval-first"
         ][:3],
         "top_follow_up_safe_campaigns": [
-            item for item in ordered if item.get("automation_posture") == "follow-up-safe"
+            item
+            for item in ordered
+            if item.get("automation_posture") == "follow-up-safe"
         ][:3],
         "top_manual_only_campaigns": [
             item for item in ordered if item.get("automation_posture") == "manual-only"

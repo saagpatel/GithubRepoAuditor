@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=68", "setuptools-scm>=8"]
+requires = ["setuptools==83.0.0", "setuptools-scm==10.3.4"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "github-repo-auditor"
 dynamic = ["version"]
-description = "Automated GitHub portfolio auditor with 12 analysis dimensions"
+description = "Automated GitHub portfolio auditor with 13 analysis dimensions"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "Saag Patel" }]
 keywords = [
@@ -22,8 +22,9 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Utilities",
 ]
@@ -119,7 +120,10 @@ pytest_add_cli_args_test_selection = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
+
+[tool.uv]
+required-version = "==0.13.0"
 
 [tool.ruff.lint]
 ignore = ["E501"]

@@ -58,15 +58,16 @@ def _stable_action_id(repo_full_name: str, campaign_type: str, action_key: str) 
     return f"{_slug(campaign_type)}-{digest}"
 
 
-def _build_audit_maps(report_data: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, float]]:
+def _build_audit_maps(
+    report_data: dict,
+) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, float]]:
     analyst_context = build_analyst_context(
         report_data,
         profile_name=report_data.get("selected_portfolio_profile", "default"),
         collection_name=report_data.get("selected_collection"),
     )
     audit_by_name = {
-        audit["metadata"]["name"]: audit
-        for audit in report_data.get("audits", [])
+        audit["metadata"]["name"]: audit for audit in report_data.get("audits", [])
     }
     collections_by_name = {
         entry["name"]: entry["collections"]
@@ -79,7 +80,9 @@ def _build_audit_maps(report_data: dict) -> tuple[dict[str, dict], dict[str, lis
     return audit_by_name, collections_by_name, profile_score_by_name
 
 
-def _selected_repo_names(report_data: dict, collection_name: str | None) -> set[str] | None:
+def _selected_repo_names(
+    report_data: dict, collection_name: str | None
+) -> set[str] | None:
     if not collection_name:
         return None
     collection = report_data.get("collections", {}).get(collection_name, {})
@@ -115,7 +118,9 @@ def _make_base_action(
     profile_score: float,
     metadata: dict | None = None,
 ) -> dict:
-    repo_full_name = audit.get("metadata", {}).get("full_name", audit.get("metadata", {}).get("name", "unknown"))
+    repo_full_name = audit.get("metadata", {}).get(
+        "full_name", audit.get("metadata", {}).get("name", "unknown")
+    )
     repo_name = audit.get("metadata", {}).get("name", repo_full_name)
     return {
         "action_id": _stable_action_id(repo_full_name, campaign_type, action_key),
@@ -160,7 +165,9 @@ def _build_security_actions(
                 campaign_type="security-review",
                 action_key=item.get("key", _slug(item.get("title", "security-review"))),
                 title=item.get("title", "Security review"),
-                body=item.get("why", item.get("summary", item.get("title", "Security review"))),
+                body=item.get(
+                    "why", item.get("summary", item.get("title", "Security review"))
+                ),
                 kind="security-governance",
                 source=item.get("source", "merged"),
                 priority=item.get("priority", "medium"),
@@ -196,7 +203,9 @@ def _build_backlog_actions(
                 campaign_type="promotion-push",
                 action_key=item.get("key", _slug(item.get("title", "promotion-push"))),
                 title=item.get("title", "Promotion push"),
-                body=item.get("rationale", item.get("action", item.get("title", "Promotion push"))),
+                body=item.get(
+                    "rationale", item.get("action", item.get("title", "Promotion push"))
+                ),
                 kind="promotion",
                 source="action_backlog",
                 priority="high" if item.get("confidence", 0) >= 0.85 else "medium",
@@ -227,7 +236,11 @@ def _build_archive_actions(
         if selected_names is not None and repo_name not in selected_names:
             continue
         audit = audit_by_name[repo_name]
-        reason = repo_data.get("reason", "Low momentum and low showcase value.") if isinstance(repo_data, dict) else "Low momentum and low showcase value."
+        reason = (
+            repo_data.get("reason", "Low momentum and low showcase value.")
+            if isinstance(repo_data, dict)
+            else "Low momentum and low showcase value."
+        )
         actions.append(
             _make_base_action(
                 audit=audit,
@@ -271,7 +284,10 @@ def _build_showcase_actions(
                 campaign_type="showcase-publish",
                 action_key=top_action.get("key", "showcase-pass"),
                 title="Prepare showcase publish pass",
-                body=top_action.get("action", "Polish README, screenshots, and public framing for this repo."),
+                body=top_action.get(
+                    "action",
+                    "Polish README, screenshots, and public framing for this repo.",
+                ),
                 kind="showcase-publish",
                 source="collection",
                 priority="high",
@@ -307,7 +323,12 @@ def _build_maintenance_actions(
                 campaign_type="maintenance-cleanup",
                 action_key=f"hotspot-{_slug(hotspot.get('category', 'cleanup'))}",
                 title=hotspot.get("title", "Maintenance cleanup"),
-                body=hotspot.get("recommended_action", hotspot.get("summary", "Address the primary hotspot for this repo.")),
+                body=hotspot.get(
+                    "recommended_action",
+                    hotspot.get(
+                        "summary", "Address the primary hotspot for this repo."
+                    ),
+                ),
                 kind="hotspot-cleanup",
                 source="hotspot",
                 priority="high" if hotspot.get("severity", 0) >= 0.7 else "medium",
@@ -327,7 +348,9 @@ def _campaign_actions(
     campaign_type: str,
     selected_names: set[str] | None,
 ) -> list[dict]:
-    audit_by_name, collections_by_name, profile_score_by_name = _build_audit_maps(report_data)
+    audit_by_name, collections_by_name, profile_score_by_name = _build_audit_maps(
+        report_data
+    )
     builders = {
         "security-review": _build_security_actions,
         "promotion-push": _build_backlog_actions,
@@ -336,7 +359,13 @@ def _campaign_actions(
         "maintenance-cleanup": _build_maintenance_actions,
     }
     builder = builders[campaign_type]
-    return builder(report_data, audit_by_name, collections_by_name, profile_score_by_name, selected_names)
+    return builder(
+        report_data,
+        audit_by_name,
+        collections_by_name,
+        profile_score_by_name,
+        selected_names,
+    )
 
 
 def build_campaign_bundle(
@@ -357,7 +386,9 @@ def build_campaign_bundle(
 
     for index, action in enumerate(actions, start=1):
         action["rank"] = index
-        action["writeback_targets"] = _preview_targets_for_action(action, writeback_target)
+        action["writeback_targets"] = _preview_targets_for_action(
+            action, writeback_target
+        )
         action["managed_issue_title"] = managed_issue_title(action["campaign_type"])
 
     definition = CAMPAIGN_DEFINITIONS[campaign_type]
@@ -436,9 +467,13 @@ def managed_issue_body(repo_name: str, campaign_type: str, actions: list[dict]) 
         "## Suggested actions",
     ]
     for action in actions:
-        lines.append(f"- [ ] **{action['title']}** ({action['priority']}, effort {action['effort']})")
+        lines.append(
+            f"- [ ] **{action['title']}** ({action['priority']}, effort {action['effort']})"
+        )
         lines.append(f"  - {action['body']}")
-        lines.append(f"  - Expected lift: {action['expected_lift']:.3f} on {action['primary_lens']}")
+        lines.append(
+            f"  - Expected lift: {action['expected_lift']:.3f} on {action['primary_lens']}"
+        )
     return "\n".join(lines)
 
 
@@ -474,16 +509,24 @@ def build_writeback_preview(
     }
     for repo_full_name, repo_actions in grouped.items():
         project_row = github_projects_rows.get(repo_full_name, {})
-        preview_repos.append({
-            "repo_full_name": repo_full_name,
-            "repo": repo_actions[0]["repo"],
-            "topics": desired_managed_topics(repo_actions[0]) if writeback_target in {"github", "all"} else [],
-            "issue_title": managed_issue_title(repo_actions[0]["campaign_type"]) if writeback_target in {"github", "all"} else None,
-            "notion_action_count": len(repo_actions) if writeback_target in {"notion", "all"} else 0,
-            "action_ids": [action["action_id"] for action in repo_actions],
-            "github_project_field_count": project_row.get("field_count", 0),
-            "github_project_fields": project_row.get("fields", {}),
-        })
+        preview_repos.append(
+            {
+                "repo_full_name": repo_full_name,
+                "repo": repo_actions[0]["repo"],
+                "topics": desired_managed_topics(repo_actions[0])
+                if writeback_target in {"github", "all"}
+                else [],
+                "issue_title": managed_issue_title(repo_actions[0]["campaign_type"])
+                if writeback_target in {"github", "all"}
+                else None,
+                "notion_action_count": len(repo_actions)
+                if writeback_target in {"notion", "all"}
+                else 0,
+                "action_ids": [action["action_id"] for action in repo_actions],
+                "github_project_field_count": project_row.get("field_count", 0),
+                "github_project_fields": project_row.get("fields", {}),
+            }
+        )
     current_action_ids = {action["action_id"] for action in actions}
     stale_actions = [
         item
@@ -498,12 +541,20 @@ def build_writeback_preview(
         "action_count": len(actions),
         "repos": preview_repos,
         "stale_action_count": len(stale_actions),
-        "stale_repos": sorted({item.get("repo_full_name", "") for item in stale_actions if item.get("repo_full_name")}),
+        "stale_repos": sorted(
+            {
+                item.get("repo_full_name", "")
+                for item in stale_actions
+                if item.get("repo_full_name")
+            }
+        ),
         "github_projects": github_projects_preview,
     }
 
 
-def _issue_lookup(issues: list[dict], campaign_type: str, repo_name: str) -> dict | None:
+def _issue_lookup(
+    issues: list[dict], campaign_type: str, repo_name: str
+) -> dict | None:
     marker = f"{MANAGED_ISSUE_MARKER}:{campaign_type}:{_slug(repo_name)}"
     for issue in issues:
         body = issue.get("body") or ""
@@ -517,14 +568,20 @@ def _managed_property_values(action: dict) -> dict[str, str]:
     return {
         "portfolio_call": action["campaign_type"],
         "showcase": "true" if "showcase" in action.get("collections", []) else "false",
-        "archive_candidate": "true" if "archive-soon" in action.get("collections", []) else "false",
-        "security_tier": "high" if action["campaign_type"] == "security-review" else "normal",
+        "archive_candidate": "true"
+        if "archive-soon" in action.get("collections", [])
+        else "false",
+        "security_tier": "high"
+        if action["campaign_type"] == "security-review"
+        else "normal",
         "next_move": _next_move_slug(action),
         "primary_lens": action["primary_lens"],
     }
 
 
-def _managed_issue_drift(issue: dict | None, expected_title: str, expected_body: str) -> list[str]:
+def _managed_issue_drift(
+    issue: dict | None, expected_title: str, expected_body: str
+) -> list[str]:
     if not issue:
         return []
     changed = []
@@ -553,7 +610,15 @@ def _find_issue_by_number(issues: list[dict], number: int | None) -> dict | None
     return None
 
 
-def _result_for_repo(sample: dict, action_ids: list[str], *, target: str, before: object, after: object, expected: dict | None = None) -> dict:
+def _result_for_repo(
+    sample: dict,
+    action_ids: list[str],
+    *,
+    target: str,
+    before: object,
+    after: object,
+    expected: dict | None = None,
+) -> dict:
     return {
         "action_ids": action_ids,
         "action_id": sample["action_id"] if len(action_ids) == 1 else None,
@@ -574,7 +639,9 @@ def _find_project_item_by_id(items_result: dict, item_id: str | None) -> dict | 
     return None
 
 
-def _project_item_snapshot(previous_actions: dict[str, dict], repo_full_name: str) -> dict:
+def _project_item_snapshot(
+    previous_actions: dict[str, dict], repo_full_name: str
+) -> dict:
     for previous in previous_actions.values():
         if previous.get("repo_full_name") != repo_full_name:
             continue
@@ -584,7 +651,9 @@ def _project_item_snapshot(previous_actions: dict[str, dict], repo_full_name: st
     return {}
 
 
-def _project_external_item_id(previous_actions: dict[str, dict], repo_full_name: str) -> str:
+def _project_external_item_id(
+    previous_actions: dict[str, dict], repo_full_name: str
+) -> str:
     snapshot = _project_item_snapshot(previous_actions, repo_full_name)
     external_key = str(snapshot.get("external_key") or "").strip()
     if external_key and not external_key.startswith("https://"):
@@ -733,8 +802,16 @@ def apply_github_writeback(
         action_ids = [action["action_id"] for action in repo_actions]
         desired_topics = desired_managed_topics(sample)
         current_topics_info = client.get_repo_topics(owner, repo)
-        existing_topics = current_topics_info.get("topics", []) if current_topics_info.get("available") else sample.get("metadata", {}).get("topics", [])
-        preserved_topics = [topic for topic in existing_topics if not topic.startswith(MANAGED_TOPIC_PREFIX)]
+        existing_topics = (
+            current_topics_info.get("topics", [])
+            if current_topics_info.get("available")
+            else sample.get("metadata", {}).get("topics", [])
+        )
+        preserved_topics = [
+            topic
+            for topic in existing_topics
+            if not topic.startswith(MANAGED_TOPIC_PREFIX)
+        ]
         topic_result = _result_for_repo(
             sample,
             action_ids,
@@ -743,8 +820,12 @@ def apply_github_writeback(
             after=preserved_topics + desired_topics,
             expected={"managed_topics": desired_topics},
         )
-        observed_managed_topics = sorted(topic for topic in existing_topics if topic.startswith(MANAGED_TOPIC_PREFIX))
-        if current_topics_info.get("available") and observed_managed_topics != sorted(desired_topics):
+        observed_managed_topics = sorted(
+            topic for topic in existing_topics if topic.startswith(MANAGED_TOPIC_PREFIX)
+        )
+        if current_topics_info.get("available") and observed_managed_topics != sorted(
+            desired_topics
+        ):
             managed_state_drift.append(
                 {
                     "action_id": sample["action_id"],
@@ -760,9 +841,13 @@ def apply_github_writeback(
             if sorted(existing_topics) == sorted(preserved_topics + desired_topics):
                 topic_result["status"] = "unchanged"
             else:
-                update = client.replace_repo_topics(owner, repo, preserved_topics + desired_topics)
+                update = client.replace_repo_topics(
+                    owner, repo, preserved_topics + desired_topics
+                )
                 topic_result["status"] = "updated" if update.get("ok") else "failed"
-                topic_result["after"] = update.get("topics", preserved_topics + desired_topics)
+                topic_result["after"] = update.get(
+                    "topics", preserved_topics + desired_topics
+                )
                 topic_result["details"] = update
         else:
             topic_result["status"] = "skipped"
@@ -773,10 +858,12 @@ def apply_github_writeback(
         before_properties = client.get_repo_custom_property_values(owner, repo)
         current_property_values = before_properties.get("values", {})
         observed_managed_properties = {
-            key: current_property_values.get(key)
-            for key in property_values
+            key: current_property_values.get(key) for key in property_values
         }
-        if before_properties.get("available") and observed_managed_properties != property_values:
+        if (
+            before_properties.get("available")
+            and observed_managed_properties != property_values
+        ):
             managed_state_drift.append(
                 {
                     "action_id": sample["action_id"],
@@ -796,11 +883,18 @@ def apply_github_writeback(
             after=property_values,
             expected=property_values,
         )
-        if before_properties.get("available") and observed_managed_properties == property_values:
+        if (
+            before_properties.get("available")
+            and observed_managed_properties == property_values
+        ):
             property_result["status"] = "unchanged"
         else:
-            update = client.update_repo_custom_property_values(owner, repo, property_values)
-            property_result["status"] = update.get("status", "updated" if update.get("ok") else "failed")
+            update = client.update_repo_custom_property_values(
+                owner, repo, property_values
+            )
+            property_result["status"] = update.get(
+                "status", "updated" if update.get("ok") else "failed"
+            )
             property_result["before"] = update.get("before", current_property_values)
             property_result["after"] = update.get("after", current_property_values)
             property_result["details"] = update
@@ -815,11 +909,18 @@ def apply_github_writeback(
             previous_issue_number = _parse_external_key(snapshot.get("external_key"))
             if previous_issue_number is not None:
                 break
-        existing_issue = _find_issue_by_number(issues, previous_issue_number) or _issue_lookup(issues, sample["campaign_type"], sample["repo"])
-        issue_body = managed_issue_body(sample["repo"], sample["campaign_type"], repo_actions)
+        existing_issue = _find_issue_by_number(
+            issues, previous_issue_number
+        ) or _issue_lookup(issues, sample["campaign_type"], sample["repo"])
+        issue_body = managed_issue_body(
+            sample["repo"], sample["campaign_type"], repo_actions
+        )
         issue_title = managed_issue_title(sample["campaign_type"])
         drift_fields = _managed_issue_drift(existing_issue, issue_title, issue_body)
-        if existing_issue is None and any(previous.get("repo_full_name") == repo_full_name for previous in previous_actions.values()):
+        if existing_issue is None and any(
+            previous.get("repo_full_name") == repo_full_name
+            for previous in previous_actions.values()
+        ):
             managed_state_drift.append(
                 {
                     "action_id": sample["action_id"],
@@ -865,10 +966,18 @@ def apply_github_writeback(
                         "state": "open",
                     },
                 )
-                issue_result["status"] = "reopened" if existing_issue.get("state") == "closed" and updated.get("ok") else ("updated" if updated.get("ok") else "failed")
+                issue_result["status"] = (
+                    "reopened"
+                    if existing_issue.get("state") == "closed" and updated.get("ok")
+                    else ("updated" if updated.get("ok") else "failed")
+                )
                 issue_result["number"] = existing_issue["number"]
-                issue_result["url"] = updated.get("html_url", existing_issue.get("html_url"))
-                issue_result["node_id"] = updated.get("node_id") or existing_issue.get("node_id")
+                issue_result["url"] = updated.get(
+                    "html_url", existing_issue.get("html_url")
+                )
+                issue_result["node_id"] = updated.get("node_id") or existing_issue.get(
+                    "node_id"
+                )
                 issue_result["details"] = updated
             else:
                 issue_result["status"] = "unchanged"
@@ -909,7 +1018,10 @@ def apply_github_writeback(
                 target="github-project-item",
                 before={},
                 after={},
-                expected={"project_owner": project.get("owner", ""), "project_number": project.get("project_number", 0)},
+                expected={
+                    "project_owner": project.get("owner", ""),
+                    "project_number": project.get("project_number", 0),
+                },
             )
             project_fields_result = _result_for_repo(
                 sample,
@@ -967,16 +1079,25 @@ def apply_github_writeback(
                         }
                     )
                 else:
-                    previous_item_id = _project_external_item_id(previous_actions, repo_full_name)
+                    previous_item_id = _project_external_item_id(
+                        previous_actions, repo_full_name
+                    )
                     existing_item_result = (
-                        client.find_project_v2_item_by_id(project.get("id", ""), previous_item_id)
+                        client.find_project_v2_item_by_id(
+                            project.get("id", ""), previous_item_id
+                        )
                         if previous_item_id
                         else {"available": True, "item": None}
                     )
                     if not existing_item_result.get("available"):
                         existing_item_result = {"available": True, "item": None}
                     existing_item = existing_item_result.get("item")
-                    if existing_item and issue_node_id and existing_item.get("issue_node_id") not in {"", issue_node_id}:
+                    if (
+                        existing_item
+                        and issue_node_id
+                        and existing_item.get("issue_node_id")
+                        not in {"", issue_node_id}
+                    ):
                         managed_state_drift.append(
                             {
                                 "action_id": sample["action_id"],
@@ -990,8 +1111,14 @@ def apply_github_writeback(
                         )
                         existing_item = None
                     if not existing_item:
-                        issue_lookup = client.find_project_v2_item_by_issue(project.get("id", ""), issue_node_id)
-                        existing_item = issue_lookup.get("item") if issue_lookup.get("available") else None
+                        issue_lookup = client.find_project_v2_item_by_issue(
+                            project.get("id", ""), issue_node_id
+                        )
+                        existing_item = (
+                            issue_lookup.get("item")
+                            if issue_lookup.get("available")
+                            else None
+                        )
 
                     project_item_result["before"] = existing_item or {}
                     if existing_item:
@@ -999,19 +1126,33 @@ def apply_github_writeback(
                         project_item_result["item_id"] = existing_item.get("id", "")
                         project_item_result["url"] = project.get("url", "")
                     else:
-                        created_item = client.add_issue_to_project_v2(project.get("id", ""), issue_node_id)
-                        project_item_result["status"] = created_item.get("status", "created" if created_item.get("ok") else "failed")
+                        created_item = client.add_issue_to_project_v2(
+                            project.get("id", ""), issue_node_id
+                        )
+                        project_item_result["status"] = created_item.get(
+                            "status", "created" if created_item.get("ok") else "failed"
+                        )
                         project_item_result["item_id"] = created_item.get("item_id", "")
                         project_item_result["url"] = project.get("url", "")
                         project_item_result["details"] = created_item
-                        existing_item = {"id": created_item.get("item_id", ""), "issue_node_id": issue_node_id}
+                        existing_item = {
+                            "id": created_item.get("item_id", ""),
+                            "issue_node_id": issue_node_id,
+                        }
 
                     if project_item_result.get("item_id"):
                         for action in repo_actions:
-                            external_refs[action["action_id"]]["github_project_item_id"] = project_item_result.get("item_id")
-                            external_refs[action["action_id"]]["github_project_url"] = project.get("url", "")
+                            external_refs[action["action_id"]][
+                                "github_project_item_id"
+                            ] = project_item_result.get("item_id")
+                            external_refs[action["action_id"]]["github_project_url"] = (
+                                project.get("url", "")
+                            )
 
-                    if project_item_result["status"] in {"created", "unchanged"} and existing_item.get("id"):
+                    if project_item_result["status"] in {
+                        "created",
+                        "unchanged",
+                    } and existing_item.get("id"):
                         project_fields_result, field_drift = _sync_project_fields(
                             client,
                             sample=sample,
@@ -1075,7 +1216,13 @@ def apply_github_writeback(
         owner, repo = repo_full_name.split("/", 1)
         issues = client.list_repo_issues(owner, repo, state="all")
         snapshot = previous.get("snapshots", {}).get("github-issue", {})
-        existing_issue = _find_issue_by_number(issues, _parse_external_key(snapshot.get("external_key"))) or _issue_lookup(issues, previous.get("campaign_type", ""), previous.get("details", {}).get("repo", repo))
+        existing_issue = _find_issue_by_number(
+            issues, _parse_external_key(snapshot.get("external_key"))
+        ) or _issue_lookup(
+            issues,
+            previous.get("campaign_type", ""),
+            previous.get("details", {}).get("repo", repo),
+        )
         if not existing_issue:
             event["status"] = "drifted"
             event["drift_state"] = "managed-issue-missing"
@@ -1097,7 +1244,9 @@ def apply_github_writeback(
             event["number"] = existing_issue.get("number")
             event["url"] = existing_issue.get("html_url")
         else:
-            updated = client.update_issue(owner, repo, existing_issue["number"], {"state": "closed"})
+            updated = client.update_issue(
+                owner, repo, existing_issue["number"], {"state": "closed"}
+            )
             event["status"] = "closed" if updated.get("ok") else "failed"
             event["number"] = existing_issue.get("number")
             event["url"] = updated.get("html_url", existing_issue.get("html_url"))
@@ -1108,20 +1257,32 @@ def apply_github_writeback(
                 "action_id": action_id,
                 "repo_full_name": repo_full_name,
                 "campaign_type": previous.get("campaign_type", ""),
-                "lifecycle_state": "resolved" if event["status"] == "closed" else "failed",
-                "reconciliation_outcome": "closed" if event["status"] == "closed" else "failed",
-                "closed_at": datetime.now(timezone.utc).isoformat() if event["status"] == "closed" else None,
+                "lifecycle_state": "resolved"
+                if event["status"] == "closed"
+                else "failed",
+                "reconciliation_outcome": "closed"
+                if event["status"] == "closed"
+                else "failed",
+                "closed_at": datetime.now(timezone.utc).isoformat()
+                if event["status"] == "closed"
+                else None,
                 "closed_reason": "left-campaign-selection",
                 "rollback_state": "rollback-available",
             }
         )
 
         if mirror_projects and project.get("available"):
-            project_item_id = _project_external_item_id(previous_actions, repo_full_name)
+            project_item_id = _project_external_item_id(
+                previous_actions, repo_full_name
+            )
             project_item = None
             if project_item_id:
-                item_lookup = client.find_project_v2_item_by_id(project.get("id", ""), project_item_id)
-                project_item = item_lookup.get("item") if item_lookup.get("available") else None
+                item_lookup = client.find_project_v2_item_by_id(
+                    project.get("id", ""), project_item_id
+                )
+                project_item = (
+                    item_lookup.get("item") if item_lookup.get("available") else None
+                )
             project_event = {
                 "action_id": action_id,
                 "repo_full_name": repo_full_name,
@@ -1144,7 +1305,9 @@ def apply_github_writeback(
                 )
             else:
                 archived = client.archive_project_v2_item(project_item.get("id", ""))
-                project_event["status"] = archived.get("status", "archived" if archived.get("ok") else "failed")
+                project_event["status"] = archived.get(
+                    "status", "archived" if archived.get("ok") else "failed"
+                )
                 project_event["item_id"] = project_item.get("id", "")
                 project_event["url"] = project.get("url", "")
                 project_event["details"] = archived
@@ -1174,7 +1337,9 @@ def build_campaign_run(
     }
 
 
-def _results_for_action(results: list[dict], action_id: str, repo_full_name: str) -> list[dict]:
+def _results_for_action(
+    results: list[dict], action_id: str, repo_full_name: str
+) -> list[dict]:
     matched = []
     for result in results:
         if result.get("action_id") == action_id:
@@ -1183,7 +1348,11 @@ def _results_for_action(results: list[dict], action_id: str, repo_full_name: str
         if action_id in (result.get("action_ids") or []):
             matched.append(result)
             continue
-        if result.get("repo_full_name") == repo_full_name and not result.get("action_id") and not result.get("action_ids"):
+        if (
+            result.get("repo_full_name") == repo_full_name
+            and not result.get("action_id")
+            and not result.get("action_ids")
+        ):
             matched.append(result)
     return matched
 
@@ -1199,7 +1368,9 @@ def build_action_runs(
 ) -> list[dict]:
     previous_actions = (previous_state or {}).get("actions", {})
     current_actions = {action["action_id"]: action for action in actions}
-    ordered_ids = list(current_actions) + [action_id for action_id in previous_actions if action_id not in current_actions]
+    ordered_ids = list(current_actions) + [
+        action_id for action_id in previous_actions if action_id not in current_actions
+    ]
 
     action_runs = []
     now = datetime.now(timezone.utc).isoformat()
@@ -1213,8 +1384,21 @@ def build_action_runs(
         closed_at = None
         closed_reason = None
         reopened_at = None
-        drift_state = next((result.get("drift_state") for result in repo_results if result.get("drift_state")), None)
-        rollback_state = "partial" if any(result.get("before") not in ({}, None, []) for result in repo_results) else "non-reversible"
+        drift_state = next(
+            (
+                result.get("drift_state")
+                for result in repo_results
+                if result.get("drift_state")
+            ),
+            None,
+        )
+        rollback_state = (
+            "partial"
+            if any(
+                result.get("before") not in ({}, None, []) for result in repo_results
+            )
+            else "non-reversible"
+        )
 
         if not apply:
             lifecycle_state = "planned"
@@ -1228,7 +1412,9 @@ def build_action_runs(
                 reconciliation_outcome = "closed"
                 closed_at = now
                 closed_reason = "left-campaign-selection"
-            elif sync_mode == "append-only" or any(status == "stale" for status in statuses):
+            elif sync_mode == "append-only" or any(
+                status == "stale" for status in statuses
+            ):
                 lifecycle_state = "deferred"
                 reconciliation_outcome = "stale"
                 drift_state = drift_state or "stale"
@@ -1260,26 +1446,30 @@ def build_action_runs(
             lifecycle_state = "deferred"
             reconciliation_outcome = "skipped"
 
-        action_runs.append({
-            "action_id": action_id,
-            "repo_full_name": repo_full_name,
-            "campaign_type": action.get("campaign_type", ""),
-            "target": target or "preview-only",
-            "status": reconciliation_outcome,
-            "lifecycle_state": lifecycle_state,
-            "reconciliation_outcome": reconciliation_outcome,
-            "closed_at": closed_at,
-            "closed_reason": closed_reason,
-            "reopened_at": reopened_at,
-            "supersedes_action_id": None,
-            "superseded_by_action_id": None,
-            "drift_state": drift_state,
-            "rollback_state": rollback_state,
-        })
+        action_runs.append(
+            {
+                "action_id": action_id,
+                "repo_full_name": repo_full_name,
+                "campaign_type": action.get("campaign_type", ""),
+                "target": target or "preview-only",
+                "status": reconciliation_outcome,
+                "lifecycle_state": lifecycle_state,
+                "reconciliation_outcome": reconciliation_outcome,
+                "closed_at": closed_at,
+                "closed_reason": closed_reason,
+                "reopened_at": reopened_at,
+                "supersedes_action_id": None,
+                "superseded_by_action_id": None,
+                "drift_state": drift_state,
+                "rollback_state": rollback_state,
+            }
+        )
     return action_runs
 
 
-def summarize_writeback_results(results: list[dict], target: str | None, apply: bool) -> dict:
+def summarize_writeback_results(
+    results: list[dict], target: str | None, apply: bool
+) -> dict:
     counts = defaultdict(int)
     for result in results:
         counts[result.get("status", "unknown")] += 1
@@ -1293,24 +1483,39 @@ def summarize_writeback_results(results: list[dict], target: str | None, apply: 
 
 def build_rollback_preview(results: list[dict]) -> dict:
     items = []
-    reversible_targets = {"github-topics", "github-custom-properties", "github-issue", "notion-action"}
+    reversible_targets = {
+        "github-topics",
+        "github-custom-properties",
+        "github-issue",
+        "notion-action",
+    }
     for result in results:
         target = result.get("target")
         if not target:
             continue
         has_before = result.get("before") not in ({}, None, [])
-        rollback_state = "fully-reversible" if target in reversible_targets and has_before else ("partial" if target in reversible_targets else "non-reversible")
-        items.append({
-            "action_id": result.get("action_id"),
-            "repo_full_name": result.get("repo_full_name"),
-            "target": target,
-            "status": result.get("status"),
-            "rollback_state": rollback_state,
-        })
+        rollback_state = (
+            "fully-reversible"
+            if target in reversible_targets and has_before
+            else ("partial" if target in reversible_targets else "non-reversible")
+        )
+        items.append(
+            {
+                "action_id": result.get("action_id"),
+                "repo_full_name": result.get("repo_full_name"),
+                "target": target,
+                "status": result.get("status"),
+                "rollback_state": rollback_state,
+            }
+        )
     return {
         "available": any(item["rollback_state"] != "non-reversible" for item in items),
         "item_count": len(items),
-        "fully_reversible_count": sum(1 for item in items if item["rollback_state"] == "fully-reversible"),
-        "partial_count": sum(1 for item in items if item["rollback_state"] == "partial"),
+        "fully_reversible_count": sum(
+            1 for item in items if item["rollback_state"] == "fully-reversible"
+        ),
+        "partial_count": sum(
+            1 for item in items if item["rollback_state"] == "partial"
+        ),
         "items": items,
     }

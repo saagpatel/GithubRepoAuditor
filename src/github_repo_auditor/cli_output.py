@@ -5,6 +5,7 @@ when it is unavailable, status and warning helpers degrade to plain text while
 the provider-authored info channel emits a fixed placeholder instead of
 writing untrusted text to a raw terminal sink.
 """
+
 from __future__ import annotations
 
 import re
@@ -20,6 +21,7 @@ try:
         TextColumn,
         TimeElapsedColumn,
     )
+
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False

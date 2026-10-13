@@ -33,8 +33,13 @@ from github_repo_auditor.portfolio_truth_metadata import (
     build_warnings,
 )
 from github_repo_auditor.portfolio_truth_precedence import build_precedence_matrix
-from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
-from github_repo_auditor.portfolio_truth_types import DERIVATION_POLICY_VERSION, SCHEMA_VERSION
+from github_repo_auditor.portfolio_truth_provenance import (
+    REQUIRED_PROJECT_PROVENANCE_KEYS,
+)
+from github_repo_auditor.portfolio_truth_types import (
+    DERIVATION_POLICY_VERSION,
+    SCHEMA_VERSION,
+)
 from github_repo_auditor.security_admission import derive_security_admission
 
 # The demo workspace is deliberately not a real filesystem path.
@@ -1064,7 +1069,9 @@ def build_snapshot(
         ),
         "projects": projects,
     }
-    from github_repo_auditor.portfolio_truth_validate import canonicalize_truth_snapshot_payload
+    from github_repo_auditor.portfolio_truth_validate import (
+        canonicalize_truth_snapshot_payload,
+    )
 
     return canonicalize_truth_snapshot_payload(
         payload,

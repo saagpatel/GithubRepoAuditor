@@ -3,6 +3,7 @@
 Provides HTTP request wrapper with retry, property value builders,
 and config loading. Used by notion_sync.py and notion_registry.py.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,6 +17,18 @@ NOTION_API_BASE = "https://api.notion.com/v1"
 DEFAULT_NOTION_VERSION = "2026-03-11"
 REQUEST_DELAY = 0.3  # seconds between API calls (rate limit ~3 req/s)
 MAX_RETRIES = 3
+
+
+class NotionOutcomeUnknownError(RuntimeError):
+    """A write may have committed, but the response could not be confirmed."""
+
+
+def _request_is_retryable(method: str, path: str) -> bool:
+    """Return whether repeating this request cannot duplicate a mutation."""
+    normalized_method = method.upper()
+    return normalized_method in {"GET", "HEAD", "OPTIONS"} or (
+        normalized_method == "POST" and path.rstrip("/").endswith("/query")
+    )
 
 
 def load_notion_config(config_dir: Path) -> dict | None:
@@ -38,34 +51,53 @@ def notion_request(
     version: str = DEFAULT_NOTION_VERSION,
     body: dict | None = None,
 ) -> requests.Response | None:
-    """Make a Notion API request with retry on 429/5xx."""
+    """Make a Notion API request, retrying only requests safe to repeat.
+
+    A failed response to a write can arrive after Notion committed the change.
+    Such failures raise :class:`NotionOutcomeUnknownError` instead of retrying
+    and potentially creating duplicate pages or appended blocks.
+    """
     headers = {
         "Authorization": f"Bearer {token}",
         "Notion-Version": version,
         "Content-Type": "application/json",
     }
     url = f"{NOTION_API_BASE}{path}"
+    retryable = _request_is_retryable(method, path)
 
     for attempt in range(MAX_RETRIES):
         try:
             response = requests.request(
-                method, url, headers=headers,
-                json=body, timeout=30,
+                method,
+                url,
+                headers=headers,
+                json=body,
+                timeout=30,
             )
             if response.status_code == 429:
+                if not retryable:
+                    return response
                 retry_after = int(response.headers.get("Retry-After", 2))
                 print(f"  Rate limited, waiting {retry_after}s...", file=sys.stderr)
                 time.sleep(retry_after)
                 continue
             if response.status_code >= 500:
-                time.sleep(2 ** attempt)
+                if not retryable:
+                    raise NotionOutcomeUnknownError(
+                        f"Notion write outcome unknown for {method} {path}: HTTP {response.status_code}"
+                    )
+                time.sleep(2**attempt)
                 continue
             return response
         except requests.RequestException as exc:
+            if not retryable:
+                raise NotionOutcomeUnknownError(
+                    f"Notion write outcome unknown for {method} {path}: {exc}"
+                ) from exc
             if attempt == MAX_RETRIES - 1:
                 print(f"  Notion API error: {exc}", file=sys.stderr)
                 return None
-            time.sleep(2 ** attempt)
+            time.sleep(2**attempt)
     return None
 
 
@@ -77,15 +109,25 @@ def query_notion_collection(
 ) -> requests.Response | None:
     """Query a Notion database or data source with compatibility fallback."""
     body = body or {}
-    response = notion_request("POST", f"/data_sources/{collection_id}/query", token, version, body)
+    response = notion_request(
+        "POST", f"/data_sources/{collection_id}/query", token, version, body
+    )
     if response is not None and response.status_code != 404:
         return response
-    return notion_request("POST", f"/databases/{collection_id}/query", token, version, body)
+    return notion_request(
+        "POST", f"/databases/{collection_id}/query", token, version, body
+    )
 
 
-def notion_parent_for_collection(collection_id: str, *, use_data_source: bool = False) -> dict:
+def notion_parent_for_collection(
+    collection_id: str, *, use_data_source: bool = False
+) -> dict:
     """Build a Notion parent object for either a database or data source."""
-    return {"data_source_id": collection_id} if use_data_source else {"database_id": collection_id}
+    return (
+        {"data_source_id": collection_id}
+        if use_data_source
+        else {"database_id": collection_id}
+    )
 
 
 def rich_text_value(text: str) -> dict:
@@ -106,6 +148,7 @@ def title_value(text: str) -> dict:
 def get_notion_token() -> str:
     """Read NOTION_TOKEN from environment. Returns empty string if unset."""
     import os
+
     return os.environ.get("NOTION_TOKEN", "").strip()
 
 

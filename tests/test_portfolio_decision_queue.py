@@ -457,9 +457,7 @@ def test_cli_json_and_markdown_are_deterministic(
     assert safe_payload["contract_version"] == CLI_AGGREGATE_CONTRACT_VERSION
     assert safe_payload["decision_queue"] == []
     assert safe_payload["summary"]["decision_queue_count"] == 1
-    assert safe_payload["summary"]["redaction_policy"] == (
-        "allowlisted-aggregate-only"
-    )
+    assert safe_payload["summary"]["redaction_policy"] == ("allowlisted-aggregate-only")
 
     previous = tmp_path / "previous.json"
     previous.write_text(
@@ -502,7 +500,13 @@ def test_cli_json_redacts_previous_digest_fields(tmp_path: Path, capsys) -> None
     truth_path.write_text(
         json.dumps(
             _truth(
-                [_project("MCPAudit", attention_state="decision-needed", security_risk=True)]
+                [
+                    _project(
+                        "MCPAudit",
+                        attention_state="decision-needed",
+                        security_risk=True,
+                    )
+                ]
             )
         ),
         encoding="utf-8",

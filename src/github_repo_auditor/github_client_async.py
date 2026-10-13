@@ -23,7 +23,11 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from github_repo_auditor.github_client import API_BASE, REST_API_VERSION, GitHubClientError
+from github_repo_auditor.github_client import (
+    API_BASE,
+    REST_API_VERSION,
+    GitHubClientError,
+)
 
 if TYPE_CHECKING:
     from github_repo_auditor.cache import ResponseCache
@@ -143,26 +147,35 @@ class AsyncGitHubClient:
                         await asyncio.sleep(wait)
                         continue
                     logger.error(
-                        "Network error fetching %s after %d retries: %s", url, attempt_network, exc
+                        "Network error fetching %s after %d retries: %s",
+                        url,
+                        attempt_network,
+                        exc,
                     )
                     raise GitHubClientError(f"Network error for {url}: {exc}") from exc
 
             status = response.status_code
 
-            if status in (404, 403):
-                logger.debug("Endpoint unavailable (%d) for %s — returning None", status, url)
-                return None
-
             if status == 429 or (
-                status == 403 and response.headers.get("X-RateLimit-Remaining") == "0"
+                status == 403
+                and (
+                    response.headers.get("X-RateLimit-Remaining") == "0"
+                    or "Retry-After" in response.headers
+                )
             ):
                 if attempt_429 >= _MAX_429_RETRIES:
                     logger.error(
-                        "Rate limit not recovering for %s after %d retries", url, attempt_429
+                        "Rate limit not recovering for %s after %d retries",
+                        url,
+                        attempt_429,
                     )
                     raise GitHubClientError(f"Rate limit exhausted for {url}")
                 retry_after = _retry_after_seconds(response)
-                wait = retry_after if retry_after > 0 else _DEFAULT_BACKOFF_BASE * (attempt_429 + 1)
+                wait = (
+                    retry_after
+                    if retry_after > 0
+                    else _DEFAULT_BACKOFF_BASE * (attempt_429 + 1)
+                )
                 attempt_429 += 1
                 logger.warning(
                     "Rate-limited on %s (attempt %d/%d) — waiting %.2fs",
@@ -174,10 +187,19 @@ class AsyncGitHubClient:
                 await asyncio.sleep(wait)
                 continue
 
+            if status in (404, 403):
+                logger.debug(
+                    "Endpoint unavailable (%d) for %s — returning None", status, url
+                )
+                return None
+
             if status >= 500:
                 if attempt_5xx >= _MAX_5XX_RETRIES:
                     logger.error(
-                        "Persistent 5xx (%d) for %s after %d retries", status, url, attempt_5xx
+                        "Persistent 5xx (%d) for %s after %d retries",
+                        status,
+                        url,
+                        attempt_5xx,
                     )
                     raise GitHubClientError(
                         f"Server error {status} for {url} after {attempt_5xx} retries"
@@ -221,11 +243,15 @@ class AsyncGitHubClient:
         """
         endpoints = _enrichment_endpoints(owner, repo)
 
-        async def _fetch_key(key: str, url: str, params: dict | None) -> tuple[str, object]:
+        async def _fetch_key(
+            key: str, url: str, params: dict | None
+        ) -> tuple[str, object]:
             try:
                 result = await self._fetch(url, params, cache=cache)
             except GitHubClientError as exc:
-                logger.warning("Enrichment fetch failed for %s/%s [%s]: %s", owner, repo, key, exc)
+                logger.warning(
+                    "Enrichment fetch failed for %s/%s [%s]: %s", owner, repo, key, exc
+                )
                 result = None
             return key, result
 
@@ -310,7 +336,9 @@ def fetch_enrichment_sync(
     -------
     Mapping of ``"owner/repo"`` → enrichment dict.
     """
-    return asyncio.run(_run_with_client(repos, token, max_concurrency, cache, _transport))
+    return asyncio.run(
+        _run_with_client(repos, token, max_concurrency, cache, _transport)
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

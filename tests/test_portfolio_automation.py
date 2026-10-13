@@ -49,7 +49,9 @@ def _project(
     return project
 
 
-def _authority(*, state: str = "selected", reason_code: str = "single_clone_topology") -> dict:
+def _authority(
+    *, state: str = "selected", reason_code: str = "single_clone_topology"
+) -> dict:
     representative = {
         "path": "Repo",
         "state": "observed",

@@ -40,7 +40,14 @@ SUPPLY_CHAIN_HEADERS = [
     "Top Recommendation",
 ]
 
-SECURITY_DEBT_HEADERS = ["Repo", "Priority", "Action", "Expected Lift", "Effort", "Source"]
+SECURITY_DEBT_HEADERS = [
+    "Repo",
+    "Priority",
+    "Action",
+    "Expected Lift",
+    "Effort",
+    "Source",
+]
 
 
 def _extract_ghas_counts(ghas_entry: dict[str, Any]) -> tuple[int, int, int, int, int]:
@@ -88,7 +95,9 @@ def build_security_sheet_rows(
 
         # OSSF Scorecard score
         ossf = audit.get("ossf_scorecard", {})
-        ossf_score: float | str = ossf.get("score", "—") if ossf.get("available") else "—"
+        ossf_score: float | str = (
+            ossf.get("score", "—") if ossf.get("available") else "—"
+        )
 
         rows.append(
             [

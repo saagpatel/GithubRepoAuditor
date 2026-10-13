@@ -27,7 +27,9 @@ def build_class_reweight_events(
                 "class_trust_reweight_direction": current_primary_target.get(
                     "class_trust_reweight_direction", "neutral"
                 ),
-                "policy_debt_status": current_primary_target.get("policy_debt_status", "none"),
+                "policy_debt_status": current_primary_target.get(
+                    "policy_debt_status", "none"
+                ),
                 "class_normalization_status": current_primary_target.get(
                     "class_normalization_status", "none"
                 ),
@@ -56,7 +58,9 @@ def build_class_reweight_events(
                 "generated_at": entry.get("generated_at", ""),
                 "class_trust_reweight_score": reweight_score or 0.0,
                 "class_trust_reweight_direction": reweight_direction or "neutral",
-                "policy_debt_status": summary.get("primary_target_policy_debt_status", "none"),
+                "policy_debt_status": summary.get(
+                    "primary_target_policy_debt_status", "none"
+                ),
                 "class_normalization_status": summary.get(
                     "primary_target_class_normalization_status", "none"
                 ),
@@ -136,7 +140,9 @@ def build_class_transition_events(
                 ),
                 "class_trust_momentum_status": summary.get(
                     "primary_target_class_trust_momentum_status",
-                    primary_target.get("class_trust_momentum_status", "insufficient-data"),
+                    primary_target.get(
+                        "class_trust_momentum_status", "insufficient-data"
+                    ),
                 ),
                 "class_reweight_stability_status": summary.get(
                     "primary_target_class_reweight_stability_status",
@@ -191,17 +197,22 @@ def target_class_transition_history(
     class_transition_closure_window_runs: int,
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
-    matching_events = [event for event in transition_events if event.get("class_key") == class_key][
-        : class_pending_resolution_window_runs + 1
-    ]
+    matching_events = [
+        event for event in transition_events if event.get("class_key") == class_key
+    ][: class_pending_resolution_window_runs + 1]
     statuses = [
-        event.get("class_reweight_transition_status", "none") or "none" for event in matching_events
+        event.get("class_reweight_transition_status", "none") or "none"
+        for event in matching_events
     ]
-    scores = [float(event.get("class_trust_reweight_score", 0.0) or 0.0) for event in matching_events]
+    scores = [
+        float(event.get("class_trust_reweight_score", 0.0) or 0.0)
+        for event in matching_events
+    ]
     target_policies = [
         policy
         for policy in (
-            event.get("trust_policy") for event in matching_events[:class_transition_closure_window_runs]
+            event.get("trust_policy")
+            for event in matching_events[:class_transition_closure_window_runs]
         )
         if policy
     ]
@@ -212,7 +223,10 @@ def target_class_transition_history(
         )
         for event in matching_events
     ]
-    health_statuses = [event.get("class_transition_health_status", "none") or "none" for event in matching_events]
+    health_statuses = [
+        event.get("class_transition_health_status", "none") or "none"
+        for event in matching_events
+    ]
     resolution_statuses = [
         event.get("class_transition_resolution_status", "none") or "none"
         for event in matching_events
@@ -225,14 +239,18 @@ def target_class_transition_history(
     recent_pending_direction = "neutral"
 
     if current_status in {"pending-support", "pending-caution"}:
-        class_transition_age_runs = consecutive_transition_runs(statuses, current_status)
+        class_transition_age_runs = consecutive_transition_runs(
+            statuses, current_status
+        )
         current_strengthening_flag = current_transition_strengthening(
             current_status,
             scores[:class_transition_age_runs],
         )
     elif len(statuses) > 1 and statuses[1] in {"pending-support", "pending-caution"}:
         recent_pending_status = statuses[1]
-        recent_pending_age_runs = consecutive_transition_runs(statuses[1:], recent_pending_status)
+        recent_pending_age_runs = consecutive_transition_runs(
+            statuses[1:], recent_pending_status
+        )
         recent_pending_direction = pending_transition_direction(recent_pending_status)
         class_transition_age_runs = recent_pending_age_runs
     elif current_status == "none":
@@ -284,8 +302,12 @@ def target_class_transition_history(
             f"{score:.2f}" for score in scores[:class_transition_closure_window_runs]
         ),
         "current_transition_status": current_status,
-        "current_transition_health_status": health_statuses[0] if health_statuses else "none",
-        "current_transition_resolution_status": resolution_statuses[0] if resolution_statuses else "none",
+        "current_transition_health_status": health_statuses[0]
+        if health_statuses
+        else "none",
+        "current_transition_resolution_status": resolution_statuses[0]
+        if resolution_statuses
+        else "none",
         "recent_pending_status": recent_pending_status,
         "recent_pending_age_runs": recent_pending_age_runs,
         "current_transition_strengthening": current_strengthening_flag,
@@ -322,7 +344,9 @@ def pending_transition_direction(transition_status: str) -> str:
     return "neutral"
 
 
-def current_transition_strengthening(transition_status: str, scores: list[float]) -> bool:
+def current_transition_strengthening(
+    transition_status: str, scores: list[float]
+) -> bool:
     if not scores:
         return False
     if len(scores) == 1:

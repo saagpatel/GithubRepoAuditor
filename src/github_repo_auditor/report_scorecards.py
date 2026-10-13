@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from github_repo_auditor.models import AuditReport
-from github_repo_auditor.portfolio_catalog import build_intent_alignment_summary, evaluate_intent_alignment
+from github_repo_auditor.portfolio_catalog import (
+    build_intent_alignment_summary,
+    evaluate_intent_alignment,
+)
 from github_repo_auditor.report_enrichment import (
     build_maturity_gap_summary,
     build_operator_focus,
@@ -22,7 +25,9 @@ from github_repo_auditor.scorecards import (
 def apply_scorecards(report: AuditReport, args: Any) -> AuditReport:
     scorecards_path = getattr(args, "scorecards", None) or DEFAULT_SCORECARDS_PATH
     scorecards_data = load_scorecards(Path(scorecards_path))
-    repo_results, summary, programs = evaluate_scorecards_for_report(report, scorecards_data)
+    repo_results, summary, programs = evaluate_scorecards_for_report(
+        report, scorecards_data
+    )
     by_repo = {result.get("repo", ""): result for result in repo_results}
     queue_by_repo = {
         str(item.get("repo") or item.get("repo_name") or "").strip(): item
@@ -53,7 +58,9 @@ def apply_scorecards(report: AuditReport, args: Any) -> AuditReport:
                     "operator_focus": operator_focus,
                 }
             )
-    catalog_by_repo = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+    catalog_by_repo = {
+        audit.metadata.name: audit.portfolio_catalog for audit in report.audits
+    }
     for item in report.operator_queue:
         repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
         result = by_repo.get(repo_name, {})
@@ -61,7 +68,9 @@ def apply_scorecards(report: AuditReport, args: Any) -> AuditReport:
         if catalog_entry:
             item["portfolio_catalog"] = dict(catalog_entry)
             item["intent_alignment"] = catalog_entry.get("intent_alignment", "")
-            item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
+            item["intent_alignment_reason"] = catalog_entry.get(
+                "intent_alignment_reason", ""
+            )
         if result:
             item["scorecard"] = dict(result)
             item["scorecard_line"] = build_scorecard_line(item)

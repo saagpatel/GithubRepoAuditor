@@ -1,9 +1,14 @@
 # tests/test_catalog_validator.py
 """Tests for the catalog completeness validator (Arc H A3)."""
+
 import pytest
 import yaml
 
-from github_repo_auditor.catalog_validator import REQUIRED_FIELDS, score_catalog_entry, validate_catalog
+from github_repo_auditor.catalog_validator import (
+    REQUIRED_FIELDS,
+    score_catalog_entry,
+    validate_catalog,
+)
 
 
 def test_full_entry_scores_one():
@@ -45,7 +50,9 @@ def test_validate_catalog_scores_repos(tmp_path):
     catalog_path = tmp_path / "portfolio-catalog.yaml"
     catalog_path.write_text(yaml.safe_dump(catalog))
 
-    results = validate_catalog(catalog_path, repo_names=["RepoA", "RepoB", "RepoC", "RepoD"])
+    results = validate_catalog(
+        catalog_path, repo_names=["RepoA", "RepoB", "RepoC", "RepoD"]
+    )
     assert results["RepoA"] == pytest.approx(1.0)
     assert results["RepoB"] == pytest.approx(0.25)
     assert results["RepoC"] == pytest.approx(0.0)

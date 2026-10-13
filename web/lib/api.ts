@@ -5,12 +5,15 @@ const API_BASE = (
 ).replace(/\/$/, "");
 
 export class ReportError extends Error {
+	readonly status: number;
+
 	constructor(
 		message: string,
-		readonly status: number,
+		status: number,
 	) {
 		super(message);
 		this.name = "ReportError";
+		this.status = status;
 	}
 }
 
@@ -41,7 +44,15 @@ export async function fetchReport(
 		throw new ReportError(messageForStatus(resp.status, username), resp.status);
 	}
 
-	const data: unknown = await resp.json();
+	let data: unknown;
+	try {
+		data = await resp.json();
+	} catch {
+		throw new ReportError(
+			"The report service returned an unexpected response.",
+			502,
+		);
+	}
 	if (!isReport(data)) {
 		throw new ReportError(
 			"The report service returned an unexpected response.",
@@ -81,11 +92,73 @@ export async function joinWaitlist(
 	return data.status === "already_joined" ? "already_joined" : "joined";
 }
 
-/** Minimal boundary check that the payload has the shape we render. */
+/** Validate the fields read by ReportView and RepoCard before rendering. */
 function isReport(value: unknown): value is Report {
 	if (typeof value !== "object" || value === null) return false;
 	const v = value as Record<string, unknown>;
-	return typeof v.username === "string" && Array.isArray(v.repos);
+	return (
+		typeof v.username === "string" &&
+		typeof v.fidelity_note === "string" &&
+		Number.isInteger(v.repo_count) &&
+		(v.repo_count as number) >= 0 &&
+		Array.isArray(v.repos) &&
+		v.repo_count === v.repos.length &&
+		v.repos.every(isRepoAudit)
+	);
+}
+
+function isRepoAudit(value: unknown): boolean {
+	if (typeof value !== "object" || value === null) return false;
+	const repo = value as Record<string, unknown>;
+	return (
+		isRecord(repo.metadata) &&
+		typeof repo.metadata.name === "string" &&
+		typeof repo.metadata.full_name === "string" &&
+		isNullableString(repo.metadata.description) &&
+		isNullableString(repo.metadata.language) &&
+		typeof repo.metadata.html_url === "string" &&
+		number(repo.metadata.stars) &&
+		Number.isInteger(repo.metadata.stars) &&
+		repo.metadata.stars >= 0 &&
+		number(repo.metadata.forks) &&
+		Number.isInteger(repo.metadata.forks) &&
+		repo.metadata.forks >= 0 &&
+		typeof repo.metadata.archived === "boolean" &&
+		typeof repo.metadata.fork === "boolean" &&
+		isNullableString(repo.metadata.pushed_at) &&
+		number(repo.overall_score) &&
+		repo.overall_score >= 0 &&
+		repo.overall_score <= 1 &&
+		typeof repo.grade === "string" &&
+		Array.isArray(repo.flags) &&
+		repo.flags.every((flag) => typeof flag === "string") &&
+		Array.isArray(repo.action_candidates) &&
+		repo.action_candidates.every(isActionCandidate)
+	);
+}
+
+function isActionCandidate(value: unknown): boolean {
+	if (!isRecord(value)) return false;
+	return (
+		typeof value.key === "string" &&
+		typeof value.title === "string" &&
+		typeof value.action === "string" &&
+		number(value.expected_lens_delta) &&
+		typeof value.effort === "string" &&
+		typeof value.expected_tier_movement === "string"
+	);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function number(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+	return value === null || typeof value === "string";
 }
 
 function messageForStatus(status: number, username: string): string {

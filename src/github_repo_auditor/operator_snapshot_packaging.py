@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-QUIET_HANDOFF = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+QUIET_HANDOFF = (
+    "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+)
 
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
@@ -27,7 +29,9 @@ def control_center_artifact_payload(report_data: dict, snapshot: dict) -> dict:
         "operator_summary": snapshot.get("operator_summary", {}),
         "operator_queue": snapshot.get("operator_queue", []),
         "portfolio_outcomes_summary": snapshot.get("portfolio_outcomes_summary", {}),
-        "operator_effectiveness_summary": snapshot.get("operator_effectiveness_summary", {}),
+        "operator_effectiveness_summary": snapshot.get(
+            "operator_effectiveness_summary", {}
+        ),
         "high_pressure_queue_history": snapshot.get("high_pressure_queue_history", []),
         "operator_setup_health": snapshot.get("operator_setup_health", {}),
         "operator_recent_changes": snapshot.get("operator_recent_changes", []),
@@ -75,29 +79,49 @@ def _build_operator_handoff(
         resolution_trend.get("primary_target_exception_retirement_status", "none"),
         resolution_trend.get("primary_target_policy_debt_status", "none"),
         resolution_trend.get("primary_target_class_normalization_status", "none"),
-        resolution_trend.get("primary_target_class_memory_freshness_status", "insufficient-data"),
+        resolution_trend.get(
+            "primary_target_class_memory_freshness_status", "insufficient-data"
+        ),
         resolution_trend.get("primary_target_class_decay_status", "none"),
-        resolution_trend.get("primary_target_class_trust_reweight_direction", "neutral"),
+        resolution_trend.get(
+            "primary_target_class_trust_reweight_direction", "neutral"
+        ),
         primary_target.get("class_trust_reweight_effect", "none"),
-        resolution_trend.get("primary_target_class_trust_momentum_status", "insufficient-data"),
+        resolution_trend.get(
+            "primary_target_class_trust_momentum_status", "insufficient-data"
+        ),
         resolution_trend.get("primary_target_class_reweight_stability_status", "watch"),
         resolution_trend.get("primary_target_class_reweight_transition_status", "none"),
         resolution_trend.get("primary_target_class_transition_health_status", "none"),
-        resolution_trend.get("primary_target_class_transition_resolution_status", "none"),
-        resolution_trend.get("primary_target_pending_debt_freshness_status", "insufficient-data"),
-        resolution_trend.get("primary_target_closure_forecast_reweight_direction", "neutral"),
+        resolution_trend.get(
+            "primary_target_class_transition_resolution_status", "none"
+        ),
+        resolution_trend.get(
+            "primary_target_pending_debt_freshness_status", "insufficient-data"
+        ),
+        resolution_trend.get(
+            "primary_target_closure_forecast_reweight_direction", "neutral"
+        ),
         primary_target.get("closure_forecast_reweight_effect", "none"),
         resolution_trend.get(
             "primary_target_closure_forecast_freshness_status", "insufficient-data"
         ),
         resolution_trend.get("primary_target_closure_forecast_decay_status", "none"),
-        resolution_trend.get("primary_target_closure_forecast_refresh_recovery_status", "none"),
-        resolution_trend.get("primary_target_closure_forecast_reacquisition_status", "none"),
+        resolution_trend.get(
+            "primary_target_closure_forecast_refresh_recovery_status", "none"
+        ),
+        resolution_trend.get(
+            "primary_target_closure_forecast_reacquisition_status", "none"
+        ),
         resolution_trend.get(
             "primary_target_closure_forecast_momentum_status", "insufficient-data"
         ),
-        resolution_trend.get("primary_target_closure_forecast_stability_status", "watch"),
-        resolution_trend.get("primary_target_closure_forecast_hysteresis_status", "none"),
+        resolution_trend.get(
+            "primary_target_closure_forecast_stability_status", "watch"
+        ),
+        resolution_trend.get(
+            "primary_target_closure_forecast_hysteresis_status", "none"
+        ),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -115,7 +139,9 @@ def _build_operator_handoff(
         raw_next_action,
         confidence_calibration,
         trust_policy=confidence.get("next_action_trust_policy", trust_policy),
-        trust_policy_reason=confidence.get("next_action_trust_policy_reason", trust_policy_reason),
+        trust_policy_reason=confidence.get(
+            "next_action_trust_policy_reason", trust_policy_reason
+        ),
     )
     operator_note = (
         f"{what_changed} {why_it_matters} "
@@ -247,7 +273,9 @@ def build_operator_summary(
         "watch_chosen_mode": watch_guidance.get("chosen_mode", ""),
         "watch_decision_reason": watch_guidance.get("reason", ""),
         "watch_decision_summary": watch_guidance.get("reason_summary", ""),
-        "next_recommended_run_mode": watch_guidance.get("next_recommended_run_mode", ""),
+        "next_recommended_run_mode": watch_guidance.get(
+            "next_recommended_run_mode", ""
+        ),
         "full_refresh_due": watch_guidance.get("full_refresh_due", False),
         "latest_trusted_baseline": watch_guidance.get("latest_trusted_baseline", {}),
         "operator_watch_decision": watch_guidance,
@@ -264,9 +292,15 @@ def build_operator_summary(
         "quiet_streak_runs": follow_through["quiet_streak_runs"],
         "follow_through_summary": follow_through["follow_through_summary"],
         "follow_through_status_counts": follow_through["follow_through_status_counts"],
-        "follow_through_checkpoint_counts": follow_through["follow_through_checkpoint_counts"],
-        "follow_through_escalation_counts": follow_through["follow_through_escalation_counts"],
-        "follow_through_recovery_counts": follow_through["follow_through_recovery_counts"],
+        "follow_through_checkpoint_counts": follow_through[
+            "follow_through_checkpoint_counts"
+        ],
+        "follow_through_escalation_counts": follow_through[
+            "follow_through_escalation_counts"
+        ],
+        "follow_through_recovery_counts": follow_through[
+            "follow_through_recovery_counts"
+        ],
         "follow_through_recovery_persistence_counts": follow_through[
             "follow_through_recovery_persistence_counts"
         ],
@@ -283,25 +317,43 @@ def build_operator_summary(
             "follow_through_recovery_memory_reset_counts"
         ],
         "top_unattempted_items": follow_through["top_unattempted_items"],
-        "top_stale_follow_through_items": follow_through["top_stale_follow_through_items"],
-        "top_overdue_follow_through_items": follow_through["top_overdue_follow_through_items"],
+        "top_stale_follow_through_items": follow_through[
+            "top_stale_follow_through_items"
+        ],
+        "top_overdue_follow_through_items": follow_through[
+            "top_overdue_follow_through_items"
+        ],
         "top_escalation_items": follow_through["top_escalation_items"],
         "top_recovering_follow_through_items": follow_through[
             "top_recovering_follow_through_items"
         ],
-        "top_retiring_follow_through_items": follow_through["top_retiring_follow_through_items"],
-        "top_relapsing_follow_through_items": follow_through["top_relapsing_follow_through_items"],
+        "top_retiring_follow_through_items": follow_through[
+            "top_retiring_follow_through_items"
+        ],
+        "top_relapsing_follow_through_items": follow_through[
+            "top_relapsing_follow_through_items"
+        ],
         "top_fragile_recovery_items": follow_through["top_fragile_recovery_items"],
         "top_sustained_recovery_items": follow_through["top_sustained_recovery_items"],
-        "top_churn_follow_through_items": follow_through["top_churn_follow_through_items"],
+        "top_churn_follow_through_items": follow_through[
+            "top_churn_follow_through_items"
+        ],
         "top_fresh_recovery_items": follow_through["top_fresh_recovery_items"],
         "top_stale_recovery_items": follow_through["top_stale_recovery_items"],
         "top_softening_recovery_items": follow_through["top_softening_recovery_items"],
         "top_reset_recovery_items": follow_through["top_reset_recovery_items"],
-        "top_rebuilding_recovery_items": follow_through["top_rebuilding_recovery_items"],
-        "follow_through_checkpoint_summary": follow_through["follow_through_checkpoint_summary"],
-        "follow_through_escalation_summary": follow_through["follow_through_escalation_summary"],
-        "follow_through_recovery_summary": follow_through["follow_through_recovery_summary"],
+        "top_rebuilding_recovery_items": follow_through[
+            "top_rebuilding_recovery_items"
+        ],
+        "follow_through_checkpoint_summary": follow_through[
+            "follow_through_checkpoint_summary"
+        ],
+        "follow_through_escalation_summary": follow_through[
+            "follow_through_escalation_summary"
+        ],
+        "follow_through_recovery_summary": follow_through[
+            "follow_through_recovery_summary"
+        ],
         "follow_through_recovery_persistence_summary": follow_through[
             "follow_through_recovery_persistence_summary"
         ],
@@ -325,7 +377,9 @@ def build_operator_summary(
         "history_window_runs": resolution_trend["history_window_runs"],
         "aging_status": resolution_trend["aging_status"],
         "primary_target_reason": resolution_trend["primary_target_reason"],
-        "primary_target_done_criteria": resolution_trend["primary_target_done_criteria"],
+        "primary_target_done_criteria": resolution_trend[
+            "primary_target_done_criteria"
+        ],
         "closure_guidance": resolution_trend["closure_guidance"],
         "attention_age_bands": resolution_trend["attention_age_bands"],
         "chronic_item_count": resolution_trend["chronic_item_count"],
@@ -335,10 +389,16 @@ def build_operator_summary(
         "primary_target": resolution_trend["primary_target"],
         "resolution_targets": resolution_trend["resolution_targets"],
         "trend_summary": resolution_trend["trend_summary"],
-        "primary_target_exception_status": resolution_trend["primary_target_exception_status"],
-        "primary_target_exception_reason": resolution_trend["primary_target_exception_reason"],
+        "primary_target_exception_status": resolution_trend[
+            "primary_target_exception_status"
+        ],
+        "primary_target_exception_reason": resolution_trend[
+            "primary_target_exception_reason"
+        ],
         "recommendation_drift_status": resolution_trend["recommendation_drift_status"],
-        "recommendation_drift_summary": resolution_trend["recommendation_drift_summary"],
+        "recommendation_drift_summary": resolution_trend[
+            "recommendation_drift_summary"
+        ],
         "policy_flip_hotspots": resolution_trend["policy_flip_hotspots"],
         "primary_target_exception_pattern_status": resolution_trend[
             "primary_target_exception_pattern_status"
@@ -353,7 +413,9 @@ def build_operator_summary(
             "primary_target_trust_recovery_reason"
         ],
         "exception_pattern_summary": resolution_trend["exception_pattern_summary"],
-        "false_positive_exception_hotspots": resolution_trend["false_positive_exception_hotspots"],
+        "false_positive_exception_hotspots": resolution_trend[
+            "false_positive_exception_hotspots"
+        ],
         "trust_recovery_window_runs": resolution_trend["trust_recovery_window_runs"],
         "primary_target_recovery_confidence_score": resolution_trend[
             "primary_target_recovery_confidence_score"
@@ -371,12 +433,20 @@ def build_operator_summary(
         "primary_target_exception_retirement_reason": resolution_trend[
             "primary_target_exception_retirement_reason"
         ],
-        "exception_retirement_summary": resolution_trend["exception_retirement_summary"],
+        "exception_retirement_summary": resolution_trend[
+            "exception_retirement_summary"
+        ],
         "retired_exception_hotspots": resolution_trend["retired_exception_hotspots"],
         "sticky_exception_hotspots": resolution_trend["sticky_exception_hotspots"],
-        "exception_retirement_window_runs": resolution_trend["exception_retirement_window_runs"],
-        "primary_target_policy_debt_status": resolution_trend["primary_target_policy_debt_status"],
-        "primary_target_policy_debt_reason": resolution_trend["primary_target_policy_debt_reason"],
+        "exception_retirement_window_runs": resolution_trend[
+            "exception_retirement_window_runs"
+        ],
+        "primary_target_policy_debt_status": resolution_trend[
+            "primary_target_policy_debt_status"
+        ],
+        "primary_target_policy_debt_reason": resolution_trend[
+            "primary_target_policy_debt_reason"
+        ],
         "primary_target_class_normalization_status": resolution_trend[
             "primary_target_class_normalization_status"
         ],
@@ -387,15 +457,21 @@ def build_operator_summary(
         "trust_normalization_summary": resolution_trend["trust_normalization_summary"],
         "policy_debt_hotspots": resolution_trend["policy_debt_hotspots"],
         "normalized_class_hotspots": resolution_trend["normalized_class_hotspots"],
-        "class_normalization_window_runs": resolution_trend["class_normalization_window_runs"],
+        "class_normalization_window_runs": resolution_trend[
+            "class_normalization_window_runs"
+        ],
         "primary_target_class_memory_freshness_status": resolution_trend[
             "primary_target_class_memory_freshness_status"
         ],
         "primary_target_class_memory_freshness_reason": resolution_trend[
             "primary_target_class_memory_freshness_reason"
         ],
-        "primary_target_class_decay_status": resolution_trend["primary_target_class_decay_status"],
-        "primary_target_class_decay_reason": resolution_trend["primary_target_class_decay_reason"],
+        "primary_target_class_decay_status": resolution_trend[
+            "primary_target_class_decay_status"
+        ],
+        "primary_target_class_decay_reason": resolution_trend[
+            "primary_target_class_decay_reason"
+        ],
         "class_memory_summary": resolution_trend["class_memory_summary"],
         "class_decay_summary": resolution_trend["class_decay_summary"],
         "stale_class_memory_hotspots": resolution_trend["stale_class_memory_hotspots"],
@@ -419,7 +495,9 @@ def build_operator_summary(
         "class_reweighting_summary": resolution_trend["class_reweighting_summary"],
         "supporting_class_hotspots": resolution_trend["supporting_class_hotspots"],
         "caution_class_hotspots": resolution_trend["caution_class_hotspots"],
-        "class_reweighting_window_runs": resolution_trend["class_reweighting_window_runs"],
+        "class_reweighting_window_runs": resolution_trend[
+            "class_reweighting_window_runs"
+        ],
         "primary_target_class_trust_momentum_score": resolution_trend[
             "primary_target_class_trust_momentum_score"
         ],
@@ -429,21 +507,29 @@ def build_operator_summary(
         "primary_target_class_reweight_stability_status": resolution_trend[
             "primary_target_class_reweight_stability_status"
         ],
-        "primary_target_class_reweight_transition_status": resolution_trend["primary_target"].get(
+        "primary_target_class_reweight_transition_status": resolution_trend[
+            "primary_target"
+        ].get(
             "class_reweight_transition_status",
             resolution_trend["primary_target_class_reweight_transition_status"],
         )
         if resolution_trend.get("primary_target")
         else resolution_trend["primary_target_class_reweight_transition_status"],
-        "primary_target_class_reweight_transition_reason": resolution_trend["primary_target"].get(
+        "primary_target_class_reweight_transition_reason": resolution_trend[
+            "primary_target"
+        ].get(
             "class_reweight_transition_reason",
             resolution_trend["primary_target_class_reweight_transition_reason"],
         )
         if resolution_trend.get("primary_target")
         else resolution_trend["primary_target_class_reweight_transition_reason"],
         "class_momentum_summary": resolution_trend["class_momentum_summary"],
-        "class_reweight_stability_summary": resolution_trend["class_reweight_stability_summary"],
-        "class_transition_window_runs": resolution_trend["class_transition_window_runs"],
+        "class_reweight_stability_summary": resolution_trend[
+            "class_reweight_stability_summary"
+        ],
+        "class_transition_window_runs": resolution_trend[
+            "class_transition_window_runs"
+        ],
         "primary_target_class_transition_health_status": resolution_trend[
             "primary_target_class_transition_health_status"
         ],
@@ -456,20 +542,28 @@ def build_operator_summary(
         "primary_target_class_transition_resolution_reason": resolution_trend[
             "primary_target_class_transition_resolution_reason"
         ],
-        "class_transition_health_summary": resolution_trend["class_transition_health_summary"],
+        "class_transition_health_summary": resolution_trend[
+            "class_transition_health_summary"
+        ],
         "class_transition_resolution_summary": resolution_trend[
             "class_transition_resolution_summary"
         ],
-        "class_transition_age_window_runs": resolution_trend["class_transition_age_window_runs"],
+        "class_transition_age_window_runs": resolution_trend[
+            "class_transition_age_window_runs"
+        ],
         "stalled_transition_hotspots": resolution_trend["stalled_transition_hotspots"],
-        "resolving_transition_hotspots": resolution_trend["resolving_transition_hotspots"],
+        "resolving_transition_hotspots": resolution_trend[
+            "resolving_transition_hotspots"
+        ],
         "primary_target_transition_closure_confidence_score": resolution_trend[
             "primary_target_transition_closure_confidence_score"
         ],
         "primary_target_transition_closure_confidence_label": resolution_trend[
             "primary_target_transition_closure_confidence_label"
         ],
-        "primary_target_transition_closure_likely_outcome": resolution_trend["primary_target"].get(
+        "primary_target_transition_closure_likely_outcome": resolution_trend[
+            "primary_target"
+        ].get(
             "transition_closure_likely_outcome",
             resolution_trend["primary_target_transition_closure_likely_outcome"],
         )
@@ -481,7 +575,9 @@ def build_operator_summary(
         "transition_closure_confidence_summary": resolution_trend[
             "transition_closure_confidence_summary"
         ],
-        "transition_closure_window_runs": resolution_trend["transition_closure_window_runs"],
+        "transition_closure_window_runs": resolution_trend[
+            "transition_closure_window_runs"
+        ],
         "primary_target_class_pending_debt_status": resolution_trend[
             "primary_target_class_pending_debt_status"
         ],
@@ -489,8 +585,12 @@ def build_operator_summary(
             "primary_target_class_pending_debt_reason"
         ],
         "class_pending_debt_summary": resolution_trend["class_pending_debt_summary"],
-        "class_pending_resolution_summary": resolution_trend["class_pending_resolution_summary"],
-        "class_pending_debt_window_runs": resolution_trend["class_pending_debt_window_runs"],
+        "class_pending_resolution_summary": resolution_trend[
+            "class_pending_resolution_summary"
+        ],
+        "class_pending_debt_window_runs": resolution_trend[
+            "class_pending_debt_window_runs"
+        ],
         "pending_debt_hotspots": resolution_trend["pending_debt_hotspots"],
         "healthy_pending_resolution_hotspots": resolution_trend[
             "healthy_pending_resolution_hotspots"
@@ -501,11 +601,17 @@ def build_operator_summary(
         "primary_target_pending_debt_freshness_reason": resolution_trend[
             "primary_target_pending_debt_freshness_reason"
         ],
-        "pending_debt_freshness_summary": resolution_trend["pending_debt_freshness_summary"],
+        "pending_debt_freshness_summary": resolution_trend[
+            "pending_debt_freshness_summary"
+        ],
         "pending_debt_decay_summary": resolution_trend["pending_debt_decay_summary"],
         "stale_pending_debt_hotspots": resolution_trend["stale_pending_debt_hotspots"],
-        "fresh_pending_resolution_hotspots": resolution_trend["fresh_pending_resolution_hotspots"],
-        "pending_debt_decay_window_runs": resolution_trend["pending_debt_decay_window_runs"],
+        "fresh_pending_resolution_hotspots": resolution_trend[
+            "fresh_pending_resolution_hotspots"
+        ],
+        "pending_debt_decay_window_runs": resolution_trend[
+            "pending_debt_decay_window_runs"
+        ],
         "primary_target_weighted_pending_resolution_support_score": resolution_trend[
             "primary_target_weighted_pending_resolution_support_score"
         ],
@@ -530,7 +636,9 @@ def build_operator_summary(
         "supporting_pending_resolution_hotspots": resolution_trend[
             "supporting_pending_resolution_hotspots"
         ],
-        "caution_pending_debt_hotspots": resolution_trend["caution_pending_debt_hotspots"],
+        "caution_pending_debt_hotspots": resolution_trend[
+            "caution_pending_debt_hotspots"
+        ],
         "primary_target_closure_forecast_momentum_score": resolution_trend[
             "primary_target_closure_forecast_momentum_score"
         ],
@@ -546,7 +654,9 @@ def build_operator_summary(
         "primary_target_closure_forecast_hysteresis_reason": resolution_trend[
             "primary_target_closure_forecast_hysteresis_reason"
         ],
-        "closure_forecast_momentum_summary": resolution_trend["closure_forecast_momentum_summary"],
+        "closure_forecast_momentum_summary": resolution_trend[
+            "closure_forecast_momentum_summary"
+        ],
         "closure_forecast_stability_summary": resolution_trend[
             "closure_forecast_stability_summary"
         ],
@@ -556,8 +666,12 @@ def build_operator_summary(
         "closure_forecast_transition_window_runs": resolution_trend[
             "closure_forecast_transition_window_runs"
         ],
-        "sustained_confirmation_hotspots": resolution_trend["sustained_confirmation_hotspots"],
-        "sustained_clearance_hotspots": resolution_trend["sustained_clearance_hotspots"],
+        "sustained_confirmation_hotspots": resolution_trend[
+            "sustained_confirmation_hotspots"
+        ],
+        "sustained_clearance_hotspots": resolution_trend[
+            "sustained_clearance_hotspots"
+        ],
         "oscillating_closure_forecast_hotspots": resolution_trend[
             "oscillating_closure_forecast_hotspots"
         ],
@@ -576,8 +690,12 @@ def build_operator_summary(
         "closure_forecast_freshness_summary": resolution_trend[
             "closure_forecast_freshness_summary"
         ],
-        "closure_forecast_decay_summary": resolution_trend["closure_forecast_decay_summary"],
-        "stale_closure_forecast_hotspots": resolution_trend["stale_closure_forecast_hotspots"],
+        "closure_forecast_decay_summary": resolution_trend[
+            "closure_forecast_decay_summary"
+        ],
+        "stale_closure_forecast_hotspots": resolution_trend[
+            "stale_closure_forecast_hotspots"
+        ],
         "fresh_closure_forecast_signal_hotspots": resolution_trend[
             "fresh_closure_forecast_signal_hotspots"
         ],
@@ -605,8 +723,12 @@ def build_operator_summary(
         "closure_forecast_refresh_window_runs": resolution_trend[
             "closure_forecast_refresh_window_runs"
         ],
-        "recovering_confirmation_hotspots": resolution_trend["recovering_confirmation_hotspots"],
-        "recovering_clearance_hotspots": resolution_trend["recovering_clearance_hotspots"],
+        "recovering_confirmation_hotspots": resolution_trend[
+            "recovering_confirmation_hotspots"
+        ],
+        "recovering_clearance_hotspots": resolution_trend[
+            "recovering_clearance_hotspots"
+        ],
         "primary_target_closure_forecast_reacquisition_age_runs": resolution_trend[
             "primary_target_closure_forecast_reacquisition_age_runs"
         ],
@@ -626,7 +748,9 @@ def build_operator_summary(
             "closure_forecast_reacquisition_window_runs"
         ],
         "just_reacquired_hotspots": resolution_trend["just_reacquired_hotspots"],
-        "holding_reacquisition_hotspots": resolution_trend["holding_reacquisition_hotspots"],
+        "holding_reacquisition_hotspots": resolution_trend[
+            "holding_reacquisition_hotspots"
+        ],
         "primary_target_closure_forecast_recovery_churn_score": resolution_trend[
             "primary_target_closure_forecast_recovery_churn_score"
         ],
@@ -658,7 +782,9 @@ def build_operator_summary(
         "closure_forecast_persistence_reset_summary": resolution_trend[
             "closure_forecast_persistence_reset_summary"
         ],
-        "stale_reacquisition_hotspots": resolution_trend["stale_reacquisition_hotspots"],
+        "stale_reacquisition_hotspots": resolution_trend[
+            "stale_reacquisition_hotspots"
+        ],
         "fresh_reacquisition_signal_hotspots": resolution_trend[
             "fresh_reacquisition_signal_hotspots"
         ],
@@ -711,7 +837,9 @@ def build_operator_summary(
             "closure_forecast_reset_reentry_window_runs"
         ],
         "just_reentered_hotspots": resolution_trend["just_reentered_hotspots"],
-        "holding_reset_reentry_hotspots": resolution_trend["holding_reset_reentry_hotspots"],
+        "holding_reset_reentry_hotspots": resolution_trend[
+            "holding_reset_reentry_hotspots"
+        ],
         "primary_target_closure_forecast_reset_reentry_churn_score": resolution_trend[
             "primary_target_closure_forecast_reset_reentry_churn_score"
         ],
@@ -724,7 +852,9 @@ def build_operator_summary(
         "closure_forecast_reset_reentry_churn_summary": resolution_trend[
             "closure_forecast_reset_reentry_churn_summary"
         ],
-        "reset_reentry_churn_hotspots": resolution_trend["reset_reentry_churn_hotspots"],
+        "reset_reentry_churn_hotspots": resolution_trend[
+            "reset_reentry_churn_hotspots"
+        ],
         "primary_target_closure_forecast_reset_reentry_freshness_status": resolution_trend[
             "primary_target_closure_forecast_reset_reentry_freshness_status"
         ],
@@ -743,7 +873,9 @@ def build_operator_summary(
         "closure_forecast_reset_reentry_reset_summary": resolution_trend[
             "closure_forecast_reset_reentry_reset_summary"
         ],
-        "stale_reset_reentry_hotspots": resolution_trend["stale_reset_reentry_hotspots"],
+        "stale_reset_reentry_hotspots": resolution_trend[
+            "stale_reset_reentry_hotspots"
+        ],
         "fresh_reset_reentry_signal_hotspots": resolution_trend[
             "fresh_reset_reentry_signal_hotspots"
         ],
@@ -886,7 +1018,9 @@ def build_operator_summary(
         "closure_forecast_reset_reentry_rebuild_reentry_window_runs": resolution_trend[
             "closure_forecast_reset_reentry_rebuild_reentry_window_runs"
         ],
-        "just_reentered_rebuild_hotspots": resolution_trend["just_reentered_rebuild_hotspots"],
+        "just_reentered_rebuild_hotspots": resolution_trend[
+            "just_reentered_rebuild_hotspots"
+        ],
         "holding_reset_reentry_rebuild_reentry_hotspots": resolution_trend[
             "holding_reset_reentry_rebuild_reentry_hotspots"
         ],
@@ -1281,7 +1415,9 @@ def build_operator_summary(
         "oscillating_class_hotspots": resolution_trend["oscillating_class_hotspots"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
-        "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
+        "primary_target_last_intervention": resolution_trend[
+            "primary_target_last_intervention"
+        ],
         "primary_target_last_outcome": resolution_trend["primary_target_last_outcome"],
         "primary_target_resolution_evidence": resolution_trend[
             "primary_target_resolution_evidence"
@@ -1289,25 +1425,39 @@ def build_operator_summary(
         "recent_interventions": resolution_trend["recent_interventions"],
         "recently_quieted_count": resolution_trend["recently_quieted_count"],
         "confirmed_resolved_count": resolution_trend["confirmed_resolved_count"],
-        "reopened_after_resolution_count": resolution_trend["reopened_after_resolution_count"],
+        "reopened_after_resolution_count": resolution_trend[
+            "reopened_after_resolution_count"
+        ],
         "decision_memory_window_runs": resolution_trend["decision_memory_window_runs"],
         "resolution_evidence_summary": resolution_trend["resolution_evidence_summary"],
-        "primary_target_confidence_score": confidence["primary_target_confidence_score"],
-        "primary_target_confidence_label": confidence["primary_target_confidence_label"],
-        "primary_target_confidence_reasons": confidence["primary_target_confidence_reasons"],
+        "primary_target_confidence_score": confidence[
+            "primary_target_confidence_score"
+        ],
+        "primary_target_confidence_label": confidence[
+            "primary_target_confidence_label"
+        ],
+        "primary_target_confidence_reasons": confidence[
+            "primary_target_confidence_reasons"
+        ],
         "next_action_confidence_score": confidence["next_action_confidence_score"],
         "next_action_confidence_label": confidence["next_action_confidence_label"],
         "next_action_confidence_reasons": confidence["next_action_confidence_reasons"],
         "decision_quality_v1": decision_quality,
-        "recommendation_quality_summary": decision_quality["recommendation_quality_summary"],
+        "recommendation_quality_summary": decision_quality[
+            "recommendation_quality_summary"
+        ],
         "primary_target_trust_policy": decision_quality["primary_target_trust_policy"],
         "primary_target_trust_policy_reason": decision_quality[
             "primary_target_trust_policy_reason"
         ],
         "next_action_trust_policy": decision_quality["next_action_trust_policy"],
-        "next_action_trust_policy_reason": decision_quality["next_action_trust_policy_reason"],
+        "next_action_trust_policy_reason": decision_quality[
+            "next_action_trust_policy_reason"
+        ],
         "adaptive_confidence_summary": decision_quality["adaptive_confidence_summary"],
-        "confidence_validation_status": decision_quality["confidence_validation_status"],
+        "confidence_validation_status": decision_quality[
+            "confidence_validation_status"
+        ],
         "decision_quality_status": decision_quality["decision_quality_status"],
         "decision_quality_authority_cap": decision_quality["authority_cap"],
         "human_skepticism_required": decision_quality["human_skepticism_required"],
@@ -1315,21 +1465,37 @@ def build_operator_summary(
         "confidence_window_runs": decision_quality["evidence_window_runs"],
         "validation_window_runs": decision_quality["validation_window_runs"],
         "judged_recommendation_count": decision_quality["judged_recommendation_count"],
-        "validated_recommendation_count": decision_quality["validated_recommendation_count"],
+        "validated_recommendation_count": decision_quality[
+            "validated_recommendation_count"
+        ],
         "partially_validated_recommendation_count": decision_quality[
             "partially_validated_recommendation_count"
         ],
-        "unresolved_recommendation_count": decision_quality["unresolved_recommendation_count"],
-        "reopened_recommendation_count": decision_quality["reopened_recommendation_count"],
-        "insufficient_future_runs_count": confidence_calibration["insufficient_future_runs_count"],
+        "unresolved_recommendation_count": decision_quality[
+            "unresolved_recommendation_count"
+        ],
+        "reopened_recommendation_count": decision_quality[
+            "reopened_recommendation_count"
+        ],
+        "insufficient_future_runs_count": confidence_calibration[
+            "insufficient_future_runs_count"
+        ],
         "high_confidence_hit_rate": decision_quality["high_confidence_hit_rate"],
         "medium_confidence_hit_rate": decision_quality["medium_confidence_hit_rate"],
         "low_confidence_caution_rate": decision_quality["low_confidence_caution_rate"],
         "recent_validation_outcomes": decision_quality["recent_validation_outcomes"],
-        "confidence_calibration_summary": decision_quality["confidence_calibration_summary"],
-        "portfolio_outcomes_summary": operator_effectiveness["portfolio_outcomes_summary"],
-        "operator_effectiveness_summary": operator_effectiveness["operator_effectiveness_summary"],
-        "high_pressure_queue_history": operator_effectiveness["high_pressure_queue_history"],
+        "confidence_calibration_summary": decision_quality[
+            "confidence_calibration_summary"
+        ],
+        "portfolio_outcomes_summary": operator_effectiveness[
+            "portfolio_outcomes_summary"
+        ],
+        "operator_effectiveness_summary": operator_effectiveness[
+            "operator_effectiveness_summary"
+        ],
+        "high_pressure_queue_history": operator_effectiveness[
+            "high_pressure_queue_history"
+        ],
         "high_pressure_queue_trend_status": operator_effectiveness[
             "high_pressure_queue_trend_status"
         ],
@@ -1340,7 +1506,9 @@ def build_operator_summary(
             "recent_reopened_recommendations"
         ],
         "recent_closed_actions": operator_effectiveness["recent_closed_actions"],
-        "recent_regression_examples": operator_effectiveness["recent_regression_examples"],
+        "recent_regression_examples": operator_effectiveness[
+            "recent_regression_examples"
+        ],
         "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
         "action_sync_summary": action_sync["action_sync_summary"],
         "next_action_sync_step": action_sync_tuning["next_action_sync_step"],
@@ -1348,7 +1516,9 @@ def build_operator_summary(
         "apply_readiness_summary": action_sync_packets["apply_readiness_summary"],
         "next_apply_candidate": action_sync_tuning["next_apply_candidate"],
         "top_apply_ready_campaigns": action_sync_tuning["top_apply_ready_campaigns"],
-        "top_preview_ready_campaigns": action_sync_tuning["top_preview_ready_campaigns"],
+        "top_preview_ready_campaigns": action_sync_tuning[
+            "top_preview_ready_campaigns"
+        ],
         "top_drift_review_campaigns": action_sync_tuning["top_drift_review_campaigns"],
         "top_blocked_campaigns": action_sync_tuning["top_blocked_campaigns"],
         "top_ready_to_apply_packets": action_sync_tuning["top_ready_to_apply_packets"],
@@ -1358,40 +1528,74 @@ def build_operator_summary(
         "campaign_outcomes_summary": action_sync_outcomes["campaign_outcomes_summary"],
         "next_monitoring_step": action_sync_outcomes["next_monitoring_step"],
         "top_monitor_now_campaigns": action_sync_outcomes["top_monitor_now_campaigns"],
-        "top_holding_clean_campaigns": action_sync_outcomes["top_holding_clean_campaigns"],
+        "top_holding_clean_campaigns": action_sync_outcomes[
+            "top_holding_clean_campaigns"
+        ],
         "top_reopened_campaigns": action_sync_outcomes["top_reopened_campaigns"],
-        "top_drift_returned_campaigns": action_sync_outcomes["top_drift_returned_campaigns"],
+        "top_drift_returned_campaigns": action_sync_outcomes[
+            "top_drift_returned_campaigns"
+        ],
         "action_sync_tuning": action_sync_tuning["action_sync_tuning"],
         "campaign_tuning_summary": action_sync_tuning["campaign_tuning_summary"],
         "next_tuned_campaign": action_sync_tuning["next_tuned_campaign"],
         "top_proven_campaigns": action_sync_tuning["top_proven_campaigns"],
         "top_caution_campaigns": action_sync_tuning["top_caution_campaigns"],
-        "top_thin_evidence_campaigns": action_sync_tuning["top_thin_evidence_campaigns"],
+        "top_thin_evidence_campaigns": action_sync_tuning[
+            "top_thin_evidence_campaigns"
+        ],
         "historical_portfolio_intelligence": intervention_ledger[
             "historical_portfolio_intelligence"
         ],
-        "intervention_ledger_summary": intervention_ledger["intervention_ledger_summary"],
+        "intervention_ledger_summary": intervention_ledger[
+            "intervention_ledger_summary"
+        ],
         "next_historical_focus": intervention_ledger["next_historical_focus"],
         "top_relapsing_repos": intervention_ledger["top_relapsing_repos"],
-        "top_persistent_pressure_repos": intervention_ledger["top_persistent_pressure_repos"],
+        "top_persistent_pressure_repos": intervention_ledger[
+            "top_persistent_pressure_repos"
+        ],
         "top_improving_repos": intervention_ledger["top_improving_repos"],
         "top_holding_repos": intervention_ledger["top_holding_repos"],
         "action_sync_automation": action_sync_automation["action_sync_automation"],
-        "automation_guidance_summary": action_sync_automation["automation_guidance_summary"],
-        "next_safe_automation_step": action_sync_automation["next_safe_automation_step"],
-        "top_preview_safe_campaigns": action_sync_automation["top_preview_safe_campaigns"],
-        "top_apply_manual_campaigns": action_sync_automation["top_apply_manual_campaigns"],
-        "top_approval_first_campaigns": action_sync_automation["top_approval_first_campaigns"],
-        "top_follow_up_safe_campaigns": action_sync_automation["top_follow_up_safe_campaigns"],
-        "top_manual_only_campaigns": action_sync_automation["top_manual_only_campaigns"],
+        "automation_guidance_summary": action_sync_automation[
+            "automation_guidance_summary"
+        ],
+        "next_safe_automation_step": action_sync_automation[
+            "next_safe_automation_step"
+        ],
+        "top_preview_safe_campaigns": action_sync_automation[
+            "top_preview_safe_campaigns"
+        ],
+        "top_apply_manual_campaigns": action_sync_automation[
+            "top_apply_manual_campaigns"
+        ],
+        "top_approval_first_campaigns": action_sync_automation[
+            "top_approval_first_campaigns"
+        ],
+        "top_follow_up_safe_campaigns": action_sync_automation[
+            "top_follow_up_safe_campaigns"
+        ],
+        "top_manual_only_campaigns": action_sync_automation[
+            "top_manual_only_campaigns"
+        ],
         "approval_ledger": approval_ledger["approval_ledger"],
         "approval_workflow_summary": approval_ledger["approval_workflow_summary"],
         "next_approval_review": approval_ledger["next_approval_review"],
-        "top_ready_for_review_approvals": approval_ledger["top_ready_for_review_approvals"],
-        "top_needs_reapproval_approvals": approval_ledger["top_needs_reapproval_approvals"],
-        "top_overdue_approval_followups": approval_ledger["top_overdue_approval_followups"],
-        "top_due_soon_approval_followups": approval_ledger["top_due_soon_approval_followups"],
-        "top_approved_manual_approvals": approval_ledger["top_approved_manual_approvals"],
+        "top_ready_for_review_approvals": approval_ledger[
+            "top_ready_for_review_approvals"
+        ],
+        "top_needs_reapproval_approvals": approval_ledger[
+            "top_needs_reapproval_approvals"
+        ],
+        "top_overdue_approval_followups": approval_ledger[
+            "top_overdue_approval_followups"
+        ],
+        "top_due_soon_approval_followups": approval_ledger[
+            "top_due_soon_approval_followups"
+        ],
+        "top_approved_manual_approvals": approval_ledger[
+            "top_approved_manual_approvals"
+        ],
         "top_blocked_approvals": approval_ledger["top_blocked_approvals"],
     }
     return summary
@@ -1489,9 +1693,13 @@ def _next_operator_action(
         return top_item["closure_guidance"]
     if resolution_trend.get("trend_status") == "quiet":
         return f"Keep the operator loop light and only escalate if the next run breaks the {resolution_trend.get('quiet_streak_runs', 0)}-run quiet streak."
-    if resolution_trend.get("trend_status") == "worsening" and top_item.get("recommended_action"):
+    if resolution_trend.get("trend_status") == "worsening" and top_item.get(
+        "recommended_action"
+    ):
         return top_item["recommended_action"]
-    if resolution_trend.get("trend_status") == "improving" and top_item.get("recommended_action"):
+    if resolution_trend.get("trend_status") == "improving" and top_item.get(
+        "recommended_action"
+    ):
         return f"Close the remaining top target next: {top_item['recommended_action']}"
     if follow_through.get("stale_item_count", 0):
         return "Start with the oldest repeated blocked or urgent item before taking on newly ready work."
@@ -1500,9 +1708,7 @@ def _next_operator_action(
     if top_item.get("recommended_action"):
         return top_item["recommended_action"]
     if watch_guidance.get("full_refresh_due"):
-        return (
-            "Run the next full audit to refresh the baseline before relying on incremental results."
-        )
+        return "Run the next full audit to refresh the baseline before relying on incremental results."
     return "Continue the normal audit/control-center loop and review the next artifact for change."
 
 
@@ -1513,7 +1719,9 @@ def _adapt_next_action(
     trust_policy: str,
     trust_policy_reason: str,
 ) -> str:
-    status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    status = confidence_calibration.get(
+        "confidence_validation_status", "insufficient-data"
+    )
     if not next_action:
         return next_action
     if trust_policy == "act-now":
@@ -1529,7 +1737,9 @@ def _adapt_next_action(
     return next_action
 
 
-def _escalation_reason(queue: list[dict], setup_health: dict, watch_guidance: dict) -> str:
+def _escalation_reason(
+    queue: list[dict], setup_health: dict, watch_guidance: dict
+) -> str:
     if setup_health.get("blocking_errors", 0):
         return "setup-blocker"
     watch_reason = watch_guidance.get("reason", "")
@@ -1580,37 +1790,57 @@ def _why_it_matters(
         resolution_trend.get("primary_target_policy_debt_reason", ""),
         resolution_trend.get("primary_target_class_normalization_status", "none"),
         resolution_trend.get("primary_target_class_normalization_reason", ""),
-        resolution_trend.get("primary_target_class_memory_freshness_status", "insufficient-data"),
+        resolution_trend.get(
+            "primary_target_class_memory_freshness_status", "insufficient-data"
+        ),
         resolution_trend.get("primary_target_class_memory_freshness_reason", ""),
         resolution_trend.get("primary_target_class_decay_status", "none"),
         resolution_trend.get("primary_target_class_decay_reason", ""),
-        resolution_trend.get("primary_target_class_trust_reweight_direction", "neutral"),
+        resolution_trend.get(
+            "primary_target_class_trust_reweight_direction", "neutral"
+        ),
         primary_target.get("class_trust_reweight_effect", "none"),
         primary_target.get("class_trust_reweight_effect_reason", ""),
         resolution_trend.get("primary_target_class_transition_health_status", "none"),
         resolution_trend.get("primary_target_class_transition_health_reason", ""),
-        resolution_trend.get("primary_target_class_transition_resolution_status", "none"),
+        resolution_trend.get(
+            "primary_target_class_transition_resolution_status", "none"
+        ),
         resolution_trend.get("primary_target_class_transition_resolution_reason", ""),
-        resolution_trend.get("primary_target_pending_debt_freshness_status", "insufficient-data"),
+        resolution_trend.get(
+            "primary_target_pending_debt_freshness_status", "insufficient-data"
+        ),
         resolution_trend.get("primary_target_pending_debt_freshness_reason", ""),
-        resolution_trend.get("primary_target_closure_forecast_reweight_direction", "neutral"),
+        resolution_trend.get(
+            "primary_target_closure_forecast_reweight_direction", "neutral"
+        ),
         primary_target.get("closure_forecast_reweight_effect", "none"),
         primary_target.get("closure_forecast_reweight_effect_reason", ""),
         resolution_trend.get(
             "primary_target_closure_forecast_freshness_status", "insufficient-data"
         ),
         resolution_trend.get("primary_target_closure_forecast_decay_status", "none"),
-        resolution_trend.get("primary_target_closure_forecast_refresh_recovery_status", "none"),
-        resolution_trend.get("primary_target_closure_forecast_reacquisition_status", "none"),
-        resolution_trend.get("primary_target_closure_forecast_reacquisition_reason", ""),
+        resolution_trend.get(
+            "primary_target_closure_forecast_refresh_recovery_status", "none"
+        ),
+        resolution_trend.get(
+            "primary_target_closure_forecast_reacquisition_status", "none"
+        ),
+        resolution_trend.get(
+            "primary_target_closure_forecast_reacquisition_reason", ""
+        ),
         resolution_trend.get(
             "primary_target_closure_forecast_reacquisition_persistence_status", "none"
         ),
         resolution_trend.get(
             "primary_target_closure_forecast_reacquisition_persistence_reason", ""
         ),
-        resolution_trend.get("primary_target_closure_forecast_recovery_churn_status", "none"),
-        resolution_trend.get("primary_target_closure_forecast_recovery_churn_reason", ""),
+        resolution_trend.get(
+            "primary_target_closure_forecast_recovery_churn_status", "none"
+        ),
+        resolution_trend.get(
+            "primary_target_closure_forecast_recovery_churn_reason", ""
+        ),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -1630,7 +1860,10 @@ def _why_it_matters(
                 "This item came back after earlier quiet or resolution, so it should be treated as a regression instead of a net-new issue. "
                 f"{trust_sentence} {calibration_sentence}"
             ).strip()
-        if resolution_trend.get("decision_memory_status") in {"attempted", "persisting"}:
+        if resolution_trend.get("decision_memory_status") in {
+            "attempted",
+            "persisting",
+        }:
             return (
                 "A prior intervention has not cleared this item yet, so the next action should focus on proving closure instead of adding more noise. "
                 f"{trust_sentence} {calibration_sentence}"
@@ -1881,7 +2114,11 @@ def _trust_policy_sentence(
             else "Trust policy: keep the weaker class posture because the earlier pending class signal aged out."
         )
     if class_transition_resolution_status == "blocked":
-        detail = class_transition_resolution_reason or class_transition_health_reason or reason
+        detail = (
+            class_transition_resolution_reason
+            or class_transition_health_reason
+            or reason
+        )
         return (
             f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}"
             if detail
@@ -1925,7 +2162,11 @@ def _trust_policy_sentence(
             else "Trust policy: keep the weaker class posture because fresh pending debt is pushing the class signal toward clearance risk."
         )
     if closure_forecast_reweight_effect == "confirm-support-softened":
-        detail = closure_forecast_reweight_effect_reason or pending_debt_freshness_reason or reason
+        detail = (
+            closure_forecast_reweight_effect_reason
+            or pending_debt_freshness_reason
+            or reason
+        )
         return (
             f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}"
             if detail
@@ -2060,7 +2301,12 @@ def _trust_policy_sentence(
     if exception_retirement_status == "candidate":
         return "Trust policy: keep the current posture for now because the target is trending toward retirement, but it has not earned it yet."
     if exception_retirement_status == "blocked":
-        detail = exception_retirement_reason or trust_recovery_reason or exception_reason or reason
+        detail = (
+            exception_retirement_reason
+            or trust_recovery_reason
+            or exception_reason
+            or reason
+        )
         return (
             f"Trust policy: keep caution in place because {detail[0].lower() + detail[1:]}"
             if detail
@@ -2188,7 +2434,9 @@ def _with_trust_policy_brief(
     if closure_forecast_reweight_effect == "clear-risk-softened":
         return f"{summary} Trust policy: older pending-debt patterns are fading instead of dominating the forecast."
     if closure_forecast_decay_status == "confirmation-decayed":
-        return f"{summary} Trust policy: stronger confirmation carry-forward is aging out."
+        return (
+            f"{summary} Trust policy: stronger confirmation carry-forward is aging out."
+        )
     if closure_forecast_decay_status == "clearance-decayed":
         return f"{summary} Trust policy: stronger clearance carry-forward is aging out."
     if closure_forecast_decay_status == "blocked":
@@ -2220,11 +2468,11 @@ def _with_trust_policy_brief(
     if class_trust_momentum_status == "building":
         return f"{summary} Trust policy: class evidence is trending in one direction, but it has not held long enough to lock in."
     if class_trust_reweight_effect == "normalization-boosted":
-        return f"{summary} Trust policy: fresh class support strengthened class guidance."
-    if class_trust_reweight_effect == "normalization-softened":
         return (
-            f"{summary} Trust policy: class normalization stayed visible, but its support weakened."
+            f"{summary} Trust policy: fresh class support strengthened class guidance."
         )
+    if class_trust_reweight_effect == "normalization-softened":
+        return f"{summary} Trust policy: class normalization stayed visible, but its support weakened."
     if class_trust_reweight_effect == "policy-debt-strengthened":
         return f"{summary} Trust policy: fresh class caution is still strong enough to matter."
     if class_trust_reweight_effect == "policy-debt-softened":
@@ -2374,7 +2622,9 @@ def _class_decay_note(resolution_trend: dict) -> str:
 
 
 def _class_reweighting_note(resolution_trend: dict) -> str:
-    direction = resolution_trend.get("primary_target_class_trust_reweight_direction", "neutral")
+    direction = resolution_trend.get(
+        "primary_target_class_trust_reweight_direction", "neutral"
+    )
     summary = resolution_trend.get("class_reweighting_summary", "")
     if direction in {None, "", "neutral"} and not summary:
         return ""
@@ -2382,7 +2632,9 @@ def _class_reweighting_note(resolution_trend: dict) -> str:
 
 
 def _class_momentum_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_class_trust_momentum_status", "insufficient-data")
+    status = resolution_trend.get(
+        "primary_target_class_trust_momentum_status", "insufficient-data"
+    )
     summary = resolution_trend.get("class_momentum_summary", "")
     if status in {None, ""} and not summary:
         return ""
@@ -2390,7 +2642,9 @@ def _class_momentum_note(resolution_trend: dict) -> str:
 
 
 def _class_reweight_stability_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_class_reweight_stability_status", "watch")
+    status = resolution_trend.get(
+        "primary_target_class_reweight_stability_status", "watch"
+    )
     summary = resolution_trend.get("class_reweight_stability_summary", "")
     if status in {None, ""} and not summary:
         return ""
@@ -2398,7 +2652,9 @@ def _class_reweight_stability_note(resolution_trend: dict) -> str:
 
 
 def _class_transition_health_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_class_transition_health_status", "none")
+    status = resolution_trend.get(
+        "primary_target_class_transition_health_status", "none"
+    )
     summary = resolution_trend.get("class_transition_health_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2406,7 +2662,9 @@ def _class_transition_health_note(resolution_trend: dict) -> str:
 
 
 def _class_transition_resolution_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_class_transition_resolution_status", "none")
+    status = resolution_trend.get(
+        "primary_target_class_transition_resolution_status", "none"
+    )
     summary = resolution_trend.get("class_transition_resolution_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2414,10 +2672,14 @@ def _class_transition_resolution_note(resolution_trend: dict) -> str:
 
 
 def _transition_closure_confidence_note(resolution_trend: dict) -> str:
-    label = resolution_trend.get("primary_target_transition_closure_confidence_label", "")
+    label = resolution_trend.get(
+        "primary_target_transition_closure_confidence_label", ""
+    )
     if not label:
         return ""
-    score = resolution_trend.get("primary_target_transition_closure_confidence_score", 0.0)
+    score = resolution_trend.get(
+        "primary_target_transition_closure_confidence_score", 0.0
+    )
     summary = resolution_trend.get("transition_closure_confidence_summary", "")
     return f"Transition closure confidence: {label} ({score:.2f}) — {summary}".strip()
 
@@ -2471,7 +2733,9 @@ def _closure_forecast_momentum_note(resolution_trend: dict) -> str:
 
 
 def _closure_forecast_decay_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_closure_forecast_decay_status", "none")
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_decay_status", "none"
+    )
     summary = resolution_trend.get("closure_forecast_decay_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2479,7 +2743,9 @@ def _closure_forecast_decay_note(resolution_trend: dict) -> str:
 
 
 def _closure_forecast_refresh_recovery_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_closure_forecast_refresh_recovery_status", "none")
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_refresh_recovery_status", "none"
+    )
     summary = resolution_trend.get("closure_forecast_refresh_recovery_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2487,7 +2753,9 @@ def _closure_forecast_refresh_recovery_note(resolution_trend: dict) -> str:
 
 
 def _closure_forecast_reacquisition_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_closure_forecast_reacquisition_status", "none")
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_reacquisition_status", "none"
+    )
     summary = resolution_trend.get("closure_forecast_reacquisition_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2498,14 +2766,18 @@ def _closure_forecast_reacquisition_persistence_note(resolution_trend: dict) -> 
     status = resolution_trend.get(
         "primary_target_closure_forecast_reacquisition_persistence_status", "none"
     )
-    summary = resolution_trend.get("closure_forecast_reacquisition_persistence_summary", "")
+    summary = resolution_trend.get(
+        "closure_forecast_reacquisition_persistence_summary", ""
+    )
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Reacquisition persistence: {status} — {summary}".strip()
 
 
 def _closure_forecast_recovery_churn_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_closure_forecast_recovery_churn_status", "none")
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_recovery_churn_status", "none"
+    )
     summary = resolution_trend.get("closure_forecast_recovery_churn_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2516,14 +2788,18 @@ def _closure_forecast_reset_refresh_recovery_note(resolution_trend: dict) -> str
     status = resolution_trend.get(
         "primary_target_closure_forecast_reset_refresh_recovery_status", "none"
     )
-    summary = resolution_trend.get("closure_forecast_reset_refresh_recovery_summary", "")
+    summary = resolution_trend.get(
+        "closure_forecast_reset_refresh_recovery_summary", ""
+    )
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Reset refresh recovery: {status} — {summary}".strip()
 
 
 def _closure_forecast_reset_reentry_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_closure_forecast_reset_reentry_status", "none")
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_reset_reentry_status", "none"
+    )
     summary = resolution_trend.get("closure_forecast_reset_reentry_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""
@@ -2535,7 +2811,9 @@ def _closure_forecast_reset_reentry_persistence_note(resolution_trend: dict) -> 
         "primary_target_closure_forecast_reset_reentry_persistence_status",
         "none",
     )
-    summary = resolution_trend.get("closure_forecast_reset_reentry_persistence_summary", "")
+    summary = resolution_trend.get(
+        "closure_forecast_reset_reentry_persistence_summary", ""
+    )
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Reset re-entry persistence: {status} — {summary}".strip()
@@ -2557,7 +2835,9 @@ def _closure_forecast_reset_reentry_freshness_note(resolution_trend: dict) -> st
         "primary_target_closure_forecast_reset_reentry_freshness_status",
         "insufficient-data",
     )
-    summary = resolution_trend.get("closure_forecast_reset_reentry_freshness_summary", "")
+    summary = resolution_trend.get(
+        "closure_forecast_reset_reentry_freshness_summary", ""
+    )
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Reset re-entry freshness: {status} — {summary}".strip()
@@ -2574,12 +2854,16 @@ def _closure_forecast_reset_reentry_reset_note(resolution_trend: dict) -> str:
     return f"Reset re-entry reset controls: {status} — {summary}".strip()
 
 
-def _closure_forecast_reset_reentry_refresh_recovery_note(resolution_trend: dict) -> str:
+def _closure_forecast_reset_reentry_refresh_recovery_note(
+    resolution_trend: dict,
+) -> str:
     status = resolution_trend.get(
         "primary_target_closure_forecast_reset_reentry_refresh_recovery_status",
         "none",
     )
-    summary = resolution_trend.get("closure_forecast_reset_reentry_refresh_recovery_summary", "")
+    summary = resolution_trend.get(
+        "closure_forecast_reset_reentry_refresh_recovery_summary", ""
+    )
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Reset re-entry refresh recovery: {status} — {summary}".strip()
@@ -2596,7 +2880,9 @@ def _closure_forecast_reset_reentry_rebuild_note(resolution_trend: dict) -> str:
     return f"Reset re-entry rebuild controls: {status} — {summary}".strip()
 
 
-def _closure_forecast_reset_reentry_rebuild_freshness_note(resolution_trend: dict) -> str:
+def _closure_forecast_reset_reentry_rebuild_freshness_note(
+    resolution_trend: dict,
+) -> str:
     status = resolution_trend.get(
         "primary_target_closure_forecast_reset_reentry_rebuild_freshness_status",
         "insufficient-data",
@@ -2683,7 +2969,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_churn_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return f"Reset re-entry rebuild re-entry churn controls: {status} — {summary}".strip()
+    return (
+        f"Reset re-entry rebuild re-entry churn controls: {status} — {summary}".strip()
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_freshness_note(
@@ -2715,7 +3003,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_reset_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return f"Reset re-entry rebuild re-entry reset controls: {status} — {summary}".strip()
+    return (
+        f"Reset re-entry rebuild re-entry reset controls: {status} — {summary}".strip()
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_note(
@@ -2731,7 +3021,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return (f"Reset re-entry rebuild re-entry refresh recovery: {status} — {summary}").strip()
+    return (
+        f"Reset re-entry rebuild re-entry refresh recovery: {status} — {summary}"
+    ).strip()
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_note(
@@ -2747,7 +3039,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return (f"Reset re-entry rebuild re-entry restore controls: {status} — {summary}").strip()
+    return (
+        f"Reset re-entry rebuild re-entry restore controls: {status} — {summary}"
+    ).strip()
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_note(
@@ -2763,7 +3057,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return (f"Reset re-entry rebuild re-entry restore persistence: {status} — {summary}").strip()
+    return (
+        f"Reset re-entry rebuild re-entry restore persistence: {status} — {summary}"
+    ).strip()
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_churn_note(
@@ -2779,7 +3075,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_churn_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return (f"Reset re-entry rebuild re-entry restore churn controls: {status} — {summary}").strip()
+    return (
+        f"Reset re-entry rebuild re-entry restore churn controls: {status} — {summary}"
+    ).strip()
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_note(
@@ -2795,7 +3093,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_note(
     )
     if status in {None, "", "none", "insufficient-data"} and not summary:
         return ""
-    return (f"Reset re-entry rebuild re-entry restore freshness: {status} — {summary}").strip()
+    return (
+        f"Reset re-entry rebuild re-entry restore freshness: {status} — {summary}"
+    ).strip()
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_reset_note(
@@ -2811,7 +3111,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_reset_note(
     )
     if status in {None, "", "none"} and not summary:
         return ""
-    return (f"Reset re-entry rebuild re-entry restore reset controls: {status} — {summary}").strip()
+    return (
+        f"Reset re-entry rebuild re-entry restore reset controls: {status} — {summary}"
+    ).strip()
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_note(
@@ -3102,7 +3404,9 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_
     ).strip()
 
 
-def _closure_forecast_reset_reentry_rebuild_persistence_note(resolution_trend: dict) -> str:
+def _closure_forecast_reset_reentry_rebuild_persistence_note(
+    resolution_trend: dict,
+) -> str:
     status = resolution_trend.get(
         "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status",
         "none",
@@ -3131,7 +3435,9 @@ def _closure_forecast_reset_reentry_rebuild_churn_note(resolution_trend: dict) -
 
 
 def _closure_forecast_hysteresis_note(resolution_trend: dict) -> str:
-    status = resolution_trend.get("primary_target_closure_forecast_hysteresis_status", "none")
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_hysteresis_status", "none"
+    )
     summary = resolution_trend.get("closure_forecast_hysteresis_summary", "")
     if status in {None, "", "none"} and not summary:
         return ""

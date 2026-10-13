@@ -67,14 +67,16 @@ def find_quick_wins(
         # Find lowest-scoring dimensions
         actions = _get_actions(audit)
 
-        wins.append({
-            "name": audit.metadata.name,
-            "current_tier": audit.completeness_tier,
-            "score": round(audit.overall_score, 3),
-            "next_tier": next_tier,
-            "gap": round(gap, 3),
-            "actions": actions[:3],  # Top 3 actions
-        })
+        wins.append(
+            {
+                "name": audit.metadata.name,
+                "current_tier": audit.completeness_tier,
+                "score": round(audit.overall_score, 3),
+                "next_tier": next_tier,
+                "gap": round(gap, 3),
+                "actions": actions[:3],  # Top 3 actions
+            }
+        )
 
     # Sort by smallest gap first (easiest wins)
     wins.sort(key=lambda w: w["gap"])
@@ -99,8 +101,7 @@ def _get_actions(audit: RepoAudit) -> list[str]:
 
     # Sort dimensions by score ascending (worst first)
     sorted_dims = sorted(
-        [(dim, score) for dim, score in score_map.items()
-         if dim in DIMENSION_ADVICE],
+        [(dim, score) for dim, score in score_map.items() if dim in DIMENSION_ADVICE],
         key=lambda x: x[1],
     )
 

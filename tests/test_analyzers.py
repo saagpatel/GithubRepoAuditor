@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from github_repo_auditor.analyzers.cicd import CicdAnalyzer
 from github_repo_auditor.analyzers.code_quality import CodeQualityAnalyzer
-from github_repo_auditor.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
+from github_repo_auditor.analyzers.completeness import (
+    BuildReadinessAnalyzer,
+    DocumentationAnalyzer,
+)
 from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer
 from github_repo_auditor.analyzers.readme import ReadmeAnalyzer
 from github_repo_auditor.analyzers.structure import StructureAnalyzer
@@ -21,7 +24,8 @@ class TestReadmeAnalyzer:
             "## Usage\n\n```python\nimport test_repo\ntest_repo.run()\n```\n\n"
             "## Features\n\n- Feature one\n- Feature two\n- Feature three\n\n"
             "## Contributing\n\nPRs welcome.\n\n"
-            + "Additional documentation and details follow here. " * 10
+            + "Additional documentation and details follow here. "
+            * 10
         )
         result = ReadmeAnalyzer().analyze(tmp_repo, sample_metadata)
         assert result.score >= 0.8
@@ -55,12 +59,25 @@ class TestStructureAnalyzer:
 
     def test_swift_repo_detects_xcodeproj(self, swift_repo):
         meta = RepoMetadata(
-            name="swift-repo", full_name="user/swift-repo",
-            description=None, language="Swift", languages={"Swift": 1000},
-            private=False, fork=False, archived=False,
-            created_at=None, updated_at=None, pushed_at=None,
-            default_branch="main", stars=0, forks=0, open_issues=0,
-            size_kb=100, html_url="", clone_url="", topics=[],
+            name="swift-repo",
+            full_name="user/swift-repo",
+            description=None,
+            language="Swift",
+            languages={"Swift": 1000},
+            private=False,
+            fork=False,
+            archived=False,
+            created_at=None,
+            updated_at=None,
+            pushed_at=None,
+            default_branch="main",
+            stars=0,
+            forks=0,
+            open_issues=0,
+            size_kb=100,
+            html_url="",
+            clone_url="",
+            topics=[],
         )
         result = StructureAnalyzer().analyze(swift_repo, meta)
         # After tuning, Swift repos should detect xcodeproj as config
@@ -108,7 +125,9 @@ class TestCicdAnalyzer:
         (repo / "Package.swift").write_text("// swift-tools-version:5.9\n")
         result = CicdAnalyzer().analyze(repo, sample_metadata)
         assert result.score >= 0.2
-        assert any("build" in f.lower() or "script" in f.lower() for f in result.findings)
+        assert any(
+            "build" in f.lower() or "script" in f.lower() for f in result.findings
+        )
 
     def test_xcodegen_project_yml_scores_build_scripts(self, tmp_path, sample_metadata):
         repo = tmp_path / "xcodegen-repo"
@@ -129,7 +148,10 @@ class TestDependenciesAnalyzer:
     def test_python_deps(self, tmp_repo, sample_metadata):
         result = DependenciesAnalyzer().analyze(tmp_repo, sample_metadata)
         assert result.score >= 0.6
-        assert result.details["dep_count"] in (0, 2)  # 2 if parsed, 0 if pyproject.toml takes priority
+        assert result.details["dep_count"] in (
+            0,
+            2,
+        )  # 2 if parsed, 0 if pyproject.toml takes priority
 
     def test_no_deps(self, empty_repo, sample_metadata):
         result = DependenciesAnalyzer().analyze(empty_repo, sample_metadata)
@@ -177,6 +199,7 @@ class TestCloneWorkspace:
         import inspect
 
         from github_repo_auditor.cloner import clone_workspace
+
         src = inspect.getsource(clone_workspace)
         assert "TemporaryDirectory" in src
         assert "/tmp/audit-repos" not in src

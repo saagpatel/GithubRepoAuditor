@@ -34,7 +34,9 @@ def write_hidden_table_sheet(
     for row_index, row_values in enumerate(rows, 2):
         for col_index, value in enumerate(row_values, 1):
             cell = ws.cell(row=row_index, column=col_index, value=value)
-            style_data_cell(cell, "center" if isinstance(value, (int, float)) else "left")
+            style_data_cell(
+                cell, "center" if isinstance(value, (int, float)) else "left"
+            )
 
     max_row = len(rows) + 1
     if max_row > 1:
@@ -61,7 +63,9 @@ def repo_detail_lookup_formula(
     lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,{column_index},FALSE)"
     if allow_blank:
         return f'=IFERROR({lookup},"{escaped_fallback}")'
-    return f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
+    return (
+        f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
+    )
 
 
 def repo_detail_last_movement(scores: list[float]) -> str:
@@ -86,4 +90,6 @@ def apply_lane_row_fill(ws, row: int, max_col: int, lane: str | None) -> None:
     if not fill_hex:
         return
     for col in range(1, max_col + 1):
-        ws.cell(row=row, column=col).fill = PatternFill(fill_type="solid", fgColor=fill_hex)
+        ws.cell(row=row, column=col).fill = PatternFill(
+            fill_type="solid", fgColor=fill_hex
+        )

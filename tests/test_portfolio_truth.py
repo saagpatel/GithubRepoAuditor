@@ -38,13 +38,18 @@ from github_repo_auditor.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
 )
-from github_repo_auditor.producer_preflight import ProducerEvidence, producer_evidence_receipt_id
+from github_repo_auditor.producer_preflight import (
+    ProducerEvidence,
+    producer_evidence_receipt_id,
+)
 from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from github_repo_auditor.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
-from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_provenance import (
+    REQUIRED_PROJECT_PROVENANCE_KEYS,
+)
 from github_repo_auditor.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
@@ -3098,7 +3103,10 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
     )
     local_only_path = portfolio_workspace / "SAFELIGHT"
     local_only_path.mkdir()
-    _write(local_only_path / "README.md", "# SAFELIGHT\n\nLocal-only active product fixture.\n")
+    _write(
+        local_only_path / "README.md",
+        "# SAFELIGHT\n\nLocal-only active product fixture.\n",
+    )
     _set_mtime(local_only_path / "README.md", now.timestamp())
     portfolio_catalog.write_text(
         portfolio_catalog.read_text()
@@ -5509,7 +5517,8 @@ def test_publish_failure_leaves_live_files_untouched(
         raise RuntimeError("renderer exploded")
 
     monkeypatch.setattr(
-        "github_repo_auditor.portfolio_truth_publish.render_portfolio_report_markdown", _boom
+        "github_repo_auditor.portfolio_truth_publish.render_portfolio_report_markdown",
+        _boom,
     )
 
     with pytest.raises(RuntimeError):
@@ -6306,7 +6315,9 @@ def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
 
 def test_report_subcommand_parses_security_cohort_count() -> None:
     from github_repo_auditor.cli import build_subcommand_parser
-    from github_repo_auditor.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    from github_repo_auditor.github_security_coverage import (
+        DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
 
     parser = build_subcommand_parser()
     explicit = parser.parse_args(
@@ -6362,7 +6373,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
         "github_repo_auditor.app.portfolio_truth.load_security_coverage_by_full_name",
         fake_security_loader,
     )
-    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr(
+        "github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish
+    )
     monkeypatch.setattr(
         "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
         lambda **kwargs: (
@@ -6404,7 +6417,9 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
     from types import SimpleNamespace
 
     from github_repo_auditor.app.portfolio_truth import run_portfolio_truth_mode
-    from github_repo_auditor.github_security_coverage import SecurityCoverageReceiptBinding
+    from github_repo_auditor.github_security_coverage import (
+        SecurityCoverageReceiptBinding,
+    )
 
     receipt_path = tmp_path / "github-security-coverage-latest.json"
     binding = SecurityCoverageReceiptBinding(
@@ -6437,7 +6452,8 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
         lambda **_kwargs: loaded,
     )
     monkeypatch.setattr(
-        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
+        lambda **_kwargs: {},
     )
 
     def fake_publish(**kwargs):
@@ -6452,7 +6468,9 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
             report_changed=False,
         )
 
-    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr(
+        "github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish
+    )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     args = SimpleNamespace(
         output_dir=str(tmp_path / "output"),
@@ -6579,9 +6597,12 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
             report_changed=False,
         )
 
-    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
-        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish
+    )
+    monkeypatch.setattr(
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
+        lambda **_kwargs: {},
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
     monkeypatch.setenv("GHRA_PRODUCER_EVIDENCE", str(receipt))

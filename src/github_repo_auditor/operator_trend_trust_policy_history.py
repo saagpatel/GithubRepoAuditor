@@ -48,13 +48,17 @@ def build_trust_exception_events(
                 "class_key": target_class_key(primary_target),
                 "label": target_label(primary_target),
                 "trust_policy": trust_policy,
-                "trust_exception_status": summary.get("primary_target_exception_status", "none"),
+                "trust_exception_status": summary.get(
+                    "primary_target_exception_status", "none"
+                ),
                 "generated_at": entry.get("generated_at", ""),
                 "lane": primary_target.get("lane", ""),
                 "kind": primary_target.get("kind", ""),
                 "decision_memory_status": summary.get("decision_memory_status", ""),
                 "last_outcome": summary.get("primary_target_last_outcome", ""),
-                "confidence_validation_status": summary.get("confidence_validation_status", ""),
+                "confidence_validation_status": summary.get(
+                    "confidence_validation_status", ""
+                ),
             }
         )
     return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
@@ -126,15 +130,22 @@ def exception_case_outcome(
     summary = run.get("operator_summary") or {}
     target = summary.get("primary_target") or {}
     target_key = queue_identity(target)
-    future_matches = [run_target_match(candidate, target_key) for candidate in future_runs]
+    future_matches = [
+        run_target_match(candidate, target_key) for candidate in future_runs
+    ]
     future_lanes = [match.get("lane") if match else None for match in future_matches]
     reopened = any(
         (
-            (candidate.get("operator_summary") or {}).get("decision_memory_status") == "reopened"
-            or (candidate.get("operator_summary") or {}).get("primary_target_last_outcome")
+            (candidate.get("operator_summary") or {}).get("decision_memory_status")
+            == "reopened"
+            or (candidate.get("operator_summary") or {}).get(
+                "primary_target_last_outcome"
+            )
             == "reopened"
         )
-        and queue_identity((candidate.get("operator_summary") or {}).get("primary_target") or {})
+        and queue_identity(
+            (candidate.get("operator_summary") or {}).get("primary_target") or {}
+        )
         == target_key
         for candidate in future_runs
     )
@@ -153,13 +164,17 @@ def target_exception_history(
     policy_flip_count: Callable[[list[str]], int],
     stable_policy_run_count: Callable[[list[str]], int],
     same_or_lower_pressure_path: Callable[[list[str]], bool],
-    latest_case_outcome: Callable[[list[dict[str, Any]], list[dict[str, Any]]], str | None],
+    latest_case_outcome: Callable[
+        [list[dict[str, Any]], list[dict[str, Any]]], str | None
+    ],
     trust_recovery_window_runs: int,
 ) -> dict[str, Any]:
     key = queue_identity(target)
     class_key = target_class_key(target)
     target_events = [event for event in exception_events if event.get("key") == key]
-    class_events = [event for event in exception_events if event.get("class_key") == class_key]
+    class_events = [
+        event for event in exception_events if event.get("class_key") == class_key
+    ]
     target_exception_events = [
         event
         for event in target_events
@@ -171,15 +186,22 @@ def target_exception_history(
         if event.get("trust_exception_status") not in {None, "", "none"}
     ]
     target_cases = [case for case in historical_cases if case.get("key") == key]
-    class_cases = [case for case in historical_cases if case.get("class_key") == class_key]
-    target_policies = [
-        event.get("trust_policy", "monitor") for event in target_events[:trust_recovery_window_runs]
+    class_cases = [
+        case for case in historical_cases if case.get("class_key") == class_key
     ]
-    target_lanes = [event.get("lane", "") for event in target_events[:trust_recovery_window_runs]]
+    target_policies = [
+        event.get("trust_policy", "monitor")
+        for event in target_events[:trust_recovery_window_runs]
+    ]
+    target_lanes = [
+        event.get("lane", "") for event in target_events[:trust_recovery_window_runs]
+    ]
     recent_exception_path = " -> ".join(
-        event.get("trust_exception_status", "none") for event in target_exception_events[:4]
+        event.get("trust_exception_status", "none")
+        for event in target_exception_events[:4]
     ) or " -> ".join(
-        event.get("trust_exception_status", "none") for event in class_exception_events[:4]
+        event.get("trust_exception_status", "none")
+        for event in class_exception_events[:4]
     )
     return {
         "stable_policy_run_count": stable_policy_run_count(target_policies),
@@ -260,7 +282,9 @@ def group_exception_hotspots(
 
     hotspots: list[dict[str, Any]] = []
     for cases in grouped.values():
-        overcautious_count = sum(1 for case in cases if case.get("case_outcome") == "overcautious")
+        overcautious_count = sum(
+            1 for case in cases if case.get("case_outcome") == "overcautious"
+        )
         if overcautious_count <= 0:
             continue
         hotspots.append(
@@ -334,7 +358,9 @@ def target_policy_history(
     key = queue_identity(target)
     class_key = target_class_key(target)
     target_events = [event for event in policy_events if event.get("key") == key]
-    class_events = [event for event in policy_events if event.get("class_key") == class_key]
+    class_events = [
+        event for event in policy_events if event.get("class_key") == class_key
+    ]
     target_policies = [event.get("trust_policy", "monitor") for event in target_events]
     class_policies = [event.get("trust_policy", "monitor") for event in class_events]
     recent_policy_path = " -> ".join(target_policies[:4]) if target_policies else ""
@@ -344,7 +370,9 @@ def target_policy_history(
         "recent_policy_path": recent_policy_path or class_policy_path,
         "class_policy_flip_count": policy_flip_count(class_policies),
         "class_policy_path": class_policy_path,
-        "strong_policy_failure_count": strong_policy_failure_count(target, policy_events),
+        "strong_policy_failure_count": strong_policy_failure_count(
+            target, policy_events
+        ),
     }
 
 
@@ -355,9 +383,15 @@ def policy_flip_hotspots(policy_events: list[dict[str, Any]]) -> list[dict[str, 
     class_hotspots = group_policy_hotspots(
         policy_events, key_name="class_key", label_name="class_key", scope="class"
     )
-    hotspots = target_hotspots + [item for item in class_hotspots if item.get("flip_count", 0) >= 2]
+    hotspots = target_hotspots + [
+        item for item in class_hotspots if item.get("flip_count", 0) >= 2
+    ]
     hotspots.sort(
-        key=lambda item: (-item.get("flip_count", 0), item.get("label", ""), item.get("scope", ""))
+        key=lambda item: (
+            -item.get("flip_count", 0),
+            item.get("label", ""),
+            item.get("scope", ""),
+        )
     )
     return hotspots[:5]
 
@@ -431,7 +465,9 @@ def trust_policy_exception_for_target(
     current_bucket: int,
     recommendation_bucket: Callable[[dict[str, Any]], int],
 ) -> tuple[str, str, str, str]:
-    status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    status = confidence_calibration.get(
+        "confidence_validation_status", "insufficient-data"
+    )
     policy = target.get("trust_policy", "monitor")
     floor = (
         "act-with-review"
@@ -450,7 +486,9 @@ def trust_policy_exception_for_target(
                 "none",
                 "",
                 policy,
-                target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+                target.get(
+                    "trust_policy_reason", "No trust-policy reason is recorded yet."
+                ),
             )
         return (
             "softened-for-noise",
@@ -459,14 +497,18 @@ def trust_policy_exception_for_target(
             "Recent trust noise warrants verifying the latest state before treating this recommendation as fully stable.",
         )
 
-    if history_meta.get("strong_policy_failure_count", 0) >= 2 and current_bucket == recommendation_bucket(target):
+    if history_meta.get(
+        "strong_policy_failure_count", 0
+    ) >= 2 and current_bucket == recommendation_bucket(target):
         softened = soften_trust_policy(policy, floor=floor)
         if softened == policy:
             return (
                 "none",
                 "",
                 policy,
-                target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+                target.get(
+                    "trust_policy_reason", "No trust-policy reason is recorded yet."
+                ),
             )
         return (
             "softened-for-reopen-risk",
@@ -476,7 +518,8 @@ def trust_policy_exception_for_target(
         )
 
     if max(
-        history_meta.get("policy_flip_count", 0), history_meta.get("class_policy_flip_count", 0)
+        history_meta.get("policy_flip_count", 0),
+        history_meta.get("class_policy_flip_count", 0),
     ) >= 2 and current_bucket == recommendation_bucket(target):
         softened = soften_trust_policy(policy, floor=floor)
         if softened == policy:
@@ -484,7 +527,9 @@ def trust_policy_exception_for_target(
                 "none",
                 "",
                 policy,
-                target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+                target.get(
+                    "trust_policy_reason", "No trust-policy reason is recorded yet."
+                ),
             )
         return (
             "softened-for-flip-churn",

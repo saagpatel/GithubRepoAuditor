@@ -13,6 +13,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Stop retrying ambiguous Notion writes, verify weekly-review replacements before
+  archival, distinguish async GitHub rate limits, and validate web report payloads.
+- Replace vacuous tier/initiative tests with deterministic checks; pin the
+  Python/uv/Node/pnpm toolchains and run locked Python and web gates via `make check`.
+
 - Reject reckoning path collisions under the saved truth workspace root and
   validate canonical truth before exporting private overlay workbooks.
 

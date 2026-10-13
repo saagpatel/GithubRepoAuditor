@@ -33,7 +33,9 @@ def _safe_text(value: Any) -> str:
 def _normalize_field_mapping(value: Any, errors: list[str]) -> dict[str, str]:
     if not isinstance(value, dict):
         if value:
-            errors.append("GitHub Projects fields must be a mapping from internal keys to project field names.")
+            errors.append(
+                "GitHub Projects fields must be a mapping from internal keys to project field names."
+            )
         return {}
 
     normalized: dict[str, str] = {}
@@ -49,7 +51,9 @@ def _normalize_field_mapping(value: Any, errors: list[str]) -> dict[str, str]:
             )
             continue
         if not field_name:
-            errors.append(f"GitHub Projects field '{key}' must map to a non-empty project field name.")
+            errors.append(
+                f"GitHub Projects field '{key}' must map to a non-empty project field name."
+            )
             continue
         normalized[key] = field_name
     return normalized
@@ -75,7 +79,9 @@ def load_github_projects_config(path: Path | None = None) -> dict[str, Any]:
             "path": str(config_path),
             "exists": True,
             "errors": [],
-            "warnings": ["PyYAML is not installed, so the GitHub Projects config was skipped."],
+            "warnings": [
+                "PyYAML is not installed, so the GitHub Projects config was skipped."
+            ],
             "owner": "",
             "project_number": 0,
             "fields": {},
@@ -115,7 +121,9 @@ def load_github_projects_config(path: Path | None = None) -> dict[str, Any]:
     if isinstance(raw_project_number, int) and raw_project_number > 0:
         project_number = raw_project_number
     else:
-        errors.append("GitHub Projects config requires a positive integer 'project_number'.")
+        errors.append(
+            "GitHub Projects config requires a positive integer 'project_number'."
+        )
 
     fields = _normalize_field_mapping(loaded.get("fields") or {}, errors)
     if not fields:
@@ -135,13 +143,21 @@ def load_github_projects_config(path: Path | None = None) -> dict[str, Any]:
 def is_github_projects_config_valid(config: dict[str, Any] | None) -> bool:
     if not isinstance(config, dict):
         return False
-    return bool(config.get("exists") and not config.get("errors") and config.get("owner") and config.get("project_number") and config.get("fields"))
+    return bool(
+        config.get("exists")
+        and not config.get("errors")
+        and config.get("owner")
+        and config.get("project_number")
+        and config.get("fields")
+    )
 
 
 def operator_context_by_repo(operator_queue: list[dict] | None) -> dict[str, dict]:
     context: dict[str, dict] = {}
     for item in operator_queue or []:
-        repo_full_name = _safe_text(item.get("repo_full_name")) or _safe_text(item.get("repo"))
+        repo_full_name = _safe_text(item.get("repo_full_name")) or _safe_text(
+            item.get("repo")
+        )
         if repo_full_name and repo_full_name not in context:
             context[repo_full_name] = item
     return context
@@ -160,7 +176,11 @@ def build_project_field_values(
     sample = repo_actions[0]
     catalog = dict(sample.get("portfolio_catalog") or {})
     highest_priority = next(
-        (priority for priority in ("critical", "high", "medium", "low") if any(action.get("priority") == priority for action in repo_actions)),
+        (
+            priority
+            for priority in ("critical", "high", "medium", "low")
+            if any(action.get("priority") == priority for action in repo_actions)
+        ),
         "",
     )
     item = operator_item or {}
@@ -174,16 +194,21 @@ def build_project_field_values(
         ) or _status_or_blank(
             build_follow_through_reacquisition_confidence_retirement_status_label(item)
         )
-        checkpoint_timing = _status_or_blank(build_follow_through_checkpoint_status_label(item))
+        checkpoint_timing = _status_or_blank(
+            build_follow_through_checkpoint_status_label(item)
+        )
         follow_through = _status_or_blank(build_follow_through_status_label(item))
         operator_focus = _status_or_blank(build_operator_focus(item))
     return {
-        "campaign": _safe_text(campaign_summary.get("label") or campaign_summary.get("campaign_type")),
+        "campaign": _safe_text(
+            campaign_summary.get("label") or campaign_summary.get("campaign_type")
+        ),
         "priority": highest_priority,
         "lane": _safe_text(item.get("lane")),
         "owner": _safe_text(catalog.get("team")) or _safe_text(catalog.get("owner")),
         "operator_focus": operator_focus,
-        "confidence": _safe_text(item.get("confidence_label")) or _safe_text(item.get("next_action_confidence_label")),
+        "confidence": _safe_text(item.get("confidence_label"))
+        or _safe_text(item.get("next_action_confidence_label")),
         "revalidation": revalidation,
         "follow_through": follow_through,
         "checkpoint_timing": checkpoint_timing,

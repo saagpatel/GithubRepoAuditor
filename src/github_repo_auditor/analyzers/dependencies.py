@@ -197,7 +197,11 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
 
     if "requirements.txt" in manifests:
         try:
-            lines = (repo_path / "requirements.txt").read_text(errors="replace").splitlines()
+            lines = (
+                (repo_path / "requirements.txt")
+                .read_text(errors="replace")
+                .splitlines()
+            )
             return sum(
                 1
                 for line in lines

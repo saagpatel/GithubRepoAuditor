@@ -1,4 +1,7 @@
-from github_repo_auditor.portfolio_risk import build_portfolio_risk_summary, build_risk_entry
+from github_repo_auditor.portfolio_risk import (
+    build_portfolio_risk_summary,
+    build_risk_entry,
+)
 
 
 def _baseline_kwargs(**overrides):

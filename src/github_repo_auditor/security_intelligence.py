@@ -36,7 +36,9 @@ def _label_for_score(score: float) -> str:
 
 
 def summarize_local_security_posture(results: list[AnalyzerResult]) -> dict:
-    security_result = next((result for result in results if result.dimension == "security"), None)
+    security_result = next(
+        (result for result in results if result.dimension == "security"), None
+    )
     if not security_result:
         return {
             "available": False,
@@ -59,7 +61,9 @@ def summarize_local_security_posture(results: list[AnalyzerResult]) -> dict:
         "has_security_md": details.get("has_security_md", False),
         "has_dependabot": details.get("has_dependabot", False),
         "dependabot_supported": details.get("dependabot_supported", False),
-        "dependabot_supported_ecosystems": details.get("dependabot_supported_ecosystems", []),
+        "dependabot_supported_ecosystems": details.get(
+            "dependabot_supported_ecosystems", []
+        ),
         "evidence": security_result.findings[:5],
     }
 
@@ -114,11 +118,15 @@ def load_scorecard_security(metadata: RepoMetadata) -> dict:
 
 
 def _normalize_security_and_analysis(data: dict | None) -> dict:
-    analysis = (data or {}).get("security_and_analysis", {}) if isinstance(data, dict) else {}
+    analysis = (
+        (data or {}).get("security_and_analysis", {}) if isinstance(data, dict) else {}
+    )
     return analysis if isinstance(analysis, dict) else {}
 
 
-def load_github_security(metadata: RepoMetadata, github_client: GitHubClient | None) -> dict:
+def load_github_security(
+    metadata: RepoMetadata, github_client: GitHubClient | None
+) -> dict:
     if github_client is None:
         return {
             "available": False,
@@ -155,13 +163,17 @@ def load_github_security(metadata: RepoMetadata, github_client: GitHubClient | N
     if analysis.get("secret_scanning", {}).get("status") == "enabled":
         secret_scanning_status = "enabled"
     elif secret_scan.get("available"):
-        secret_scanning_status = "alerts-open" if (secret_scan.get("open_alerts") or 0) > 0 else "enabled"
+        secret_scanning_status = (
+            "alerts-open" if (secret_scan.get("open_alerts") or 0) > 0 else "enabled"
+        )
     elif analysis.get("secret_scanning", {}).get("status"):
         secret_scanning_status = analysis["secret_scanning"]["status"]
 
     code_scanning_status = "unavailable"
     if code_scan.get("available"):
-        code_scanning_status = "alerts-open" if (code_scan.get("open_alerts") or 0) > 0 else "enabled"
+        code_scanning_status = (
+            "alerts-open" if (code_scan.get("open_alerts") or 0) > 0 else "enabled"
+        )
     elif code_scan.get("http_status") == 404:
         code_scanning_status = "not-configured"
 
@@ -175,23 +187,40 @@ def load_github_security(metadata: RepoMetadata, github_client: GitHubClient | N
     if code_scanning_status != "unavailable":
         evidence.append(
             "Code scanning: "
-            + (f"{code_scanning_status} ({code_scan.get('open_alerts', 0)} alerts)" if code_scan.get("available") else code_scanning_status)
+            + (
+                f"{code_scanning_status} ({code_scan.get('open_alerts', 0)} alerts)"
+                if code_scan.get("available")
+                else code_scanning_status
+            )
         )
     if secret_scanning_status != "unavailable":
         evidence.append(
             "Secret scanning: "
-            + (f"{secret_scanning_status} ({secret_scan.get('open_alerts', 0)} alerts)" if secret_scan.get("available") else secret_scanning_status)
+            + (
+                f"{secret_scanning_status} ({secret_scan.get('open_alerts', 0)} alerts)"
+                if secret_scan.get("available")
+                else secret_scanning_status
+            )
         )
 
-    provider_available = bool(repo_security.get("available") or secret_scan.get("available") or code_scan.get("available") or sbom.get("available"))
+    provider_available = bool(
+        repo_security.get("available")
+        or secret_scan.get("available")
+        or code_scan.get("available")
+        or sbom.get("available")
+    )
     return {
         "available": provider_available,
         "provider_available": provider_available,
         "security_and_analysis_available": repo_security.get("available", False),
         "dependency_graph_enabled": dependency_graph_enabled,
         "dependency_graph_status": dependency_graph_status,
-        "sbom_exportable": True if sbom.get("available") else (False if sbom.get("http_status") == 404 else None),
-        "sbom_status": "enabled" if sbom.get("available") else ("not-configured" if sbom.get("http_status") == 404 else "unavailable"),
+        "sbom_exportable": True
+        if sbom.get("available")
+        else (False if sbom.get("http_status") == 404 else None),
+        "sbom_status": "enabled"
+        if sbom.get("available")
+        else ("not-configured" if sbom.get("http_status") == 404 else "unavailable"),
         "code_scanning_status": code_scanning_status,
         "code_scanning_alerts": code_scan.get("open_alerts"),
         "code_scanning_critical_alerts": code_scan.get("critical", 0),
@@ -252,68 +281,85 @@ def _scorecard_provider_score(scorecard: dict) -> float | None:
     return _clamp(float(raw) / 10.0)
 
 
-def _build_security_recommendations(local: dict, github: dict, scorecard: dict, metadata: RepoMetadata) -> list[dict]:
+def _build_security_recommendations(
+    local: dict, github: dict, scorecard: dict, metadata: RepoMetadata
+) -> list[dict]:
     recommendations: list[dict] = []
 
     if local.get("secrets_found", 0) > 0:
-        recommendations.append({
-            "key": "remove-exposed-secrets",
-            "title": "Remove exposed secrets",
-            "why": "Potential secrets were detected in the repository and should be rotated and removed before promotion.",
-            "expected_posture_lift": 0.18,
-            "effort": "high",
-            "priority": "high",
-            "source": "local",
-        })
+        recommendations.append(
+            {
+                "key": "remove-exposed-secrets",
+                "title": "Remove exposed secrets",
+                "why": "Potential secrets were detected in the repository and should be rotated and removed before promotion.",
+                "expected_posture_lift": 0.18,
+                "effort": "high",
+                "priority": "high",
+                "source": "local",
+            }
+        )
     if not local.get("has_security_md", False):
-        recommendations.append({
-            "key": "add-security-md",
-            "title": "Add SECURITY.md",
-            "why": "The repo is missing a published security policy and disclosure path.",
-            "expected_posture_lift": 0.08,
-            "effort": "small",
-            "priority": "medium",
-            "source": "local",
-        })
-    if not local.get("has_dependabot", False) and local.get("dependabot_supported", False):
-        recommendations.append({
-            "key": "add-dependabot-config",
-            "title": "Add Dependabot config",
-            "why": "Automated dependency updates are missing, which weakens supply-chain hygiene.",
-            "expected_posture_lift": 0.1,
-            "effort": "small",
-            "priority": "medium",
-            "source": "local",
-        })
+        recommendations.append(
+            {
+                "key": "add-security-md",
+                "title": "Add SECURITY.md",
+                "why": "The repo is missing a published security policy and disclosure path.",
+                "expected_posture_lift": 0.08,
+                "effort": "small",
+                "priority": "medium",
+                "source": "local",
+            }
+        )
+    if not local.get("has_dependabot", False) and local.get(
+        "dependabot_supported", False
+    ):
+        recommendations.append(
+            {
+                "key": "add-dependabot-config",
+                "title": "Add Dependabot config",
+                "why": "Automated dependency updates are missing, which weakens supply-chain hygiene.",
+                "expected_posture_lift": 0.1,
+                "effort": "small",
+                "priority": "medium",
+                "source": "local",
+            }
+        )
 
     if github.get("provider_available"):
         if github.get("code_scanning_status") == "not-configured":
-            recommendations.append({
-                "key": "enable-codeql-default-setup",
-                "title": "Enable CodeQL default setup",
-                "why": "GitHub code scanning is not configured, so code-level findings are not being surfaced.",
-                "expected_posture_lift": 0.12,
-                "effort": "medium",
-                "priority": "high",
-                "source": "github",
-            })
+            recommendations.append(
+                {
+                    "key": "enable-codeql-default-setup",
+                    "title": "Enable CodeQL default setup",
+                    "why": "GitHub code scanning is not configured, so code-level findings are not being surfaced.",
+                    "expected_posture_lift": 0.12,
+                    "effort": "medium",
+                    "priority": "high",
+                    "source": "github",
+                }
+            )
         elif github.get("code_scanning_status") == "alerts-open":
-            critical_high = (
-                (github.get("code_scanning_critical_alerts") or 0)
-                + (
-                    github.get("code_scanning_actionable_high_alerts")
-                    if github.get("code_scanning_actionable_high_alerts") is not None
-                    else (github.get("code_scanning_high_alerts") or 0)
-                )
+            critical_high = (github.get("code_scanning_critical_alerts") or 0) + (
+                github.get("code_scanning_actionable_high_alerts")
+                if github.get("code_scanning_actionable_high_alerts") is not None
+                else (github.get("code_scanning_high_alerts") or 0)
             )
-            if "code_scanning_high_alerts" not in github and "code_scanning_critical_alerts" not in github:
+            if (
+                "code_scanning_high_alerts" not in github
+                and "code_scanning_critical_alerts" not in github
+            ):
                 critical_high = github.get("code_scanning_alerts") or 0
-            warning_alerts = (
-                (github.get("code_scanning_warning_alerts") or 0)
-                + (github.get("code_scanning_contextual_high_alerts") or 0)
+            warning_alerts = (github.get("code_scanning_warning_alerts") or 0) + (
+                github.get("code_scanning_contextual_high_alerts") or 0
             )
-            priority = "high" if critical_high > 0 else ("medium" if warning_alerts > 0 else "low")
-            expected_lift = 0.14 if priority == "high" else (0.06 if priority == "medium" else 0.03)
+            priority = (
+                "high"
+                if critical_high > 0
+                else ("medium" if warning_alerts > 0 else "low")
+            )
+            expected_lift = (
+                0.14 if priority == "high" else (0.06 if priority == "medium" else 0.03)
+            )
             why = (
                 "GitHub reports critical or high code scanning alerts that should be triaged before promotion."
                 if priority == "high"
@@ -321,70 +367,89 @@ def _build_security_recommendations(local: dict, github: dict, scorecard: dict, 
                 if priority == "medium"
                 else "GitHub reports note-level code scanning alerts that can be reviewed after higher-risk security work."
             )
-            recommendations.append({
-                "key": "review-code-scanning-alerts",
-                "title": "Review open code scanning alerts",
-                "why": why,
-                "expected_posture_lift": expected_lift,
-                "effort": "medium",
-                "priority": priority,
-                "source": "github",
-            })
+            recommendations.append(
+                {
+                    "key": "review-code-scanning-alerts",
+                    "title": "Review open code scanning alerts",
+                    "why": why,
+                    "expected_posture_lift": expected_lift,
+                    "effort": "medium",
+                    "priority": priority,
+                    "source": "github",
+                }
+            )
 
-        if github.get("secret_scanning_status") not in {"enabled", "alerts-open", "unavailable"}:
-            recommendations.append({
-                "key": "enable-secret-scanning",
-                "title": "Enable secret scanning",
-                "why": "GitHub secret scanning is not enabled where it appears available.",
-                "expected_posture_lift": 0.1,
-                "effort": "small",
-                "priority": "high",
-                "source": "github",
-            })
+        if github.get("secret_scanning_status") not in {
+            "enabled",
+            "alerts-open",
+            "unavailable",
+        }:
+            recommendations.append(
+                {
+                    "key": "enable-secret-scanning",
+                    "title": "Enable secret scanning",
+                    "why": "GitHub secret scanning is not enabled where it appears available.",
+                    "expected_posture_lift": 0.1,
+                    "effort": "small",
+                    "priority": "high",
+                    "source": "github",
+                }
+            )
         elif github.get("secret_scanning_status") == "alerts-open":
-            recommendations.append({
-                "key": "review-secret-scanning-alerts",
-                "title": "Review open secret scanning alerts",
-                "why": "Open secret scanning alerts indicate credentials or tokens may need rotation and cleanup.",
-                "expected_posture_lift": 0.2,
-                "effort": "high",
-                "priority": "high",
-                "source": "github",
-            })
+            recommendations.append(
+                {
+                    "key": "review-secret-scanning-alerts",
+                    "title": "Review open secret scanning alerts",
+                    "why": "Open secret scanning alerts indicate credentials or tokens may need rotation and cleanup.",
+                    "expected_posture_lift": 0.2,
+                    "effort": "high",
+                    "priority": "high",
+                    "source": "github",
+                }
+            )
 
-        if github.get("sbom_exportable") is False or github.get("dependency_graph_enabled") is False:
-            recommendations.append({
-                "key": "export-sbom",
-                "title": "Ensure dependency graph coverage and SBOM export",
-                "why": "Dependency graph or SBOM coverage looks unavailable, which limits supply-chain visibility.",
-                "expected_posture_lift": 0.08,
-                "effort": "medium",
-                "priority": "medium",
-                "source": "github",
-            })
+        if (
+            github.get("sbom_exportable") is False
+            or github.get("dependency_graph_enabled") is False
+        ):
+            recommendations.append(
+                {
+                    "key": "export-sbom",
+                    "title": "Ensure dependency graph coverage and SBOM export",
+                    "why": "Dependency graph or SBOM coverage looks unavailable, which limits supply-chain visibility.",
+                    "expected_posture_lift": 0.08,
+                    "effort": "medium",
+                    "priority": "medium",
+                    "source": "github",
+                }
+            )
 
     if not metadata.private:
         scorecard_score = scorecard.get("score")
         if scorecard_score is None:
-            recommendations.append({
-                "key": "add-scorecard-action",
-                "title": "Add OpenSSF Scorecard action",
-                "why": "A Scorecard workflow would provide continuous external security hygiene signals for this public repo.",
-                "expected_posture_lift": 0.06,
-                "effort": "small",
-                "priority": "low",
-                "source": "scorecard",
-            })
+            recommendations.append(
+                {
+                    "key": "add-scorecard-action",
+                    "title": "Add OpenSSF Scorecard action",
+                    "why": "A Scorecard workflow would provide continuous external security hygiene signals for this public repo.",
+                    "expected_posture_lift": 0.06,
+                    "effort": "small",
+                    "priority": "low",
+                    "source": "scorecard",
+                }
+            )
         elif float(scorecard_score) < 7.5:
-            recommendations.append({
-                "key": "improve-scorecard-checks",
-                "title": "Improve low Scorecard checks",
-                "why": "External Scorecard checks indicate notable security hygiene gaps on this public repo.",
-                "expected_posture_lift": 0.08,
-                "effort": "medium",
-                "priority": "medium",
-                "source": "scorecard",
-            })
+            recommendations.append(
+                {
+                    "key": "improve-scorecard-checks",
+                    "title": "Improve low Scorecard checks",
+                    "why": "External Scorecard checks indicate notable security hygiene gaps on this public repo.",
+                    "expected_posture_lift": 0.08,
+                    "effort": "medium",
+                    "priority": "medium",
+                    "source": "scorecard",
+                }
+            )
 
     recommendations.sort(
         key=lambda item: (
@@ -411,10 +476,14 @@ def build_security_posture(
         if scorecard_enabled and not security_offline
         else {
             "available": False,
-            "enabled": bool(scorecard_enabled and not metadata.private and not security_offline),
+            "enabled": bool(
+                scorecard_enabled and not metadata.private and not security_offline
+            ),
             "score": None,
             "checks": {},
-            "reason": "disabled" if not scorecard_enabled else ("offline" if security_offline else "private-repo"),
+            "reason": "disabled"
+            if not scorecard_enabled
+            else ("offline" if security_offline else "private-repo"),
             "repo": _scorecard_repo_path(metadata),
         }
     )
@@ -432,7 +501,9 @@ def build_security_posture(
         weight_total += 0.1
     merged_score = _clamp(weighted_total / weight_total if weight_total else 0.0)
 
-    recommendations = _build_security_recommendations(local, github, scorecard, metadata)
+    recommendations = _build_security_recommendations(
+        local, github, scorecard, metadata
+    )
     evidence = list(local.get("evidence", []))
     evidence.extend(github.get("evidence", []))
     if scorecard.get("available"):
@@ -461,7 +532,9 @@ def build_security_posture(
         "has_security_md": local.get("has_security_md", False),
         "has_dependabot": local.get("has_dependabot", False),
         "dependabot_supported": local.get("dependabot_supported", False),
-        "dependabot_supported_ecosystems": local.get("dependabot_supported_ecosystems", []),
+        "dependabot_supported_ecosystems": local.get(
+            "dependabot_supported_ecosystems", []
+        ),
         "evidence": evidence[:8],
         "local": local,
         "github": github,
@@ -475,11 +548,13 @@ def build_security_governance_preview(audits: list[RepoAudit]) -> list[dict]:
     preview: list[dict] = []
     for audit in audits:
         for item in audit.security_posture.get("recommendations", []):
-            preview.append({
-                "repo": audit.metadata.name,
-                "target_repo": audit.metadata.full_name,
-                **item,
-            })
+            preview.append(
+                {
+                    "repo": audit.metadata.name,
+                    "target_repo": audit.metadata.full_name,
+                    **item,
+                }
+            )
     preview.sort(
         key=lambda item: (
             {"high": 0, "medium": 1, "low": 2}.get(item.get("priority", "low"), 3),

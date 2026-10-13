@@ -7,7 +7,9 @@ def transition_closure_confidence_for_target(
     target: dict[str, Any],
     history_meta: dict[str, Any],
     *,
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
+    target_specific_normalization_noise: Callable[
+        [dict[str, Any], dict[str, Any]], bool
+    ],
     clamp_round: Callable[[float, float, float], float],
 ) -> tuple[float, str, str, list[str]]:
     transition_status = target.get("class_reweight_transition_status", "none")
@@ -23,11 +25,18 @@ def transition_closure_confidence_for_target(
     stability_status = target.get("class_reweight_stability_status", "watch")
     reweight_score = float(target.get("class_trust_reweight_score", 0.0) or 0.0)
     transition_age_runs = int(
-        target.get("class_transition_age_runs", history_meta.get("class_transition_age_runs", 0))
+        target.get(
+            "class_transition_age_runs",
+            history_meta.get("class_transition_age_runs", 0),
+        )
         or 0
     )
-    transition_score_delta = float(history_meta.get("transition_score_delta", 0.0) or 0.0)
-    current_strengthening = bool(history_meta.get("current_transition_strengthening", False))
+    transition_score_delta = float(
+        history_meta.get("transition_score_delta", 0.0) or 0.0
+    )
+    current_strengthening = bool(
+        history_meta.get("current_transition_strengthening", False)
+    )
     active_pending = transition_status in {"pending-support", "pending-caution"}
     local_noise = target_specific_normalization_noise(target, history_meta)
     blocked = (
@@ -37,8 +46,12 @@ def transition_closure_confidence_for_target(
         or (transition_status == "pending-support" and local_noise)
     )
     matching_momentum = (
-        transition_status == "pending-support" and momentum_status == "sustained-support"
-    ) or (transition_status == "pending-caution" and momentum_status == "sustained-caution")
+        transition_status == "pending-support"
+        and momentum_status == "sustained-support"
+    ) or (
+        transition_status == "pending-caution"
+        and momentum_status == "sustained-caution"
+    )
 
     if not active_pending:
         if blocked:
@@ -112,7 +125,8 @@ def transition_closure_confidence_for_target(
     health_reason = target.get("class_transition_health_reason", "")
     if health_status == "building":
         reasons.append(
-            health_reason or "The pending class signal is still building in the same direction."
+            health_reason
+            or "The pending class signal is still building in the same direction."
         )
     elif health_status == "holding":
         reasons.append(
@@ -121,21 +135,27 @@ def transition_closure_confidence_for_target(
         )
     elif health_status == "stalled":
         reasons.append(
-            health_reason or "The pending class signal has lingered without enough strengthening."
+            health_reason
+            or "The pending class signal has lingered without enough strengthening."
         )
     elif health_status == "blocked":
         reasons.append(
-            health_reason or "Local target instability is blocking this pending class transition."
+            health_reason
+            or "Local target instability is blocking this pending class transition."
         )
 
     if matching_momentum:
-        reasons.append("Recent class momentum is still aligned with the pending direction.")
+        reasons.append(
+            "Recent class momentum is still aligned with the pending direction."
+        )
     elif stability_status == "stable":
         reasons.append(
             "Class guidance is stable even though the pending signal has not confirmed yet."
         )
     elif momentum_status == "reversing":
-        reasons.append("Recent class momentum is reversing against the pending direction.")
+        reasons.append(
+            "Recent class momentum is reversing against the pending direction."
+        )
 
     if transition_score_delta >= 0.05:
         reasons.append(
@@ -188,7 +208,9 @@ def apply_transition_closure_control(
             "unresolved pending states, so the pending state was cleared back to the weaker posture."
         )
         if transition_status == "pending-support":
-            reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+            reverted_policy = target.get(
+                "pre_class_normalization_trust_policy", trust_policy
+            )
             reverted_reason = target.get(
                 "pre_class_normalization_trust_policy_reason", trust_policy_reason
             )

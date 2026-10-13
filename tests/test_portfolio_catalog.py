@@ -93,10 +93,7 @@ def test_load_portfolio_catalog_rejects_duplicate_repo_key(tmp_path: Path) -> No
 def test_load_portfolio_catalog_rejects_invalid_group_order(tmp_path: Path) -> None:
     path = tmp_path / "portfolio-catalog.yaml"
     path.write_text(
-        "groups:\n"
-        "  active:\n"
-        "    path_prefixes: [active]\n"
-        "    order: first\n",
+        "groups:\n  active:\n    path_prefixes: [active]\n    order: first\n",
         encoding="utf-8",
     )
 

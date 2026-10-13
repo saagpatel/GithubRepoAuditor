@@ -12,7 +12,9 @@ def test_recommendation_drift_status_flags_repeated_flips() -> None:
     assert recommendation_drift_status(0, []) == "stable"
 
 
-def test_recommendation_drift_summary_prefers_primary_target_path_then_hotspot() -> None:
+def test_recommendation_drift_summary_prefers_primary_target_path_then_hotspot() -> (
+    None
+):
     primary = recommendation_drift_summary(
         "RepoA: Approval drift",
         1,
@@ -23,7 +25,13 @@ def test_recommendation_drift_summary_prefers_primary_target_path_then_hotspot()
         "RepoA: Approval drift",
         0,
         "",
-        [{"label": "RepoB", "flip_count": 3, "recent_policy_path": "monitor -> act-now"}],
+        [
+            {
+                "label": "RepoB",
+                "flip_count": 3,
+                "recent_policy_path": "monitor -> act-now",
+            }
+        ],
     )
 
     assert "RepoA: Approval drift has started to wobble" in primary

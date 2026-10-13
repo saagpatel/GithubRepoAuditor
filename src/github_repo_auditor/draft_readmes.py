@@ -138,10 +138,14 @@ def build_context(
     latest_release: str = str(repo.get("latest_release") or "")
 
     # File tree (stored in structure analyzer details or top_level_dirs field)
-    file_tree: list[str] = list(repo.get("top_level_dirs") or repo.get("file_tree") or [])
+    file_tree: list[str] = list(
+        repo.get("top_level_dirs") or repo.get("file_tree") or []
+    )
 
     # README content
-    current_readme: str = str(repo.get("readme_text") or repo.get("readme_content") or "")
+    current_readme: str = str(
+        repo.get("readme_text") or repo.get("readme_content") or ""
+    )
     current_readme_sha: str | None = repo.get("readme_sha") or None
 
     # Recent commits (list of strings or dicts with "message" key)
@@ -164,7 +168,9 @@ def build_context(
             for n in neighbors:
                 context_repos.append({"repo_name": n.repo_name, "snippet": n.snippet})
         except Exception as exc:  # noqa: BLE001
-            logger.debug("draft_readmes: find_neighbors failed for %s: %s", repo_name, exc)
+            logger.debug(
+                "draft_readmes: find_neighbors failed for %s: %s", repo_name, exc
+            )
 
     return {
         "repo_name": repo_name,
@@ -194,9 +200,13 @@ def _build_readme_prompt(context: dict) -> str:
     topics = ", ".join(context["topics"]) if context["topics"] else "none"
     stars = context["stars"]
     license_name = context["license"] or "unknown"
-    file_tree = "\n".join(f"  {f}" for f in context["file_tree"][:30]) or "  (unavailable)"
+    file_tree = (
+        "\n".join(f"  {f}" for f in context["file_tree"][:30]) or "  (unavailable)"
+    )
     current_readme = context["current_readme"]
-    recent_commits = "\n".join(f"  - {c}" for c in context["recent_commits"]) or "  (unavailable)"
+    recent_commits = (
+        "\n".join(f"  - {c}" for c in context["recent_commits"]) or "  (unavailable)"
+    )
 
     neighbors_block = ""
     for nb in context["context_repos"]:
@@ -445,14 +455,20 @@ def load_approved_drafts(
 
         try:
             packet = DraftReadmePacket(
-                repo_name=str(record.get("repo_name") or record.get("subject_key") or ""),
+                repo_name=str(
+                    record.get("repo_name") or record.get("subject_key") or ""
+                ),
                 current_readme_sha=record.get("current_readme_sha") or None,
                 proposed_readme=str(record.get("proposed_readme") or ""),
-                diff_summary=str(record.get("diff_summary") or record.get("approval_note") or ""),
+                diff_summary=str(
+                    record.get("diff_summary") or record.get("approval_note") or ""
+                ),
                 llm_provider=str(record.get("llm_provider") or ""),
                 llm_model=str(record.get("llm_model") or ""),
                 llm_cost_usd=float(record.get("llm_cost_usd") or 0.0),
-                generated_at=str(record.get("generated_at") or record.get("approved_at") or ""),
+                generated_at=str(
+                    record.get("generated_at") or record.get("approved_at") or ""
+                ),
                 context_repos=list(record.get("context_repos") or []),
             )
         except (TypeError, ValueError) as exc:
@@ -488,7 +504,10 @@ def mark_draft_applied(
     Uses INSERT OR REPLACE semantics — safe to call multiple times.
     On failure (missing warehouse), logs a warning rather than raising.
     """
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
 
@@ -690,7 +709,10 @@ def approve_section(record_id: str, output_dir: Path) -> None:
 
     Raises ``ValueError`` if the record is not found.
     """
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
     matching = [
@@ -716,7 +738,10 @@ def reject_section(record_id: str, output_dir: Path, reason: str = "") -> None:
 
     Raises ``ValueError`` if the record is not found.
     """
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
     matching = [
@@ -801,7 +826,10 @@ def assemble_readme_from_approved_sections(sections: list[dict]) -> str | None:
 
 def mark_section_packet_applied(packet_id: str, output_dir: Path) -> None:
     """Set ``status='applied'`` on every section sub-record sharing *packet_id*."""
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     records = load_approval_records(output_dir, "", limit=500)
     for record in records:

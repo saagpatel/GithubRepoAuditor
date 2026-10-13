@@ -19,7 +19,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from github_repo_auditor.analyzer_cache import _deep_equal, _diff_summary, reconcile, store
+from github_repo_auditor.analyzer_cache import (
+    _deep_equal,
+    _diff_summary,
+    reconcile,
+    store,
+)
 from github_repo_auditor.analyzers.readme import ReadmeAnalyzer
 from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 

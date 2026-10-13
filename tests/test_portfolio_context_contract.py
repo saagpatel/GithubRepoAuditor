@@ -29,7 +29,11 @@ def test_readme_fallback_marks_run_instructions_present(tmp_path):
 def test_no_fallback_when_neither_documents_it(tmp_path):
     # Neither file documents how to run it → still absent (fallback must not hallucinate).
     _write(tmp_path, "AGENTS.md", _GENERIC_AGENTS)
-    _write(tmp_path, "README.md", "# Proj\n\nA short blurb with no run guidance whatsoever.\n")
+    _write(
+        tmp_path,
+        "README.md",
+        "# Proj\n\nA short blurb with no run guidance whatsoever.\n",
+    )
     result = analyze_project_context(tmp_path, ["AGENTS.md", "README.md"])
     assert result.run_instructions_present is False
 

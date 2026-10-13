@@ -29,7 +29,10 @@ def test_current_item_resolution_evidence_reports_recent_attempt() -> None:
         attention_lanes=ATTENTION_LANES,
     )
 
-    assert "2026-04-17 — drifted for RepoA: Approval drift (open)".lower() in evidence.lower()
+    assert (
+        "2026-04-17 — drifted for RepoA: Approval drift (open)".lower()
+        in evidence.lower()
+    )
     assert evidence.endswith("but the item is still open.")
 
 

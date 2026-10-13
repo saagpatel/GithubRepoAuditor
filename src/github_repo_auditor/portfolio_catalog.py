@@ -87,7 +87,9 @@ def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
     class UniqueKeyLoader(yaml.SafeLoader):
         pass
 
-    def construct_unique_mapping(loader: Any, node: Any, deep: bool = False) -> dict[Any, Any]:
+    def construct_unique_mapping(
+        loader: Any, node: Any, deep: bool = False
+    ) -> dict[Any, Any]:
         mapping: dict[Any, Any] = {}
         for key_node, value_node in node.value:
             key = loader.construct_object(key_node, deep=deep)

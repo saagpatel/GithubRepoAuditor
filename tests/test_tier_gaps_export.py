@@ -23,7 +23,10 @@ from unittest.mock import patch
 
 import pytest
 
-from github_repo_auditor.app.portfolio_analysis import _print_tier_gaps_markdown, _run_tier_gaps_export_mode
+from github_repo_auditor.app.portfolio_analysis import (
+    _print_tier_gaps_markdown,
+    _run_tier_gaps_export_mode,
+)
 from github_repo_auditor.cli import build_subcommand_parser
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -105,15 +108,8 @@ class TestMissingPortfolioTruth:
         # No truth file written — directory is empty
         _run_tier_gaps_export_mode(args)
         captured = capsys.readouterr()
-        assert (
-            "portfolio-truth-latest.json" in captured.out
-            or "portfolio-truth-latest.json" in captured.err
-            or True
-        )
-        # Just verify it doesn't raise and doesn't produce JSON
         out = captured.out + captured.err
-        assert "portfolio-truth" in out.lower() or "not found" in out.lower() or True
-        # The key assertion: function returns without crashing
+        assert "portfolio-truth-latest.json not found" in out
 
 
 class TestMalformedPortfolioTruth:
@@ -179,16 +175,15 @@ class TestTargetOverride:
         from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("repo-a")
-        if compute_tier(bronze) in (0, 4):
-            pytest.skip("bronze fixture tier is edge value in this env")
+        assert compute_tier(bronze) == 1, "bronze fixture must remain tier 1"
 
         _write_truth(tmp_path, [bronze])
         args = _make_args(str(tmp_path), tier_gaps_target=3, fmt="json")
         _run_tier_gaps_export_mode(args)
         out = capsys.readouterr().out
         envelope = json.loads(out)
-        for gap in envelope["gaps"]:
-            assert gap["target_tier"] == 3
+        assert len(envelope["gaps"]) == 1
+        assert envelope["gaps"][0]["target_tier"] == 3
 
     def test_target_override_equal_to_current_skips_repo(self, tmp_path, capsys):
         """--tier-gaps-target equal to current tier → repo skipped (target <= current).
@@ -241,8 +236,7 @@ class TestMarkdownFormat:
         from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("md-repo")
-        if compute_tier(bronze) in (0, 4):
-            pytest.skip("bronze fixture tier is edge value")
+        assert compute_tier(bronze) == 1, "bronze fixture must remain tier 1"
 
         _write_truth(tmp_path, [bronze])
         args = _make_args(str(tmp_path), fmt="markdown")
@@ -277,23 +271,22 @@ class TestJsonFormat:
         from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("field-check")
-        if compute_tier(bronze) in (0, 4):
-            pytest.skip("bronze fixture tier is edge value")
+        assert compute_tier(bronze) == 1, "field-check fixture must remain tier 1"
 
         _write_truth(tmp_path, [bronze])
         args = _make_args(str(tmp_path), fmt="json")
         _run_tier_gaps_export_mode(args)
         out = capsys.readouterr().out
         envelope = json.loads(out)
-        if envelope["gaps"]:
-            gap = envelope["gaps"][0]
-            assert "repo_name" in gap
-            assert "current_tier" in gap
-            assert "current_tier_name" in gap
-            assert "target_tier" in gap
-            assert "target_tier_name" in gap
-            assert "missing_requirements" in gap
-            assert "requirement_sources" in gap
+        assert len(envelope["gaps"]) == 1
+        gap = envelope["gaps"][0]
+        assert "repo_name" in gap
+        assert "current_tier" in gap
+        assert "current_tier_name" in gap
+        assert "target_tier" in gap
+        assert "target_tier_name" in gap
+        assert "missing_requirements" in gap
+        assert "requirement_sources" in gap
 
 
 class TestRequirementSources:
@@ -302,16 +295,17 @@ class TestRequirementSources:
         from github_repo_auditor.maturity_tiers import compute_tier
 
         bronze = _bronze_project("src-check")
-        if compute_tier(bronze) in (0, 4):
-            pytest.skip("bronze fixture tier is edge value")
+        assert compute_tier(bronze) == 1, "source fixture must remain tier 1"
 
         _write_truth(tmp_path, [bronze])
         args = _make_args(str(tmp_path), fmt="json")
         _run_tier_gaps_export_mode(args)
         out = capsys.readouterr().out
         envelope = json.loads(out)
-        for gap in envelope["gaps"]:
-            assert len(gap["missing_requirements"]) == len(gap["requirement_sources"])
+        assert len(envelope["gaps"]) == 1
+        gap = envelope["gaps"][0]
+        assert gap["missing_requirements"]
+        assert len(gap["missing_requirements"]) == len(gap["requirement_sources"])
 
 
 class TestEmptyDisplayName:
@@ -345,16 +339,16 @@ class TestDefaultTarget:
 
         bronze = _bronze_project("default-target")
         current = compute_tier(bronze)
-        if current in (0, 4):
-            pytest.skip("bronze fixture tier is edge value")
+        assert current == 1, "default-target fixture must remain tier 1"
 
         _write_truth(tmp_path, [bronze])
         args = _make_args(str(tmp_path), tier_gaps_target=None, fmt="json")
         _run_tier_gaps_export_mode(args)
         out = capsys.readouterr().out
         envelope = json.loads(out)
-        for gap in envelope["gaps"]:
-            assert gap["target_tier"] == gap["current_tier"] + 1
+        assert len(envelope["gaps"]) == 1
+        gap = envelope["gaps"][0]
+        assert gap["target_tier"] == gap["current_tier"] + 1
 
 
 class TestPrintTierGapsMarkdown:
@@ -401,7 +395,13 @@ class TestCliParsing:
 
     def test_tier_gaps_target_parses(self):
         args = self._parse(
-            "report", "myuser", "--tier-gaps", "--tier-gaps-target", "3", "--output-dir", "output"
+            "report",
+            "myuser",
+            "--tier-gaps",
+            "--tier-gaps-target",
+            "3",
+            "--output-dir",
+            "output",
         )
         assert args.tier_gaps_target == 3
 
@@ -411,6 +411,12 @@ class TestCliParsing:
 
     def test_format_markdown_parses(self):
         args = self._parse(
-            "report", "myuser", "--tier-gaps", "--format", "markdown", "--output-dir", "output"
+            "report",
+            "myuser",
+            "--tier-gaps",
+            "--format",
+            "markdown",
+            "--output-dir",
+            "output",
         )
         assert args.format == "markdown"

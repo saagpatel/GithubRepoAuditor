@@ -44,9 +44,7 @@ def security(*, commit: str = COMMIT, valid: bool = True) -> SecurityBinding:
         content_sha256="d" * 64,
         produced_at="2026-08-25T16:30:00Z",
         evaluated_at="2026-08-25T17:00:00Z",
-        valid_until=(
-            "2026-08-25T17:30:00Z" if valid else "2026-08-25T16:45:00Z"
-        ),
+        valid_until=("2026-08-25T17:30:00Z" if valid else "2026-08-25T16:45:00Z"),
         max_age_hours=1,
         producer_repository="saagpatel/GithubRepoAuditor",
         producer_commit=commit,
@@ -560,8 +558,12 @@ class PortfolioGenerationTests(unittest.TestCase):
         rolled_forward = swap_current_previous(
             root, updated_at=CREATED + timedelta(minutes=3)
         )
-        self.assertEqual(rolled_forward["current"]["generation_id"], second.generation_id)
-        self.assertEqual(rolled_forward["previous"]["generation_id"], first.generation_id)
+        self.assertEqual(
+            rolled_forward["current"]["generation_id"], second.generation_id
+        )
+        self.assertEqual(
+            rolled_forward["previous"]["generation_id"], first.generation_id
+        )
 
 
 if __name__ == "__main__":
@@ -569,7 +571,9 @@ if __name__ == "__main__":
 
 
 class TerminalObservationOrderTests(unittest.TestCase):
-    def test_same_second_terminal_is_accepted_and_earlier_second_is_refused(self) -> None:
+    def test_same_second_terminal_is_accepted_and_earlier_second_is_refused(
+        self,
+    ) -> None:
         from datetime import UTC, datetime
 
         produced = datetime(2026, 9, 2, 12, 8, 8, 576236, tzinfo=UTC)
