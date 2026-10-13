@@ -276,9 +276,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "cross-provider-egress-guard",
         "cost-tracker",
         "portfolio-index",
-        "portfolio-health",
         "portfolio-mcp",
-        "Lazarus",
         "peer-agent-tools",
         "ApplyKit",
         "JobCommandCenter",
@@ -299,6 +297,19 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     for repo_name in manual_only:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
     assert catalog["repos"]["gpt_rag"]["lifecycle_state"] == "dormant"
+
+    # Reckoning wave 0 archived these on GitHub; each repo row now carries the
+    # archive contract, overriding its former manual-only or active state.
+    for repo_name in (
+        "portfolio-tribunal",
+        "consolidation-map",
+        "Lazarus",
+        "repository-renaissance",
+        "portfolio-health",
+    ):
+        entry = catalog["repos"][repo_name.lower()]
+        assert entry["lifecycle_state"] == "archived"
+        assert entry["operating_path"] == "archive"
 
 
 def test_live_catalog_resolves_egress_alias_to_canonical_manual_only_entry() -> None:

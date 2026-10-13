@@ -1180,9 +1180,9 @@ repos:
     tool_provenance: claude-code
   portfolio-health:
     owner: d
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: claude-code
   IncidentMgmt:
@@ -1382,10 +1382,10 @@ repos:
   Lazarus:
     owner: d
     purpose: guarded repository recovery tool that selects safe historical revisions and blocks sensitive-file restoration
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     criticality: medium
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: codex
     notes: Drill-verified (dated passing drill) at 2026-07-17 tribunal judgment; tribunal
@@ -1586,17 +1586,17 @@ repos:
     owner: d
     purpose: local-first case system for understanding and planning interventions in
       difficult Git repositories, binding observations to immutable scan epochs
-    lifecycle_state: active
+    lifecycle_state: archived
     review_cadence: weekly
-    operating_path: experiment
+    operating_path: archive
     category: infrastructure
   portfolio-tribunal:
     owner: d
     purpose: KEEP/PARK/KILL judgment layer over GithubRepoAuditor portfolio truth
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     criticality: medium
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: claude-code
     maturity_program: maintain
@@ -1632,10 +1632,10 @@ repos:
   consolidation-map:
     owner: d
     purpose: border arbitration over tribunal KEEP repos, ruling MERGE/ABSORB/SHARE_INFRA/STAND_ALONE
-    lifecycle_state: manual-only
+    lifecycle_state: archived
     criticality: medium
     review_cadence: quarterly
-    operating_path: maintain
+    operating_path: archive
     category: infrastructure
     tool_provenance: claude-code
     maturity_program: maintain
