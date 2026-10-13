@@ -2215,8 +2215,10 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
         project.identity.display_name: project for project in result.snapshot.projects
     }
 
+    # The reckoning archived both egress repos on GitHub; they stay outside
+    # the cohort as archived rather than manual-only.
     for name in excluded_egress_repositories:
-        assert by_display_name[name].derived.attention_state == "manual-only"
+        assert by_display_name[name].derived.attention_state == "archived"
     assert (
         by_display_name["egress-guard-oss"].provenance["declared.lifecycle_state"][
             "detail"

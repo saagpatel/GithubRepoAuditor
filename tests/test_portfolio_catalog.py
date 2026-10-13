@@ -196,19 +196,18 @@ def test_catalog_entry_for_repo_defaults_automation_eligible_false():
     assert entry["automation_eligible"] is False
 
 
-def test_live_catalog_reflects_tribunal_reactivation_of_recovery_exclusions() -> None:
-    # The 2026-06 recovery settlement archived these two; the operator-approved
-    # 2026-07-17 Portfolio Tribunal ledger reversed both on live evidence
-    # (engraph: in-flight perf branch + harness-registered MCP server;
-    # reliability-vault: substantive feature commits 07-09/07-10). This pin now
-    # guards the reactivated state; automation stays off pending re-review.
+def test_live_catalog_archives_tribunal_reactivated_recovery_repos() -> None:
+    # The 2026-06 recovery settlement archived these two and the 2026-07-17
+    # Portfolio Tribunal ledger reactivated them; the reckoning then archived
+    # both on GitHub, so each row carries the archive contract again.
+    # Automation stays off.
     catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
     catalog = load_portfolio_catalog(catalog_path)
 
     for repo_name in ("engraph", "reliability-vault"):
         entry = catalog["repos"][repo_name]
-        assert entry["lifecycle_state"] == "active"
-        assert entry["operating_path"] == "maintain"
+        assert entry["lifecycle_state"] == "archived"
+        assert entry["operating_path"] == "archive"
         # Migrated off the deprecated field; read-compat fallback is covered
         # separately by test_load_portfolio_catalog_warns_on_deprecated_disposition.
         assert entry["intended_disposition"] == ""
@@ -265,33 +264,17 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     # Tier 1, Tier 2, and explicitly unranked projects remain available only when
     # the operator asks for them. They do not create default portfolio attention.
     manual_only = {
-        "agent-bridge",
         "mcpforge",
         "mcpaudit-web",
         "notification-hub",
         "cross-system-smoke",
         "continuity",
-        "cross-provider-egress-guard",
-        "cost-tracker",
         "portfolio-index",
         "portfolio-mcp",
-        "peer-agent-tools",
-        "JobCommandCenter",
-        "Phantom Frequencies",
-        "SignalDecay",
-        "Afterimage",
-        "Liminal",
-        "DeepTank",
-        "BattleGrid",
-        "Temper",
-        "book-two-manuscript",
-        "ccusage",
-        "manipulable-library",
         "rag-knowledge-base",
     }
     for repo_name in manual_only:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
-    assert catalog["repos"]["gpt_rag"]["lifecycle_state"] == "dormant"
 
     # The reckoning archived these on GitHub; each repo row now carries the
     # archive contract, overriding its former manual-only or active state.
@@ -316,13 +299,33 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "Seismoscope",
         "JSMTicketAnalyticsExport",
         "operator-os-docs",
+        # waves 4-8
+        "agent-bridge",
+        "cross-provider-egress-guard",
+        "cost-tracker",
+        "peer-agent-tools",
+        "JobCommandCenter",
+        "Phantom Frequencies",
+        "SignalDecay",
+        "Afterimage",
+        "Liminal",
+        "DeepTank",
+        "BattleGrid",
+        "Temper",
+        "book-two-manuscript",
+        "ccusage",
+        "manipulable-library",
+        "gpt_rag",
+        # Both the local-path row and the canonical GitHub row must agree.
+        "OrbitMechanic",
+        "saagpatel/OrbitMechanics",
     ):
         entry = catalog["repos"][repo_name.lower()]
         assert entry["lifecycle_state"] == "archived"
         assert entry["operating_path"] == "archive"
 
 
-def test_live_catalog_resolves_egress_alias_to_canonical_manual_only_entry() -> None:
+def test_live_catalog_resolves_egress_alias_to_canonical_archived_entry() -> None:
     catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
     catalog = load_portfolio_catalog(catalog_path)
 
@@ -343,8 +346,8 @@ def test_live_catalog_resolves_egress_alias_to_canonical_manual_only_entry() -> 
 
     assert entry["catalog_key"] == "cross-provider-egress-guard"
     assert entry["matched_by"] == "path"
-    assert entry["lifecycle_state"] == "manual-only"
-    assert entry["operating_path"] == "maintain"
+    assert entry["lifecycle_state"] == "archived"
+    assert entry["operating_path"] == "archive"
     assert entry["category"] == "infrastructure"
     assert entry["maturity_program"] == "maintain"
 
