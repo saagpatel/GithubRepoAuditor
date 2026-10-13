@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   proof:
-    uses: saagpatel/proof-pr/.github/workflows/proof-pr-receipt.yml@194f0864a1f17374d27bcc11e7d26a65bba2ffb3
+    uses: saagpatel/proof-pr/.github/workflows/proof-pr-receipt.yml@194f0864a1f17374d27bcc11e7d26a65bba2ffb3 # v0.2.14
     with:
       receipt_path: proof-pr.json
       proof_pr_ref: 194f0864a1f17374d27bcc11e7d26a65bba2ffb3
