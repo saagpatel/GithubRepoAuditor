@@ -1,16 +1,44 @@
-.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release publish-pypi
+.PHONY: setup check check-python check-web require-tools install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release publish-pypi
+.DEFAULT_GOAL := install
 
-PYTHON := python3
+PYTHON := uv run --locked python
+MYPY_MODULES := src/github_repo_auditor/operator_resolution_trend.py src/github_repo_auditor/operator_trend_support.py src/github_repo_auditor/operator_trend_pending_text.py src/github_repo_auditor/operator_trend_pending_debt.py src/github_repo_auditor/operator_trend_transition_closure.py src/github_repo_auditor/operator_trend_decision_memory.py src/github_repo_auditor/operator_trend_recommendation_drift.py src/github_repo_auditor/operator_trend_confidence_calibration.py src/github_repo_auditor/operator_trend_trust_policy_history.py src/github_repo_auditor/operator_trend_exception_recovery.py src/github_repo_auditor/operator_trend_class_transitions.py src/github_repo_auditor/operator_trend_run_context.py src/github_repo_auditor/operator_trend_summary_context.py src/github_repo_auditor/operator_trend_apply_chain.py src/github_repo_auditor/operator_trend_topline_payload.py
 SOURCE_ENV := PYTHONPATH=src
 CLI := $(SOURCE_ENV) uv run python -m github_repo_auditor.cli
 USERNAME ?= saagpatel
 ARGS ?=
 
-install:
-	$(PYTHON) -m pip install -e ".[config]"
+# Setup hints are checked before any tools run. Checks do not regenerate outputs.
+require-tools:
+	@command -v uv >/dev/null 2>&1 || { echo "Missing uv. Install uv 0.13.0, then run make setup."; exit 1; }
 
-install-dev:
-	$(PYTHON) -m pip install -e ".[dev,config]"
+setup: require-tools
+	@command -v pnpm >/dev/null 2>&1 || { echo "Missing pnpm. Install the Node and pnpm pins in web/, then run make setup."; exit 1; }
+	uv sync --locked --extra dev --extra serve --extra config --extra build
+	pnpm --dir web install --frozen-lockfile
+
+check: check-python check-web
+
+check-python: require-tools
+	uv run --locked --extra dev ruff check src/ tests/
+	uv run --locked --extra dev ruff format --check src/ tests/
+	uv run --locked --extra dev mypy $(MYPY_MODULES)
+	uv run --locked python scripts/generate_portfolio_truth_contract_fixture.py --check
+	uv run --locked --extra dev --extra serve --extra config --extra build pytest -q -k 'not semantic_index'
+
+check-web:
+	@command -v pnpm >/dev/null 2>&1 || { echo "Missing pnpm. Install the Node and pnpm pins in web/, then run make setup."; exit 1; }
+	@test -d web/node_modules || { echo "Missing web dependencies. Run make setup."; exit 1; }
+	pnpm --dir web typecheck
+	pnpm --dir web lint
+	pnpm --dir web test
+	pnpm --dir web build
+
+install: require-tools
+	uv sync --locked --extra config
+
+install-dev: require-tools
+	uv sync --locked --extra dev --extra serve --extra config --extra build
 
 doctor:
 	$(CLI) $(USERNAME) --doctor $(ARGS)
@@ -37,13 +65,13 @@ test:
 	$(SOURCE_ENV) $(PYTHON) -m pytest tests/ -v
 
 lint:
-	ruff check src/ tests/
+	uv run --locked --extra dev ruff check src/ tests/
 
 format:
-	ruff format src/ tests/
+	uv run --locked --extra dev ruff format src/ tests/
 
 type-check:
-	mypy src/ --ignore-missing-imports
+	uv run --locked --extra dev mypy $(MYPY_MODULES)
 
 run:
 	$(CLI) --help
@@ -64,18 +92,18 @@ clean:
 
 build:
 	@echo "=== Building wheel + sdist ==="
-	$(PYTHON) -m build
+	uv run --locked --extra build python -m build
 	@echo "=== Build complete: dist/ ==="
 
 dist-check:
 	@echo "=== Running twine check ==="
-	$(PYTHON) -m twine check dist/*
+	uv run --locked --extra build python -m twine check dist/*.whl dist/*.tar.gz
 
-shiv:
+shiv: build
 	@echo "=== Building shiv single-file binary ==="
-	@command -v shiv >/dev/null 2>&1 || { echo "shiv not installed — run: pip install shiv"; exit 1; }
 	@mkdir -p dist
-	shiv -c audit -o dist/audit.pyz . --python "/usr/bin/env python3"
+	uv export --locked --no-dev --extra config --no-emit-project --no-hashes -o dist/shiv-requirements.txt
+	uv run --locked --extra build shiv -c audit -o dist/audit.pyz -r dist/shiv-requirements.txt --no-deps dist/*.whl --python "/usr/bin/env python3"
 	@echo "=== dist/audit.pyz ready. Test: ./dist/audit.pyz --help ==="
 
 release: build dist-check shiv
