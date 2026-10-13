@@ -16,6 +16,9 @@ output/.github-security-coverage-latest.json.lock
 output/.portfolio-truth-latest.json.lock
 # Local run output written by PortfolioCommandCenter before truth publication.
 output/pcc-auditor-run.log
+output/doc-truth-up-*
+.cache/
+/verification-tmp/
 # Staging and rollback copies of the generated artifacts above.
 output/tmp*.json.tmp
 output/tmp*.json.bak
