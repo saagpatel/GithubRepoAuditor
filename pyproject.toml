@@ -55,7 +55,7 @@ dev = [
 config = ["pyyaml>=6.0"]
 semantic = [
     "sqlite-vec>=0.1.0",
-    "sentence-transformers>=3.0",
+    "sentence-transformers>=6.1.0",
 ]
 serve = [
     "fastapi>=0.115",
