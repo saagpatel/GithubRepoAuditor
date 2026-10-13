@@ -229,13 +229,17 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "saagpatel/operant": "infrastructure",
         "AIGCCore": "infrastructure",
         "safelight": "commercial",
-        "operator-os-explainer": "commercial",
     }
     for repo_name, category in tier_zero.items():
         entry = catalog["repos"][repo_name.lower()]
         assert entry["lifecycle_state"] == "active"
         assert entry["operating_path"] == "maintain"
         assert entry["category"] == category
+
+    # operator-os-explainer left tier zero when the reckoning archived it on GitHub.
+    explainer = catalog["repos"]["operator-os-explainer"]
+    assert explainer["lifecycle_state"] == "archived"
+    assert explainer["operating_path"] == "archive"
 
     portfolio_index = catalog["repos"]["portfolio-index"]
     assert portfolio_index["lifecycle_state"] == "manual-only"

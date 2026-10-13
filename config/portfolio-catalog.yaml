@@ -1570,13 +1570,13 @@ repos:
     owner: d
     purpose: public interactive explainer of the personal multi-agent operator OS,
       deployed at operator-os-explainer.vercel.app
-    lifecycle_state: active
+    lifecycle_state: archived
     criticality: high
     review_cadence: monthly
-    operating_path: maintain
+    operating_path: archive
     category: commercial
     tool_provenance: claude-code
-    notes: Tier-0 flagship story for the Operator OS and part of the public workshop product surface.
+    notes: "Archived on GitHub 2026-10-12. The Vercel deployment stays up."
   repository-renaissance:
     owner: d
     purpose: local-first case system for understanding and planning interventions in
