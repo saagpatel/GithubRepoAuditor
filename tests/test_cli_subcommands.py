@@ -17,6 +17,8 @@ import io
 import re
 import warnings
 
+import pytest
+
 import github_repo_auditor.cli as cli_module
 
 _infer_subcommand_from_flags = cli_module._infer_subcommand_from_flags
@@ -224,7 +226,12 @@ class TestReportSubcommand:
 
     def test_report_writeback(self):
         args = _parse(
-            "report", "myuser", "--campaign", "promotion-push", "--writeback-target", "github"
+            "report",
+            "myuser",
+            "--campaign",
+            "promotion-push",
+            "--writeback-target",
+            "github",
         )
         assert args.writeback_target == "github"
 
@@ -238,7 +245,10 @@ class TestReportSubcommand:
 
     def test_report_apply_context_recovery(self):
         args = _parse(
-            "report", "myuser", "--portfolio-context-recovery", "--apply-context-recovery"
+            "report",
+            "myuser",
+            "--portfolio-context-recovery",
+            "--apply-context-recovery",
         )
         assert args.portfolio_context_recovery is True
         assert args.apply_context_recovery is True
@@ -248,6 +258,12 @@ class TestReportSubcommand:
 
 
 class TestServeSubcommand:
+    def test_serve_rejects_ineffective_token_flag(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            _parse("serve", "--token", "test-token")
+        assert exc.value.code == 2
+        assert "unrecognized arguments: --token" in capsys.readouterr().err
+
     def test_serve_subcommand_parses(self):
         args = _parse("serve")
         assert args._subcommand == "serve"
@@ -277,7 +293,9 @@ class TestServeSubcommand:
 
     def test_legacy_parser_accepts_arc_h_report_flags(self):
         parser = build_parser()
-        args = parser.parse_args(["saagpatel", "--context-triage", "--tier-recalibration-report"])
+        args = parser.parse_args(
+            ["saagpatel", "--context-triage", "--tier-recalibration-report"]
+        )
         assert args.context_triage is True
         assert args.tier_recalibration_report is True
 
@@ -360,13 +378,22 @@ class TestInferSubcommand:
         assert _infer_subcommand_from_flags(self._ns(approval_center=True)) == "triage"
 
     def test_infer_triage_acknowledge(self):
-        assert _infer_subcommand_from_flags(self._ns(acknowledge_target="myrepo")) == "triage"
+        assert (
+            _infer_subcommand_from_flags(self._ns(acknowledge_target="myrepo"))
+            == "triage"
+        )
 
     def test_infer_report_portfolio_truth(self):
         assert _infer_subcommand_from_flags(self._ns(portfolio_truth=True)) == "report"
 
     def test_infer_report_campaign(self):
-        assert _infer_subcommand_from_flags(self._ns(campaign="security-review")) == "report"
+        assert (
+            _infer_subcommand_from_flags(self._ns(campaign="security-review"))
+            == "report"
+        )
 
     def test_infer_report_writeback(self):
-        assert _infer_subcommand_from_flags(self._ns(writeback_target="github")) == "report"
+        assert (
+            _infer_subcommand_from_flags(self._ns(writeback_target="github"))
+            == "report"
+        )

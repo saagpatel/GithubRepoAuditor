@@ -70,7 +70,9 @@ from github_repo_auditor.reckoning_overlay import (
 _LEGACY_WARNING_EVENTS: set[str] = set()
 
 
-def _prepare_reckoning_export(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+def _prepare_reckoning_export(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> None:
     """Load requested private workbook inputs before any audit or shared refresh."""
     overlay_path = getattr(args, "reckoning_overlay", None)
     if overlay_path is None:
@@ -85,7 +87,9 @@ def _prepare_reckoning_export(args: argparse.Namespace, parser: argparse.Argumen
 
         # A dry run never exports a workbook, so only the overlay itself is checked.
         if not getattr(args, "dry_run", False):
-            from github_repo_auditor.excel_export_truth_helpers import load_reckoning_truth
+            from github_repo_auditor.excel_export_truth_helpers import (
+                load_reckoning_truth,
+            )
 
             load_reckoning_truth(Path(args.output_dir))
     except (ReckoningOverlayError, OSError, ValueError) as exc:
@@ -202,7 +206,9 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
     )
     _add_global_flags(p)
     p.add_argument(
-        "--reckoning-overlay", type=Path, metavar="PATH",
+        "--reckoning-overlay",
+        type=Path,
+        metavar="PATH",
         help=argparse.SUPPRESS,  # Advanced option; keep primary subcommand help bounded.
     )
     p.add_argument(
@@ -797,11 +803,6 @@ def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # t
     )
     p.add_argument(
         "--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)"
-    )
-    p.add_argument(
-        "--token",
-        default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
-        help="GitHub personal access token",
     )
     p.add_argument(
         "--output-dir",
@@ -1911,7 +1912,9 @@ def _run_portfolio_truth_mode(args) -> None:
 
 
 def _run_portfolio_context_recovery_mode(args) -> None:
-    from github_repo_auditor.app.portfolio_truth import run_portfolio_context_recovery_mode
+    from github_repo_auditor.app.portfolio_truth import (
+        run_portfolio_context_recovery_mode,
+    )
 
     run_portfolio_context_recovery_mode(args)
 

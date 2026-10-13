@@ -7,8 +7,8 @@ export default function Home() {
 				<p className="eyebrow">Portfolio health · clone-free</p>
 				<h1>See what your GitHub portfolio is missing.</h1>
 				<p className="lede">
-					Paste a username. We read the GitHub API — no cloning — score every
-					public repo, and surface the highest-leverage fixes for each one.
+					Paste a username. We read the GitHub API — no cloning — score up to 20
+					public repos, and surface the highest-leverage fixes for each one.
 					Free, no signup.
 				</p>
 				<UsernameForm />
