@@ -45,8 +45,6 @@ LIVE: dict[str, Any] = _enum.build_contract()
 
 # The persistence builders whose only logic delta is the per-event magnitude floor:
 # rebuild clamps (``max(0.0, magnitude - X)``); rererestore does not (``magnitude -= X``).
-_REBUILD_PERSISTENCE = "closure_forecast_reset_reentry_rebuild_persistence_for_target"
-_RERERESTORE_PERSISTENCE = "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target"
 _REBUILD_SCORE_KEY = "closure_forecast_reset_reentry_rebuild_persistence_score"
 _RERERESTORE_SCORE_KEY = "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score"
 # The rerererestore tier wraps + delegates to rererestore (so it also does not floor).

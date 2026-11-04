@@ -266,6 +266,7 @@ def load_source_paths(config_path: Path | None) -> dict[str, object]:
             configured = json.loads(config_path.read_text()).get("sources", {})
             sources.update({k: v for k, v in configured.items() if v})
         except (json.JSONDecodeError, OSError):
+            # Optional source overrides are best-effort; keep built-in defaults.
             pass
     return {
         "bridge_db": Path(sources["bridge_db"]).expanduser(),

@@ -6,10 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from github_repo_auditor.badges import compute_badges, suggest_next_badges
 from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
-from github_repo_auditor.scoring_dimensions import (
-    UNSCORED_DIMENSIONS as UNSCORED_DIMENSIONS,
-    display_dimension as display_dimension,
-)
 
 if TYPE_CHECKING:
     from github_repo_auditor.github_client import GitHubClient

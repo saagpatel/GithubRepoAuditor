@@ -129,6 +129,7 @@ def _canonical_project_view(project: dict[str, Any]) -> dict[str, Any]:
         maturity_tier = compute_tier(project)
         maturity_label = tier_name(maturity_tier)
     except (KeyError, TypeError, ValueError):
+        # Optional display enrichment keeps the available maturity defaults.
         pass
     readiness_rank = float(maturity_tier) if maturity_tier is not None else None
     return {

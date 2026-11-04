@@ -1673,9 +1673,11 @@ def test_writer_intent_interruption_does_not_leave_stale_lock(
         now=NOW,
     ).binding()
 
-    with pytest.raises(RuntimeError, match="collector interrupted"):
+    def interrupt_writer() -> None:
         with security_coverage_receipt_writer(canonical):
             raise RuntimeError("collector interrupted")
+
+    assert pytest.raises(RuntimeError, interrupt_writer).match("collector interrupted")
 
     assert canonical.with_name(f".{canonical.name}.lock").is_file()
     with verified_security_coverage_receipt_binding(binding) as loaded:
