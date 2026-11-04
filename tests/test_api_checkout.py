@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from github_repo_auditor.api_checkout import materialize_api_checkout, materialize_api_workspace
+from github_repo_auditor.api_checkout import (
+    materialize_api_checkout,
+    materialize_api_workspace,
+)
 from github_repo_auditor.models import RepoMetadata
 
 

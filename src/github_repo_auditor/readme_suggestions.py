@@ -1,4 +1,5 @@
 """README improvement suggestions — generates specific actionable fixes per repo."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -21,26 +22,45 @@ def _check_readme(repo_path: Path) -> tuple[str, list[str]]:
             break
 
     if not content:
-        return "", ["Create a README.md with project description, installation, and usage"]
+        return "", [
+            "Create a README.md with project description, installation, and usage"
+        ]
 
     # Check for images/screenshots
     if "![" not in content or "](" not in content:
-        suggestions.append("Add a screenshot or demo GIF to make the project visually appealing")
+        suggestions.append(
+            "Add a screenshot or demo GIF to make the project visually appealing"
+        )
 
     # Check for installation instructions
-    install_markers = ["## install", "## getting started", "## setup", "## quick start", "```bash", "pip install", "npm install", "cargo install"]
+    install_markers = [
+        "## install",
+        "## getting started",
+        "## setup",
+        "## quick start",
+        "```bash",
+        "pip install",
+        "npm install",
+        "cargo install",
+    ]
     has_install = any(m in content.lower() for m in install_markers)
     if not has_install:
-        suggestions.append("Add installation instructions (## Installation section with commands)")
+        suggestions.append(
+            "Add installation instructions (## Installation section with commands)"
+        )
 
     # Check for usage examples
     code_block_count = content.count("```")
     if code_block_count < 2:
-        suggestions.append("Add usage examples with code blocks showing how to use the project")
+        suggestions.append(
+            "Add usage examples with code blocks showing how to use the project"
+        )
 
     # Check for badges
     if "img.shields.io" not in content and "badge" not in content.lower()[:500]:
-        suggestions.append("Add status badges (build, test, coverage) to the top of the README")
+        suggestions.append(
+            "Add status badges (build, test, coverage) to the top of the README"
+        )
 
     # Check description placement
     lines = content.strip().splitlines()
@@ -57,7 +77,9 @@ def _check_readme(repo_path: Path) -> tuple[str, list[str]]:
 
     # Check length
     if len(content) < 500:
-        suggestions.append("Expand the README — aim for at least 500 characters with clear sections")
+        suggestions.append(
+            "Expand the README — aim for at least 500 characters with clear sections"
+        )
 
     return content, suggestions
 
@@ -108,9 +130,14 @@ def generate_readme_suggestions(
         suggestions: list[str] = []
 
         if readme_score == 0.0:
-            suggestions.append("Create a README.md with project description, installation, and usage")
+            suggestions.append(
+                "Create a README.md with project description, installation, and usage"
+            )
         elif readme_score < 0.5:
-            if not any("image" in f.lower() or "screenshot" in f.lower() for f in readme_findings):
+            if not any(
+                "image" in f.lower() or "screenshot" in f.lower()
+                for f in readme_findings
+            ):
                 suggestions.append("Add a screenshot or demo GIF")
             if not any("badge" in f.lower() for f in readme_findings):
                 suggestions.append("Add status badges to the top")
@@ -119,7 +146,9 @@ def generate_readme_suggestions(
         elif readme_score < 0.8:
             suggestions.append("Add usage examples with code blocks")
             if not any("image" in f.lower() for f in readme_findings):
-                suggestions.append("Add visual content (screenshots, diagrams, or GIFs)")
+                suggestions.append(
+                    "Add visual content (screenshots, diagrams, or GIFs)"
+                )
 
         if suggestions:
             repos_with_suggestions += 1

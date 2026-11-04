@@ -13,6 +13,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Stop retrying ambiguous Notion writes, verify weekly-review replacements before
+  archival, distinguish async GitHub rate limits, and validate web report payloads.
+- Replace vacuous tier/initiative tests with deterministic checks; pin the
+  Python/uv/Node/pnpm toolchains and run locked Python and web gates via `make check`.
+
+- Reject reckoning path collisions under the saved truth workspace root and
+  validate canonical truth before exporting private overlay workbooks.
+
+- Prefer live checkouts over archive copies, validate private overlay inputs in
+  CLI preflight, preserve overlays on shared workbook refresh, and isolate
+  synthetic gates and exports from private runtime settings.
+
+- Show every reckoning family once, aggregate matched truth activity and attention,
+  and expose unmatched members and unreckoned truth projects in the workbook.
+
+- Read private runtime reckoning verdicts into an optional visible workbook sheet
+  without changing canonical truth; discover `_archive` children with archived defaults.
+
+- Refuse new portfolio generation publication when staged truth lacks valid
+  GitHub security receipt and content identities or disagrees with the admitted
+  manifest; preserve historical generation readback compatibility.
+
+- Evaluate security-cohort R3 staleness at the receipt observation time; report clock-only arrivals as pending security coverage and covered clock departures explicitly. Preserve metadata-only R3 failure diagnostics beside publication outputs.
+
 - Clarify locked contributor setup, optional test dependencies, and credential-free fixture verification without workstation discovery.
 
 ### Added

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from github_repo_auditor.scoring_dimensions import UNSCORED_DIMENSIONS, display_dimension
+from github_repo_auditor.scoring_dimensions import (
+    UNSCORED_DIMENSIONS,
+    display_dimension,
+)
 
 SCORE_EXPLAINER_HEADERS = ["Dimension", "Weight", "What It Measures", "How to Improve"]
 
@@ -29,7 +32,10 @@ DIMENSION_INFO = {
         ".gitignore, source dirs, config files, LICENSE",
         "Add .gitignore + LICENSE + package manifest",
     ),
-    "cicd": ("GitHub Actions, CI configs, build scripts", "Add .github/workflows/ci.yml"),
+    "cicd": (
+        "GitHub Actions, CI configs, build scripts",
+        "Add .github/workflows/ci.yml",
+    ),
     "dependencies": (
         "Manifest + lockfile, dep count, libyears",
         "Add lockfile alongside manifest",
@@ -38,7 +44,10 @@ DIMENSION_INFO = {
         "Docker, Makefile, .env.example, deploy configs",
         "Add Dockerfile or Makefile",
     ),
-    "community_profile": ("LICENSE, CONTRIBUTING, CODE_OF_CONDUCT", "Add CONTRIBUTING.md"),
+    "community_profile": (
+        "LICENSE, CONTRIBUTING, CODE_OF_CONDUCT",
+        "Add CONTRIBUTING.md",
+    ),
     "documentation": (
         "docs/ dir, CHANGELOG, comment density",
         "Add docs/ folder or CHANGELOG.md",
@@ -64,8 +73,11 @@ def build_score_explainer_content(
                 DIMENSION_INFO.get(dimension, ("", ""))[0],
                 DIMENSION_INFO.get(dimension, ("", ""))[1],
             ]
-            for dimension, weight in sorted(weights.items(), key=lambda item: item[1], reverse=True)
-        ] + [
+            for dimension, weight in sorted(
+                weights.items(), key=lambda item: item[1], reverse=True
+            )
+        ]
+        + [
             [
                 display_dimension(dimension),
                 "Unscored",
@@ -75,7 +87,9 @@ def build_score_explainer_content(
             for dimension in sorted(UNSCORED_DIMENSIONS)
             if dimension not in weights
         ],
-        "grade_rows": [[grade, f">= {threshold:.0%}"] for threshold, grade in grade_thresholds],
+        "grade_rows": [
+            [grade, f">= {threshold:.0%}"] for threshold, grade in grade_thresholds
+        ],
         "tier_rows": [
             [tier_name.capitalize(), f">= {threshold:.0%}"]
             for tier_name, threshold in completeness_tiers

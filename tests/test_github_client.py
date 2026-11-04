@@ -61,9 +61,10 @@ class TestGitHubClientHardening:
 
         monkeypatch.setattr(client, "_request", _request)
 
-        assert client._paginate(
-            "https://api.github.test/items", {"per_page": 100}
-        ) == [{"page": 1}, {"page": 2}]
+        assert client._paginate("https://api.github.test/items", {"per_page": 100}) == [
+            {"page": 1},
+            {"page": 2},
+        ]
         assert requested == [
             ("https://api.github.test/items", {"per_page": 100}),
             ("https://api.github.test/items?page=2", {}),
@@ -483,7 +484,9 @@ class TestGitHubClientTreeAndContents:
             },
         )
 
-        assert client.get_file_content("o", "r", "huge.bin", max_bytes=1_000_000) is None
+        assert (
+            client.get_file_content("o", "r", "huge.bin", max_bytes=1_000_000) is None
+        )
 
     def test_get_repo_tree_propagates_unexpected_status(self, monkeypatch):
         client = GitHubClient()

@@ -8,19 +8,33 @@ from github_repo_auditor.models import AnalyzerResult, RepoAudit, RepoMetadata
 
 def _meta(**overrides) -> RepoMetadata:
     defaults = dict(
-        name="test", full_name="user/test", description=None,
-        language="Python", languages={"Python": 5000}, private=False, fork=False,
-        archived=False, created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        name="test",
+        full_name="user/test",
+        description=None,
+        language="Python",
+        languages={"Python": 5000},
+        private=False,
+        fork=False,
+        archived=False,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=0, forks=0, open_issues=0,
-        size_kb=100, html_url="", clone_url="", topics=[],
+        default_branch="main",
+        stars=0,
+        forks=0,
+        open_issues=0,
+        size_kb=100,
+        html_url="",
+        clone_url="",
+        topics=[],
     )
     defaults.update(overrides)
     return RepoMetadata(**defaults)
 
 
-def _audit(scores: dict[str, float], details: dict[str, dict] | None = None, **meta_kw) -> RepoAudit:
+def _audit(
+    scores: dict[str, float], details: dict[str, dict] | None = None, **meta_kw
+) -> RepoAudit:
     results = []
     for dim, score in scores.items():
         d = (details or {}).get(dim, {})
@@ -65,10 +79,20 @@ class TestComputeBadges:
         assert "has-fans" in compute_badges(audit)
 
     def test_complete_package(self):
-        scores = {d: 0.6 for d in [
-            "readme", "structure", "code_quality", "testing", "cicd",
-            "dependencies", "activity", "documentation", "build_readiness",
-        ]}
+        scores = {
+            d: 0.6
+            for d in [
+                "readme",
+                "structure",
+                "code_quality",
+                "testing",
+                "cicd",
+                "dependencies",
+                "activity",
+                "documentation",
+                "build_readiness",
+            ]
+        }
         audit = _audit(scores)
         assert "complete-package" in compute_badges(audit)
 
@@ -90,11 +114,22 @@ class TestSuggestNextBadges:
         assert suggestions[0]["gap"] <= 0.2
 
     def test_no_suggestions_when_all_earned(self):
-        scores = {d: 1.0 for d in [
-            "readme", "structure", "code_quality", "testing", "cicd",
-            "dependencies", "activity", "documentation", "build_readiness",
-            "community_profile", "interest",
-        ]}
+        scores = {
+            d: 1.0
+            for d in [
+                "readme",
+                "structure",
+                "code_quality",
+                "testing",
+                "cicd",
+                "dependencies",
+                "activity",
+                "documentation",
+                "build_readiness",
+                "community_profile",
+                "interest",
+            ]
+        }
         audit = _audit(
             scores,
             details={
@@ -103,7 +138,8 @@ class TestSuggestNextBadges:
                 "code_quality": {"todo_density_per_1k": 0.0},
                 "interest": {"tech_novelty": 0.2, "readme_storytelling": 0.1},
             },
-            stars=1, languages={"Python": 1, "Rust": 1, "Go": 1},
+            stars=1,
+            languages={"Python": 1, "Rust": 1, "Go": 1},
         )
         audit.badges = compute_badges(audit)
         suggest_next_badges(audit)

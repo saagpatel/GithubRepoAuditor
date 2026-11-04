@@ -207,7 +207,9 @@ def apply_zebra_stripes(
                     ws.cell(row=row, column=col).fill = ZEBRA_FILL
 
 
-def auto_width(ws, max_col: int, max_row: int, min_width: int = 8, max_width: int = 55) -> None:
+def auto_width(
+    ws, max_col: int, max_row: int, min_width: int = 8, max_width: int = 55
+) -> None:
     """Auto-size columns based on content.
 
     No-ops on hidden sheets: column sizing is cosmetically irrelevant when the
@@ -265,7 +267,9 @@ def write_kpi_card(
 
     # Merge 2 cols wide for each card
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1)
-    ws.merge_cells(start_row=row + 1, start_column=col, end_row=row + 1, end_column=col + 1)
+    ws.merge_cells(
+        start_row=row + 1, start_column=col, end_row=row + 1, end_column=col + 1
+    )
 
 
 def color_grade_cell(cell, grade: str) -> None:

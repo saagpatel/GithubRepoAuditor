@@ -19,13 +19,17 @@ def _history_row(
         "pressure_effect": pressure_effect,
         "drift_state": "returned" if monitoring_state == "drift-returned" else "clear",
         "reopen_state": "reopened" if monitoring_state == "reopened" else "none",
-        "rollback_state": "partial" if monitoring_state == "rollback-watch" else "ready",
+        "rollback_state": "partial"
+        if monitoring_state == "rollback-watch"
+        else "ready",
         "latest_target": "all",
         "details": {},
     }
 
 
-def _readiness_record(campaign_type: str, readiness_stage: str, *, action_count: int = 2) -> dict:
+def _readiness_record(
+    campaign_type: str, readiness_stage: str, *, action_count: int = 2
+) -> dict:
     return {
         "campaign_type": campaign_type,
         "label": campaign_type.replace("-", " ").title(),
@@ -39,7 +43,9 @@ def _readiness_record(campaign_type: str, readiness_stage: str, *, action_count:
     }
 
 
-def _packet_record(campaign_type: str, execution_state: str, *, action_count: int = 2) -> dict:
+def _packet_record(
+    campaign_type: str, execution_state: str, *, action_count: int = 2
+) -> dict:
     return {
         "campaign_type": campaign_type,
         "label": campaign_type.replace("-", " ").title(),
@@ -93,7 +99,11 @@ def _bundle(
 
 
 def _tuning(bundle: dict, campaign_type: str) -> dict:
-    return next(item for item in bundle["action_sync_tuning"] if item["campaign_type"] == campaign_type)
+    return next(
+        item
+        for item in bundle["action_sync_tuning"]
+        if item["campaign_type"] == campaign_type
+    )
 
 
 def test_tuning_classifies_proven_mixed_caution_and_insufficient_evidence() -> None:
@@ -111,18 +121,84 @@ def test_tuning_classifies_proven_mixed_caution_and_insufficient_evidence() -> N
             _packet_record("archive-sweep", "preview-next"),
         ],
         outcome_history=[
-            _history_row("security-review", "run-1", "2026-04-13T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-2", "2026-04-12T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-3", "2026-04-11T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("promotion-push", "run-4", "2026-04-13T08:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("promotion-push", "run-5", "2026-04-12T08:00:00+00:00", monitoring_state="holding-clean", pressure_effect="flat"),
-            _history_row("promotion-push", "run-6", "2026-04-11T08:00:00+00:00", monitoring_state="rollback-watch", pressure_effect="flat"),
-            _history_row("promotion-push", "run-12", "2026-04-10T08:00:00+00:00", monitoring_state="drift-returned", pressure_effect="flat"),
-            _history_row("maintenance-cleanup", "run-7", "2026-04-13T07:00:00+00:00", monitoring_state="drift-returned", pressure_effect="worse"),
-            _history_row("maintenance-cleanup", "run-8", "2026-04-12T07:00:00+00:00", monitoring_state="reopened", pressure_effect="flat"),
-            _history_row("maintenance-cleanup", "run-9", "2026-04-11T07:00:00+00:00", monitoring_state="rollback-watch", pressure_effect="flat"),
-            _history_row("archive-sweep", "run-10", "2026-04-13T06:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("archive-sweep", "run-11", "2026-04-12T06:00:00+00:00", monitoring_state="monitor-now"),
+            _history_row(
+                "security-review",
+                "run-1",
+                "2026-04-13T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-2",
+                "2026-04-12T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-3",
+                "2026-04-11T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-4",
+                "2026-04-13T08:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-5",
+                "2026-04-12T08:00:00+00:00",
+                monitoring_state="holding-clean",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-6",
+                "2026-04-11T08:00:00+00:00",
+                monitoring_state="rollback-watch",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-12",
+                "2026-04-10T08:00:00+00:00",
+                monitoring_state="drift-returned",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "maintenance-cleanup",
+                "run-7",
+                "2026-04-13T07:00:00+00:00",
+                monitoring_state="drift-returned",
+                pressure_effect="worse",
+            ),
+            _history_row(
+                "maintenance-cleanup",
+                "run-8",
+                "2026-04-12T07:00:00+00:00",
+                monitoring_state="reopened",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "maintenance-cleanup",
+                "run-9",
+                "2026-04-11T07:00:00+00:00",
+                monitoring_state="rollback-watch",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "archive-sweep",
+                "run-10",
+                "2026-04-13T06:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "archive-sweep",
+                "run-11",
+                "2026-04-12T06:00:00+00:00",
+                monitoring_state="monitor-now",
+            ),
         ],
     )
 
@@ -150,18 +226,58 @@ def test_tuning_breaks_ties_within_same_readiness_stage_but_not_across_stages() 
             _packet_record("promotion-push", "preview-next"),
         ],
         outcome_history=[
-            _history_row("security-review", "run-1", "2026-04-13T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-2", "2026-04-12T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-3", "2026-04-11T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("promotion-push", "run-4", "2026-04-13T08:00:00+00:00", monitoring_state="drift-returned", pressure_effect="flat"),
-            _history_row("promotion-push", "run-5", "2026-04-12T08:00:00+00:00", monitoring_state="reopened", pressure_effect="worse"),
-            _history_row("promotion-push", "run-6", "2026-04-11T08:00:00+00:00", monitoring_state="rollback-watch", pressure_effect="flat"),
+            _history_row(
+                "security-review",
+                "run-1",
+                "2026-04-13T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-2",
+                "2026-04-12T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-3",
+                "2026-04-11T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-4",
+                "2026-04-13T08:00:00+00:00",
+                monitoring_state="drift-returned",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-5",
+                "2026-04-12T08:00:00+00:00",
+                monitoring_state="reopened",
+                pressure_effect="worse",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-6",
+                "2026-04-11T08:00:00+00:00",
+                monitoring_state="rollback-watch",
+                pressure_effect="flat",
+            ),
         ],
     )
 
-    assert same_stage_bundle["next_tuned_campaign"]["campaign_type"] == "security-review"
-    assert same_stage_bundle["top_preview_ready_campaigns"][0]["campaign_type"] == "security-review"
-    assert same_stage_bundle["next_action_sync_step"].startswith("Preview Security Review")
+    assert (
+        same_stage_bundle["next_tuned_campaign"]["campaign_type"] == "security-review"
+    )
+    assert (
+        same_stage_bundle["top_preview_ready_campaigns"][0]["campaign_type"]
+        == "security-review"
+    )
+    assert same_stage_bundle["next_action_sync_step"].startswith(
+        "Preview Security Review"
+    )
 
     stronger_stage_bundle = _bundle(
         readiness_records=[
@@ -173,21 +289,64 @@ def test_tuning_breaks_ties_within_same_readiness_stage_but_not_across_stages() 
             _packet_record("promotion-push", "ready-to-apply"),
         ],
         outcome_history=[
-            _history_row("security-review", "run-1", "2026-04-13T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-2", "2026-04-12T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-3", "2026-04-11T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("promotion-push", "run-4", "2026-04-13T08:00:00+00:00", monitoring_state="drift-returned", pressure_effect="flat"),
-            _history_row("promotion-push", "run-5", "2026-04-12T08:00:00+00:00", monitoring_state="reopened", pressure_effect="worse"),
-            _history_row("promotion-push", "run-6", "2026-04-11T08:00:00+00:00", monitoring_state="rollback-watch", pressure_effect="flat"),
+            _history_row(
+                "security-review",
+                "run-1",
+                "2026-04-13T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-2",
+                "2026-04-12T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-3",
+                "2026-04-11T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-4",
+                "2026-04-13T08:00:00+00:00",
+                monitoring_state="drift-returned",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-5",
+                "2026-04-12T08:00:00+00:00",
+                monitoring_state="reopened",
+                pressure_effect="worse",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-6",
+                "2026-04-11T08:00:00+00:00",
+                monitoring_state="rollback-watch",
+                pressure_effect="flat",
+            ),
         ],
     )
 
-    assert stronger_stage_bundle["next_tuned_campaign"]["campaign_type"] == "promotion-push"
-    assert stronger_stage_bundle["top_apply_ready_campaigns"][0]["campaign_type"] == "promotion-push"
-    assert stronger_stage_bundle["next_action_sync_step"].startswith("Promotion Push is ready to apply")
+    assert (
+        stronger_stage_bundle["next_tuned_campaign"]["campaign_type"]
+        == "promotion-push"
+    )
+    assert (
+        stronger_stage_bundle["top_apply_ready_campaigns"][0]["campaign_type"]
+        == "promotion-push"
+    )
+    assert stronger_stage_bundle["next_action_sync_step"].startswith(
+        "Promotion Push is ready to apply"
+    )
 
 
-def test_tuning_breaks_ties_within_same_execution_state_but_not_across_execution_states() -> None:
+def test_tuning_breaks_ties_within_same_execution_state_but_not_across_execution_states() -> (
+    None
+):
     same_state_bundle = _bundle(
         readiness_records=[
             _readiness_record("security-review", "preview-ready"),
@@ -198,18 +357,55 @@ def test_tuning_breaks_ties_within_same_execution_state_but_not_across_execution
             _packet_record("promotion-push", "preview-next"),
         ],
         outcome_history=[
-            _history_row("security-review", "run-1", "2026-04-13T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-2", "2026-04-12T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-3", "2026-04-11T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("promotion-push", "run-4", "2026-04-13T08:00:00+00:00", monitoring_state="drift-returned", pressure_effect="flat"),
-            _history_row("promotion-push", "run-5", "2026-04-12T08:00:00+00:00", monitoring_state="reopened", pressure_effect="worse"),
-            _history_row("promotion-push", "run-6", "2026-04-11T08:00:00+00:00", monitoring_state="rollback-watch", pressure_effect="flat"),
+            _history_row(
+                "security-review",
+                "run-1",
+                "2026-04-13T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-2",
+                "2026-04-12T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-3",
+                "2026-04-11T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-4",
+                "2026-04-13T08:00:00+00:00",
+                monitoring_state="drift-returned",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-5",
+                "2026-04-12T08:00:00+00:00",
+                monitoring_state="reopened",
+                pressure_effect="worse",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-6",
+                "2026-04-11T08:00:00+00:00",
+                monitoring_state="rollback-watch",
+                pressure_effect="flat",
+            ),
         ],
     )
 
-    assert same_state_bundle["next_apply_candidate"]["campaign_type"] == "security-review"
+    assert (
+        same_state_bundle["next_apply_candidate"]["campaign_type"] == "security-review"
+    )
     assert same_state_bundle["top_ready_to_apply_packets"] == []
-    assert same_state_bundle["next_apply_candidate"]["execution_state"] == "preview-next"
+    assert (
+        same_state_bundle["next_apply_candidate"]["execution_state"] == "preview-next"
+    )
 
     stronger_state_bundle = _bundle(
         readiness_records=[
@@ -221,20 +417,66 @@ def test_tuning_breaks_ties_within_same_execution_state_but_not_across_execution
             _packet_record("promotion-push", "ready-to-apply"),
         ],
         outcome_history=[
-            _history_row("security-review", "run-1", "2026-04-13T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-2", "2026-04-12T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("security-review", "run-3", "2026-04-11T09:00:00+00:00", monitoring_state="holding-clean"),
-            _history_row("promotion-push", "run-4", "2026-04-13T08:00:00+00:00", monitoring_state="drift-returned", pressure_effect="flat"),
-            _history_row("promotion-push", "run-5", "2026-04-12T08:00:00+00:00", monitoring_state="reopened", pressure_effect="worse"),
-            _history_row("promotion-push", "run-6", "2026-04-11T08:00:00+00:00", monitoring_state="rollback-watch", pressure_effect="flat"),
+            _history_row(
+                "security-review",
+                "run-1",
+                "2026-04-13T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-2",
+                "2026-04-12T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "security-review",
+                "run-3",
+                "2026-04-11T09:00:00+00:00",
+                monitoring_state="holding-clean",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-4",
+                "2026-04-13T08:00:00+00:00",
+                monitoring_state="drift-returned",
+                pressure_effect="flat",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-5",
+                "2026-04-12T08:00:00+00:00",
+                monitoring_state="reopened",
+                pressure_effect="worse",
+            ),
+            _history_row(
+                "promotion-push",
+                "run-6",
+                "2026-04-11T08:00:00+00:00",
+                monitoring_state="rollback-watch",
+                pressure_effect="flat",
+            ),
         ],
     )
 
-    assert stronger_state_bundle["next_apply_candidate"]["campaign_type"] == "promotion-push"
-    assert stronger_state_bundle["top_ready_to_apply_packets"][0]["campaign_type"] == "promotion-push"
-    assert stronger_state_bundle["next_apply_candidate"]["execution_state"] == "ready-to-apply"
-    assert stronger_state_bundle["operator_queue"][0]["campaign_tuning_status"] == "proven"
-    assert stronger_state_bundle["operator_queue"][0]["campaign_tuning_line"].startswith("Campaign Tuning:")
+    assert (
+        stronger_state_bundle["next_apply_candidate"]["campaign_type"]
+        == "promotion-push"
+    )
+    assert (
+        stronger_state_bundle["top_ready_to_apply_packets"][0]["campaign_type"]
+        == "promotion-push"
+    )
+    assert (
+        stronger_state_bundle["next_apply_candidate"]["execution_state"]
+        == "ready-to-apply"
+    )
+    assert (
+        stronger_state_bundle["operator_queue"][0]["campaign_tuning_status"] == "proven"
+    )
+    assert stronger_state_bundle["operator_queue"][0][
+        "campaign_tuning_line"
+    ].startswith("Campaign Tuning:")
 
 
 def test_tuning_next_action_sync_step_honors_packet_execution_blockers() -> None:

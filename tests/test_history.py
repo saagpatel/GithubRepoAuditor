@@ -3,19 +3,28 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from github_repo_auditor.history import archive_report, find_previous, load_complexity_trends, load_history_index
+from github_repo_auditor.history import (
+    archive_report,
+    find_previous,
+    load_complexity_trends,
+    load_history_index,
+)
 
 
 class TestArchive:
     def test_archives_report(self, tmp_path):
         history_dir = tmp_path / "history"
         report = tmp_path / "audit-report-user-2026-03-25.json"
-        report.write_text(json.dumps({
-            "generated_at": "2026-03-25T00:00:00+00:00",
-            "repos_audited": 10,
-            "average_score": 0.5,
-            "tier_distribution": {"shipped": 5, "wip": 5},
-        }))
+        report.write_text(
+            json.dumps(
+                {
+                    "generated_at": "2026-03-25T00:00:00+00:00",
+                    "repos_audited": 10,
+                    "average_score": 0.5,
+                    "tier_distribution": {"shipped": 5, "wip": 5},
+                }
+            )
+        )
 
         archived = archive_report(report, history_dir)
         assert archived.exists()
@@ -24,12 +33,16 @@ class TestArchive:
     def test_creates_index(self, tmp_path):
         history_dir = tmp_path / "history"
         report = tmp_path / "audit-report-user-2026-03-25.json"
-        report.write_text(json.dumps({
-            "generated_at": "2026-03-25T00:00:00+00:00",
-            "repos_audited": 10,
-            "average_score": 0.5,
-            "tier_distribution": {},
-        }))
+        report.write_text(
+            json.dumps(
+                {
+                    "generated_at": "2026-03-25T00:00:00+00:00",
+                    "repos_audited": 10,
+                    "average_score": 0.5,
+                    "tier_distribution": {},
+                }
+            )
+        )
 
         archive_report(report, history_dir)
         index = load_history_index(history_dir)
@@ -107,10 +120,12 @@ class TestLoadComplexityTrends:
             filename = f"audit-report-user-2026-03-{20 + i:02d}.json"
             report_path = history_dir / filename
             report_path.write_text(json.dumps(report_data))
-            index.append({
-                "filename": filename,
-                "generated_at": report_data["generated_at"],
-            })
+            index.append(
+                {
+                    "filename": filename,
+                    "generated_at": report_data["generated_at"],
+                }
+            )
 
         (history_dir / "index.json").write_text(json.dumps(index))
         return output_dir
@@ -136,7 +151,9 @@ class TestLoadComplexityTrends:
         assert result == {}
 
     def test_collects_mi_for_single_repo(self, tmp_path: Path) -> None:
-        report = _make_report_with_code_quality("my-repo", mi=72.5, worst_cc=8, complex_count=3)
+        report = _make_report_with_code_quality(
+            "my-repo", mi=72.5, worst_cc=8, complex_count=3
+        )
         output_dir = self._setup_history(tmp_path, [report])
         result = load_complexity_trends(output_dir)
 
@@ -165,7 +182,12 @@ class TestLoadComplexityTrends:
         output_dir = tmp_path / "output"
         history_dir = output_dir / "history"
         history_dir.mkdir(parents=True)
-        index = [{"filename": "audit-report-ghost.json", "generated_at": "2026-03-25T00:00:00+00:00"}]
+        index = [
+            {
+                "filename": "audit-report-ghost.json",
+                "generated_at": "2026-03-25T00:00:00+00:00",
+            }
+        ]
         (history_dir / "index.json").write_text(json.dumps(index))
 
         result = load_complexity_trends(output_dir)
@@ -177,7 +199,12 @@ class TestLoadComplexityTrends:
         history_dir.mkdir(parents=True)
         bad_file = history_dir / "audit-report-bad.json"
         bad_file.write_text("not json {{{")
-        index = [{"filename": "audit-report-bad.json", "generated_at": "2026-03-25T00:00:00+00:00"}]
+        index = [
+            {
+                "filename": "audit-report-bad.json",
+                "generated_at": "2026-03-25T00:00:00+00:00",
+            }
+        ]
         (history_dir / "index.json").write_text(json.dumps(index))
 
         result = load_complexity_trends(output_dir)
@@ -191,7 +218,11 @@ class TestLoadComplexityTrends:
                 {
                     "metadata": {"name": "repo"},
                     "analyzer_results": [
-                        {"dimension": "code_quality", "score": 0.5, "details": {"worst_cc_score": 3}}
+                        {
+                            "dimension": "code_quality",
+                            "score": 0.5,
+                            "details": {"worst_cc_score": 3},
+                        }
                     ],
                 }
             ],

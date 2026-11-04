@@ -8,7 +8,10 @@ from typing import Any
 from github_repo_auditor.cli_output import print_info
 from github_repo_auditor.portfolio_security_gate import build_security_gate_report
 from github_repo_auditor.portfolio_truth_types import TRUTH_LATEST_FILENAME
-from github_repo_auditor.security_burndown import build_security_burndown, render_burndown_markdown
+from github_repo_auditor.security_burndown import (
+    build_security_burndown,
+    render_burndown_markdown,
+)
 
 
 _SECURITY_GATE_OUTPUT_CONTRACT = "security_gate_cli_v2"
@@ -144,13 +147,9 @@ def _safe_security_gate_summary(report: Any) -> dict[str, Any]:
         "repos_with_open_high_critical": _safe_count(
             getattr(report, "repos_with_open_high_critical", 0)
         ),
-        "total_open_critical": _safe_count(
-            getattr(report, "total_open_critical", 0)
-        ),
+        "total_open_critical": _safe_count(getattr(report, "total_open_critical", 0)),
         "total_open_high": _safe_count(getattr(report, "total_open_high", 0)),
-        "total_open_secrets": _safe_count(
-            getattr(report, "total_open_secrets", 0)
-        ),
+        "total_open_secrets": _safe_count(getattr(report, "total_open_secrets", 0)),
         "source_freshness": _safe_freshness(report),
         "generated_at": _REDACTED,
         "freshness_error": None,

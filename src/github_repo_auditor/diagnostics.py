@@ -15,8 +15,16 @@ from github_repo_auditor.baseline_context import (
     format_mismatch_value,
     normalize_scoring_profile,
 )
-from github_repo_auditor.config import ConfigInspection, inspect_config, validate_config_data
-from github_repo_auditor.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
+from github_repo_auditor.config import (
+    ConfigInspection,
+    inspect_config,
+    validate_config_data,
+)
+from github_repo_auditor.excel_template import (
+    DEFAULT_TEMPLATE_PATH,
+    TEMPLATE_INFO_SHEET,
+    TEMPLATE_SHEETS,
+)
 from github_repo_auditor.portfolio_intelligence import DEFAULT_PROFILES
 
 NOTION_CONFIG_PATH = Path("config") / "notion-config.json"
@@ -121,7 +129,9 @@ def run_diagnostics(
     config_inspection: ConfigInspection | None = None,
     full: bool = False,
 ) -> DiagnosticsResult:
-    config_inspection = config_inspection or inspect_config(Path(getattr(args, "config", None)) if getattr(args, "config", None) else None)
+    config_inspection = config_inspection or inspect_config(
+        Path(getattr(args, "config", None)) if getattr(args, "config", None) else None
+    )
     requested_features = infer_requested_features(args)
     checks: list[DiagnosticCheck] = []
     output_dir = Path(getattr(args, "output_dir", "output"))
@@ -183,7 +193,9 @@ def format_diagnostics_report(result: DiagnosticsResult) -> str:
     return "\n".join(lines)
 
 
-def write_diagnostics_report(result: DiagnosticsResult, output_dir: Path, username: str) -> Path:
+def write_diagnostics_report(
+    result: DiagnosticsResult, output_dir: Path, username: str
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     path = output_dir / f"diagnostics-{username}-{stamp}.json"
@@ -223,7 +235,9 @@ def _add_github_auth_checks(checks: list[DiagnosticCheck], args) -> None:
                 if hard_required
                 else "GitHub authentication is not configured."
             ),
-            details=details if hard_required else f"{details} The audit can still read public repos only.",
+            details=details
+            if hard_required
+            else f"{details} The audit can still read public repos only.",
             recommended_fix="Set GITHUB_TOKEN or pass --token before running features that need private repo or write access.",
         )
     )
@@ -391,8 +405,18 @@ def _add_notion_checks(checks: list[DiagnosticCheck], args, *, full: bool) -> No
         notion_config = config_state["data"]
     else:
         notion_config = {}
-        level = "error" if (requested_sync or requested_registry or requested_writeback) else "warning"
-        if config_state["exists"] or full or requested_sync or requested_registry or requested_writeback:
+        level = (
+            "error"
+            if (requested_sync or requested_registry or requested_writeback)
+            else "warning"
+        )
+        if (
+            config_state["exists"]
+            or full
+            or requested_sync
+            or requested_registry
+            or requested_writeback
+        ):
             checks.append(
                 DiagnosticCheck(
                     key="notion-config",
@@ -400,7 +424,8 @@ def _add_notion_checks(checks: list[DiagnosticCheck], args, *, full: bool) -> No
                     severity=level,
                     status=level,
                     summary="Notion config file is missing or unreadable.",
-                    details=config_state["message"] or f"Expected {NOTION_CONFIG_PATH}.",
+                    details=config_state["message"]
+                    or f"Expected {NOTION_CONFIG_PATH}.",
                     recommended_fix="Create config/notion-config.json with the required database IDs for the Notion features you use.",
                 )
             )
@@ -417,7 +442,11 @@ def _add_notion_checks(checks: list[DiagnosticCheck], args, *, full: bool) -> No
                 recommended_fix="Add events_database_id to config/notion-config.json before using --notion-sync.",
             )
         )
-    if requested_registry and notion_config and not notion_config.get("projects_data_source_id"):
+    if (
+        requested_registry
+        and notion_config
+        and not notion_config.get("projects_data_source_id")
+    ):
         checks.append(
             DiagnosticCheck(
                 key="notion-projects-source",
@@ -431,7 +460,8 @@ def _add_notion_checks(checks: list[DiagnosticCheck], args, *, full: bool) -> No
         )
     if requested_writeback and notion_config:
         has_action_collection = bool(
-            notion_config.get("action_requests_data_source_id") or notion_config.get("action_requests_db_id")
+            notion_config.get("action_requests_data_source_id")
+            or notion_config.get("action_requests_db_id")
         )
         has_campaign_collection = bool(
             notion_config.get("campaign_runs_data_source_id")
@@ -487,8 +517,12 @@ def _add_excel_checks(checks: list[DiagnosticCheck], args) -> None:
         with zipfile.ZipFile(template_path) as archive:
             workbook_xml = archive.read("xl/workbook.xml")
             if TEMPLATE_INFO_SHEET.encode() not in workbook_xml:
-                raise ValueError(f"Missing workbook marker sheet: {TEMPLATE_INFO_SHEET}")
-            missing = [sheet for sheet in TEMPLATE_SHEETS if sheet.encode() not in workbook_xml]
+                raise ValueError(
+                    f"Missing workbook marker sheet: {TEMPLATE_INFO_SHEET}"
+                )
+            missing = [
+                sheet for sheet in TEMPLATE_SHEETS if sheet.encode() not in workbook_xml
+            ]
             if missing:
                 raise ValueError(f"Missing template sheets: {', '.join(missing)}")
     except (OSError, zipfile.BadZipFile, KeyError, ValueError) as exc:
@@ -517,8 +551,12 @@ def _add_excel_checks(checks: list[DiagnosticCheck], args) -> None:
     )
 
 
-def _add_filesystem_checks(checks: list[DiagnosticCheck], args, output_dir: Path) -> None:
-    writable_target = output_dir if output_dir.exists() else _nearest_existing_parent(output_dir)
+def _add_filesystem_checks(
+    checks: list[DiagnosticCheck], args, output_dir: Path
+) -> None:
+    writable_target = (
+        output_dir if output_dir.exists() else _nearest_existing_parent(output_dir)
+    )
     if writable_target and os.access(writable_target, os.W_OK):
         checks.append(
             DiagnosticCheck(
@@ -543,7 +581,11 @@ def _add_filesystem_checks(checks: list[DiagnosticCheck], args, output_dir: Path
             )
         )
 
-    requires_baseline = bool(getattr(args, "repos", None) or getattr(args, "incremental", False) or getattr(args, "generate_manifest", False))
+    requires_baseline = bool(
+        getattr(args, "repos", None)
+        or getattr(args, "incremental", False)
+        or getattr(args, "generate_manifest", False)
+    )
     latest_report = _find_latest_report(output_dir)
     if requires_baseline and latest_report is None:
         checks.append(
@@ -583,7 +625,9 @@ def _add_filesystem_checks(checks: list[DiagnosticCheck], args, output_dir: Path
                     )
                 )
             else:
-                existing_context = extract_baseline_context(latest_report_inspection["data"])
+                existing_context = extract_baseline_context(
+                    latest_report_inspection["data"]
+                )
                 if not existing_context:
                     checks.append(
                         DiagnosticCheck(
@@ -599,9 +643,13 @@ def _add_filesystem_checks(checks: list[DiagnosticCheck], args, output_dir: Path
                 else:
                     requested_context = build_requested_baseline_context(
                         args,
-                        scoring_profile=normalize_scoring_profile(getattr(args, "scoring_profile", None)),
+                        scoring_profile=normalize_scoring_profile(
+                            getattr(args, "scoring_profile", None)
+                        ),
                     )
-                    mismatches = compare_baseline_context(requested_context, existing_context, include_size=False)
+                    mismatches = compare_baseline_context(
+                        requested_context, existing_context, include_size=False
+                    )
                     if mismatches:
                         details = "; ".join(
                             f"{item['label']}: existing={format_mismatch_value(item['actual'])} | requested={format_mismatch_value(item['expected'])}"
@@ -679,8 +727,14 @@ def _add_writeback_checks(checks: list[DiagnosticCheck], args) -> None:
         )
 
 
-def _add_governance_checks(checks: list[DiagnosticCheck], args, output_dir: Path) -> None:
-    if getattr(args, "campaign", None) == "security-review" and _find_latest_report(output_dir) is None and getattr(args, "repos", None):
+def _add_governance_checks(
+    checks: list[DiagnosticCheck], args, output_dir: Path
+) -> None:
+    if (
+        getattr(args, "campaign", None) == "security-review"
+        and _find_latest_report(output_dir) is None
+        and getattr(args, "repos", None)
+    ):
         checks.append(
             DiagnosticCheck(
                 key="governance-baseline",
@@ -696,9 +750,19 @@ def _add_governance_checks(checks: list[DiagnosticCheck], args, output_dir: Path
 
 def _inspect_json_file(path: Path) -> dict:
     if not path.is_file():
-        return {"ok": False, "exists": False, "data": {}, "message": f"File not found: {path}"}
+        return {
+            "ok": False,
+            "exists": False,
+            "data": {},
+            "message": f"File not found: {path}",
+        }
     try:
-        return {"ok": True, "exists": True, "data": json.loads(path.read_text()), "message": ""}
+        return {
+            "ok": True,
+            "exists": True,
+            "data": json.loads(path.read_text()),
+            "message": "",
+        }
     except (json.JSONDecodeError, OSError) as exc:
         return {"ok": False, "exists": True, "data": {}, "message": str(exc)}
 

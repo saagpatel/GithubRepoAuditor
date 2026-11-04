@@ -100,21 +100,25 @@ def diff_reports(
         new_tier = new["completeness_tier"]
 
         delta = new_score - old_score
-        score_changes.append({
-            "name": name,
-            "old_score": round(old_score, 3),
-            "new_score": round(new_score, 3),
-            "delta": round(delta, 3),
-        })
-
-        if old_tier != new_tier:
-            tier_changes.append({
+        score_changes.append(
+            {
                 "name": name,
-                "old_tier": old_tier,
-                "new_tier": new_tier,
                 "old_score": round(old_score, 3),
                 "new_score": round(new_score, 3),
-            })
+                "delta": round(delta, 3),
+            }
+        )
+
+        if old_tier != new_tier:
+            tier_changes.append(
+                {
+                    "name": name,
+                    "old_tier": old_tier,
+                    "new_tier": new_tier,
+                    "old_score": round(old_score, 3),
+                    "new_score": round(new_score, 3),
+                }
+            )
 
         old_lenses = old.get("lenses", {})
         new_lenses = new.get("lenses", {})
@@ -136,7 +140,9 @@ def diff_reports(
             "new_label": new_security.get("label", "unknown"),
             "old_score": round(old_security.get("score", 0.0), 3),
             "new_score": round(new_security.get("score", 0.0), 3),
-            "delta": round(new_security.get("score", 0.0) - old_security.get("score", 0.0), 3),
+            "delta": round(
+                new_security.get("score", 0.0) - old_security.get("score", 0.0), 3
+            ),
         }
         if (
             security_change["old_label"] != security_change["new_label"]
@@ -153,7 +159,10 @@ def diff_reports(
             "old_primary": old_hotspots[0].get("title", "") if old_hotspots else "",
             "new_primary": new_hotspots[0].get("title", "") if new_hotspots else "",
         }
-        if hotspot_change["old_count"] != hotspot_change["new_count"] or hotspot_change["old_primary"] != hotspot_change["new_primary"]:
+        if (
+            hotspot_change["old_count"] != hotspot_change["new_count"]
+            or hotspot_change["old_primary"] != hotspot_change["new_primary"]
+        ):
             hotspot_changes.append(hotspot_change)
 
         old_memberships = sorted(prev_collections.get(name, []))
@@ -166,18 +175,20 @@ def diff_reports(
         if collection_change["old"] != collection_change["new"]:
             collection_changes.append(collection_change)
 
-        repo_changes.append({
-            "name": name,
-            "old_score": round(old_score, 3),
-            "new_score": round(new_score, 3),
-            "delta": round(delta, 3),
-            "old_tier": old_tier,
-            "new_tier": new_tier,
-            "lens_deltas": lens_delta_map,
-            "security_change": security_change,
-            "hotspot_change": hotspot_change,
-            "collection_change": collection_change,
-        })
+        repo_changes.append(
+            {
+                "name": name,
+                "old_score": round(old_score, 3),
+                "new_score": round(new_score, 3),
+                "delta": round(delta, 3),
+                "old_tier": old_tier,
+                "new_tier": new_tier,
+                "lens_deltas": lens_delta_map,
+                "security_change": security_change,
+                "hotspot_change": hotspot_change,
+                "collection_change": collection_change,
+            }
+        )
 
     # Sort score changes by absolute delta descending
     score_changes.sort(key=lambda c: abs(c["delta"]), reverse=True)
@@ -210,7 +221,8 @@ def diff_reports(
             curr_lenses.get(lens_name, {}).get("average_score", 0.0)
             - prev_lenses.get(lens_name, {}).get("average_score", 0.0),
             3,
-        ) != 0
+        )
+        != 0
     }
 
     prev_board = build_profile_leaderboard(prev, portfolio_profile, collection_name)
@@ -227,7 +239,9 @@ def diff_reports(
         }
     }
 
-    scenario_preview = summarize_scenario_preview(curr, portfolio_profile, collection_name)
+    scenario_preview = summarize_scenario_preview(
+        curr, portfolio_profile, collection_name
+    )
 
     return AuditDiff(
         previous_date=prev.get("generated_at", "unknown"),
@@ -292,8 +306,10 @@ def format_diff_markdown(diff: AuditDiff) -> str:
         _w("| Repo | Old Tier | New Tier | Old Score | New Score |")
         _w("|------|----------|----------|-----------|-----------|")
         for c in diff.tier_changes:
-            _w(f"| {c['name']} | {c['old_tier']} | {c['new_tier']} | "
-               f"{c['old_score']:.2f} | {c['new_score']:.2f} |")
+            _w(
+                f"| {c['name']} | {c['old_tier']} | {c['new_tier']} | "
+                f"{c['old_score']:.2f} | {c['new_score']:.2f} |"
+            )
         _w("")
 
     improvements = [c for c in diff.score_changes if c["delta"] > 0.05]
@@ -305,7 +321,9 @@ def format_diff_markdown(diff: AuditDiff) -> str:
         _w("| Repo | Old | New | Delta |")
         _w("|------|-----|-----|-------|")
         for c in improvements[:20]:
-            _w(f"| {c['name']} | {c['old_score']:.2f} | {c['new_score']:.2f} | {c['delta']:+.3f} |")
+            _w(
+                f"| {c['name']} | {c['old_score']:.2f} | {c['new_score']:.2f} | {c['delta']:+.3f} |"
+            )
         _w("")
 
     if regressions:
@@ -314,7 +332,9 @@ def format_diff_markdown(diff: AuditDiff) -> str:
         _w("| Repo | Old | New | Delta |")
         _w("|------|-----|-----|-------|")
         for c in regressions[:20]:
-            _w(f"| {c['name']} | {c['old_score']:.2f} | {c['new_score']:.2f} | {c['delta']:+.3f} |")
+            _w(
+                f"| {c['name']} | {c['old_score']:.2f} | {c['new_score']:.2f} | {c['delta']:+.3f} |"
+            )
         _w("")
 
     if diff.lens_deltas:
@@ -332,7 +352,9 @@ def format_diff_markdown(diff: AuditDiff) -> str:
         _w("| Repo | Old Label | New Label | Delta |")
         _w("|------|-----------|-----------|-------|")
         for change in diff.security_changes[:10]:
-            _w(f"| {change['name']} | {change['old_label']} | {change['new_label']} | {change['delta']:+.3f} |")
+            _w(
+                f"| {change['name']} | {change['old_label']} | {change['new_label']} | {change['delta']:+.3f} |"
+            )
         _w("")
 
     if diff.profile_leaderboards:
@@ -348,8 +370,12 @@ def format_diff_markdown(diff: AuditDiff) -> str:
         _w("## Scenario Preview")
         _w("")
         _w(f"- Selected repos: {preview.get('selected_repo_count', 0)}")
-        _w(f"- Projected average score delta: {preview.get('projected_average_score_delta', 0):+.3f}")
-        _w(f"- Projected tier promotions: {preview.get('projected_tier_promotions', 0)}")
+        _w(
+            f"- Projected average score delta: {preview.get('projected_average_score_delta', 0):+.3f}"
+        )
+        _w(
+            f"- Projected tier promotions: {preview.get('projected_tier_promotions', 0)}"
+        )
         _w("")
 
     return "\n".join(lines)
@@ -368,7 +394,9 @@ def print_diff_summary(diff: AuditDiff) -> None:
     delta = diff.average_score_delta
     color = "green" if delta >= 0 else "red"
     sign = "+" if delta >= 0 else ""
-    console.print(f"\n[bold]Portfolio Score Delta:[/bold] [{color}]{sign}{delta:.3f}[/{color}]")
+    console.print(
+        f"\n[bold]Portfolio Score Delta:[/bold] [{color}]{sign}{delta:.3f}[/{color}]"
+    )
 
     if diff.tier_changes:
         table = Table(title="Tier Changes", show_lines=False)
@@ -380,7 +408,9 @@ def print_diff_summary(diff: AuditDiff) -> None:
             old_t = tc.get("old_tier", "")
             new_t = tc.get("new_tier", "")
             promoted = tc.get("promoted", False)
-            direction = "[green]↑ Promoted[/green]" if promoted else "[red]↓ Demoted[/red]"
+            direction = (
+                "[green]↑ Promoted[/green]" if promoted else "[red]↓ Demoted[/red]"
+            )
             table.add_row(tc.get("name", ""), old_t, new_t, direction)
         console.print(table)
 
@@ -396,4 +426,6 @@ def print_diff_summary(diff: AuditDiff) -> None:
         for s in regressions:
             console.print(f"  [red]↓ {s['name']}: {s['delta']:.3f}[/red]")
 
-    console.print(f"\n[dim]New repos: {len(diff.new_repos)} | Removed: {len(diff.removed_repos)}[/dim]")
+    console.print(
+        f"\n[dim]New repos: {len(diff.new_repos)} | Removed: {len(diff.removed_repos)}[/dim]"
+    )

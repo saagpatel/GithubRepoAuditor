@@ -13,10 +13,19 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from github_repo_auditor.excel_all_repos_helpers import ALL_REPOS_HEADERS, build_all_repo_rows
+from github_repo_auditor.excel_all_repos_helpers import (
+    ALL_REPOS_HEADERS,
+    build_all_repo_rows,
+)
 from github_repo_auditor.excel_export import _build_all_repos, _build_security
-from github_repo_auditor.excel_repo_data_helpers import _arc_f_detail_cols, repo_detail_rows
-from github_repo_auditor.excel_security_sheet_helpers import SECURITY_HEADERS, build_security_sheet_rows
+from github_repo_auditor.excel_repo_data_helpers import (
+    _arc_f_detail_cols,
+    repo_detail_rows,
+)
+from github_repo_auditor.excel_security_sheet_helpers import (
+    SECURITY_HEADERS,
+    build_security_sheet_rows,
+)
 from github_repo_auditor.operator_control_center import build_operator_snapshot
 
 # ─────────────────────────────────────────────────────────────
@@ -188,7 +197,9 @@ class TestSecuritySheetGhasAndOssf:
     def test_ghas_counts_populated_when_lookup_provided(self) -> None:
         audit = _make_audit_with_arc_f()
         ghas = {
-            "repo-alpha": _make_ghas_entry(dep_critical=3, dep_high=5, cs_critical=1, ss_open=2)
+            "repo-alpha": _make_ghas_entry(
+                dep_critical=3, dep_high=5, cs_critical=1, ss_open=2
+            )
         }
         rows = build_security_sheet_rows([audit], ghas_lookup=ghas)
         assert len(rows) == 1
@@ -341,7 +352,9 @@ class TestAllReposNewColumns:
             "analyzer_results": [],
         }
         wb = Workbook()
-        _build_all_repos(wb, _make_report_data([audit]), score_history=None, risk_lookup=None)
+        _build_all_repos(
+            wb, _make_report_data([audit]), score_history=None, risk_lookup=None
+        )
         assert "All Repos" in wb.sheetnames
 
 
@@ -408,7 +421,9 @@ class TestArcFDetailCols:
 
     def test_risk_tier_appended_as_column_79(self) -> None:
         data = _make_report_data([_make_audit_with_arc_f(name="repo-alpha")])
-        detail_rows, _, _ = repo_detail_rows(data, None, risk_lookup={"repo-alpha": "elevated"})
+        detail_rows, _, _ = repo_detail_rows(
+            data, None, risk_lookup={"repo-alpha": "elevated"}
+        )
         assert len(detail_rows[0]) == 79
         assert detail_rows[0][78] == "elevated"
 
@@ -455,7 +470,9 @@ class TestControlCenterArcFLanes:
         report = _make_report_data([audit])
         snapshot = self._snapshot(report, tmp_path)
         queue = snapshot.get("operator_queue", [])
-        arc_f_items = [i for i in queue if "arc-f:readme-stale:my-repo" in i.get("item_id", "")]
+        arc_f_items = [
+            i for i in queue if "arc-f:readme-stale:my-repo" in i.get("item_id", "")
+        ]
         assert arc_f_items, "Expected an arc-f:readme-stale item in the queue"
         assert arc_f_items[0]["lane"] == "urgent"
 
@@ -467,7 +484,9 @@ class TestControlCenterArcFLanes:
         arc_f_items = [i for i in queue if "arc-f:readme-stale" in i.get("item_id", "")]
         assert not arc_f_items
 
-    def test_ghas_critical_dependabot_lands_in_blocked_lane(self, tmp_path: Path) -> None:
+    def test_ghas_critical_dependabot_lands_in_blocked_lane(
+        self, tmp_path: Path
+    ) -> None:
         audit = _make_audit_with_arc_f(name="vuln-repo")
         report = _make_report_data(
             [audit],
@@ -475,7 +494,9 @@ class TestControlCenterArcFLanes:
         )
         snapshot = self._snapshot(report, tmp_path)
         queue = snapshot.get("operator_queue", [])
-        arc_f_items = [i for i in queue if "arc-f:ghas-critical:vuln-repo" in i.get("item_id", "")]
+        arc_f_items = [
+            i for i in queue if "arc-f:ghas-critical:vuln-repo" in i.get("item_id", "")
+        ]
         assert arc_f_items, "Expected an arc-f:ghas-critical item in the queue"
         assert arc_f_items[0]["lane"] == "blocked"
 
@@ -487,32 +508,46 @@ class TestControlCenterArcFLanes:
         )
         snapshot = self._snapshot(report, tmp_path)
         queue = snapshot.get("operator_queue", [])
-        arc_f_items = [i for i in queue if "arc-f:ghas-critical:cs-repo" in i.get("item_id", "")]
+        arc_f_items = [
+            i for i in queue if "arc-f:ghas-critical:cs-repo" in i.get("item_id", "")
+        ]
         assert arc_f_items
         assert arc_f_items[0]["lane"] == "blocked"
 
-    def test_ghas_zero_criticals_does_not_add_blocked_item(self, tmp_path: Path) -> None:
+    def test_ghas_zero_criticals_does_not_add_blocked_item(
+        self, tmp_path: Path
+    ) -> None:
         audit = _make_audit_with_arc_f(name="safe-repo")
         report = _make_report_data(
             [audit],
-            ghas_alerts={"safe-repo": _make_ghas_entry(dep_critical=0, cs_critical=0, ss_open=0)},
+            ghas_alerts={
+                "safe-repo": _make_ghas_entry(dep_critical=0, cs_critical=0, ss_open=0)
+            },
         )
         snapshot = self._snapshot(report, tmp_path)
         queue = snapshot.get("operator_queue", [])
-        arc_f_items = [i for i in queue if "arc-f:ghas-critical" in i.get("item_id", "")]
+        arc_f_items = [
+            i for i in queue if "arc-f:ghas-critical" in i.get("item_id", "")
+        ]
         assert not arc_f_items
 
     def test_ossf_low_score_lands_in_ready_lane(self, tmp_path: Path) -> None:
-        audit = _make_audit_with_arc_f(name="low-ossf-repo", ossf_available=True, ossf_score=3.1)
+        audit = _make_audit_with_arc_f(
+            name="low-ossf-repo", ossf_available=True, ossf_score=3.1
+        )
         report = _make_report_data([audit])
         snapshot = self._snapshot(report, tmp_path)
         queue = snapshot.get("operator_queue", [])
-        arc_f_items = [i for i in queue if "arc-f:ossf-low:low-ossf-repo" in i.get("item_id", "")]
+        arc_f_items = [
+            i for i in queue if "arc-f:ossf-low:low-ossf-repo" in i.get("item_id", "")
+        ]
         assert arc_f_items, "Expected an arc-f:ossf-low item in the queue"
         assert arc_f_items[0]["lane"] == "ready"
 
     def test_ossf_adequate_score_does_not_add_item(self, tmp_path: Path) -> None:
-        audit = _make_audit_with_arc_f(name="ok-ossf-repo", ossf_available=True, ossf_score=6.0)
+        audit = _make_audit_with_arc_f(
+            name="ok-ossf-repo", ossf_available=True, ossf_score=6.0
+        )
         report = _make_report_data([audit])
         snapshot = self._snapshot(report, tmp_path)
         queue = snapshot.get("operator_queue", [])
@@ -562,7 +597,9 @@ class _FakeSemanticIndex:
 
 
 class TestControlCenterDuplicateGroupLanes:
-    def _snapshot_with_index(self, report_data: dict, tmp_path: Path, semantic_index) -> dict:
+    def _snapshot_with_index(
+        self, report_data: dict, tmp_path: Path, semantic_index
+    ) -> dict:
         return build_operator_snapshot(
             report_data, output_dir=tmp_path, semantic_index=semantic_index
         )
@@ -580,7 +617,9 @@ class TestControlCenterDuplicateGroupLanes:
         snapshot = self._snapshot_with_index(report, tmp_path, fake_idx)
 
         queue = snapshot.get("operator_queue", [])
-        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        dup_items = [
+            i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")
+        ]
         assert len(dup_items) == 1
 
         item = dup_items[0]
@@ -601,7 +640,9 @@ class TestControlCenterDuplicateGroupLanes:
         snapshot = self._snapshot_with_index(report, tmp_path, fake_idx)
 
         queue = snapshot.get("operator_queue", [])
-        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        dup_items = [
+            i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")
+        ]
         assert dup_items
         combined = dup_items[0]["title"] + dup_items[0]["summary"]
         for name in ["RepoA", "RepoB", "RepoC"]:
@@ -610,10 +651,14 @@ class TestControlCenterDuplicateGroupLanes:
     def test_no_duplicate_entries_without_semantic_index(self, tmp_path: Path) -> None:
         """When semantic_index=None, no duplicate-group lane entries are generated."""
         report = _make_report_data([_make_audit_with_arc_f("SomeRepo")])
-        snapshot = build_operator_snapshot(report, output_dir=tmp_path, semantic_index=None)
+        snapshot = build_operator_snapshot(
+            report, output_dir=tmp_path, semantic_index=None
+        )
 
         queue = snapshot.get("operator_queue", [])
-        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        dup_items = [
+            i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")
+        ]
         assert dup_items == []
 
     def test_no_duplicate_entries_when_groups_empty(self, tmp_path: Path) -> None:
@@ -623,5 +668,7 @@ class TestControlCenterDuplicateGroupLanes:
         snapshot = self._snapshot_with_index(report, tmp_path, fake_idx)
 
         queue = snapshot.get("operator_queue", [])
-        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        dup_items = [
+            i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")
+        ]
         assert dup_items == []

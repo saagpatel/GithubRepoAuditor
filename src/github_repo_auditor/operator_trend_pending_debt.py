@@ -12,9 +12,9 @@ def class_pending_debt_for_target(
     class_pending_debt_window_runs: int,
 ) -> tuple[str, str, float, float, str]:
     class_key = target_class_key(target)
-    matching_events = [event for event in transition_events if event.get("class_key") == class_key][
-        :class_pending_debt_window_runs
-    ]
+    matching_events = [
+        event for event in transition_events if event.get("class_key") == class_key
+    ][:class_pending_debt_window_runs]
     outcomes = [pending_debt_event_outcome(event) for event in matching_events]
     relevant_outcomes = [outcome for outcome in outcomes if outcome != "none"]
     pending_entry_count = len(relevant_outcomes)
@@ -38,7 +38,8 @@ def class_pending_debt_for_target(
     recent_pending_debt_path = " -> ".join(relevant_outcomes[:4])
 
     if pending_entry_count >= 3 and (
-        debt_like_count >= healthy_resolution_count + 1 or class_pending_debt_rate >= 0.60
+        debt_like_count >= healthy_resolution_count + 1
+        or class_pending_debt_rate >= 0.60
     ):
         return (
             "active-debt",
@@ -48,7 +49,8 @@ def class_pending_debt_for_target(
             recent_pending_debt_path,
         )
     if pending_entry_count >= 2 and (
-        healthy_resolution_count >= debt_like_count + 1 or class_pending_resolution_rate >= 0.60
+        healthy_resolution_count >= debt_like_count + 1
+        or class_pending_resolution_rate >= 0.60
     ):
         return (
             "clearing",
@@ -117,15 +119,21 @@ def class_pending_debt_hotspots(
         current = {
             "scope": "class",
             "label": class_key,
-            "class_pending_debt_status": target.get("class_pending_debt_status", "none"),
+            "class_pending_debt_status": target.get(
+                "class_pending_debt_status", "none"
+            ),
             "class_pending_debt_rate": target.get("class_pending_debt_rate", 0.0),
-            "class_pending_resolution_rate": target.get("class_pending_resolution_rate", 0.0),
+            "class_pending_resolution_rate": target.get(
+                "class_pending_resolution_rate", 0.0
+            ),
             "recent_pending_debt_path": target.get("recent_pending_debt_path", ""),
             "dominant_count": dominant_count,
             "pending_entry_count": len(
                 [
                     part
-                    for part in (target.get("recent_pending_debt_path", "") or "").split(" -> ")
+                    for part in (
+                        target.get("recent_pending_debt_path", "") or ""
+                    ).split(" -> ")
                     if part
                 ]
             ),
@@ -137,7 +145,9 @@ def class_pending_debt_hotspots(
     hotspots = list(grouped.values())
     if mode == "healthy":
         hotspots = [
-            item for item in hotspots if item.get("class_pending_debt_status") == "clearing"
+            item
+            for item in hotspots
+            if item.get("class_pending_debt_status") == "clearing"
         ]
         hotspots.sort(
             key=lambda item: (
@@ -148,7 +158,9 @@ def class_pending_debt_hotspots(
         )
     else:
         hotspots = [
-            item for item in hotspots if item.get("class_pending_debt_status") == "active-debt"
+            item
+            for item in hotspots
+            if item.get("class_pending_debt_status") == "active-debt"
         ]
         hotspots.sort(
             key=lambda item: (
@@ -171,7 +183,9 @@ def pending_debt_freshness_for_target(
     pending_debt_freshness_window_runs: int,
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
-    class_events = [event for event in transition_events if event.get("class_key") == class_key]
+    class_events = [
+        event for event in transition_events if event.get("class_key") == class_key
+    ]
     relevant_events: list[tuple[dict[str, Any], str]] = []
     for event in class_events:
         outcome = pending_debt_event_outcome(event)
@@ -198,12 +212,16 @@ def pending_debt_freshness_for_target(
         if outcome in {"confirmed", "cleared"}:
             weighted_healthy_resolution += weight
 
-    recent_window_weight_share = recent_pending_weight / max(weighted_pending_entry_count, 1.0)
+    recent_window_weight_share = recent_pending_weight / max(
+        weighted_pending_entry_count, 1.0
+    )
     freshness_status = pending_debt_freshness_status(
         weighted_pending_entry_count,
         recent_window_weight_share,
     )
-    decayed_pending_debt_rate = weighted_debt_like / max(weighted_pending_entry_count, 1.0)
+    decayed_pending_debt_rate = weighted_debt_like / max(
+        weighted_pending_entry_count, 1.0
+    )
     decayed_pending_resolution_rate = weighted_healthy_resolution / max(
         weighted_pending_entry_count, 1.0
     )
@@ -289,7 +307,9 @@ def closure_forecast_reweight_scores_for_target(
     transition_history_meta: dict[str, Any],
     pending_history_meta: dict[str, Any],
     *,
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
+    target_specific_normalization_noise: Callable[
+        [dict[str, Any], dict[str, Any]], bool
+    ],
     clamp_round: Callable[[float, float, float], float],
 ) -> tuple[float, float, float, str, list[str]]:
     transition_status = target.get("class_reweight_transition_status", "none")
@@ -335,7 +355,9 @@ def closure_forecast_reweight_scores_for_target(
         caution_adjustments += 0.10
     if health_status == "holding":
         caution_adjustments += 0.05
-    if int(target.get("class_transition_age_runs", 0) or 0) >= 3 and not transition_history_meta.get(
+    if int(
+        target.get("class_transition_age_runs", 0) or 0
+    ) >= 3 and not transition_history_meta.get(
         "current_transition_strengthening",
         False,
     ):
@@ -380,13 +402,17 @@ def closure_forecast_reweight_scores_for_target(
             "Recent class resolution behavior is still strong enough that this pending signal could confirm soon."
         )
     elif health_status == "building":
-        reasons.append("The live pending signal is still building in the same direction.")
+        reasons.append(
+            "The live pending signal is still building in the same direction."
+        )
     elif target.get("class_reweight_stability_status", "watch") == "stable":
         reasons.append(
             "Class transition stability is still good enough to keep the pending forecast coherent."
         )
     if pending_debt_status == "active-debt":
-        reasons.append("Fresh unresolved pending debt is still clustering in this class.")
+        reasons.append(
+            "Fresh unresolved pending debt is still clustering in this class."
+        )
     elif likely_outcome in {"clear-risk", "expire-risk"}:
         reasons.append(
             "The live pending signal is already leaning toward clearance or expiry risk."

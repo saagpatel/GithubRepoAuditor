@@ -1,4 +1,5 @@
 """Create GitHub Issues from audit quick wins."""
+
 from __future__ import annotations
 
 import sys
@@ -30,7 +31,9 @@ def create_audit_issues(
             # If issue listing fails, continue and let create_issue surface any hard error.
             pass
         actions = qw.get("actions", [])
-        title = f"[Audit] {repo_name}: {actions[0] if actions else 'Improve audit score'}"
+        title = (
+            f"[Audit] {repo_name}: {actions[0] if actions else 'Improve audit score'}"
+        )
         body_parts = [
             f"## Audit Findings for {repo_name}\n",
             f"**Current Score:** {qw.get('score', 0):.2f}",
@@ -47,9 +50,19 @@ def create_audit_issues(
             created.append({"repo": repo_name, "title": title, "dry_run": True})
         else:
             try:
-                result = client.create_issue(username, repo_name, {"title": title, "body": body, "labels": [label]})
+                result = client.create_issue(
+                    username,
+                    repo_name,
+                    {"title": title, "body": body, "labels": [label]},
+                )
                 if result:
-                    created.append({"repo": repo_name, "title": title, "url": result.get("html_url", "")})
+                    created.append(
+                        {
+                            "repo": repo_name,
+                            "title": title,
+                            "url": result.get("html_url", ""),
+                        }
+                    )
             except Exception as e:
                 print(f"  Issue creation failed for {repo_name}: {e}", file=sys.stderr)
     return {"created": created, "skipped": skipped}

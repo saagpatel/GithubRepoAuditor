@@ -62,7 +62,9 @@ class TestResponseCache:
             {"name": "repo", "nested": {"client_secret": "secret-value"}},
         )
 
-        assert cache.get(url, {"access_token": "secret-param", "per_page": "10"}) is None
+        assert (
+            cache.get(url, {"access_token": "secret-param", "per_page": "10"}) is None
+        )
 
     def test_put_skips_embedded_url_credentials(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)

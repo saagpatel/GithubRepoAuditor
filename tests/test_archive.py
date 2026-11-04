@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from github_repo_auditor.archive_candidates import export_archive_report, find_archive_candidates
+from github_repo_auditor.archive_candidates import (
+    export_archive_report,
+    find_archive_candidates,
+)
 
 
 class TestFindArchiveCandidates:
@@ -41,7 +44,13 @@ class TestFindArchiveCandidates:
 
 class TestExportArchiveReport:
     def test_creates_file(self, tmp_path):
-        candidates = [{"name": "OldRepo", "last_scores": [0.05, 0.03, 0.02], "current_score": 0.02}]
+        candidates = [
+            {
+                "name": "OldRepo",
+                "last_scores": [0.05, 0.03, 0.02],
+                "current_score": 0.02,
+            }
+        ]
         result = export_archive_report(candidates, "testuser", tmp_path)
         assert result["report_path"].is_file()
         assert result["count"] == 1

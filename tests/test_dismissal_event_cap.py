@@ -19,7 +19,8 @@ def _make_event(
 ) -> DismissalEvent:
     """Build a DismissalEvent with a deterministic occurred_at."""
     ts = (
-        datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=offset_seconds)
+        datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        + timedelta(seconds=offset_seconds)
     ).isoformat()
     return DismissalEvent(
         repo_name=repo,

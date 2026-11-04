@@ -13,10 +13,15 @@ import pytest
 
 from github_repo_auditor.demo_portfolio import resolved_coverage_state
 from github_repo_auditor.portfolio_truth_coverage import build_coverage_envelope
-from github_repo_auditor.portfolio_truth_metadata import build_source_summary, build_warnings
+from github_repo_auditor.portfolio_truth_metadata import (
+    build_source_summary,
+    build_warnings,
+)
 from github_repo_auditor.portfolio_pathing import build_operating_path_entry
 from github_repo_auditor.portfolio_truth_precedence import PRECEDENCE_MATRIX
-from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_provenance import (
+    REQUIRED_PROJECT_PROVENANCE_KEYS,
+)
 from github_repo_auditor.portfolio_truth_contract_fixture import (
     CONSUMER_PROFILE_MANIFEST_PATHS,
     CONTRACT_VERSION,
@@ -37,7 +42,9 @@ from github_repo_auditor.portfolio_truth_contract_fixture import (
     portable_fixture_bytes,
 )
 from github_repo_auditor.portfolio_truth_reconcile import _build_security_fields
-from github_repo_auditor.portfolio_truth_sources import WORKSPACE_DISCOVERY_POLICY_VERSION
+from github_repo_auditor.portfolio_truth_sources import (
+    WORKSPACE_DISCOVERY_POLICY_VERSION,
+)
 from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
 from github_repo_auditor.portfolio_truth_validate import (
     _snapshot_from_payload,
@@ -1448,7 +1455,9 @@ def _replace_all_repository_paths_with_other_demo_path(
         ),
         (
             lambda state: _set_nested_repository_value(
-                state, ("topology", "configured_path"), "/Users/example/private-topology"
+                state,
+                ("topology", "configured_path"),
+                "/Users/example/private-topology",
             ),
             "[Rr]epository",
         ),

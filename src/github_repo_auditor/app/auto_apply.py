@@ -34,13 +34,17 @@ def run_auto_apply_approved_mode(args, output_dir: Path) -> None:
 
     cache = None if getattr(args, "no_cache", False) else None
     client: GitHubClient | None = (
-        GitHubClient(token=args.token, cache=cache) if getattr(args, "token", None) else None
+        GitHubClient(token=args.token, cache=cache)
+        if getattr(args, "token", None)
+        else None
     )
 
     try:
         _report_path, _diff_dict, report = refresh_latest_report_state(output_dir, args)
     except FileNotFoundError:
-        print_info("No existing audit report found in output directory. Run a normal audit first.")
+        print_info(
+            "No existing audit report found in output directory. Run a normal audit first."
+        )
         return
 
     truth_path = truth_latest_path(output_dir)
@@ -140,4 +144,6 @@ def run_auto_apply_approved_mode(args, output_dir: Path) -> None:
             f"Campaign {campaign_type!r}: applied {applied_count} / {len(trusted_actions)} actions."
         )
 
-    print_info(f"Auto-apply complete: {total_applied} applied, {total_skipped} skipped.")
+    print_info(
+        f"Auto-apply complete: {total_applied} applied, {total_skipped} skipped."
+    )

@@ -64,7 +64,9 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "resolution_evidence_summary": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
-            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "next_action_confidence_reasons": [
+                "The next step is tied directly to the current top target."
+            ],
             "primary_target_trust_policy": "act-with-review",
             "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
             "next_action_trust_policy": "act-with-review",
@@ -362,7 +364,12 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "age_days": 4,
                 "aging_status": "watch",
             },
-            "attention_age_bands": {"0-1 days": 0, "2-7 days": 1, "8-21 days": 0, "22+ days": 0},
+            "attention_age_bands": {
+                "0-1 days": 0,
+                "2-7 days": 1,
+                "8-21 days": 0,
+                "22+ days": 0,
+            },
             "accountability_summary": "This urgent item is already being watched across recent runs, so it stays ahead of ready work until it clears. Aging pressure: 0 chronic item(s) and 0 newly stale item(s).",
             "primary_target": {
                 "item_id": "campaign-drift:repo-c",
@@ -399,7 +406,11 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             }
         ],
         "operator_recent_changes": [
-            {"generated_at": "2026-04-07T12:00:00+00:00", "repo": "RepoC", "summary": "managed-issue-edited"}
+            {
+                "generated_at": "2026-04-07T12:00:00+00:00",
+                "repo": "RepoC",
+                "summary": "managed-issue-edited",
+            }
         ],
     }
 
@@ -474,19 +485,45 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery" in markdown
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls" in markdown
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls" in markdown
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls" in markdown
+    )
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery" in markdown
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls" in markdown
+    )
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery"
+        in markdown
+    )
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls" in markdown
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence" in markdown
+    )
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls"
+        in markdown
+    )
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence" in markdown
-    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls" in markdown
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls"
+        in markdown
+    )
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery"
+        in markdown
+    )
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls" in markdown
+    )
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        in markdown
+    )
+    assert (
+        "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        in markdown
+    )
     assert "Reset Re-entry Rebuild Persistence" in markdown
     assert "Reset Re-entry Rebuild Churn Controls" in markdown
     assert "Reacquisition Persistence" in markdown
@@ -514,7 +551,9 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     payload["operator_summary"]["action_sync_summary"] = {
         "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
     }
-    payload["operator_summary"]["next_action_sync_step"] = "Preview Security Review next, then decide whether it is ready to sync to all."
+    payload["operator_summary"]["next_action_sync_step"] = (
+        "Preview Security Review next, then decide whether it is ready to sync to all."
+    )
     payload["operator_summary"]["apply_readiness_summary"] = {
         "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
     }
@@ -571,43 +610,92 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
             "drift_state": "managed-project-item-missing",
         }
     ]
-    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(json.dumps(payload))
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(
+        json.dumps(payload)
+    )
 
     build_scheduled_handoff(tmp_path)
 
     markdown = (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").read_text()
     assert "Campaign mirror: Security Review" in markdown
-    assert "GitHub Projects: configured (octo-org #7, 2 items, 1 project drift)" in markdown
+    assert (
+        "GitHub Projects: configured (octo-org #7, 2 items, 1 project drift)"
+        in markdown
+    )
     assert "Action Sync readiness: Action Sync is preview-ready" in markdown
     assert "Next Action Sync step: Preview Security Review next" in markdown
     assert "Apply packet: Apply handoff says preview Security Review next" in markdown
-    assert "Action Sync command hint: audit testuser --campaign security-review --writeback-target all" in markdown
+    assert (
+        "Action Sync command hint: audit testuser --campaign security-review --writeback-target all"
+        in markdown
+    )
     assert "Post-apply monitoring: Security Review was applied recently" in markdown
-    assert "Next monitoring step: Monitor Security Review for at least 2 post-apply runs" in markdown
-    assert "Campaign tuning: Security Review should win ties because recent outcomes are proven." in markdown
-    assert "Next Tie-Break Candidate: Security Review should win ties inside the preview-ready group" in markdown
-    assert "Historical portfolio intelligence: RepoC is improving after intervention while RepoD still looks relapsing." in markdown
-    assert "Next historical focus: Read RepoC next: it is the clearest current example of improvement after intervention." in markdown
-    assert "Automation Guidance: Preview Security Review next; that is the strongest safe automation step right now." in markdown
-    assert "Next safe automation step: Preview Security Review next; that is the strongest safe automation step right now." in markdown
-    assert "Safe automation command: audit testuser --campaign security-review --writeback-target all" in markdown
+    assert (
+        "Next monitoring step: Monitor Security Review for at least 2 post-apply runs"
+        in markdown
+    )
+    assert (
+        "Campaign tuning: Security Review should win ties because recent outcomes are proven."
+        in markdown
+    )
+    assert (
+        "Next Tie-Break Candidate: Security Review should win ties inside the preview-ready group"
+        in markdown
+    )
+    assert (
+        "Historical portfolio intelligence: RepoC is improving after intervention while RepoD still looks relapsing."
+        in markdown
+    )
+    assert (
+        "Next historical focus: Read RepoC next: it is the clearest current example of improvement after intervention."
+        in markdown
+    )
+    assert (
+        "Automation Guidance: Preview Security Review next; that is the strongest safe automation step right now."
+        in markdown
+    )
+    assert (
+        "Next safe automation step: Preview Security Review next; that is the strongest safe automation step right now."
+        in markdown
+    )
+    assert (
+        "Safe automation command: audit testuser --campaign security-review --writeback-target all"
+        in markdown
+    )
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
     payload = _control_center_payload(urgency="quiet")
-    payload["operator_summary"]["headline"] = "No operator triage items are currently surfaced."
-    payload["operator_summary"]["what_changed"] = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
-    payload["operator_summary"]["why_it_matters"] = "The latest run is quiet enough that no immediate operator intervention is required."
-    payload["operator_summary"]["what_to_do_next"] = "Continue the normal audit/control-center loop and review the next artifact for change."
-    payload["operator_summary"]["counts"] = {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+    payload["operator_summary"]["headline"] = (
+        "No operator triage items are currently surfaced."
+    )
+    payload["operator_summary"]["what_changed"] = (
+        "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+    )
+    payload["operator_summary"]["why_it_matters"] = (
+        "The latest run is quiet enough that no immediate operator intervention is required."
+    )
+    payload["operator_summary"]["what_to_do_next"] = (
+        "Continue the normal audit/control-center loop and review the next artifact for change."
+    )
+    payload["operator_summary"]["counts"] = {
+        "blocked": 0,
+        "urgent": 0,
+        "ready": 0,
+        "deferred": 0,
+    }
     payload["operator_summary"]["trend_status"] = "quiet"
-    payload["operator_summary"]["trend_summary"] = "The queue is quiet and has stayed that way for 2 consecutive run(s)."
+    payload["operator_summary"]["trend_summary"] = (
+        "The queue is quiet and has stayed that way for 2 consecutive run(s)."
+    )
     payload["operator_summary"]["quiet_streak_runs"] = 2
     payload["operator_summary"]["resolved_attention_count"] = 1
     payload["operator_summary"]["persisting_attention_count"] = 0
     payload["operator_queue"] = []
     payload["operator_recent_changes"] = []
-    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(json.dumps(payload))
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(
+        json.dumps(payload)
+    )
 
     result = build_scheduled_handoff(tmp_path)
 
@@ -620,15 +708,35 @@ def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
 
 def test_build_scheduled_handoff_closes_open_issue_when_run_turns_quiet(tmp_path):
     payload = _control_center_payload(urgency="quiet")
-    payload["operator_summary"]["headline"] = "No operator triage items are currently surfaced."
-    payload["operator_summary"]["counts"] = {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
-    payload["operator_summary"]["what_changed"] = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
-    payload["operator_summary"]["why_it_matters"] = "The latest run is quiet enough that no immediate operator intervention is required."
-    payload["operator_summary"]["what_to_do_next"] = "Continue the normal audit/control-center loop and review the next artifact for change."
+    payload["operator_summary"]["headline"] = (
+        "No operator triage items are currently surfaced."
+    )
+    payload["operator_summary"]["counts"] = {
+        "blocked": 0,
+        "urgent": 0,
+        "ready": 0,
+        "deferred": 0,
+    }
+    payload["operator_summary"]["what_changed"] = (
+        "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+    )
+    payload["operator_summary"]["why_it_matters"] = (
+        "The latest run is quiet enough that no immediate operator intervention is required."
+    )
+    payload["operator_summary"]["what_to_do_next"] = (
+        "Continue the normal audit/control-center loop and review the next artifact for change."
+    )
     payload["operator_queue"] = []
-    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(json.dumps(payload))
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(
+        json.dumps(payload)
+    )
 
-    result = build_scheduled_handoff(tmp_path, issue_state="open", issue_number="42", issue_url="https://example.com/42")
+    result = build_scheduled_handoff(
+        tmp_path,
+        issue_state="open",
+        issue_number="42",
+        issue_url="https://example.com/42",
+    )
 
     assert result["issue_candidate"]["action"] == "close"
     assert result["issue_candidate"]["close_reason"] == "quiet-recovery"
@@ -661,7 +769,12 @@ def test_build_scheduled_handoff_reopens_closed_canonical_issue_for_new_noise(tm
         json.dumps(_control_center_payload())
     )
 
-    result = build_scheduled_handoff(tmp_path, issue_state="closed", issue_number="42", issue_url="https://example.com/42")
+    result = build_scheduled_handoff(
+        tmp_path,
+        issue_state="closed",
+        issue_number="42",
+        issue_url="https://example.com/42",
+    )
 
     assert result["issue_candidate"]["action"] == "update"
     assert result["issue_candidate"]["reopen_existing"] is True

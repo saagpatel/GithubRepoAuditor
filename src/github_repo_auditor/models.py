@@ -258,8 +258,12 @@ class AuditReport:
         # AuditReport assembly needs portfolio/scoring modules that depend on these core
         # dataclasses.  Import them dynamically at call time so the model layer stays
         # import-light and does not form static import cycles.
-        implementation_hotspots = importlib.import_module("github_repo_auditor.implementation_hotspots")
-        portfolio_intelligence = importlib.import_module("github_repo_auditor.portfolio_intelligence")
+        implementation_hotspots = importlib.import_module(
+            "github_repo_auditor.implementation_hotspots"
+        )
+        portfolio_intelligence = importlib.import_module(
+            "github_repo_auditor.portfolio_intelligence"
+        )
         scorer = importlib.import_module("github_repo_auditor.scorer")
 
         # Tier distribution

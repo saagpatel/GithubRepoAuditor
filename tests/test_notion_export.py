@@ -22,7 +22,10 @@ def _make_report(**overrides) -> dict:
         "tier_distribution": {"shipped": 1, "wip": 1},
         "audits": [
             {
-                "metadata": {"name": "MappedRepo", "html_url": "https://github.com/user/MappedRepo"},
+                "metadata": {
+                    "name": "MappedRepo",
+                    "html_url": "https://github.com/user/MappedRepo",
+                },
                 "overall_score": 0.80,
                 "interest_score": 0.50,
                 "grade": "B",
@@ -30,12 +33,27 @@ def _make_report(**overrides) -> dict:
                 "badges": ["fresh", "fully-tested"],
                 "flags": [],
                 "analyzer_results": [
-                    {"dimension": "testing", "score": 0.9, "max_score": 1.0, "findings": [], "details": {}},
-                    {"dimension": "readme", "score": 0.4, "max_score": 1.0, "findings": [], "details": {}},
+                    {
+                        "dimension": "testing",
+                        "score": 0.9,
+                        "max_score": 1.0,
+                        "findings": [],
+                        "details": {},
+                    },
+                    {
+                        "dimension": "readme",
+                        "score": 0.4,
+                        "max_score": 1.0,
+                        "findings": [],
+                        "details": {},
+                    },
                 ],
             },
             {
-                "metadata": {"name": "UnmappedRepo", "html_url": "https://github.com/user/UnmappedRepo"},
+                "metadata": {
+                    "name": "UnmappedRepo",
+                    "html_url": "https://github.com/user/UnmappedRepo",
+                },
                 "overall_score": 0.30,
                 "interest_score": 0.10,
                 "grade": "F",
@@ -43,7 +61,13 @@ def _make_report(**overrides) -> dict:
                 "badges": [],
                 "flags": ["no-tests"],
                 "analyzer_results": [
-                    {"dimension": "testing", "score": 0.0, "max_score": 1.0, "findings": [], "details": {}},
+                    {
+                        "dimension": "testing",
+                        "score": 0.0,
+                        "max_score": 1.0,
+                        "findings": [],
+                        "details": {},
+                    },
                 ],
             },
         ],
@@ -111,7 +135,13 @@ class TestNormalizeEvent:
         audit["badges"] = [f"badge-{i}" for i in range(400)]
         audit["flags"] = [f"flag-{i}" for i in range(400)]
         audit["analyzer_results"] = [
-            {"dimension": f"dim-{i}", "score": 0.5, "max_score": 1.0, "findings": [], "details": {}}
+            {
+                "dimension": f"dim-{i}",
+                "score": 0.5,
+                "max_score": 1.0,
+                "findings": [],
+                "details": {},
+            }
             for i in range(400)
         ]
         mapping = {"MappedRepo": {"localProjectId": "uuid-123"}}
@@ -134,11 +164,16 @@ class TestProjectMappingLookup:
             "GitHub Repo Auditor": {"localProjectId": "spaced-id"},
             "GithubRepoAuditor": {"localProjectId": "exact-id"},
         }
-        assert _lookup_project_mapping("GithubRepoAuditor", mapping)["localProjectId"] == "exact-id"
+        assert (
+            _lookup_project_mapping("GithubRepoAuditor", mapping)["localProjectId"]
+            == "exact-id"
+        )
 
     def test_normalized_alias_match_resolves_spacing_and_case(self):
         mapping = {"MCP Audit": {"localProjectId": "mcp-id"}}
-        assert _lookup_project_mapping("MCPAudit", mapping)["localProjectId"] == "mcp-id"
+        assert (
+            _lookup_project_mapping("MCPAudit", mapping)["localProjectId"] == "mcp-id"
+        )
 
 
 def test_lookup_project_mapping_rejects_ambiguous_normalized_aliases() -> None:
@@ -173,22 +208,30 @@ class TestBiggestDrag:
 
 class TestExportNotionEvents:
     def test_creates_json_file(self, tmp_path):
-        config_dir = _write_map(tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}})
+        config_dir = _write_map(
+            tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}}
+        )
         result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
         assert result["events_path"].is_file()
 
     def test_event_count_matches_mapped(self, tmp_path):
-        config_dir = _write_map(tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}})
+        config_dir = _write_map(
+            tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}}
+        )
         result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
         assert result["event_count"] == 1
 
     def test_unmapped_repos_collected(self, tmp_path):
-        config_dir = _write_map(tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}})
+        config_dir = _write_map(
+            tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}}
+        )
         result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
         assert "UnmappedRepo" in result["unmapped"]
 
     def test_json_has_correct_structure(self, tmp_path):
-        config_dir = _write_map(tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}})
+        config_dir = _write_map(
+            tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}}
+        )
         result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
         data = json.loads(result["events_path"].read_text())
         assert data["version"] == 1
@@ -198,7 +241,9 @@ class TestExportNotionEvents:
         assert data["stats"]["unmapped_repos"] == 1
 
     def test_exported_events_include_machine_data(self, tmp_path):
-        config_dir = _write_map(tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}})
+        config_dir = _write_map(
+            tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}}
+        )
         result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
         data = json.loads(result["events_path"].read_text())
         event = data["events"][0]

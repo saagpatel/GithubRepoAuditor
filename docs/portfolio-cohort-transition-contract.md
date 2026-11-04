@@ -25,13 +25,13 @@ receipt:  required = prospective
           outgoing = prior − prospective
           collection = required ∪ outgoing
         ↓
-producer independently recomputes the candidate cohort
+producer independently recomputes the candidate cohort as of receipt produced_at
         ↓
 R1  receipt   == required ∪ outgoing
 R2  required  ∩ outgoing == ∅
 R3  candidate == required                      (exact set equality)
 R4  outgoing  ∩ candidate == ∅
-R5  final     ⊆ receipt
+R5  final     ⊆ receipt ∪ explicitly pending clock-only arrivals
 R6  every departure positively explained
         ↓
 transactional publication
@@ -42,6 +42,63 @@ not relaxed: it now compares against a derived, receipt-declared set instead of 
 hand-maintained integer. That is strictly stronger on membership — a same-size
 swap passed the old count tripwire silently and now fails R3 with both sides
 named.
+
+## Receipt observation clock and pending coverage
+
+R3 evaluates time-relative activity staleness at the receipt's timezone-aware
+`produced_at` observation time. It uses the inputs observed by the current run:
+activity timestamp, classification, and prior security evidence. Only the clock
+changes; inputs are not restored from history. A moved HEAD, reclassification,
+or real coverage gap that changes membership at that observation time still
+fails the exact set comparison. Missing, invalid, or timezone-less receipt time
+fails closed. Receipt freshness and publication guards still use the run/live
+clock.
+
+The same observed inputs are also evaluated at the run clock. Repositories that
+enter attention only because of elapsed time are listed as **pending security
+coverage**, remain in current attention, and are not counted as collected or
+admitted security evidence. Covered repositories that leave attention only
+because of elapsed time are recorded without failing. R1, R2, and R4 remain
+strict; R4 checks the current candidate as before, so declared outgoing members
+cannot become pending. Declared-outgoing departure evidence is unchanged. R6
+accepts a clock-only departure only when both the pre-security and post-security
+views show that departure from changing the clock alone.
+
+`portfolio-cohort-transition-latest.json` adds these fields under `transition`:
+
+- `receipt_observed_at`
+- `pending_security_coverage_count` and `pending_security_coverage_repositories`
+- `clock_departed_count` and `clock_departed_repositories`
+
+For runs with clock differences, the same lists and counts appear under
+`portfolio-truth-latest.json` → `source_summary.security_coverage_clock`, with
+`receipt_observed_at` and `evaluated_at`. The portfolio Markdown report names
+each pending repository and covered clock departure. These are coverage
+annotations; the existing attention-state vocabulary remains unchanged.
+
+On R3 publication failure, a unique
+`portfolio-cohort-r3-failure-<run-stamp>-<unique-id>.json` is written in the
+requested output directory before the error is returned. The error points to
+it. It contains receipt identity/time, receipt and run evaluation clocks,
+required/collected and both derived cohorts, and differing repositories'
+activity timestamp/source, classification, local HEAD, and attention states.
+It contains metadata only and is outside the publication transaction, so the
+prior truth and reports remain untouched. In-memory snapshot builds carry the
+same diagnostics on `CohortR3Error` without writing files.
+
+Operator-scripts integration: advance `release-pins.json`'s
+`auditor_truth_ref.value` to the reviewed producer commit containing this fix,
+then regenerate and activate the governed release manifest. Both wrappers read
+that shared pin through release preflight; keep one pin. Extend
+`portfolio-maintenance.sh`'s `read_cohort_transition()` JSON projection with the
+five new transition fields listed above, so its terminal-state/history
+`cohort_transition` summary retains the pending repositories and clock departures.
+Any digest or summary consumer should display
+`pending_security_coverage_repositories` as pending (never covered/clean) and
+`clock_departed_repositories` as already covered. Read the lists from the
+transition outcome or the optional truth summary; absent lists mean empty for
+older outputs. Exit status remains the failure gate. No new CLI flag, changed
+receipt schema, attention-state enum, or hand-maintained cohort count is needed.
 
 ## Surfaces
 
@@ -59,8 +116,9 @@ two equivalent algorithms would silently drift apart and reproduce the deadlock.
 
 ## Departure evidence
 
-A repository may leave the published default-attention cohort only with positive
-evidence, through one of three branches:
+A source or security change may remove a repository from the published
+default-attention cohort only with positive evidence, through one of three
+branches (covered clock departures are handled separately above):
 
 1. **observed resolution** — prior high+critical > 0, fresh receipt, Dependabot
    `observed`, current high = critical = 0.
@@ -99,8 +157,9 @@ Both are overridable per run (`--max-cohort-size`, `--max-cohort-delta`).
 ## Backward compatibility
 
 A receipt without the transition block is legacy-shaped: reconcile falls back to
-`required = collected`, `outgoing = ∅`, which reproduces the pre-transition
-semantics verbatim, size tripwire included. `--portfolio-truth-require-cohort-transition`
+`required = collected`, `outgoing = ∅`, retaining the pre-transition partition
+and size tripwire. Receipt-time recency evaluation applies in this mode too.
+`--portfolio-truth-require-cohort-transition`
 turns "a stale collector silently reverted us to a deadlock" into a named
 refusal. `--portfolio-truth-security-cohort-count` is retained as a deprecated
 alias for one release so a stale deployed wrapper cannot hard-error on an unknown

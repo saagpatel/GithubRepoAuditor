@@ -2,7 +2,12 @@ import argparse
 
 import pytest
 
-from github_repo_auditor.config import inspect_config, load_config, merge_config_with_args, validate_config_data
+from github_repo_auditor.config import (
+    inspect_config,
+    load_config,
+    merge_config_with_args,
+    validate_config_data,
+)
 
 
 class TestLoadConfig:
@@ -42,7 +47,9 @@ class TestLoadConfig:
         cfg = tmp_path / "list.yaml"
         cfg.write_text("- html\n- notion\n")
         inspection = inspect_config(cfg)
-        assert inspection.errors == ["Config root must be a YAML mapping of option names to values."]
+        assert inspection.errors == [
+            "Config root must be a YAML mapping of option names to values."
+        ]
 
 
 class TestMergeConfig:
@@ -98,8 +105,17 @@ class TestMergeConfig:
         assert not hasattr(args, "nonexistent_key")
 
     def test_config_overrides_known_string_defaults(self):
-        args = argparse.Namespace(excel_mode="standard", preflight_mode="auto", watch_strategy="adaptive")
-        merge_config_with_args(args, {"excel_mode": "template", "preflight_mode": "strict", "watch_strategy": "full"})
+        args = argparse.Namespace(
+            excel_mode="standard", preflight_mode="auto", watch_strategy="adaptive"
+        )
+        merge_config_with_args(
+            args,
+            {
+                "excel_mode": "template",
+                "preflight_mode": "strict",
+                "watch_strategy": "full",
+            },
+        )
         assert args.excel_mode == "template"
         assert args.preflight_mode == "strict"
         assert args.watch_strategy == "full"
@@ -124,5 +140,11 @@ class TestValidateConfigData:
         assert issues[0]["severity"] == "error"
 
     def test_accepts_new_operator_choices(self):
-        issues = validate_config_data({"preflight_mode": "strict", "triage_view": "urgent", "watch_strategy": "adaptive"})
+        issues = validate_config_data(
+            {
+                "preflight_mode": "strict",
+                "triage_view": "urgent",
+                "watch_strategy": "adaptive",
+            }
+        )
         assert issues == []

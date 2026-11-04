@@ -12,19 +12,25 @@ def _normalize_profile_name(report_data: dict, profile_name: str | None) -> str:
     profiles = report_data.get("profiles", {})
     if profile_name and profile_name in profiles:
         return profile_name
-    return "default" if "default" in profiles else (next(iter(profiles.keys()), "default"))
+    return (
+        "default" if "default" in profiles else (next(iter(profiles.keys()), "default"))
+    )
 
 
 def collection_membership_map(report_data: dict) -> dict[str, list[str]]:
     memberships: dict[str, list[str]] = {}
     for collection_name, collection_data in report_data.get("collections", {}).items():
         for repo_data in collection_data.get("repos", []):
-            repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            repo_name = (
+                repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            )
             memberships.setdefault(repo_name, []).append(collection_name)
     return memberships
 
 
-def filter_audits_by_collection(report_data: dict, collection_name: str | None = None) -> list[dict]:
+def filter_audits_by_collection(
+    report_data: dict, collection_name: str | None = None
+) -> list[dict]:
     audits = list(report_data.get("audits", []))
     if not collection_name:
         return audits
@@ -32,11 +38,14 @@ def filter_audits_by_collection(report_data: dict, collection_name: str | None =
     return [
         audit
         for audit in audits
-        if collection_name in memberships.get(audit.get("metadata", {}).get("name", ""), [])
+        if collection_name
+        in memberships.get(audit.get("metadata", {}).get("name", ""), [])
     ]
 
 
-def compute_profile_score_for_audit(audit: dict, profiles: dict[str, dict], profile_name: str) -> float:
+def compute_profile_score_for_audit(
+    audit: dict, profiles: dict[str, dict], profile_name: str
+) -> float:
     profile = profiles.get(profile_name) or profiles.get("default", {})
     weights = profile.get("lens_weights", {})
     if not weights:
@@ -61,20 +70,28 @@ def rank_audits_for_profile(
 
     for audit in filter_audits_by_collection(report_data, collection_name):
         name = audit.get("metadata", {}).get("name", "")
-        ranked.append({
-            "name": name,
-            "profile_score": compute_profile_score_for_audit(audit, profiles, normalized_profile),
-            "overall_score": round(audit.get("overall_score", 0), 3),
-            "interest_score": round(audit.get("interest_score", 0), 3),
-            "tier": audit.get("completeness_tier", ""),
-            "grade": audit.get("grade", ""),
-            "collections": memberships.get(name, []),
-            "hotspot_count": len(audit.get("hotspots", [])),
-            "security_label": audit.get("security_posture", {}).get("label", "unknown"),
-            "primary_hotspot": audit.get("hotspots", [{}])[0].get("title", "") if audit.get("hotspots") else "",
-            "lenses": audit.get("lenses", {}),
-            "audit": audit,
-        })
+        ranked.append(
+            {
+                "name": name,
+                "profile_score": compute_profile_score_for_audit(
+                    audit, profiles, normalized_profile
+                ),
+                "overall_score": round(audit.get("overall_score", 0), 3),
+                "interest_score": round(audit.get("interest_score", 0), 3),
+                "tier": audit.get("completeness_tier", ""),
+                "grade": audit.get("grade", ""),
+                "collections": memberships.get(name, []),
+                "hotspot_count": len(audit.get("hotspots", [])),
+                "security_label": audit.get("security_posture", {}).get(
+                    "label", "unknown"
+                ),
+                "primary_hotspot": audit.get("hotspots", [{}])[0].get("title", "")
+                if audit.get("hotspots")
+                else "",
+                "lenses": audit.get("lenses", {}),
+                "audit": audit,
+            }
+        )
 
     ranked.sort(
         key=lambda item: (
@@ -114,15 +131,17 @@ def summarize_collection_views(report_data: dict) -> list[dict]:
     summary = []
     for collection_name, collection_data in report_data.get("collections", {}).items():
         repos = collection_data.get("repos", [])
-        summary.append({
-            "name": collection_name,
-            "count": len(repos),
-            "description": collection_data.get("description", ""),
-            "repos": [
-                repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
-                for repo_data in repos[:5]
-            ],
-        })
+        summary.append(
+            {
+                "name": collection_name,
+                "count": len(repos),
+                "description": collection_data.get("description", ""),
+                "repos": [
+                    repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+                    for repo_data in repos[:5]
+                ],
+            }
+        )
     return summary
 
 
@@ -136,14 +155,16 @@ def summarize_scenario_preview(
     weights = profiles.get(normalized_profile, {}).get("lens_weights", {})
     selected_audits = filter_audits_by_collection(report_data, collection_name)
 
-    grouped: dict[str, dict] = defaultdict(lambda: {
-        "title": "",
-        "lens": "",
-        "repo_count": 0,
-        "expected_lens_delta_total": 0.0,
-        "weighted_impact_total": 0.0,
-        "projected_tier_promotions": 0,
-    })
+    grouped: dict[str, dict] = defaultdict(
+        lambda: {
+            "title": "",
+            "lens": "",
+            "repo_count": 0,
+            "expected_lens_delta_total": 0.0,
+            "weighted_impact_total": 0.0,
+            "projected_tier_promotions": 0,
+        }
+    )
 
     for audit in selected_audits:
         for action in audit.get("action_candidates", [])[:2]:
@@ -152,7 +173,9 @@ def summarize_scenario_preview(
             entry["lens"] = action.get("lens", "")
             entry["repo_count"] += 1
             entry["expected_lens_delta_total"] += action.get("expected_lens_delta", 0.0)
-            entry["weighted_impact_total"] += action.get("expected_lens_delta", 0.0) * abs(weights.get(action.get("lens", ""), 1.0))
+            entry["weighted_impact_total"] += action.get(
+                "expected_lens_delta", 0.0
+            ) * abs(weights.get(action.get("lens", ""), 1.0))
             if str(action.get("expected_tier_movement", "")).startswith("Closer to"):
                 entry["projected_tier_promotions"] += 1
 
@@ -163,18 +186,28 @@ def summarize_scenario_preview(
                 "title": value["title"],
                 "lens": value["lens"],
                 "repo_count": value["repo_count"],
-                "average_expected_lens_delta": round(value["expected_lens_delta_total"] / value["repo_count"], 3),
+                "average_expected_lens_delta": round(
+                    value["expected_lens_delta_total"] / value["repo_count"], 3
+                ),
                 "weighted_impact": round(value["weighted_impact_total"], 3),
                 "projected_tier_promotions": value["projected_tier_promotions"],
             }
             for key, value in grouped.items()
             if value["repo_count"] > 0
         ],
-        key=lambda item: (item["weighted_impact"], item["repo_count"], item["average_expected_lens_delta"]),
+        key=lambda item: (
+            item["weighted_impact"],
+            item["repo_count"],
+            item["average_expected_lens_delta"],
+        ),
         reverse=True,
     )[:5]
 
-    projected_average_score_delta = round(sum(item["average_expected_lens_delta"] for item in top_levers) * 0.08, 3) if top_levers else 0.0
+    projected_average_score_delta = (
+        round(sum(item["average_expected_lens_delta"] for item in top_levers) * 0.08, 3)
+        if top_levers
+        else 0.0
+    )
 
     return {
         "profile_name": normalized_profile,
@@ -183,7 +216,9 @@ def summarize_scenario_preview(
         "portfolio_projection": {
             "selected_repo_count": len(selected_audits),
             "projected_average_score_delta": projected_average_score_delta,
-            "projected_tier_promotions": sum(item["projected_tier_promotions"] for item in top_levers),
+            "projected_tier_promotions": sum(
+                item["projected_tier_promotions"] for item in top_levers
+            ),
         },
     }
 
@@ -198,10 +233,16 @@ def build_analyst_context(
     return {
         "profile_name": normalized_profile,
         "collection_name": collection_name,
-        "ranked_audits": rank_audits_for_profile(report_data, normalized_profile, collection_name),
-        "profile_leaderboard": build_profile_leaderboard(report_data, normalized_profile, collection_name),
+        "ranked_audits": rank_audits_for_profile(
+            report_data, normalized_profile, collection_name
+        ),
+        "profile_leaderboard": build_profile_leaderboard(
+            report_data, normalized_profile, collection_name
+        ),
         "collection_summary": summarize_collection_views(report_data),
-        "scenario_preview": summarize_scenario_preview(report_data, normalized_profile, collection_name),
+        "scenario_preview": summarize_scenario_preview(
+            report_data, normalized_profile, collection_name
+        ),
     }
 
 
@@ -235,7 +276,9 @@ def load_run_catalog(output_dir: Path, username: str) -> list[dict]:
     ]
 
 
-def load_previous_report_path(output_dir: Path, username: str, current_report_path: Path | None = None) -> Path | None:
+def load_previous_report_path(
+    output_dir: Path, username: str, current_report_path: Path | None = None
+) -> Path | None:
     catalog = load_run_catalog(output_dir, username)
     if not catalog:
         return None

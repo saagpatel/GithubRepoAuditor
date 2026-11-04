@@ -5,7 +5,10 @@ from pathlib import Path
 from openpyxl import Workbook
 
 from github_repo_auditor.approval_ledger import render_approval_center_markdown
-from github_repo_auditor.excel_export import _build_approval_ledger, _build_hidden_data_sheets
+from github_repo_auditor.excel_export import (
+    _build_approval_ledger,
+    _build_hidden_data_sheets,
+)
 from github_repo_auditor.review_pack import export_review_pack
 from github_repo_auditor.scheduled_handoff import render_scheduled_handoff_markdown
 from github_repo_auditor.web_export import _render_html
@@ -111,7 +114,9 @@ def _report() -> dict:
     }
 
 
-def test_review_pack_web_and_scheduled_handoff_include_approval_workflow(tmp_path: Path) -> None:
+def test_review_pack_web_and_scheduled_handoff_include_approval_workflow(
+    tmp_path: Path,
+) -> None:
     report = _report()
 
     review_pack = export_review_pack(report, tmp_path)["review_pack_path"].read_text()

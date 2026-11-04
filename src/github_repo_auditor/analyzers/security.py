@@ -1,4 +1,5 @@
 """Security surface analyzer — scans for exposed secrets, dangerous files, and security config."""
+
 from __future__ import annotations
 
 import re
@@ -31,16 +32,28 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
             re.IGNORECASE,
         ),
     ),
-    ("Private Key Header", re.compile(r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----")),
+    (
+        "Private Key Header",
+        re.compile(r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----"),
+    ),
 ]
 
 # Files that should never be committed
-DANGEROUS_FILES = frozenset({
-    ".env", ".env.local", ".env.production",
-    "credentials.json", "service-account.json",
-    "id_rsa", "id_ed25519", "id_dsa",
-    ".htpasswd", ".pgpass", ".netrc",
-})
+DANGEROUS_FILES = frozenset(
+    {
+        ".env",
+        ".env.local",
+        ".env.production",
+        "credentials.json",
+        "service-account.json",
+        "id_rsa",
+        "id_ed25519",
+        "id_dsa",
+        ".htpasswd",
+        ".pgpass",
+        ".netrc",
+    }
+)
 
 DANGEROUS_EXTENSIONS = frozenset({".pem", ".key", ".p12", ".pfx"})
 
@@ -79,33 +92,71 @@ DEPENDABOT_ECOSYSTEM_FILES = {
 }
 
 # Directories to skip during scanning
-SKIP_DIRS = frozenset({
-    ".git", "node_modules", "vendor", "__pycache__", ".venv",
-    "venv", ".tox", "dist", "build", ".next", ".nuxt",
-    ".claude", ".serena", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    "output", "htmlcov",
-})
+SKIP_DIRS = frozenset(
+    {
+        ".git",
+        "node_modules",
+        "vendor",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".tox",
+        "dist",
+        "build",
+        ".next",
+        ".nuxt",
+        ".claude",
+        ".serena",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "output",
+        "htmlcov",
+    }
+)
 
-CODE_EXTENSIONS = frozenset({
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".java",
-    ".rb", ".php", ".swift", ".kt", ".scala", ".sh", ".bash",
-    ".yml", ".yaml", ".toml", ".json", ".xml", ".env.example",
-})
+CODE_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".rs",
+        ".go",
+        ".java",
+        ".rb",
+        ".php",
+        ".swift",
+        ".kt",
+        ".scala",
+        ".sh",
+        ".bash",
+        ".yml",
+        ".yaml",
+        ".toml",
+        ".json",
+        ".xml",
+        ".env.example",
+    }
+)
 
-PLACEHOLDER_SECRET_VALUES = frozenset({
-    "client-secret",
-    "change-me",
-    "dev-webhook-secret",
-    "test-secret",
-    "test-only-password",
-    "dummy-secret",
-    "example-secret",
-    "placeholder-secret",
-    "playwright-secret",
-    "required",
-    "supersecretkey",
-    "your-secret-here",
-})
+PLACEHOLDER_SECRET_VALUES = frozenset(
+    {
+        "client-secret",
+        "change-me",
+        "dev-webhook-secret",
+        "test-secret",
+        "test-only-password",
+        "dummy-secret",
+        "example-secret",
+        "placeholder-secret",
+        "playwright-secret",
+        "required",
+        "supersecretkey",
+        "your-secret-here",
+    }
+)
 
 
 class SecurityAnalyzer(BaseAnalyzer):
@@ -236,7 +287,7 @@ def _is_ignored_secret_match(match: re.Match, path: Path | None = None) -> bool:
     try:
         value = match.group("value").strip()
     except IndexError:
-        snippet = match.string[match.start(): match.start() + 120].lower()
+        snippet = match.string[match.start() : match.start() + 120].lower()
         if "..." in snippet:
             return True
         return False
@@ -260,7 +311,8 @@ def _is_ignored_secret_match(match: re.Match, path: Path | None = None) -> bool:
     if is_test_path and re.fullmatch(r"[0-9a-f]{32,}", normalized):
         return True
     if normalized_token.startswith("xox") and any(
-        marker in normalized_token for marker in ("fake", "test", "dummy", "your", "placeholder")
+        marker in normalized_token
+        for marker in ("fake", "test", "dummy", "your", "placeholder")
     ):
         return True
     if normalized_token.startswith("xox") and len(normalized_token) < 24:
@@ -271,11 +323,14 @@ def _is_ignored_secret_match(match: re.Match, path: Path | None = None) -> bool:
     ):
         return True
     if "password" in normalized_token and any(
-        marker in normalized_token for marker in ("test", "smoke", "fixture", "placeholder")
+        marker in normalized_token
+        for marker in ("test", "smoke", "fixture", "placeholder")
     ):
         return True
-    if normalized.startswith("{") and normalized.endswith("}") and re.fullmatch(
-        r"\{[a-zA-Z_][a-zA-Z0-9_]*\}", normalized
+    if (
+        normalized.startswith("{")
+        and normalized.endswith("}")
+        and re.fullmatch(r"\{[a-zA-Z_][a-zA-Z0-9_]*\}", normalized)
     ):
         return True
     if value.startswith("${") and ":-" in value:

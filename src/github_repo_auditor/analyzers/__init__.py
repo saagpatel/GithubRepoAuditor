@@ -14,7 +14,10 @@ from github_repo_auditor.analyzers.base import BaseAnalyzer
 from github_repo_auditor.analyzers.cicd import CicdAnalyzer
 from github_repo_auditor.analyzers.code_quality import CodeQualityAnalyzer
 from github_repo_auditor.analyzers.community_profile import CommunityProfileAnalyzer
-from github_repo_auditor.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
+from github_repo_auditor.analyzers.completeness import (
+    BuildReadinessAnalyzer,
+    DocumentationAnalyzer,
+)
 from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer
 from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 from github_repo_auditor.analyzers.interest import InterestAnalyzer
@@ -125,13 +128,20 @@ def run_with_cache(
     # Pass sbom_source only to DependenciesAnalyzer to avoid breaking the
     # BaseAnalyzer contract for all other analyzers.
     if isinstance(analyzer, DependenciesAnalyzer):
-        result = analyzer.analyze(repo_path, metadata, github_client, sbom_source=sbom_source)
+        result = analyzer.analyze(
+            repo_path, metadata, github_client, sbom_source=sbom_source
+        )
     else:
         result = analyzer.analyze(repo_path, metadata, github_client)
 
     if inputs_hash is not None and conn is not None:
         store(
-            conn, metadata.name, commit_sha, analyzer.name, inputs_hash, dataclasses.asdict(result)
+            conn,
+            metadata.name,
+            commit_sha,
+            analyzer.name,
+            inputs_hash,
+            dataclasses.asdict(result),
         )
 
     return result

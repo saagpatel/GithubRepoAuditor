@@ -39,7 +39,9 @@ _MAX_DISMISSAL_EVENTS = 1000
 # (e.g. portfolio-truth generated_at + target_tier).
 # OrderedDict for LRU-style eviction (insertion-order, FIFO eviction on overflow).
 # Tuple: (suggestions, cost_usd, iso_timestamp)
-_suggestion_cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float, str]] = OrderedDict()
+_suggestion_cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float, str]] = (
+    OrderedDict()
+)
 
 # Track which output_dir paths have already been loaded from disk (lazy-load guard).
 _loaded_from_disk: set[Path] = set()
@@ -78,7 +80,9 @@ def load_suggestion_cache(
         return OrderedDict()
 
     if not isinstance(data, dict):
-        logger.warning("suggest_initiatives: unrecognised cache schema in %s — ignoring", path)
+        logger.warning(
+            "suggest_initiatives: unrecognised cache schema in %s — ignoring", path
+        )
         return OrderedDict()
 
     version = data.get("version")
@@ -93,12 +97,16 @@ def load_suggestion_cache(
         return OrderedDict()
 
     if version != 2:
-        logger.warning("suggest_initiatives: unrecognised cache schema in %s — ignoring", path)
+        logger.warning(
+            "suggest_initiatives: unrecognised cache schema in %s — ignoring", path
+        )
         return OrderedDict()
 
     # ── v2: parse + TTL eviction ──────────────────────────────────────────────
     cutoff = date.today() - timedelta(days=_CACHE_TTL_DAYS)
-    result: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict()
+    result: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = (
+        OrderedDict()
+    )
     dropped = 0
 
     for entry in data.get("entries", []):
@@ -106,14 +114,18 @@ def load_suggestion_cache(
             key = str(entry["key"])
             cost = float(entry["cost"])
             ts = str(entry["timestamp"])
-            suggestions = [InitiativeSuggestion.from_dict(s) for s in entry["suggestions"]]
+            suggestions = [
+                InitiativeSuggestion.from_dict(s) for s in entry["suggestions"]
+            ]
             entry_date = date.fromisoformat(ts[:10])
             if entry_date < cutoff:
                 dropped += 1
                 continue
             result[key] = (suggestions, cost, ts)
         except (KeyError, TypeError, ValueError) as exc:
-            logger.warning("suggest_initiatives: skipping malformed cache entry: %s", exc)
+            logger.warning(
+                "suggest_initiatives: skipping malformed cache entry: %s", exc
+            )
 
     if dropped:
         logger.info(
@@ -166,7 +178,9 @@ def _write_cache_v2(
             json.dump(serialisable, tmp, indent=2)
         tmp_path.replace(path)
     except OSError as exc:
-        logger.error("suggest_initiatives: atomic cache write failed for %s: %s", path, exc)
+        logger.error(
+            "suggest_initiatives: atomic cache write failed for %s: %s", path, exc
+        )
         raise
 
 
@@ -182,8 +196,8 @@ def save_suggestion_cache(
     next :func:`load_suggestion_cache` call.
     """
     # Cap to most recent _CACHE_MAX_SIZE entries before writing
-    trimmed: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict(
-        list(cache.items())[-_CACHE_MAX_SIZE:]
+    trimmed: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = (
+        OrderedDict(list(cache.items())[-_CACHE_MAX_SIZE:])
     )
     _write_cache_v2(path, trimmed)
 
@@ -267,11 +281,15 @@ def load_dismissed(path: Path) -> list[DismissedSuggestion]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("suggest_initiatives: could not load dismissed file %s: %s", path, exc)
+        logger.warning(
+            "suggest_initiatives: could not load dismissed file %s: %s", path, exc
+        )
         return []
 
     if not isinstance(data, dict) or data.get("version") not in (1, 2):
-        logger.warning("suggest_initiatives: unrecognised dismissed schema in %s — ignoring", path)
+        logger.warning(
+            "suggest_initiatives: unrecognised dismissed schema in %s — ignoring", path
+        )
         return []
 
     result: list[DismissedSuggestion] = []
@@ -279,7 +297,9 @@ def load_dismissed(path: Path) -> list[DismissedSuggestion]:
         try:
             result.append(DismissedSuggestion.from_dict(entry))
         except (KeyError, TypeError, ValueError) as exc:
-            logger.warning("suggest_initiatives: skipping malformed dismissed entry: %s", exc)
+            logger.warning(
+                "suggest_initiatives: skipping malformed dismissed entry: %s", exc
+            )
 
     return result
 
@@ -291,7 +311,9 @@ def load_dismissal_events(path: Path) -> list[DismissalEvent]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("suggest_initiatives: could not load dismissed file %s: %s", path, exc)
+        logger.warning(
+            "suggest_initiatives: could not load dismissed file %s: %s", path, exc
+        )
         return []
 
     if not isinstance(data, dict) or data.get("version") not in (1, 2):
@@ -302,7 +324,9 @@ def load_dismissal_events(path: Path) -> list[DismissalEvent]:
         try:
             result.append(DismissalEvent.from_dict(entry))
         except (KeyError, TypeError, ValueError) as exc:
-            logger.warning("suggest_initiatives: skipping malformed dismissal event: %s", exc)
+            logger.warning(
+                "suggest_initiatives: skipping malformed dismissal event: %s", exc
+            )
 
     return result
 
@@ -367,7 +391,9 @@ def _save_dismissed_full(
             json.dump(serialisable, tmp, indent=2)
         tmp_path.replace(path)
     except OSError as exc:
-        logger.error("suggest_initiatives: atomic dismissed write failed for %s: %s", path, exc)
+        logger.error(
+            "suggest_initiatives: atomic dismissed write failed for %s: %s", path, exc
+        )
         raise
 
 
@@ -512,7 +538,9 @@ def clear_suggestion_cache(path: Path | None = None) -> None:
         try:
             path.unlink()
         except OSError as exc:
-            logger.warning("suggest_initiatives: could not delete cache %s: %s", path, exc)
+            logger.warning(
+                "suggest_initiatives: could not delete cache %s: %s", path, exc
+            )
 
 
 # ── Public dataclass ──────────────────────────────────────────────────────────
@@ -721,7 +749,8 @@ def parse_suggest_response(
         repo_name = str(entry.get("repo_name") or "")
         if repo_name not in candidate_map:
             logger.debug(
-                "suggest_initiatives: unknown repo_name %r in LLM response — skipping", repo_name
+                "suggest_initiatives: unknown repo_name %r in LLM response — skipping",
+                repo_name,
             )
             continue
 
@@ -828,7 +857,12 @@ def accept_suggestion(
     """
     from datetime import datetime, timezone
 
-    from github_repo_auditor.initiatives import Initiative, initiatives_path, operator_identity, upsert_initiative
+    from github_repo_auditor.initiatives import (
+        Initiative,
+        initiatives_path,
+        operator_identity,
+        upsert_initiative,
+    )
     from github_repo_auditor.maturity_tiers import compute_tier
 
     # 1. Find project
@@ -843,7 +877,9 @@ def accept_suggestion(
     # 2. Validate current tier
     current = compute_tier(project)
     if current == 0:
-        raise ValueError(f"repo '{repo_name}' has no git (current_tier=0); cannot set initiative")
+        raise ValueError(
+            f"repo '{repo_name}' has no git (current_tier=0); cannot set initiative"
+        )
     if current >= 4:
         raise ValueError(f"repo '{repo_name}' is already at Platinum (tier 4)")
 
@@ -962,7 +998,9 @@ def generate_suggestions(
     _dismissed_set: set[str] | None = None
     if output_dir is not None:
         dismissed_items = load_dismissed(dismissed_path(output_dir))
-        _dismissed_set = {d.repo_name for d in dismissed_items} if dismissed_items else None
+        _dismissed_set = (
+            {d.repo_name for d in dismissed_items} if dismissed_items else None
+        )
 
     # ── Cache lookup ──────────────────────────────────────────────────────────
     if cache_key is not None and cache_key in _suggestion_cache:
@@ -973,7 +1011,10 @@ def generate_suggestions(
     # ── Deterministic fast-path (no LLM, no CostTracker) ─────────────────────
     if force_deterministic:
         candidates = narrow_candidates(
-            projects, target_tier=target_tier, max_missing=max_missing, dismissed=_dismissed_set
+            projects,
+            target_tier=target_tier,
+            max_missing=max_missing,
+            dismissed=_dismissed_set,
         )
         if not candidates:
             return [], 0.0
@@ -989,11 +1030,16 @@ def generate_suggestions(
             while len(_suggestion_cache) > _CACHE_MAX_SIZE:
                 _suggestion_cache.popitem(last=False)
             if output_dir is not None:
-                save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
+                save_suggestion_cache(
+                    suggestion_cache_path(output_dir), _suggestion_cache
+                )
         return suggestions, 0.0
 
     candidates = narrow_candidates(
-        projects, target_tier=target_tier, max_missing=max_missing, dismissed=_dismissed_set
+        projects,
+        target_tier=target_tier,
+        max_missing=max_missing,
+        dismissed=_dismissed_set,
     )
     if not candidates:
         return [], 0.0
@@ -1017,7 +1063,9 @@ def generate_suggestions(
             while len(_suggestion_cache) > _CACHE_MAX_SIZE:
                 _suggestion_cache.popitem(last=False)
             if output_dir is not None:
-                save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
+                save_suggestion_cache(
+                    suggestion_cache_path(output_dir), _suggestion_cache
+                )
         return suggestions, 0.0
 
     provider, model_name = provider_result
@@ -1028,7 +1076,9 @@ def generate_suggestions(
     # Rough token estimate: ~4 chars per token; enforce pre-call budget check
     estimated_input_tokens = len(prompt) // 4
     estimated_output_tokens = 1500
-    estimated_cost = estimated_input_tokens * 0.000003 + estimated_output_tokens * 0.000015
+    estimated_cost = (
+        estimated_input_tokens * 0.000003 + estimated_output_tokens * 0.000015
+    )
     if budget_usd is not None and estimated_cost > budget_usd:
         raise BudgetExceededError(
             budget_usd=budget_usd,

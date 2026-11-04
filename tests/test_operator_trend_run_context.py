@@ -4,7 +4,11 @@ from github_repo_auditor.operator_trend_run_context import build_resolution_run_
 
 
 def _snapshot_from_queue(queue: list[dict], *, generated_at: str = "") -> dict:
-    return {"items": {item["id"]: item for item in queue}, "has_attention": bool(queue), "generated_at": generated_at}
+    return {
+        "items": {item["id"]: item for item in queue},
+        "has_attention": bool(queue),
+        "generated_at": generated_at,
+    }
 
 
 def _snapshot_from_history(entry: dict) -> dict:
@@ -23,7 +27,12 @@ def test_build_resolution_run_context_tracks_attention_sets() -> None:
     queue = [{"id": "current", "lane": "blocked"}]
     history = [
         {"snapshot": {"items": {"previous": {"lane": "ready"}}, "has_attention": True}},
-        {"snapshot": {"items": {"current": {"lane": "blocked"}}, "has_attention": True}},
+        {
+            "snapshot": {
+                "items": {"current": {"lane": "blocked"}},
+                "has_attention": True,
+            }
+        },
     ]
 
     context = build_resolution_run_context(

@@ -1,4 +1,5 @@
 """Tests for OSV.dev vulnerability checking."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,9 +31,7 @@ def _osv_response(vulns_per_query: list[list[dict]]) -> MagicMock:
     """Build a mock requests.post response with OSV batch format."""
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.json.return_value = {
-        "results": [{"vulns": v} for v in vulns_per_query]
-    }
+    mock_resp.json.return_value = {"results": [{"vulns": v} for v in vulns_per_query]}
     return mock_resp
 
 
@@ -77,7 +76,9 @@ class TestCheckVulnerabilities:
             "severity": [{"type": "CVSS_V3", "score": "9.8"}],
         }
         mock_resp = _osv_response([[vuln]])
-        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", return_value=mock_resp
+        ):
             result = check_vulnerabilities([audit])
 
         assert "my-repo" in result
@@ -90,24 +91,31 @@ class TestCheckVulnerabilities:
     def test_empty_vulns_list_not_included(self) -> None:
         audit = _make_audit("clean-repo", [("flask", "2.0.0", "pypi")])
         mock_resp = _osv_response([[]])  # no vulns
-        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", return_value=mock_resp
+        ):
             result = check_vulnerabilities([audit])
         assert result == {}
 
     def test_ecosystem_mapping_applied(self) -> None:
         """Ensure npm/pypi/crates are mapped to OSV ecosystem names."""
-        audit = _make_audit("repo", [
-            ("lodash", "4.17.0", "npm"),
-            ("django", "3.0", "pypi"),
-            ("serde", "1.0.0", "crates"),
-        ])
+        audit = _make_audit(
+            "repo",
+            [
+                ("lodash", "4.17.0", "npm"),
+                ("django", "3.0", "pypi"),
+                ("serde", "1.0.0", "crates"),
+            ],
+        )
         captured_body: list[dict] = []
 
         def fake_post(url, json, timeout):
             captured_body.append(json)
             return _osv_response([[], [], []])
 
-        with patch("github_repo_auditor.vuln_check.requests.post", side_effect=fake_post):
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", side_effect=fake_post
+        ):
             check_vulnerabilities([audit])
 
         assert captured_body
@@ -117,7 +125,10 @@ class TestCheckVulnerabilities:
 
     def test_api_error_returns_empty(self, capsys) -> None:
         audit = _make_audit("repo", [("requests", "2.0", "pypi")])
-        with patch("github_repo_auditor.vuln_check.requests.post", side_effect=Exception("network error")):
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post",
+            side_effect=Exception("network error"),
+        ):
             result = check_vulnerabilities([audit])
         assert result == {}
         captured = capsys.readouterr()
@@ -127,7 +138,9 @@ class TestCheckVulnerabilities:
         audit = _make_audit("repo", [("requests", "2.0", "pypi")])
         mock_resp = MagicMock()
         mock_resp.status_code = 500
-        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", return_value=mock_resp
+        ):
             result = check_vulnerabilities([audit])
         assert result == {}
 
@@ -139,12 +152,16 @@ class TestCheckVulnerabilities:
         vuln = {"id": "CVE-001", "summary": "bug", "severity": []}
         mock_resp = _osv_response([[vuln]])
 
-        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp) as mock_post:
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", return_value=mock_resp
+        ) as mock_post:
             result1 = check_vulnerabilities([audit], cache=cache)
         assert mock_post.call_count == 1
 
         # Second call should use cache — no new HTTP request
-        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp) as mock_post2:
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", return_value=mock_resp
+        ) as mock_post2:
             result2 = check_vulnerabilities([audit], cache=cache)
         assert mock_post2.call_count == 0
         assert result2 == result1
@@ -154,7 +171,9 @@ class TestCheckVulnerabilities:
         audit = _make_audit("repo", [("pkg", "1.0", "pypi")])
         vuln = {"id": "CVE-001", "summary": long_summary, "severity": []}
         mock_resp = _osv_response([[vuln]])
-        with patch("github_repo_auditor.vuln_check.requests.post", return_value=mock_resp):
+        with patch(
+            "github_repo_auditor.vuln_check.requests.post", return_value=mock_resp
+        ):
             result = check_vulnerabilities([audit])
         assert len(result["repo"][0]["summary"]) <= 200
 
@@ -167,7 +186,12 @@ class TestFormatVulnSummary:
     def test_single_repo_listed(self) -> None:
         vulns = {
             "my-repo": [
-                {"dep": "requests", "vuln_id": "CVE-001", "summary": "RCE bug", "severity": "9.8"}
+                {
+                    "dep": "requests",
+                    "vuln_id": "CVE-001",
+                    "summary": "RCE bug",
+                    "severity": "9.8",
+                }
             ]
         }
         msg = format_vuln_summary(vulns)

@@ -133,7 +133,9 @@ class TestNarrowCandidates:
 
     def test_no_semantic_index_returns_all_when_fewer_than_max(self) -> None:
         repos = _make_repos(["b-repo", "a-repo"])
-        result = narrow_candidates(repos, goal="test", semantic_index=None, max_repos=50)
+        result = narrow_candidates(
+            repos, goal="test", semantic_index=None, max_repos=50
+        )
         assert len(result) == 2
         assert result[0]["repo_name"] == "a-repo"
 
@@ -167,7 +169,9 @@ class TestNarrowCandidates:
         mock_index = MagicMock()
         mock_index.search.side_effect = RuntimeError("index unavailable")
 
-        result = narrow_candidates(repos, goal="test", semantic_index=mock_index, max_repos=2)
+        result = narrow_candidates(
+            repos, goal="test", semantic_index=mock_index, max_repos=2
+        )
         assert len(result) == 2
         assert result[0]["repo_name"] == "a-repo"
 
@@ -192,7 +196,9 @@ class TestGenerateActionForRepo:
 
     def test_qualifies_false_returns_none(self) -> None:
         provider = _FakeProvider(
-            _valid_json_response(qualifies=False, action_type="", target="", rationale="")
+            _valid_json_response(
+                qualifies=False, action_type="", target="", rationale=""
+            )
         )
         action = generate_action_for_repo(
             _make_repo(), goal="test", provider=provider, model="fake-model"
@@ -242,7 +248,9 @@ class TestGenerateActionForRepo:
 
     def test_expected_impact_none_preserved(self) -> None:
         provider = _FakeProvider(_valid_json_response(expected_impact=None))
-        action = generate_action_for_repo(_make_repo(), goal="test", provider=provider, model="m")
+        action = generate_action_for_repo(
+            _make_repo(), goal="test", provider=provider, model="m"
+        )
         assert action is not None
         assert action.expected_impact is None
 
@@ -251,7 +259,9 @@ class TestGenerateActionForRepo:
         inner = _valid_json_response()
         fenced = f"```json\n{inner}\n```"
         provider = _FakeProvider(fenced)
-        action = generate_action_for_repo(_make_repo(), goal="test", provider=provider, model="m")
+        action = generate_action_for_repo(
+            _make_repo(), goal="test", provider=provider, model="m"
+        )
         assert action is not None
         assert action.action_type == "add_topics"
 
@@ -263,7 +273,9 @@ class TestGeneratePlan:
     def test_walks_candidates_and_builds_packet(self) -> None:
         repos = _make_repos(["repo-a", "repo-b", "repo-c"])
         provider = _FakeProvider(_valid_json_response())
-        packet = generate_plan(repos, goal="add topics to everything", provider=provider, model="m")
+        packet = generate_plan(
+            repos, goal="add topics to everything", provider=provider, model="m"
+        )
         assert isinstance(packet, CampaignPlanPacket)
         assert packet.candidate_count == 3
         assert packet.qualified_count == 3
@@ -285,24 +297,32 @@ class TestGeneratePlan:
                 }
             ]
         }
-        packet = generate_plan(repos, goal="test", provider=provider, model="m", prefs=prefs)
+        packet = generate_plan(
+            repos, goal="test", provider=provider, model="m", prefs=prefs
+        )
         assert packet.candidate_count == 3
         assert packet.qualified_count == 2
         repo_names = [a.repo_name for a in packet.actions]
         assert "suppressed-repo" not in repo_names
 
     def test_qualifies_false_repo_not_in_actions(self) -> None:
-        def _provider_for_repo(prompt: str, model: str, max_tokens: int, **_kw: Any) -> str:
+        def _provider_for_repo(
+            prompt: str, model: str, max_tokens: int, **_kw: Any
+        ) -> str:
             # Only qualify repos containing "good" in the prompt
             qualifies = "good-repo" in prompt
             return _valid_json_response(qualifies=qualifies)
 
         class _SelectiveProvider:
-            def generate(self, prompt: str, model: str, max_tokens: int, **kw: Any) -> str:
+            def generate(
+                self, prompt: str, model: str, max_tokens: int, **kw: Any
+            ) -> str:
                 return _provider_for_repo(prompt, model, max_tokens, **kw)
 
         repos = _make_repos(["bad-repo", "good-repo"])
-        packet = generate_plan(repos, goal="test", provider=_SelectiveProvider(), model="m")
+        packet = generate_plan(
+            repos, goal="test", provider=_SelectiveProvider(), model="m"
+        )
         assert packet.qualified_count == 1
         assert packet.actions[0].repo_name == "good-repo"
 
@@ -352,7 +372,9 @@ class TestWritePacketToLedger:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             packet = self._make_packet()
-            record_id = write_packet_to_ledger(packet, output_dir=output_dir, reviewer="tester")
+            record_id = write_packet_to_ledger(
+                packet, output_dir=output_dir, reviewer="tester"
+            )
             assert isinstance(record_id, str)
             assert record_id.startswith("cp-")
 
@@ -362,7 +384,9 @@ class TestWritePacketToLedger:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             packet = self._make_packet()
-            record_id = write_packet_to_ledger(packet, output_dir=output_dir, reviewer="tester")
+            record_id = write_packet_to_ledger(
+                packet, output_dir=output_dir, reviewer="tester"
+            )
 
             records = load_approval_records(output_dir, username="", limit=10)
             matching = [r for r in records if r.get("approval_id") == record_id]
@@ -440,7 +464,9 @@ class TestCLIDispatch:
     def test_legacy_invocation_emits_deprecation_warning(self) -> None:
         """audit someuser --plan-campaign 'goal' via legacy path calls _emit_legacy_deprecation_warning."""
         with patch("github_repo_auditor.cli._run_plan_campaign_mode"):
-            with patch("github_repo_auditor.cli._emit_legacy_deprecation_warning") as mock_warn:
+            with patch(
+                "github_repo_auditor.cli._emit_legacy_deprecation_warning"
+            ) as mock_warn:
                 with patch(
                     "sys.argv",
                     [
@@ -469,12 +495,16 @@ class TestCLIDispatch:
         from github_repo_auditor.cli import build_parser
 
         parser = build_parser()
-        args = parser.parse_args(["someuser", "--campaign-from-ledger", "--output-dir", "/tmp"])
+        args = parser.parse_args(
+            ["someuser", "--campaign-from-ledger", "--output-dir", "/tmp"]
+        )
         assert args.campaign_from_ledger is True
 
     def test_campaign_from_ledger_dispatches_run_mode(self) -> None:
         """audit report --writeback-apply --campaign-from-ledger someuser dispatches apply mode."""
-        with patch("github_repo_auditor.cli._run_campaign_from_ledger_mode") as mock_dispatch:
+        with patch(
+            "github_repo_auditor.cli._run_campaign_from_ledger_mode"
+        ) as mock_dispatch:
             with patch(
                 "sys.argv",
                 [
@@ -506,7 +536,10 @@ class TestCLIDispatch:
             # No truth file
 
             captured_output: list[str] = []
-            with patch("github_repo_auditor.cli.print_info", side_effect=lambda msg: captured_output.append(msg)):
+            with patch(
+                "github_repo_auditor.cli.print_info",
+                side_effect=lambda msg: captured_output.append(msg),
+            ):
                 with patch(
                     "sys.argv",
                     [
@@ -670,25 +703,33 @@ class TestDispatchAction:
 
     def test_pending_human_action_returns_false_manual_review_required(self) -> None:
         action = self._make_action("pending_human_action")
-        ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=False)
+        ok, msg = dispatch_action(
+            action, client=MagicMock(), owner="user", dry_run=False
+        )
         assert ok is False
         assert "manual review required" in msg
 
     def test_add_codeowners_returns_handler_not_implemented(self) -> None:
         action = self._make_action("add_codeowners")
-        ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=False)
+        ok, msg = dispatch_action(
+            action, client=MagicMock(), owner="user", dry_run=False
+        )
         assert ok is False
         assert "handler not yet implemented" in msg
 
     def test_add_license_returns_handler_not_implemented(self) -> None:
         action = self._make_action("add_license")
-        ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=False)
+        ok, msg = dispatch_action(
+            action, client=MagicMock(), owner="user", dry_run=False
+        )
         assert ok is False
         assert "handler not yet implemented" in msg
 
     def test_enable_dependabot_returns_handler_not_implemented(self) -> None:
         action = self._make_action("enable_dependabot")
-        ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=False)
+        ok, msg = dispatch_action(
+            action, client=MagicMock(), owner="user", dry_run=False
+        )
         assert ok is False
         assert "handler not yet implemented" in msg
 
@@ -696,11 +737,15 @@ class TestDispatchAction:
         action = self._make_action("archive", repo_name="my-repo")
         mock_client = MagicMock()
 
-        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
+        with patch(
+            "github_repo_auditor.repo_improver.apply_metadata_updates"
+        ) as mock_apply:
             mock_apply.return_value = [
                 {"repo": "my-repo", "actions": [{"type": "archived", "ok": True}]}
             ]
-            ok, msg = dispatch_action(action, client=mock_client, owner="user", dry_run=False)
+            ok, msg = dispatch_action(
+                action, client=mock_client, owner="user", dry_run=False
+            )
 
         assert ok is True
         assert msg == "archive applied to my-repo"
@@ -717,11 +762,15 @@ class TestDispatchAction:
         action = self._make_action("add_topics", target="python cli tool")
         mock_client = MagicMock()
 
-        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
+        with patch(
+            "github_repo_auditor.repo_improver.apply_metadata_updates"
+        ) as mock_apply:
             mock_apply.return_value = [
                 {"repo": "test-repo", "actions": [{"type": "topics", "ok": True}]}
             ]
-            ok, msg = dispatch_action(action, client=mock_client, owner="user", dry_run=False)
+            ok, msg = dispatch_action(
+                action, client=mock_client, owner="user", dry_run=False
+            )
 
         assert ok is True
         assert msg == "add_topics applied to test-repo: ['python', 'cli', 'tool']"
@@ -734,8 +783,12 @@ class TestDispatchAction:
     def test_dry_run_does_not_call_executor(self) -> None:
         action = self._make_action("archive", repo_name="dry-repo")
 
-        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
-            ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=True)
+        with patch(
+            "github_repo_auditor.repo_improver.apply_metadata_updates"
+        ) as mock_apply:
+            ok, msg = dispatch_action(
+                action, client=MagicMock(), owner="user", dry_run=True
+            )
 
         mock_apply.assert_not_called()
         assert ok is True
@@ -744,17 +797,27 @@ class TestDispatchAction:
     def test_dry_run_pending_human_action_still_returns_false(self) -> None:
         """pending_human_action is always skipped — even in dry-run."""
         action = self._make_action("pending_human_action")
-        with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_apply:
-            ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=True)
+        with patch(
+            "github_repo_auditor.repo_improver.apply_metadata_updates"
+        ) as mock_apply:
+            ok, msg = dispatch_action(
+                action, client=MagicMock(), owner="user", dry_run=True
+            )
         mock_apply.assert_not_called()
         assert ok is False
 
     def test_apply_readme_calls_apply_readme_updates(self) -> None:
-        action = self._make_action("apply_readme", target="# Hello\nThis is the readme.")
+        action = self._make_action(
+            "apply_readme", target="# Hello\nThis is the readme."
+        )
 
-        with patch("github_repo_auditor.repo_improver.apply_readme_updates") as mock_apply:
+        with patch(
+            "github_repo_auditor.repo_improver.apply_readme_updates"
+        ) as mock_apply:
             mock_apply.return_value = [{"repo": "test-repo", "ok": True}]
-            ok, msg = dispatch_action(action, client=MagicMock(), owner="user", dry_run=False)
+            ok, msg = dispatch_action(
+                action, client=MagicMock(), owner="user", dry_run=False
+            )
 
         mock_apply.assert_called_once()
         call_kwargs = mock_apply.call_args
@@ -831,7 +894,10 @@ class TestCampaignFromLedgerEndToEnd:
         actions: list[CampaignAction],
         goal: str = "e2e test goal",
     ) -> CampaignPlanPacket:
-        from github_repo_auditor.plan_campaign import _goal_subject_key, _packet_record_id
+        from github_repo_auditor.plan_campaign import (
+            _goal_subject_key,
+            _packet_record_id,
+        )
         from github_repo_auditor.warehouse import save_approval_record
 
         packet = CampaignPlanPacket(
@@ -884,12 +950,16 @@ class TestCampaignFromLedgerEndToEnd:
             output_dir = Path(tmp)
             actions = [
                 CampaignAction("repo-a", "archive", "archive", "old repo", None),
-                CampaignAction("repo-b", "add_topics", "python cli", "needs topics", None),
+                CampaignAction(
+                    "repo-b", "add_topics", "python cli", "needs topics", None
+                ),
                 CampaignAction("repo-c", "add_codeowners", "", "needs owners", None),
             ]
             packet = self._write_packet_with_actions(output_dir, actions)
 
-            with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_meta:
+            with patch(
+                "github_repo_auditor.repo_improver.apply_metadata_updates"
+            ) as mock_meta:
                 mock_meta.return_value = [
                     {"repo": "repo-a", "actions": [{"type": "archived", "ok": True}]},
                 ]
@@ -900,7 +970,10 @@ class TestCampaignFromLedgerEndToEnd:
                     # patch topics call too
                     if action.action_type == "add_topics":
                         mock_meta.return_value = [
-                            {"repo": "repo-b", "actions": [{"type": "topics", "ok": True}]}
+                            {
+                                "repo": "repo-b",
+                                "actions": [{"type": "topics", "ok": True}],
+                            }
                         ]
                     ok, msg = dispatch_action(
                         action, client=mock_client, owner="user", dry_run=False
@@ -941,9 +1014,13 @@ class TestCampaignFromLedgerEndToEnd:
             actions = [
                 CampaignAction("repo-a", "archive", "archive", "old repo", None),
             ]
-            packet = self._write_packet_with_actions(output_dir, actions, goal="failure e2e test")
+            packet = self._write_packet_with_actions(
+                output_dir, actions, goal="failure e2e test"
+            )
 
-            with patch("github_repo_auditor.repo_improver.apply_metadata_updates") as mock_meta:
+            with patch(
+                "github_repo_auditor.repo_improver.apply_metadata_updates"
+            ) as mock_meta:
                 mock_meta.return_value = [
                     {"repo": "repo-a", "actions": [{"ok": False, "error": "API error"}]}
                 ]

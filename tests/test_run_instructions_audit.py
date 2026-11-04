@@ -360,9 +360,7 @@ def test_prepare_pilot_blocks_unknown_checkout_authority(tmp_path):
                     "checkout_authority": _checkout_authority(
                         canonical_path="ConflictedRepo",
                         state="unknown",
-                        reason_code=(
-                            "declared_path_conflicts_with_representative"
-                        ),
+                        reason_code=("declared_path_conflicts_with_representative"),
                     )
                 },
             },

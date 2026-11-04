@@ -155,7 +155,9 @@ def upsert_initiative(path: Path, initiative: Initiative) -> None:
     save_initiatives(path, updated)
 
 
-def close_initiative(path: Path, repo_name: str, reason: str = "met") -> Initiative | None:
+def close_initiative(
+    path: Path, repo_name: str, reason: str = "met"
+) -> Initiative | None:
     """Set ``closed_at`` + ``closed_reason`` on the open initiative for *repo_name*.
 
     Returns the closed ``Initiative``, or ``None`` if no open initiative exists
@@ -166,7 +168,11 @@ def close_initiative(path: Path, repo_name: str, reason: str = "met") -> Initiat
     updated: list[Initiative] = []
     now = datetime.now(tz=timezone.utc).isoformat()
     for item in existing:
-        if item.repo_name == repo_name and item.closed_at is None and closed_item is None:
+        if (
+            item.repo_name == repo_name
+            and item.closed_at is None
+            and closed_item is None
+        ):
             closed_item = Initiative(
                 repo_name=item.repo_name,
                 target_tier=item.target_tier,

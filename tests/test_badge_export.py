@@ -100,7 +100,12 @@ class TestExportBadges:
     def test_portfolio_badges_written(self, tmp_path):
         export_badges(_make_report_data(), tmp_path)
         badges_dir = tmp_path / "badges"
-        for name in ["portfolio-grade", "portfolio-repos", "portfolio-shipped", "portfolio-avg-score"]:
+        for name in [
+            "portfolio-grade",
+            "portfolio-repos",
+            "portfolio-shipped",
+            "portfolio-avg-score",
+        ]:
             path = badges_dir / f"{name}.json"
             assert path.is_file(), f"Missing {name}.json"
             data = json.loads(path.read_text())
@@ -130,11 +135,15 @@ class TestExportBadges:
     def test_grade_color_mapping(self, tmp_path):
         export_badges(_make_report_data(), tmp_path)
         # shipped-repo has grade B
-        data = json.loads((tmp_path / "badges" / "repos" / "shipped-repo-grade.json").read_text())
+        data = json.loads(
+            (tmp_path / "badges" / "repos" / "shipped-repo-grade.json").read_text()
+        )
         assert data["message"] == "B"
         assert data["color"] == "green"
         # functional-repo has grade C
-        data = json.loads((tmp_path / "badges" / "repos" / "functional-repo-grade.json").read_text())
+        data = json.loads(
+            (tmp_path / "badges" / "repos" / "functional-repo-grade.json").read_text()
+        )
         assert data["message"] == "C"
         assert data["color"] == "yellow"
 
@@ -161,7 +170,9 @@ class TestBadgesMarkdown:
         assert "img.shields.io/badge/" in content
 
     def test_endpoint_urls_when_gist(self, tmp_path):
-        gist_urls = {"portfolio-grade.json": "https://gist.githubusercontent.com/user/abc/raw/portfolio-grade.json"}
+        gist_urls = {
+            "portfolio-grade.json": "https://gist.githubusercontent.com/user/abc/raw/portfolio-grade.json"
+        }
         _write_badges_markdown(_make_report_data(), tmp_path, gist_urls=gist_urls)
         content = (tmp_path / "badges.md").read_text()
         assert "img.shields.io/endpoint" in content

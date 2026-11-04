@@ -16,9 +16,7 @@ def test_z_suffix_is_treated_as_utc() -> None:
 def test_explicit_offset_is_converted_to_utc() -> None:
     parsed = parse_utc_timestamp("2026-09-02T01:30:00+02:30")
 
-    assert parsed == datetime(
-        2026, 9, 1, 23, 0, tzinfo=timezone.utc
-    )
+    assert parsed == datetime(2026, 9, 1, 23, 0, tzinfo=timezone.utc)
     assert parsed.tzinfo is timezone.utc
 
 
@@ -27,9 +25,9 @@ def test_naive_timestamp_is_rejected_by_default() -> None:
 
 
 def test_naive_timestamp_can_be_assumed_utc() -> None:
-    assert parse_utc_timestamp(
-        "2026-09-02T12:34:56", naive="assume_utc"
-    ) == datetime(2026, 9, 2, 12, 34, 56, tzinfo=timezone.utc)
+    assert parse_utc_timestamp("2026-09-02T12:34:56", naive="assume_utc") == datetime(
+        2026, 9, 2, 12, 34, 56, tzinfo=timezone.utc
+    )
 
 
 @pytest.mark.parametrize("value", [None, "", "   "])

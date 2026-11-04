@@ -44,9 +44,7 @@ def write_dashboard_header(
 
     ws.merge_cells("A2:L2")
     subtitle_cell = ws["A2"]
-    subtitle_cell.value = (
-        f"Generated: {data['generated_at'][:10]} | {data['repos_audited']} repos audited"
-    )
+    subtitle_cell.value = f"Generated: {data['generated_at'][:10]} | {data['repos_audited']} repos audited"
     subtitle_cell.font = subtitle_font
     subtitle_cell.alignment = center_alignment
 
@@ -77,7 +75,9 @@ def build_dashboard_ranked_content(
     return {
         "top_attention_start": top_attention_start,
         "top_attention_rows": build_dashboard_top_attention_rows(repo_rollups),
-        "top_opportunities": build_dashboard_top_opportunity_rows(data.get("audits", [])),
+        "top_opportunities": build_dashboard_top_opportunity_rows(
+            data.get("audits", [])
+        ),
         "laggard_rows": build_dashboard_laggard_rows(data.get("audits", [])),
     }
 
@@ -157,7 +157,10 @@ def build_dashboard_operator_rows(
 ) -> list[tuple[str, Any]]:
     rows: list[tuple[str, Any]] = [
         ("Setup Health", display_operator_state(setup_health.get("status", "ok"))),
-        ("Operator Headline", operator_summary.get("headline", "Portfolio health is stable.")),
+        (
+            "Operator Headline",
+            operator_summary.get("headline", "Portfolio health is stable."),
+        ),
         ("Queue Counts", format_lane_counts(lane_counts)),
         (
             "Governance",
@@ -239,7 +242,9 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Freshness Detail",
-                    operator_context["follow_through_recovery_freshness_hotspot_summary"],
+                    operator_context[
+                        "follow_through_recovery_freshness_hotspot_summary"
+                    ],
                 ),
                 (
                     "Rebuild Hotspot",
@@ -279,7 +284,9 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Fragile Reacquisition Confidence Hotspot",
-                    operator_context["follow_through_fragile_reacquisition_confidence_hotspot"],
+                    operator_context[
+                        "follow_through_fragile_reacquisition_confidence_hotspot"
+                    ],
                 ),
                 (
                     "Reacquisition Softening Hotspot",
@@ -287,11 +294,15 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Revalidation Needed Hotspot",
-                    operator_context["follow_through_reacquisition_revalidation_hotspot"],
+                    operator_context[
+                        "follow_through_reacquisition_revalidation_hotspot"
+                    ],
                 ),
                 (
                     "Retired Confidence Hotspot",
-                    operator_context["follow_through_reacquisition_retired_confidence_hotspot"],
+                    operator_context[
+                        "follow_through_reacquisition_retired_confidence_hotspot"
+                    ],
                 ),
                 (
                     "Under Revalidation Hotspot",
@@ -299,7 +310,9 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Rebuilding Restored Confidence Hotspot",
-                    operator_context["follow_through_rebuilding_restored_confidence_hotspot"],
+                    operator_context[
+                        "follow_through_rebuilding_restored_confidence_hotspot"
+                    ],
                 ),
                 (
                     "Re-Earning Confidence Hotspot",
@@ -311,7 +324,9 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Holding Re-Earned Confidence Hotspot",
-                    operator_context["follow_through_holding_reearned_confidence_hotspot"],
+                    operator_context[
+                        "follow_through_holding_reearned_confidence_hotspot"
+                    ],
                 ),
             ]
         )
@@ -421,7 +436,9 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
-                    operator_context["reset_reentry_rebuild_reentry_restore_rerererestore_churn"],
+                    operator_context[
+                        "reset_reentry_rebuild_reentry_restore_rerererestore_churn"
+                    ],
                 ),
                 (
                     "Closure Forecast Summary",
@@ -483,13 +500,22 @@ def build_dashboard_top_attention_rows(
             ]
         )
     return rows or [
-        ["Portfolio", "No open items", "Nothing is currently queued.", "Monitor future audits"]
+        [
+            "Portfolio",
+            "No open items",
+            "Nothing is currently queued.",
+            "Monitor future audits",
+        ]
     ]
 
 
-def build_dashboard_top_opportunity_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
+def build_dashboard_top_opportunity_rows(
+    audits: list[dict[str, Any]],
+) -> list[list[Any]]:
     rows: list[list[Any]] = []
-    audits_sorted = sorted(audits, key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    audits_sorted = sorted(
+        audits, key=lambda audit: audit.get("overall_score", 0), reverse=True
+    )
     for audit in audits_sorted:
         action = (audit.get("action_candidates") or [{}])[0]
         hotspots = audit.get("hotspots") or []
@@ -587,7 +613,9 @@ def build_dashboard_story_blocks(
     build_portfolio_intent_alignment_summary,
     build_scorecards_summary,
 ) -> dict[str, Any]:
-    run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
+    run_change_summary = data.get("run_change_summary") or build_run_change_summary(
+        diff_data
+    )
     weekly_pack = build_weekly_review_pack(data, diff_data)
     queue_pressure_summary = resolve_weekly_story_value(
         weekly_pack,
@@ -653,7 +681,9 @@ def build_dashboard_portfolio_trend_sparkline(
 
 
 def build_dashboard_dna_tiers(audits: list[dict[str, Any]]) -> list[str]:
-    audits_sorted = sorted(audits, key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    audits_sorted = sorted(
+        audits, key=lambda audit: audit.get("overall_score", 0), reverse=True
+    )
     return [audit.get("completeness_tier", "abandoned") for audit in audits_sorted[:24]]
 
 
@@ -709,7 +739,9 @@ def write_dashboard_visual_sections(
 ) -> None:
     _write_dashboard_dna_row(ws, data.get("audits", []), subheader_font, tier_fills)
     _write_dashboard_usage_note(ws, subtitle_font, wrap_alignment)
-    _write_dashboard_distribution_charts(ws, tiers, data.get("audits", []), pie_colors, tier_order)
+    _write_dashboard_distribution_charts(
+        ws, tiers, data.get("audits", []), pie_colors, tier_order
+    )
     _write_dashboard_highlights(ws, data, section_font, subheader_font)
     for column_index in range(24, 42):
         ws.column_dimensions[get_column_letter(column_index)].hidden = True
@@ -718,10 +750,14 @@ def write_dashboard_visual_sections(
     _write_dashboard_language_chart(
         ws, build_dashboard_language_rows(data.get("language_distribution", {}))
     )
-    _write_dashboard_scatter_section(ws, data.get("audits", []), section_font, subheader_font)
+    _write_dashboard_scatter_section(
+        ws, data.get("audits", []), section_font, subheader_font
+    )
 
 
-def _write_dashboard_dna_row(ws, audits: list[dict[str, Any]], subheader_font, tier_fills) -> None:
+def _write_dashboard_dna_row(
+    ws, audits: list[dict[str, Any]], subheader_font, tier_fills
+) -> None:
     dna_row = 8
     ws.cell(row=dna_row, column=1, value="Portfolio DNA").font = subheader_font
     for i, tier in enumerate(build_dashboard_dna_tiers(audits)):
@@ -757,8 +793,12 @@ def _write_dashboard_distribution_charts(
     pie = PieChart()
     pie.title = "Tier Distribution"
     pie.style = 10
-    labels = Reference(ws, min_col=pie_label_col, min_row=pie_start, max_row=pie_start + 4)
-    values = Reference(ws, min_col=pie_value_col, min_row=pie_start, max_row=pie_start + 4)
+    labels = Reference(
+        ws, min_col=pie_label_col, min_row=pie_start, max_row=pie_start + 4
+    )
+    values = Reference(
+        ws, min_col=pie_value_col, min_row=pie_start, max_row=pie_start + 4
+    )
     pie.add_data(values, titles_from_data=False)
     pie.set_categories(labels)
     pie.dataLabels = DataLabelList()
@@ -781,14 +821,20 @@ def _write_dashboard_distribution_charts(
     grade_row = 10
     for i, grade in enumerate(["A", "B", "C", "D", "F"]):
         ws.cell(row=grade_row + i, column=grade_label_col, value=grade)
-        ws.cell(row=grade_row + i, column=grade_value_col, value=grade_dist.get(grade, 0))
+        ws.cell(
+            row=grade_row + i, column=grade_value_col, value=grade_dist.get(grade, 0)
+        )
 
     bar = BarChart()
     bar.type = "col"
     bar.title = "Grade Distribution"
     bar.style = 10
-    bar_data = Reference(ws, min_col=grade_value_col, min_row=grade_row, max_row=grade_row + 4)
-    bar_cats = Reference(ws, min_col=grade_label_col, min_row=grade_row, max_row=grade_row + 4)
+    bar_data = Reference(
+        ws, min_col=grade_value_col, min_row=grade_row, max_row=grade_row + 4
+    )
+    bar_cats = Reference(
+        ws, min_col=grade_label_col, min_row=grade_row, max_row=grade_row + 4
+    )
     bar.add_data(bar_data, titles_from_data=False)
     bar.set_categories(bar_cats)
     bar.width = 8.4
@@ -796,16 +842,22 @@ def _write_dashboard_distribution_charts(
     ws.add_chart(bar, "J17")
 
 
-def _write_dashboard_highlights(ws, data: dict[str, Any], section_font, subheader_font) -> None:
+def _write_dashboard_highlights(
+    ws, data: dict[str, Any], section_font, subheader_font
+) -> None:
     highlight_row = 31
     ws.cell(row=highlight_row, column=1, value="Highlights").font = section_font
     highlight_rows = build_dashboard_highlight_rows(data)
     if highlight_rows["best_work"]:
-        ws.cell(row=highlight_row + 1, column=1, value="Best Work:").font = subheader_font
+        ws.cell(
+            row=highlight_row + 1, column=1, value="Best Work:"
+        ).font = subheader_font
         for i, name in enumerate(highlight_rows["best_work"]):
             ws.cell(row=highlight_row + 1, column=2 + i, value=name)
     if highlight_rows["needs_attention"]:
-        ws.cell(row=highlight_row + 2, column=1, value="Needs Attention:").font = subheader_font
+        ws.cell(
+            row=highlight_row + 2, column=1, value="Needs Attention:"
+        ).font = subheader_font
         for i, name in enumerate(highlight_rows["needs_attention"]):
             ws.cell(row=highlight_row + 2, column=2 + i, value=name)
 
@@ -887,7 +939,9 @@ def _write_dashboard_scatter_section(
     vline_y = Reference(
         ws, min_col=line_col + 1, min_row=data_start_row, max_row=data_start_row + 1
     )
-    vline_x = Reference(ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1)
+    vline_x = Reference(
+        ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1
+    )
     chart.add_data(vline_y, titles_from_data=False)
     chart.set_categories(vline_x)
     if len(chart.series) > 1:
@@ -917,7 +971,11 @@ def _write_dashboard_scatter_section(
     chart.height = 8
     ws.add_chart(chart, "J34")
     _write_quadrant_table(
-        ws, audits, legend_row=52, section_font=section_font, subheader_font=subheader_font
+        ws,
+        audits,
+        legend_row=52,
+        section_font=section_font,
+        subheader_font=subheader_font,
     )
 
 

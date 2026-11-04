@@ -167,7 +167,9 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     ]
     report.campaign_history = list(report.action_runs)
     report.external_refs = {
-        "promotion-push-abc123": {"github_issue_url": "https://github.com/user/warehouse-repo/issues/1"}
+        "promotion-push-abc123": {
+            "github_issue_url": "https://github.com/user/warehouse-repo/issues/1"
+        }
     }
     report.review_summary = {
         "review_id": "review-1",
@@ -234,9 +236,18 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
         "catalog_line": "operator-loop | warehouse verification | lifecycle active | criticality high | cadence weekly | disposition maintain",
     }
-    report.portfolio_catalog_summary = {"summary": "1/1 repos have an explicit catalog contract."}
-    report.operating_paths_summary = {"summary": "Maintain 1", "path_counts": {"maintain": 1}, "confidence_counts": {"high": 1}, "override_counts": {}}
-    report.intent_alignment_summary = {"summary": "1 aligned, 0 needing review, and 0 missing a contract."}
+    report.portfolio_catalog_summary = {
+        "summary": "1/1 repos have an explicit catalog contract."
+    }
+    report.operating_paths_summary = {
+        "summary": "Maintain 1",
+        "path_counts": {"maintain": 1},
+        "confidence_counts": {"high": 1},
+        "override_counts": {},
+    }
+    report.intent_alignment_summary = {
+        "summary": "1 aligned, 0 needing review, and 0 missing a contract."
+    }
     audit.scorecard = {
         "program": "maintain",
         "program_label": "Maintain",
@@ -247,7 +258,9 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         "failed_rule_keys": ["testing", "ci"],
         "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
     }
-    report.scorecards_summary = {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."}
+    report.scorecards_summary = {
+        "summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."
+    }
     report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
     report.portfolio_outcomes_summary = {
         "summary": "Managed action closure is at 50%; blocked and urgent pressure quiets in about 2.0 run(s); repeated regression is running at 25%.",
@@ -316,9 +329,15 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "high_pressure_queue_history": report.high_pressure_queue_history,
             "high_pressure_queue_trend_status": "stable",
             "high_pressure_queue_trend_summary": "Blocked and urgent queue pressure is stable.",
-            "recent_closed_actions": [{"repo": "warehouse-repo", "title": "Close warehouse follow-up"}],
-            "recent_reopened_recommendations": [{"repo": "warehouse-repo", "title": "warehouse recommendation"}],
-            "recent_regression_examples": [{"repo": "warehouse-repo", "title": "warehouse regression"}],
+            "recent_closed_actions": [
+                {"repo": "warehouse-repo", "title": "Close warehouse follow-up"}
+            ],
+            "recent_reopened_recommendations": [
+                {"repo": "warehouse-repo", "title": "warehouse recommendation"}
+            ],
+            "recent_regression_examples": [
+                {"repo": "warehouse-repo", "title": "warehouse regression"}
+            ],
         }
     )
     report.action_sync_outcomes = [
@@ -445,20 +464,42 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         action_rows = conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]
         collection_rows = conn.execute("SELECT COUNT(*) FROM collections").fetchone()[0]
         scenario_rows = conn.execute("SELECT COUNT(*) FROM scenarios").fetchone()[0]
-        control_rows = conn.execute("SELECT COUNT(*) FROM security_controls").fetchone()[0]
-        provider_rows = conn.execute("SELECT COUNT(*) FROM security_providers").fetchone()[0]
-        recommendation_rows = conn.execute("SELECT COUNT(*) FROM security_recommendations").fetchone()[0]
-        campaign_history_rows = conn.execute("SELECT COUNT(*) FROM campaign_history").fetchone()[0]
-        campaign_outcome_rows = conn.execute("SELECT COUNT(*) FROM campaign_outcomes").fetchone()[0]
-        campaign_tuning_rows = conn.execute("SELECT COUNT(*) FROM campaign_tuning").fetchone()[0]
-        intervention_ledger_rows = conn.execute("SELECT COUNT(*) FROM intervention_ledger").fetchone()[0]
-        action_sync_automation_rows = conn.execute("SELECT COUNT(*) FROM action_sync_automation").fetchone()[0]
-        hotspot_history_rows = conn.execute("SELECT COUNT(*) FROM repo_implementation_hotspots").fetchone()[0]
-        catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
+        control_rows = conn.execute(
+            "SELECT COUNT(*) FROM security_controls"
+        ).fetchone()[0]
+        provider_rows = conn.execute(
+            "SELECT COUNT(*) FROM security_providers"
+        ).fetchone()[0]
+        recommendation_rows = conn.execute(
+            "SELECT COUNT(*) FROM security_recommendations"
+        ).fetchone()[0]
+        campaign_history_rows = conn.execute(
+            "SELECT COUNT(*) FROM campaign_history"
+        ).fetchone()[0]
+        campaign_outcome_rows = conn.execute(
+            "SELECT COUNT(*) FROM campaign_outcomes"
+        ).fetchone()[0]
+        campaign_tuning_rows = conn.execute(
+            "SELECT COUNT(*) FROM campaign_tuning"
+        ).fetchone()[0]
+        intervention_ledger_rows = conn.execute(
+            "SELECT COUNT(*) FROM intervention_ledger"
+        ).fetchone()[0]
+        action_sync_automation_rows = conn.execute(
+            "SELECT COUNT(*) FROM action_sync_automation"
+        ).fetchone()[0]
+        hotspot_history_rows = conn.execute(
+            "SELECT COUNT(*) FROM repo_implementation_hotspots"
+        ).fetchone()[0]
+        catalog_rows = conn.execute(
+            "SELECT COUNT(*) FROM portfolio_catalog_entries"
+        ).fetchone()[0]
         catalog_contract = conn.execute(
             "SELECT operating_path, path_override, path_confidence, path_rationale FROM portfolio_catalog_entries"
         ).fetchone()
-        scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
+        scorecard_rows = conn.execute(
+            "SELECT COUNT(*) FROM repo_scorecards"
+        ).fetchone()[0]
     finally:
         conn.close()
 
@@ -500,25 +541,57 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     watch_checkpoint = load_watch_checkpoint(tmp_path, "user")
     operator_state = load_latest_operator_state(tmp_path, "user")
     assert history[0]["action_id"] == "promotion-push-abc123"
-    assert latest_state["actions"]["promotion-push-abc123"]["repo_full_name"] == "user/warehouse-repo"
+    assert (
+        latest_state["actions"]["promotion-push-abc123"]["repo_full_name"]
+        == "user/warehouse-repo"
+    )
     assert latest_runs[0]["review_summary"]["review_id"] == "review-1"
     assert latest_runs[0]["governance_summary"]["status"] == "blocked"
-    assert latest_runs[0]["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
+    assert (
+        latest_runs[0]["portfolio_catalog_summary"]["summary"]
+        == "1/1 repos have an explicit catalog contract."
+    )
     assert latest_runs[0]["operating_paths_summary"]["summary"] == "Maintain 1"
-    assert latest_runs[0]["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
-    assert latest_runs[0]["scorecards_summary"]["summary"].startswith("0 repos are on track")
+    assert (
+        latest_runs[0]["intent_alignment_summary"]["summary"]
+        == "1 aligned, 0 needing review, and 0 missing a contract."
+    )
+    assert latest_runs[0]["scorecards_summary"]["summary"].startswith(
+        "0 repos are on track"
+    )
     assert latest_runs[0]["scorecard_programs"]["maintain"]["label"] == "Maintain"
-    assert latest_runs[0]["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
-    assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
-    assert latest_runs[0]["decision_quality_summary"]["contract_version"] == "decision_quality_v1"
-    assert latest_runs[0]["decision_quality_summary"]["authority_cap"] == "bounded-automation"
+    assert latest_runs[0]["portfolio_outcomes_summary"]["summary"].startswith(
+        "Managed action closure"
+    )
+    assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith(
+        "recommendation validation"
+    )
+    assert (
+        latest_runs[0]["decision_quality_summary"]["contract_version"]
+        == "decision_quality_v1"
+    )
+    assert (
+        latest_runs[0]["decision_quality_summary"]["authority_cap"]
+        == "bounded-automation"
+    )
     assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
-    assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
-    assert latest_runs[0]["automation_guidance_summary"]["summary"].startswith("Use a non-mutating follow-up")
+    assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith(
+        "Promotion Push was applied recently"
+    )
+    assert latest_runs[0]["automation_guidance_summary"]["summary"].startswith(
+        "Use a non-mutating follow-up"
+    )
     assert action_sync_automation[0]["automation_posture"] == "follow-up-safe"
-    assert operator_state["automation_guidance_summary"]["summary"].startswith("Use a non-mutating follow-up")
-    assert operator_state["next_safe_automation_step"]["recommended_command"] == "audit user --control-center"
-    assert latest_runs[0]["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
+    assert operator_state["automation_guidance_summary"]["summary"].startswith(
+        "Use a non-mutating follow-up"
+    )
+    assert (
+        operator_state["next_safe_automation_step"]["recommended_command"]
+        == "audit user --control-center"
+    )
+    assert latest_runs[0]["campaign_tuning_summary"]["summary"].startswith(
+        "Promotion Push should win ties"
+    )
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
     assert campaign_outcomes[0]["campaign_type"] == "promotion-push"
@@ -526,31 +599,64 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert campaign_tuning[0]["campaign_type"] == "promotion-push"
     assert campaign_tuning[0]["tuning_status"] == "proven"
     assert intervention_ledger[0]["repo"] == "warehouse-repo"
-    assert intervention_ledger[0]["historical_intelligence_status"] == "improving-after-intervention"
+    assert (
+        intervention_ledger[0]["historical_intelligence_status"]
+        == "improving-after-intervention"
+    )
     assert hotspot_history[0]["repo"] == "warehouse-repo"
     assert repo_scorecards[0]["repo"] == "warehouse-repo"
     assert review_history[0]["review_id"] == "review-1"
     assert watch_checkpoint["filter_signature"] == "abc123"
-    assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
+    assert (
+        operator_state["operator_summary"]["headline"]
+        == "Campaign work is ready for review."
+    )
     assert operator_state["governance_summary"]["needs_reapproval"] is True
-    assert operator_state["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
+    assert (
+        operator_state["portfolio_catalog_summary"]["summary"]
+        == "1/1 repos have an explicit catalog contract."
+    )
     assert operator_state["operating_paths_summary"]["summary"] == "Maintain 1"
-    assert operator_state["scorecards_summary"]["summary"].startswith("0 repos are on track")
+    assert operator_state["scorecards_summary"]["summary"].startswith(
+        "0 repos are on track"
+    )
     assert operator_state["scorecard_programs"]["maintain"]["label"] == "Maintain"
-    assert operator_state["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
-    assert operator_state["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
-    assert operator_state["decision_quality_summary"]["decision_quality_status"] == "trusted"
-    assert operator_state["decision_quality_summary"]["authority_cap"] == "bounded-automation"
+    assert operator_state["portfolio_outcomes_summary"]["summary"].startswith(
+        "Managed action closure"
+    )
+    assert operator_state["operator_effectiveness_summary"]["summary"].startswith(
+        "recommendation validation"
+    )
+    assert (
+        operator_state["decision_quality_summary"]["decision_quality_status"]
+        == "trusted"
+    )
+    assert (
+        operator_state["decision_quality_summary"]["authority_cap"]
+        == "bounded-automation"
+    )
     assert operator_state["high_pressure_queue_history"][0]["high_pressure_count"] == 1
-    assert operator_state["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
-    assert operator_state["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
-    assert operator_state["next_tuned_campaign"]["summary"].startswith("Promotion Push should win ties")
-    assert operator_state["intervention_ledger_summary"]["summary"].startswith("warehouse-repo is improving after intervention")
-    assert operator_state["next_historical_focus"]["summary"].startswith("Read warehouse-repo next")
+    assert operator_state["campaign_outcomes_summary"]["summary"].startswith(
+        "Promotion Push was applied recently"
+    )
+    assert operator_state["campaign_tuning_summary"]["summary"].startswith(
+        "Promotion Push should win ties"
+    )
+    assert operator_state["next_tuned_campaign"]["summary"].startswith(
+        "Promotion Push should win ties"
+    )
+    assert operator_state["intervention_ledger_summary"]["summary"].startswith(
+        "warehouse-repo is improving after intervention"
+    )
+    assert operator_state["next_historical_focus"]["summary"].startswith(
+        "Read warehouse-repo next"
+    )
     assert recent_campaign_history[0]["action_id"] == "promotion-push-abc123"
 
 
-def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_style_rows(tmp_path):
+def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_style_rows(
+    tmp_path,
+):
     audit = score_repo(_make_metadata(), _make_results())
 
     from github_repo_auditor.models import AuditReport
@@ -564,14 +670,20 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
     assert latest_runs[0]["campaign_outcomes_summary"] == {}
     assert latest_runs[0]["campaign_tuning_summary"] == {}
     assert latest_runs[0]["intervention_ledger_summary"] == {}
-    assert latest_runs[0]["decision_quality_summary"]["decision_quality_status"] == "insufficient-data"
+    assert (
+        latest_runs[0]["decision_quality_summary"]["decision_quality_status"]
+        == "insufficient-data"
+    )
     assert latest_runs[0]["decision_quality_summary"]["downgrade_reasons"] == [
         "legacy-run-without-decision-quality-contract"
     ]
     assert operator_state["campaign_outcomes_summary"] == {}
     assert operator_state["campaign_tuning_summary"] == {}
     assert operator_state["intervention_ledger_summary"] == {}
-    assert operator_state["decision_quality_summary"]["decision_quality_status"] == "insufficient-data"
+    assert (
+        operator_state["decision_quality_summary"]["decision_quality_status"]
+        == "insufficient-data"
+    )
 
 
 def test_write_warehouse_snapshot_expands_multi_action_target_results(tmp_path):

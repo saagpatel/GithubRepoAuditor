@@ -1,9 +1,15 @@
 """Tests for audit progress persistence (save/load/clear)."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
-from github_repo_auditor.progress import PROGRESS_FILE, clear_progress, load_progress, save_progress
+from github_repo_auditor.progress import (
+    PROGRESS_FILE,
+    clear_progress,
+    load_progress,
+    save_progress,
+)
 
 
 def _sample_audits() -> list[dict]:

@@ -20,7 +20,12 @@ def _make_report() -> dict:
         "repos_audited": 50,
         "average_score": 0.57,
         "portfolio_grade": "C",
-        "tier_distribution": {"shipped": 10, "functional": 20, "wip": 15, "skeleton": 5},
+        "tier_distribution": {
+            "shipped": 10,
+            "functional": 20,
+            "wip": 15,
+            "skeleton": 5,
+        },
         "language_distribution": {"TypeScript": 20, "Python": 15, "Rust": 10},
         "summary": {
             "highest_scored": ["RepoA", "RepoB"],
@@ -63,7 +68,9 @@ class TestAnthropicProvider:
         with patch("anthropic.Anthropic", return_value=mock_client) as mock_cls:
             provider = AnthropicProvider(api_key="test-key")
             result = provider.generate(
-                prompt="Analyze this portfolio", model="claude-haiku-test", max_tokens=512
+                prompt="Analyze this portfolio",
+                model="claude-haiku-test",
+                max_tokens=512,
             )
 
         mock_cls.assert_called_once_with(api_key="test-key")
@@ -92,7 +99,9 @@ class TestGitHubModelsProvider:
             )
 
         call_kwargs = mock_post.call_args
-        url_called = call_kwargs[0][0] if call_kwargs[0] else call_kwargs[1].get("url", "")
+        url_called = (
+            call_kwargs[0][0] if call_kwargs[0] else call_kwargs[1].get("url", "")
+        )
         assert "chat/completions" in url_called
 
         headers_sent = call_kwargs[1]["headers"]
@@ -200,7 +209,9 @@ class TestGenerateNarrativeSkips:
 class TestCLIProviderIntegration:
     """Verify CLI parser wires --narrative-provider and --narrative-model correctly."""
 
-    def test_github_models_provider_flag_routes_to_github_models(self, tmp_path, monkeypatch):
+    def test_github_models_provider_flag_routes_to_github_models(
+        self, tmp_path, monkeypatch
+    ):
         """End-to-end: explicit --narrative-provider github-models selects GitHubModelsProvider."""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
@@ -230,7 +241,14 @@ class TestCLIProviderIntegration:
 
         parser = build_parser()
         args = parser.parse_args(
-            ["someuser", "--narrative", "--narrative-provider", "github-models", "--narrative-model", "gpt-4o-mini"]
+            [
+                "someuser",
+                "--narrative",
+                "--narrative-provider",
+                "github-models",
+                "--narrative-model",
+                "gpt-4o-mini",
+            ]
         )
         assert args.narrative is True
         assert args.narrative_provider == "github-models"

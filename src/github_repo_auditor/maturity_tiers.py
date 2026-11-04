@@ -271,7 +271,9 @@ def _check_bronze(repo: dict) -> list[str]:
         missing.append("Has git history (identity.has_git == True)")
     lma = _get(repo, "derived", "last_meaningful_activity_at", default=None)
     if not lma:
-        missing.append("At least one commit (derived.last_meaningful_activity_at non-empty)")
+        missing.append(
+            "At least one commit (derived.last_meaningful_activity_at non-empty)"
+        )
     if not _has_readme(repo):
         missing.append("README present (README.md in derived.context_files)")
     return missing
@@ -290,11 +292,15 @@ def _check_silver(repo: dict) -> list[str]:
 
     readme_ok, _ = _check_readme_chars(derived)
     if not readme_ok:
-        missing.append("Non-boilerplate README (proxy: context_quality != 'boilerplate')")
+        missing.append(
+            "Non-boilerplate README (proxy: context_quality != 'boilerplate')"
+        )
 
     tests_ok, _ = _check_has_tests(derived)
     if not tests_ok:
-        missing.append("Tests present (proxy: derived.run_instructions_present == True)")
+        missing.append(
+            "Tests present (proxy: derived.run_instructions_present == True)"
+        )
 
     ci_ok, _ = _check_has_ci(derived, risk)
     if not ci_ok:
@@ -331,7 +337,9 @@ def _check_gold(repo: dict) -> list[str]:
         )
 
     if not _has_license(repo):
-        missing.append("LICENSE present (LICENSE in derived.context_files, case-insensitive)")
+        missing.append(
+            "LICENSE present (LICENSE in derived.context_files, case-insensitive)"
+        )
 
     stale_ok, _ = _check_readme_not_stale(derived)
     if not stale_ok:
@@ -387,12 +395,16 @@ def _check_silver_with_sources(
 
     readme_ok, readme_src = _check_readme_chars(derived)
     if not readme_ok:
-        missing.append("Non-boilerplate README (proxy: context_quality != 'boilerplate')")
+        missing.append(
+            "Non-boilerplate README (proxy: context_quality != 'boilerplate')"
+        )
         sources.append(readme_src)
 
     tests_ok, tests_src = _check_has_tests(derived)
     if not tests_ok:
-        missing.append("Tests present (proxy: derived.run_instructions_present == True)")
+        missing.append(
+            "Tests present (proxy: derived.run_instructions_present == True)"
+        )
         sources.append(tests_src)
 
     ci_ok, ci_src = _check_has_ci(derived, risk)
@@ -437,8 +449,12 @@ def _check_gold_with_sources(
         sources.append("proxy")  # security check is always proxy-based
 
     if not _has_license(repo):
-        missing.append("LICENSE present (LICENSE in derived.context_files, case-insensitive)")
-        sources.append("proxy")  # LICENSE presence is file-based, no strict signal change
+        missing.append(
+            "LICENSE present (LICENSE in derived.context_files, case-insensitive)"
+        )
+        sources.append(
+            "proxy"
+        )  # LICENSE presence is file-based, no strict signal change
 
     stale_ok, stale_src = _check_readme_not_stale(derived)
     if not stale_ok:
@@ -534,7 +550,9 @@ def tier_gap(repo: dict, target: int) -> TierGap:
     current = compute_tier(repo)
 
     if current >= target:
-        return TierGap(current_tier=current, target_tier=target, missing_requirements=[])
+        return TierGap(
+            current_tier=current, target_tier=target, missing_requirements=[]
+        )
 
     missing: list[str] = []
     sources: list[Literal["strict", "proxy"]] = []

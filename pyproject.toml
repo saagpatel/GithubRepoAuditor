@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=68", "setuptools-scm>=8"]
+requires = ["setuptools==84.1.0", "setuptools-scm==10.3.4"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "github-repo-auditor"
 dynamic = ["version"]
-description = "Automated GitHub portfolio auditor with 12 analysis dimensions"
+description = "Automated GitHub portfolio auditor with 13 analysis dimensions"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "Saag Patel" }]
 keywords = [
@@ -22,8 +22,9 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Utilities",
 ]
@@ -32,7 +33,7 @@ dependencies = [
     "python-dateutil>=2.8.0",
     "openpyxl>=3.1.0",
     "pyyaml>=6.0",
-    "radon>=6.0.0",
+    "radon>=6.0.1",
     "rich>=13.0",
     "anthropic>=0.40.0",
     "fpdf2>=2.7.0",
@@ -54,13 +55,13 @@ dev = [
 config = ["pyyaml>=6.0"]
 semantic = [
     "sqlite-vec>=0.1.0",
-    "sentence-transformers>=3.0",
+    "sentence-transformers>=6.2.0",
 ]
 serve = [
-    "fastapi>=0.115",
+    "fastapi>=0.143.0",
     "uvicorn[standard]>=0.30",
     "jinja2>=3.1",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.32",
 ]
 hosting = [
     # Optional: a shared Redis/Upstash backend for the hosted report cache and
@@ -68,7 +69,7 @@ hosting = [
     "redis>=5.0",
 ]
 build = [
-    "shiv>=1.0",
+    "shiv>=1.0.8",
     "build>=1.0",
     "twine>=5.0",
 ]
@@ -119,7 +120,10 @@ pytest_add_cli_args_test_selection = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
+
+[tool.uv]
+required-version = "==0.13.0"
 
 [tool.ruff.lint]
 ignore = ["E501"]

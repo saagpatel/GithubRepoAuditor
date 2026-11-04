@@ -1,4 +1,5 @@
 """Watch mode — re-run audit on interval."""
+
 from __future__ import annotations
 
 import signal

@@ -34,7 +34,12 @@ def write_instruction_banner(ws, row: int, end_col: int, message: str) -> None:
 
 
 def write_key_value_block(
-    ws, start_row: int, start_col: int, rows: list[tuple[str, object]], *, title: str | None = None
+    ws,
+    start_row: int,
+    start_col: int,
+    rows: list[tuple[str, object]],
+    *,
+    title: str | None = None,
 ) -> int:
     row = start_row
     if title:
@@ -68,7 +73,8 @@ def write_ranked_list(
         for col_offset, value in enumerate(values):
             align = "center" if isinstance(value, (int, float)) else "left"
             style_data_cell(
-                ws.cell(row=row_index, column=start_col + col_offset, value=value), align
+                ws.cell(row=row_index, column=start_col + col_offset, value=value),
+                align,
             )
     if rows:
         apply_zebra_stripes(

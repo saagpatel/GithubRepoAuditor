@@ -35,7 +35,9 @@ def run_automation_proposals_mode(args) -> None:
     proposals_path = output_dir / "pending-proposals.json"
     now = datetime.now(timezone.utc).isoformat()
 
-    if getattr(args, "approve_proposal", None) or getattr(args, "reject_proposal", None):
+    if getattr(args, "approve_proposal", None) or getattr(
+        args, "reject_proposal", None
+    ):
         try:
             proposals = load_proposals(proposals_path)
             if getattr(args, "approve_proposal", None):
@@ -47,7 +49,9 @@ def run_automation_proposals_mode(args) -> None:
                 )
                 label = f"Approved proposal {args.approve_proposal!r}."
             else:
-                updated = reject_proposal(proposals, args.reject_proposal, rejected_at=now)
+                updated = reject_proposal(
+                    proposals, args.reject_proposal, rejected_at=now
+                )
                 label = f"Rejected proposal {args.reject_proposal!r}."
         except (ProposalNotFoundError, ProposalApprovalError, ValueError) as exc:
             print_warning(str(exc))
@@ -63,15 +67,21 @@ def run_automation_proposals_mode(args) -> None:
             return
         print_info(f"Bounded-automation proposal queue ({len(proposals)} total):")
         for proposal in proposals:
-            print_info(f"  {proposal.status}: {proposal.proposal_id} — {proposal.description}")
+            print_info(
+                f"  {proposal.status}: {proposal.proposal_id} — {proposal.description}"
+            )
         return
 
     if getattr(args, "propose_automation", False):
-        from github_repo_auditor.weekly_command_center import load_latest_portfolio_truth
+        from github_repo_auditor.weekly_command_center import (
+            load_latest_portfolio_truth,
+        )
 
         _truth_path, truth = load_latest_portfolio_truth(output_dir)
         if not truth:
-            print_warning("No portfolio truth snapshot found. Run --portfolio-truth first.")
+            print_warning(
+                "No portfolio truth snapshot found. Run --portfolio-truth first."
+            )
             return
         try:
             _report_path, _diff, report = refresh_latest_report_state(output_dir, args)
@@ -102,13 +112,17 @@ def run_automation_proposals_mode(args) -> None:
     if getattr(args, "execute_proposals", False):
         from github_repo_auditor.automation_proposals import executable_proposals
         from github_repo_auditor.automation_workflow import execute_approved_proposals
-        from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+        from github_repo_auditor.portfolio_truth_reconcile import (
+            build_portfolio_truth_snapshot,
+        )
 
         if not executable_proposals(load_proposals(proposals_path)):
             print_info("No approved bounded-automation proposals to execute.")
             return
 
-        workspace_root = Path(getattr(args, "workspace_root", None) or DEFAULT_PORTFOLIO_WORKSPACE)
+        workspace_root = Path(
+            getattr(args, "workspace_root", None) or DEFAULT_PORTFOLIO_WORKSPACE
+        )
         catalog_path = (
             Path(args.catalog)
             if getattr(args, "catalog", None)
@@ -143,4 +157,6 @@ def run_automation_proposals_mode(args) -> None:
         for result in results:
             print_info(f"  {result.outcome}: {result.proposal_id} — {result.detail}")
         mode = "apply" if apply else "dry-run"
-        print_info(f"Execute proposals ({mode}): {len(results)} approved proposal(s) processed.")
+        print_info(
+            f"Execute proposals ({mode}): {len(results)} approved proposal(s) processed."
+        )

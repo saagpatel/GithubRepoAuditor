@@ -28,7 +28,9 @@ def _make_report() -> dict:
             }
         },
         "scenario_summary": {"top_levers": [], "portfolio_projection": {}},
-        "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
+        "portfolio_catalog_summary": {
+            "summary": "1/1 repos have an explicit catalog contract."
+        },
         "operating_paths_summary": {"summary": "Maintain 1"},
         "intent_alignment_summary": {
             "summary": "1 aligned, 0 needing review, and 0 missing a contract."
@@ -243,9 +245,15 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Act Now" in content
     assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
     assert "Operating Paths: Maintain 1" in content
-    assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
+    assert (
+        "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract."
+        in content
+    )
     assert "Scorecards: 0 repos are on track, 1 is below target" in content
-    assert "Implementation Hotspots: 1 repos have concrete implementation pressure." in content
+    assert (
+        "Implementation Hotspots: 1 repos have concrete implementation pressure."
+        in content
+    )
     assert "Operator Outcomes:" in content
     assert "Operator Effectiveness:" in content
     assert "High-Pressure Queue Trend:" in content
@@ -266,10 +274,15 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Operating Path: Maintain (high confidence)" in content
     assert "Where To Start: Start in src/core.py." in content
-    assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
+    assert (
+        "Intent Alignment: aligned: The repo is holding a maintain posture" in content
+    )
     assert "Scorecard: Maintain — Operating (target Strong)" in content
     assert "Maturity Gap: testing, ci are still below the maintain bar." in content
-    assert "Action Sync: Security Review is preview-ready — recommended target all." in content
+    assert (
+        "Action Sync: Security Review is preview-ready — recommended target all."
+        in content
+    )
     assert (
         "Campaign Tuning: Security Review should win ties because recent outcomes are proven."
         in content
@@ -282,7 +295,9 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
         "Automation Guidance: Security Review is preview-safe: use a preview-only step first."
         in content
     )
-    assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
+    assert (
+        "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
+    )
 
 
 def test_review_pack_includes_github_projects_campaign_context(tmp_path):

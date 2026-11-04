@@ -2,8 +2,13 @@ from openpyxl import Workbook
 from openpyxl.worksheet.hyperlink import Hyperlink
 
 from github_repo_auditor.excel_detail_helpers import set_internal_hyperlink
-from github_repo_auditor.excel_operator_follow_through_helpers import operator_follow_through_details
-from github_repo_auditor.excel_operator_summary_helpers import operator_handoff_values, operator_watch_values
+from github_repo_auditor.excel_operator_follow_through_helpers import (
+    operator_follow_through_details,
+)
+from github_repo_auditor.excel_operator_summary_helpers import (
+    operator_handoff_values,
+    operator_watch_values,
+)
 from github_repo_auditor.excel_sheet_layout_helpers import write_instruction_banner
 from github_repo_auditor.excel_styles import (
     CENTER,
@@ -20,7 +25,11 @@ from github_repo_auditor.excel_styles import (
     auto_width,
     style_data_cell,
 )
-from github_repo_auditor.excel_workbook_helpers import clear_worksheet, configure_sheet_view, sheet_location
+from github_repo_auditor.excel_workbook_helpers import (
+    clear_worksheet,
+    configure_sheet_view,
+    sheet_location,
+)
 
 
 def inject_sheet_navigation(wb: Workbook) -> None:
@@ -117,11 +126,21 @@ def build_navigation(
     ws.cell(row=6, column=1, value="Collection").font = SUBHEADER_FONT
     ws.cell(row=6, column=2, value=collection or "all")
     ws.cell(row=6, column=3, value="Source Run").font = SUBHEADER_FONT
-    ws.cell(row=6, column=4, value=(data.get("operator_summary") or {}).get("source_run_id", ""))
+    ws.cell(
+        row=6,
+        column=4,
+        value=(data.get("operator_summary") or {}).get("source_run_id", ""),
+    )
     ws.cell(row=7, column=1, value="Report Reference").font = SUBHEADER_FONT
-    ws.cell(row=7, column=2, value=(data.get("operator_summary") or {}).get("report_reference", ""))
+    ws.cell(
+        row=7,
+        column=2,
+        value=(data.get("operator_summary") or {}).get("report_reference", ""),
+    )
     ws.cell(row=7, column=3, value="Operator Headline").font = SUBHEADER_FONT
-    ws.cell(row=7, column=4, value=(data.get("operator_summary") or {}).get("headline", ""))
+    ws.cell(
+        row=7, column=4, value=(data.get("operator_summary") or {}).get("headline", "")
+    )
     ws.cell(row=8, column=1, value="Next Run").font = SUBHEADER_FONT
     ws.cell(row=8, column=2, value=next_mode)
     ws.cell(row=8, column=3, value="Watch Strategy").font = SUBHEADER_FONT
@@ -169,12 +188,30 @@ def build_navigation(
             18,
             1,
             [
-                ("Dashboard", "Start here for the big-picture health view and top attention items."),
-                ("Review Queue", "Use this for blocked, urgent, ready, and safe-to-defer review work."),
-                ("Run Changes", "See what changed since the last run before you decide where to spend attention."),
-                ("Campaigns", "Check managed campaign state, reopen/closure context, and drift."),
-                ("Governance Controls", "Review governed controls, approval posture, and rollback visibility."),
-                ("Writeback Audit", "See what writeback changed and what is reversible."),
+                (
+                    "Dashboard",
+                    "Start here for the big-picture health view and top attention items.",
+                ),
+                (
+                    "Review Queue",
+                    "Use this for blocked, urgent, ready, and safe-to-defer review work.",
+                ),
+                (
+                    "Run Changes",
+                    "See what changed since the last run before you decide where to spend attention.",
+                ),
+                (
+                    "Campaigns",
+                    "Check managed campaign state, reopen/closure context, and drift.",
+                ),
+                (
+                    "Governance Controls",
+                    "Review governed controls, approval posture, and rollback visibility.",
+                ),
+                (
+                    "Writeback Audit",
+                    "See what writeback changed and what is reversible.",
+                ),
             ],
         ),
         (
@@ -182,12 +219,30 @@ def build_navigation(
             17,
             5,
             [
-                ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
-                ("Repo Detail", "Select one repo and get a single-page briefing on score, risks, trend, and next action."),
-                ("By Lens", "Compare the portfolio by ship readiness, momentum, security, and fit."),
-                ("By Collection", "Understand collection-level leaders and concentration."),
-                ("Trend Summary", "See portfolio-wide movement and repo trendlines over time."),
-                ("All Repos", "Scan the full inventory with grades, tiers, and supporting evidence."),
+                (
+                    "Portfolio Explorer",
+                    "Rank repos, compare score quality, and drill from summary into raw facts.",
+                ),
+                (
+                    "Repo Detail",
+                    "Select one repo and get a single-page briefing on score, risks, trend, and next action.",
+                ),
+                (
+                    "By Lens",
+                    "Compare the portfolio by ship readiness, momentum, security, and fit.",
+                ),
+                (
+                    "By Collection",
+                    "Understand collection-level leaders and concentration.",
+                ),
+                (
+                    "Trend Summary",
+                    "See portfolio-wide movement and repo trendlines over time.",
+                ),
+                (
+                    "All Repos",
+                    "Scan the full inventory with grades, tiers, and supporting evidence.",
+                ),
             ],
         ),
         (
@@ -195,8 +250,14 @@ def build_navigation(
             27,
             1,
             [
-                ("Executive Summary", "Readable leadership summary with what changed and what matters this week."),
-                ("Print Pack", "Print-friendly handoff with risks, opportunities, and operator counts in plain language."),
+                (
+                    "Executive Summary",
+                    "Readable leadership summary with what changed and what matters this week.",
+                ),
+                (
+                    "Print Pack",
+                    "Print-friendly handoff with risks, opportunities, and operator counts in plain language.",
+                ),
             ],
         ),
         (
@@ -204,12 +265,27 @@ def build_navigation(
             27,
             5,
             [
-                ("Security", "Raw security posture, secrets, and dangerous-file findings."),
+                (
+                    "Security",
+                    "Raw security posture, secrets, and dangerous-file findings.",
+                ),
                 ("Security Controls", "Control coverage and rollout detail by repo."),
-                ("Supply Chain", "Dependency health, scorecard signals, and provider coverage."),
-                ("Scoring Heatmap", "Dimension-by-dimension matrix for detailed score inspection."),
-                ("Hotspots", "Highest-severity risks and opportunities across the portfolio."),
-                ("Review History", "Recurring review history and decision-state ledger."),
+                (
+                    "Supply Chain",
+                    "Dependency health, scorecard signals, and provider coverage.",
+                ),
+                (
+                    "Scoring Heatmap",
+                    "Dimension-by-dimension matrix for detailed score inspection.",
+                ),
+                (
+                    "Hotspots",
+                    "Highest-severity risks and opportunities across the portfolio.",
+                ),
+                (
+                    "Review History",
+                    "Recurring review history and decision-state ledger.",
+                ),
                 ("Governance Audit", "Approval, drift, and rollback evidence summary."),
                 ("Score Explainer", "How scores, grades, and tiers are computed."),
                 ("Action Items", "Prioritized improvement ideas with effort context."),
@@ -238,7 +314,9 @@ def build_navigation(
                 location=sheet_location(name),
                 display=str(name),
             )
-            sheet_cell.font = Font("Calibri", 11, bold=True, color=TEAL, underline="single")
+            sheet_cell.font = Font(
+                "Calibri", 11, bold=True, color=TEAL, underline="single"
+            )
             sheet_cell.border = THIN_BORDER
             sheet_cell.alignment = LEFT
             style_data_cell(ws.cell(row=row, column=start_col + 1, value=desc), "left")
@@ -248,7 +326,9 @@ def build_navigation(
                 location=sheet_location(name),
                 display="Open",
             )
-            go_cell.font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
+            go_cell.font = Font(
+                "Calibri", 10, bold=True, color=TEAL, underline="single"
+            )
             go_cell.border = THIN_BORDER
             go_cell.alignment = CENTER
             row += 1

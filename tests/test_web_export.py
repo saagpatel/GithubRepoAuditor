@@ -9,7 +9,11 @@ from github_repo_auditor.report_enrichment import (
     no_baseline_summary,
     no_linked_artifact_summary,
 )
-from github_repo_auditor.web_export import _render_html, _risk_posture_section, export_html_dashboard
+from github_repo_auditor.web_export import (
+    _render_html,
+    _risk_posture_section,
+    export_html_dashboard,
+)
 
 
 def _make_report(**overrides) -> dict:
@@ -23,8 +27,14 @@ def _make_report(**overrides) -> dict:
         "tier_distribution": {"shipped": 1, "functional": 1, "wip": 1},
         "language_distribution": {"Python": 2, "Rust": 1},
         "lenses": {
-            "ship_readiness": {"average_score": 0.72, "description": "Delivery readiness"},
-            "showcase_value": {"average_score": 0.63, "description": "Story and polish"},
+            "ship_readiness": {
+                "average_score": 0.72,
+                "description": "Delivery readiness",
+            },
+            "showcase_value": {
+                "average_score": 0.63,
+                "description": "Story and polish",
+            },
         },
         "collections": {
             "showcase": {
@@ -93,7 +103,11 @@ def _make_report(**overrides) -> dict:
             "mode": "apply",
             "target": "github",
             "results": [
-                {"repo_full_name": "user/RepoC", "target": "github-issue", "status": "created"}
+                {
+                    "repo_full_name": "user/RepoC",
+                    "target": "github-issue",
+                    "status": "created",
+                }
             ],
         },
         "managed_state_drift": [
@@ -103,9 +117,13 @@ def _make_report(**overrides) -> dict:
                 "drift_state": "managed-issue-edited",
             }
         ],
-        "governance_results": {"results": [{"repo_full_name": "user/RepoC", "status": "applied"}]},
+        "governance_results": {
+            "results": [{"repo_full_name": "user/RepoC", "status": "applied"}]
+        },
         "governance_approval": {"status": "approved"},
-        "governance_drift": [{"repo_full_name": "user/RepoC", "drift_type": "already-enabled"}],
+        "governance_drift": [
+            {"repo_full_name": "user/RepoC", "drift_type": "already-enabled"}
+        ],
         "governance_summary": {
             "headline": "Governed control drift needs operator review.",
             "status": "drifted",
@@ -608,7 +626,10 @@ class TestExportHtmlDashboard:
                     "projects": [
                         {
                             "identity": {"display_name": "RepoB"},
-                            "risk": {"risk_tier": "elevated", "risk_summary": "Weak context."},
+                            "risk": {
+                                "risk_tier": "elevated",
+                                "risk_summary": "Weak context.",
+                            },
                         }
                     ],
                 }
@@ -683,8 +704,14 @@ class TestRenderHtml:
         )
         assert "Run Changes" in html
         assert "One repo improved and one regressed." in html
-        assert f"Why It Matters:</strong> {weekly_pack['weekly_story_v1']['why_this_week']}" in html
-        assert f"What To Do Next:</strong> {weekly_pack['weekly_story_v1']['decision']}" in html
+        assert (
+            f"Why It Matters:</strong> {weekly_pack['weekly_story_v1']['why_this_week']}"
+            in html
+        )
+        assert (
+            f"What To Do Next:</strong> {weekly_pack['weekly_story_v1']['decision']}"
+            in html
+        )
 
     def test_run_changes_uses_shared_fallback_without_diff(self):
         html = _render_html(_make_report(), diff_data=None)
@@ -692,7 +719,10 @@ class TestRenderHtml:
 
     def test_operator_section_includes_trend_and_primary_target(self):
         html = _render_html(_make_report())
-        assert f"Queue Pressure:</strong> {build_queue_pressure_summary(_make_report())}" in html
+        assert (
+            f"Queue Pressure:</strong> {build_queue_pressure_summary(_make_report())}"
+            in html
+        )
         assert (
             f"Top Recommendation:</strong> {build_top_recommendation_summary(_make_report())}"
             in html
@@ -763,19 +793,47 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:" in html
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:" in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:"
+            in html
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:" in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:" in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:" in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:"
+            in html
+        )
         assert "Reset Re-entry Rebuild Persistence:" in html
         assert "Reset Re-entry Rebuild Churn Controls:" in html
         assert "Recommendation Drift:" in html
@@ -819,29 +877,60 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Freshness Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary:" in html
         assert (
-            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:" in html
+            "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary:" in html
+        )
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary:" in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary:" in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:"
+            in html
         )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:"
+            in html
+        )
         assert (
             "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:"
             in html
         )
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:" in html
         assert (
-            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:" in html
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:" in html
         )
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary:"
+            in html
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:"
+            in html
+        )
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Churn Summary:" in html
         assert "Operator Focus:</strong>" in html
@@ -850,7 +939,9 @@ class TestRenderHtml:
         assert "Improving" in html
         assert "Fragile" in html
         assert "Revalidate" in html
-        assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in html
+        assert (
+            "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in html
+        )
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
@@ -899,7 +990,10 @@ class TestRenderHtml:
                     "blocking_errors": 0,
                     "warnings": 2,
                     "checks": [
-                        {"category": "config", "summary": "No audit-config.yaml was found."}
+                        {
+                            "category": "config",
+                            "summary": "No audit-config.yaml was found.",
+                        }
                     ],
                 }
             )
@@ -1039,21 +1133,36 @@ class TestRenderHtml:
                 "date": "2026-01-01",
                 "average_score": 0.50,
                 "repos_audited": 5,
-                "tier_distribution": {"shipped": 1, "functional": 2, "wip": 1, "skeleton": 1},
+                "tier_distribution": {
+                    "shipped": 1,
+                    "functional": 2,
+                    "wip": 1,
+                    "skeleton": 1,
+                },
                 "top_repos": {},
             },
             {
                 "date": "2026-02-01",
                 "average_score": 0.55,
                 "repos_audited": 6,
-                "tier_distribution": {"shipped": 2, "functional": 2, "wip": 1, "skeleton": 1},
+                "tier_distribution": {
+                    "shipped": 2,
+                    "functional": 2,
+                    "wip": 1,
+                    "skeleton": 1,
+                },
                 "top_repos": {},
             },
             {
                 "date": "2026-03-01",
                 "average_score": 0.62,
                 "repos_audited": 7,
-                "tier_distribution": {"shipped": 3, "functional": 2, "wip": 1, "skeleton": 1},
+                "tier_distribution": {
+                    "shipped": 3,
+                    "functional": 2,
+                    "wip": 1,
+                    "skeleton": 1,
+                },
                 "top_repos": {},
             },
         ]
@@ -1091,7 +1200,9 @@ class TestRenderHtml:
             ]
         )
         html = _render_html(report)
-        assert "&lt;/script&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;" in html
+        assert (
+            "&lt;/script&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;" in html
+        )
         assert '</script><script>alert("xss")</script>' not in html
         assert '<script id="dashboard-data" type="application/json">' in html
         assert "<\\/script>" in html
@@ -1101,11 +1212,19 @@ class TestRenderHtml:
             "average_score_delta": 0.04,
             "lens_deltas": {"ship_readiness": 0.1},
             "repo_changes": [
-                {"name": "RepoA", "delta": 0.1, "old_tier": "functional", "new_tier": "shipped"}
+                {
+                    "name": "RepoA",
+                    "delta": 0.1,
+                    "old_tier": "functional",
+                    "new_tier": "shipped",
+                }
             ],
         }
         html = _render_html(
-            _make_report(), diff_data=diff_data, portfolio_profile="default", collection="showcase"
+            _make_report(),
+            diff_data=diff_data,
+            portfolio_profile="default",
+            collection="showcase",
         )
         assert "Analyst View" in html
         assert "Decision Lenses" in html
@@ -1242,7 +1361,10 @@ class TestRenderHtml:
         assert "Next Historical Focus:" in html
         assert "Automation Guidance:" in html
         assert "Next Safe Automation Step:" in html
-        assert "Security Review should win ties because recent outcomes are proven." in html
+        assert (
+            "Security Review should win ties because recent outcomes are proven."
+            in html
+        )
         assert "RepoC is improving after intervention" in html
         assert (
             "Preview Security Review next; that is the strongest safe automation step right now."

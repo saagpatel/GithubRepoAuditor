@@ -11,7 +11,9 @@ from github_repo_auditor.operator_os_seam_linter import (
     lint_operator_os_seams,
     main,
 )
-from github_repo_auditor.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
+from github_repo_auditor.portfolio_truth_render import (
+    GENERATED_MARKDOWN_PROVENANCE_MARKER,
+)
 from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
 
 
@@ -102,8 +104,7 @@ def _write_bridge_db(
                 (project_name, canonical_key, timestamp),
             )
         cost_rows = session_cost_rows or [
-            (name, "2026-07-03T12:00:00+00:00")
-            for name in (session_cost_names or [])
+            (name, "2026-07-03T12:00:00+00:00") for name in (session_cost_names or [])
         ]
         conn.executemany(
             "INSERT INTO session_costs (project_name, started_at) VALUES (?, ?)",
@@ -158,11 +159,15 @@ def test_recent_artifact_fails_when_catalog_source_hash_differs(tmp_path: Path) 
     )
 
     assert not result.passed
-    finding = next(item for item in result.findings if item.check == "artifact_freshness")
+    finding = next(
+        item for item in result.findings if item.check == "artifact_freshness"
+    )
     assert "different catalog content" in finding.violation
 
 
-def test_recent_artifact_fails_when_catalog_source_hash_is_absent(tmp_path: Path) -> None:
+def test_recent_artifact_fails_when_catalog_source_hash_is_absent(
+    tmp_path: Path,
+) -> None:
     truth, markdown = _passing_paths(tmp_path)
     catalog = tmp_path / "portfolio-catalog.yaml"
     catalog.write_text("repos: {}\n", encoding="utf-8")
@@ -178,7 +183,9 @@ def test_recent_artifact_fails_when_catalog_source_hash_is_absent(tmp_path: Path
     )
 
     assert not result.passed
-    finding = next(item for item in result.findings if item.check == "artifact_freshness")
+    finding = next(
+        item for item in result.findings if item.check == "artifact_freshness"
+    )
     assert finding.level == "fail"
     assert "not source-bound" in finding.violation
 
@@ -377,9 +384,7 @@ def test_contract_shadow_fails_when_excluded_backup_leaks_into_projects(
             },
             "projects": [
                 {
-                    "identity": {
-                        "path": "Documents/Codex Backups/Wave 2R Post-Update"
-                    },
+                    "identity": {"path": "Documents/Codex Backups/Wave 2R Post-Update"},
                     "derived": {"attention_state": "decision-needed"},
                 }
             ],
@@ -676,7 +681,9 @@ def test_identity_resolution_bridge_canonical_key_disagreement_fails(
 
     assert not result.passed
     assert result.findings[0].check == "identity_resolution"
-    assert result.findings[0].violation == "bridge canonical_key disagrees with alias map"
+    assert (
+        result.findings[0].violation == "bridge canonical_key disagrees with alias map"
+    )
 
 
 def test_identity_resolution_since_ignores_old_timestamped_rows(tmp_path: Path) -> None:
@@ -730,7 +737,9 @@ def test_identity_resolution_since_skips_untimestamped_notion_snapshot(
     assert result.passed
 
 
-def test_identity_resolution_since_includes_new_timestamped_rows(tmp_path: Path) -> None:
+def test_identity_resolution_since_includes_new_timestamped_rows(
+    tmp_path: Path,
+) -> None:
     truth, markdown = _passing_paths(tmp_path)
     _write_identity_truth(truth)
     bridge_db = tmp_path / "bridge.db"

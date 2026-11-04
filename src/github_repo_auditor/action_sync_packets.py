@@ -22,7 +22,9 @@ EXECUTION_PRIORITY = {
 }
 
 
-def _campaign_actions(report_data: dict[str, Any], campaign_type: str) -> list[dict[str, Any]]:
+def _campaign_actions(
+    report_data: dict[str, Any], campaign_type: str
+) -> list[dict[str, Any]]:
     _summary, actions = build_campaign_bundle(
         report_data,
         campaign_type=campaign_type,
@@ -41,9 +43,7 @@ def _automation_eligible_repo_names(report_data: dict[str, Any]) -> set[str]:
         if not catalog.get("automation_eligible"):
             continue
         repo_name = str(
-            catalog.get("repo")
-            or audit.get("metadata", {}).get("name")
-            or ""
+            catalog.get("repo") or audit.get("metadata", {}).get("name") or ""
         ).strip()
         if repo_name:
             names.add(repo_name)
@@ -76,23 +76,31 @@ def _automation_subset(
 
 
 def _github_projects_enabled_and_healthy(report_data: dict[str, Any]) -> bool:
-    github_projects = ((report_data.get("writeback_preview") or {}).get("github_projects") or {})
+    github_projects = (report_data.get("writeback_preview") or {}).get(
+        "github_projects"
+    ) or {}
     return bool(github_projects.get("enabled")) and _github_projects_ready(report_data)
 
 
-def _command_prefix(report_data: dict[str, Any], campaign_type: str, target: str, sync_mode: str) -> str:
+def _command_prefix(
+    report_data: dict[str, Any], campaign_type: str, target: str, sync_mode: str
+) -> str:
     username = str(report_data.get("username") or "<github-username>")
     command = f"audit {username} --campaign {campaign_type}"
     if target and target != "none":
         command += f" --writeback-target {target}"
     if sync_mode and sync_mode != "reconcile":
         command += f" --campaign-sync-mode {sync_mode}"
-    if target in {"github", "all"} and _github_projects_enabled_and_healthy(report_data):
+    if target in {"github", "all"} and _github_projects_enabled_and_healthy(
+        report_data
+    ):
         command += " --github-projects"
     return command
 
 
-def _rollback_status(report_data: dict[str, Any], campaign_type: str, actions: list[dict[str, Any]]) -> str:
+def _rollback_status(
+    report_data: dict[str, Any], campaign_type: str, actions: list[dict[str, Any]]
+) -> str:
     if not actions:
         return "not-applicable"
 
@@ -104,9 +112,13 @@ def _rollback_status(report_data: dict[str, Any], campaign_type: str, actions: l
         for row in report_data.get("action_runs") or []
         if str(row.get("campaign_type") or "") == campaign_type
     )
-    matching = [item for item in items if str(item.get("action_id") or "") in action_ids]
+    matching = [
+        item for item in items if str(item.get("action_id") or "") in action_ids
+    ]
     if not matching:
-        active_campaign = campaign_type == str((report_data.get("campaign_summary") or {}).get("campaign_type") or "")
+        active_campaign = campaign_type == str(
+            (report_data.get("campaign_summary") or {}).get("campaign_type") or ""
+        )
         mode = str((report_data.get("writeback_results") or {}).get("mode") or "")
         if active_campaign and mode == "apply":
             return "missing"
@@ -138,7 +150,12 @@ def _blockers(
 
     if str(record.get("readiness_stage") or "") == "drift-review":
         blocker_types.append("managed-drift")
-        blockers.append(str(record.get("reason") or "Managed drift needs review before any further sync."))
+        blockers.append(
+            str(
+                record.get("reason")
+                or "Managed drift needs review before any further sync."
+            )
+        )
 
     if action_count > 0 and recommended_target == "none":
         if not _github_ready(report_data):
@@ -148,13 +165,25 @@ def _blockers(
             blocker_types.append("notion-access")
             blockers.append("Notion writeback prerequisites are not healthy yet.")
 
-    if action_count > 0 and campaign_type == "security-review" and not _governance_ready(report_data, campaign_type):
+    if (
+        action_count > 0
+        and campaign_type == "security-review"
+        and not _governance_ready(report_data, campaign_type)
+    ):
         blocker_types.append("governance-approval")
-        blockers.append("Governed security controls still need approval or re-approval before apply.")
+        blockers.append(
+            "Governed security controls still need approval or re-approval before apply."
+        )
         approvals_required.append("governance")
 
-    if action_count > 0 and recommended_target in {"github", "all"} and not _github_projects_ready(report_data):
-        github_projects = ((report_data.get("writeback_preview") or {}).get("github_projects") or {})
+    if (
+        action_count > 0
+        and recommended_target in {"github", "all"}
+        and not _github_projects_ready(report_data)
+    ):
+        github_projects = (report_data.get("writeback_preview") or {}).get(
+            "github_projects"
+        ) or {}
         if github_projects.get("enabled"):
             blocker_types.append("github-projects")
             blockers.append("GitHub Projects mirroring is enabled but not healthy yet.")
@@ -162,9 +191,13 @@ def _blockers(
     if action_count > 0 and rollback_status in {"partial", "missing"}:
         blocker_types.append("rollback-coverage")
         if rollback_status == "partial":
-            blockers.append("Rollback coverage is only partial for the current managed action path.")
+            blockers.append(
+                "Rollback coverage is only partial for the current managed action path."
+            )
         else:
-            blockers.append("Rollback coverage is missing for the current managed action path.")
+            blockers.append(
+                "Rollback coverage is missing for the current managed action path."
+            )
 
     deduped_types = list(dict.fromkeys(blocker_types))
     deduped_blockers = list(dict.fromkeys(blockers))
@@ -177,7 +210,9 @@ def _execution_state(record: dict[str, Any], blocker_types: list[str]) -> str:
     blocker_set = set(blocker_types)
     if readiness_stage == "drift-review":
         return "review-drift"
-    if blocker_set and blocker_set.issubset({"governance-approval", "rollback-coverage"}):
+    if blocker_set and blocker_set.issubset(
+        {"governance-approval", "rollback-coverage"}
+    ):
         return "needs-approval"
     if readiness_stage == "apply-ready" and not blocker_set:
         return "ready-to-apply"
@@ -193,9 +228,13 @@ def _packet_summary(packet: dict[str, Any]) -> str:
     blockers = list(packet.get("blockers") or [])
 
     if execution_state == "review-drift":
-        return f"{label} should stop at drift review before any further sync to {target}."
+        return (
+            f"{label} should stop at drift review before any further sync to {target}."
+        )
     if execution_state == "needs-approval":
-        reason = blockers[0] if blockers else "Approval or rollback review is still needed."
+        reason = (
+            blockers[0] if blockers else "Approval or rollback review is still needed."
+        )
         return f"{label} still needs approval or rollback review before apply to {target}. {reason}"
     if execution_state == "ready-to-apply":
         return f"{label} is ready to apply to {target} when you are."
@@ -228,7 +267,9 @@ def _next_candidate_summary(packet: dict[str, Any]) -> str:
 
 
 def _summary_line(packets: list[dict[str, Any]]) -> str:
-    actionable = [packet for packet in packets if packet.get("execution_state") != "stay-local"]
+    actionable = [
+        packet for packet in packets if packet.get("execution_state") != "stay-local"
+    ]
     if not actionable:
         return "No current campaign has a safe execution handoff yet, so the local weekly story should stay local for now."
     packet = sorted(actionable, key=_packet_sort_key)[0]
@@ -241,7 +282,9 @@ def _summary_line(packets: list[dict[str, Any]]) -> str:
         return f"Apply handoff says {label} still needs approval or rollback review before apply to {target}."
     if execution_state == "ready-to-apply":
         return f"Apply handoff says {label} is ready to apply to {target} when you are."
-    return f"Apply handoff says preview {label} next before deciding on apply to {target}."
+    return (
+        f"Apply handoff says preview {label} next before deciding on apply to {target}."
+    )
 
 
 def _queue_apply_packets(
@@ -260,11 +303,18 @@ def _queue_apply_packets(
     for item in queue:
         mapped = dict(item)
         repo_name = str(mapped.get("repo") or mapped.get("repo_name") or "").strip()
-        campaign_type = str(mapped.get("suggested_campaign") or repo_to_campaign.get(repo_name) or _infer_campaign(repo_name, mapped, report_data))
+        campaign_type = str(
+            mapped.get("suggested_campaign")
+            or repo_to_campaign.get(repo_name)
+            or _infer_campaign(repo_name, mapped, report_data)
+        )
         packet = packets_by_campaign.get(campaign_type, {})
         execution_state = str(packet.get("execution_state") or "stay-local")
         mapped["apply_packet_state"] = execution_state
-        mapped["apply_packet_summary"] = str(packet.get("summary") or "No current apply packet is surfaced for this item.")
+        mapped["apply_packet_summary"] = str(
+            packet.get("summary")
+            or "No current apply packet is surfaced for this item."
+        )
         if execution_state == "ready-to-apply":
             mapped["apply_packet_command"] = str(packet.get("apply_command") or "")
         elif execution_state == "preview-next":
@@ -282,7 +332,10 @@ def build_action_sync_packets_bundle(
 ) -> dict[str, Any]:
     readiness_by_campaign = {
         str(record.get("campaign_type") or ""): record
-        for record in ((readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns") or [])
+        for record in (
+            (readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns")
+            or []
+        )
     }
 
     packets: list[dict[str, Any]] = []
@@ -291,20 +344,26 @@ def build_action_sync_packets_bundle(
         readiness_record = dict(readiness_by_campaign.get(campaign_type) or {})
         actions = _campaign_actions(report_data, campaign_type)
         rollback_status = _rollback_status(report_data, campaign_type, actions)
-        blocker_types, blockers, approvals_required = _blockers(report_data, readiness_record, rollback_status)
+        blocker_types, blockers, approvals_required = _blockers(
+            report_data, readiness_record, rollback_status
+        )
         execution_state = _execution_state(readiness_record, blocker_types)
         recommended_target = str(readiness_record.get("recommended_target") or "none")
         sync_mode = str(readiness_record.get("sync_mode") or "reconcile")
         preview_command = ""
         if readiness_record.get("action_count", 0):
-            preview_command = _command_prefix(report_data, campaign_type, recommended_target, sync_mode)
+            preview_command = _command_prefix(
+                report_data, campaign_type, recommended_target, sync_mode
+            )
         apply_command = ""
         if execution_state == "ready-to-apply" and recommended_target != "none":
             apply_command = f"{_command_prefix(report_data, campaign_type, recommended_target, sync_mode)} --writeback-apply"
 
         packet = {
             "campaign_type": campaign_type,
-            "label": str(readiness_record.get("label") or campaign_type.replace("-", " ").title()),
+            "label": str(
+                readiness_record.get("label") or campaign_type.replace("-", " ").title()
+            ),
             "readiness_stage": str(readiness_record.get("readiness_stage") or "idle"),
             "execution_state": execution_state,
             "recommended_target": recommended_target,
@@ -324,25 +383,49 @@ def build_action_sync_packets_bundle(
         packets.append(packet)
         packets_by_campaign[campaign_type] = packet
 
-    actionable = [packet for packet in packets if packet.get("execution_state") != "stay-local"]
+    actionable = [
+        packet for packet in packets if packet.get("execution_state") != "stay-local"
+    ]
     next_candidate = sorted(actionable, key=_packet_sort_key)[0] if actionable else {}
-    top_ready = [packet for packet in sorted(packets, key=_packet_sort_key) if packet.get("execution_state") == "ready-to-apply"][:3]
-    top_needs_approval = [packet for packet in sorted(packets, key=_packet_sort_key) if packet.get("execution_state") == "needs-approval"][:3]
-    top_review_drift = [packet for packet in sorted(packets, key=_packet_sort_key) if packet.get("execution_state") == "review-drift"][:3]
+    top_ready = [
+        packet
+        for packet in sorted(packets, key=_packet_sort_key)
+        if packet.get("execution_state") == "ready-to-apply"
+    ][:3]
+    top_needs_approval = [
+        packet
+        for packet in sorted(packets, key=_packet_sort_key)
+        if packet.get("execution_state") == "needs-approval"
+    ][:3]
+    top_review_drift = [
+        packet
+        for packet in sorted(packets, key=_packet_sort_key)
+        if packet.get("execution_state") == "review-drift"
+    ][:3]
 
     return {
         "action_sync_packets": packets,
         "apply_readiness_summary": {
             "summary": _summary_line(packets),
             "counts": {
-                state: sum(1 for packet in packets if packet.get("execution_state") == state)
-                for state in ("stay-local", "preview-next", "review-drift", "needs-approval", "ready-to-apply")
+                state: sum(
+                    1 for packet in packets if packet.get("execution_state") == state
+                )
+                for state in (
+                    "stay-local",
+                    "preview-next",
+                    "review-drift",
+                    "needs-approval",
+                    "ready-to-apply",
+                )
             },
         },
         "next_apply_candidate": next_candidate,
         "top_ready_to_apply_packets": top_ready,
         "top_needs_approval_packets": top_needs_approval,
         "top_review_drift_packets": top_review_drift,
-        "next_apply_candidate_line": _next_candidate_summary(next_candidate) if next_candidate else "Stay local for now; no current campaign has a safe execution handoff.",
+        "next_apply_candidate_line": _next_candidate_summary(next_candidate)
+        if next_candidate
+        else "Stay local for now; no current campaign has a safe execution handoff.",
         "operator_queue": _queue_apply_packets(queue, report_data, packets_by_campaign),
     }

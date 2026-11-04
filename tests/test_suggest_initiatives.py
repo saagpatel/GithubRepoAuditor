@@ -127,8 +127,10 @@ def _silver_qualifying_repo(name: str = "SilverRepo") -> dict:
 
 def _platinum_repo(name: str = "PlatinumRepo") -> dict:
     """Repo at Platinum (tier 4) — no next tier."""
-    return _make_pt_repo(
+    repo = _make_pt_repo(
         name=name,
+        activity_status="active",
+        context_quality="strong",
         has_readme=True,
         has_license=True,
         has_ci=True,
@@ -138,6 +140,14 @@ def _platinum_repo(name: str = "PlatinumRepo") -> dict:
         days_since_push=5,
         risk_factors=[],
     )
+    repo["derived"].update(
+        {
+            "context_files": ["README.md", "LICENSE"],
+            "last_meaningful_activity_at": date.today().isoformat(),
+        }
+    )
+    repo["risk"].update({"risk_tier": "baseline", "doctor_gap": False})
+    return repo
 
 
 # ── narrow_candidates ─────────────────────────────────────────────────────────
@@ -165,10 +175,8 @@ class TestNarrowCandidates:
         from github_repo_auditor.maturity_tiers import compute_tier
 
         repo = _platinum_repo()
-        # Only include if actually Platinum (tier 4)
         tier = compute_tier(repo)
-        if tier < 4:
-            pytest.skip("Platinum factory did not produce tier 4 in this environment")
+        assert tier == 4, "platinum fixture must remain tier 4"
         result = narrow_candidates([repo])
         assert result == []
 
@@ -231,8 +239,7 @@ class TestBuildSuggestPrompt:
     def test_includes_tier_info(self):
         repo = _bronze_repo("MyRepo")
         candidates = narrow_candidates([repo], max_missing=10)
-        if not candidates:
-            pytest.skip("No candidates produced")
+        assert candidates, "bronze fixture must produce a prompt candidate"
         prompt = build_suggest_prompt(candidates)
         assert "current_tier" in prompt
         assert "target_tier" in prompt
@@ -241,8 +248,7 @@ class TestBuildSuggestPrompt:
     def test_asks_for_json_array(self):
         repo = _bronze_repo("Repo")
         candidates = narrow_candidates([repo], max_missing=10)
-        if not candidates:
-            pytest.skip("No candidates produced")
+        assert candidates, "bronze fixture must produce a prompt candidate"
         prompt = build_suggest_prompt(candidates)
         assert "JSON" in prompt
         assert "estimated_effort" in prompt
@@ -264,8 +270,7 @@ class TestParseSuggestResponse:
 
     def test_valid_json_returns_suggestions(self):
         candidates = self._candidates(["Repo1", "Repo2"])
-        if not candidates:
-            pytest.skip("No candidates produced")
+        assert candidates, "bronze fixtures must produce parse candidates"
         known_names = [
             (
                 c[0].get("identity", {}).get("display_name")
@@ -293,8 +298,16 @@ class TestParseSuggestResponse:
         candidates = self._candidates(["RealRepo"])
         raw = json.dumps(
             [
-                {"repo_name": "RealRepo", "rationale": "Good", "estimated_effort": "small"},
-                {"repo_name": "FakeRepo", "rationale": "Invented", "estimated_effort": "large"},
+                {
+                    "repo_name": "RealRepo",
+                    "rationale": "Good",
+                    "estimated_effort": "small",
+                },
+                {
+                    "repo_name": "FakeRepo",
+                    "rationale": "Invented",
+                    "estimated_effort": "large",
+                },
             ]
         )
         result = parse_suggest_response(raw, candidates)
@@ -309,8 +322,7 @@ class TestParseSuggestResponse:
     def test_tiers_from_candidate_not_llm(self):
         """current_tier and target_tier come from candidate tuple, NOT from LLM output."""
         candidates = self._candidates(["MyRepo"])
-        if not candidates:
-            pytest.skip("No candidates produced")
+        assert candidates, "bronze fixture must produce a tier-validation candidate"
         name = (
             candidates[0][0].get("identity", {}).get("display_name")
             or candidates[0][0].get("metadata", {}).get("name")
@@ -335,8 +347,7 @@ class TestParseSuggestResponse:
 
     def test_fenced_json_is_parsed(self):
         candidates = self._candidates(["Repo1"])
-        if not candidates:
-            pytest.skip("No candidates produced")
+        assert candidates, "bronze fixture must produce a fenced-JSON candidate"
         name = (
             candidates[0][0].get("identity", {}).get("display_name")
             or candidates[0][0].get("metadata", {}).get("name")
@@ -344,7 +355,9 @@ class TestParseSuggestResponse:
         )
         raw = (
             "```json\n"
-            + json.dumps([{"repo_name": name, "rationale": "x", "estimated_effort": "large"}])
+            + json.dumps(
+                [{"repo_name": name, "rationale": "x", "estimated_effort": "large"}]
+            )
             + "\n```"
         )
         result = parse_suggest_response(raw, candidates)
@@ -370,7 +383,10 @@ class TestGenerateSuggestions:
     def test_no_provider_returns_deterministic_fallback(self):
         """When no LLM provider is available, return deterministic ranking."""
         repos = [_near_silver_repo("Alpha"), _near_silver_repo("Beta")]
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             suggestions, cost = generate_suggestions(repos)
         assert cost == 0.0
         assert isinstance(suggestions, list)
@@ -383,19 +399,25 @@ class TestGenerateSuggestions:
         repos = [_near_silver_repo("MyRepo")]
         # Use default max_missing=3 — near_silver_repo has exactly 1 missing
         candidates = narrow_candidates(repos)
-        if not candidates:
-            pytest.skip("No candidates produced")
+        assert candidates, "near-silver fixture must produce a candidate"
         name = (
             candidates[0][0].get("identity", {}).get("display_name")
             or candidates[0][0].get("metadata", {}).get("name")
             or "unknown"
         )
         canned = json.dumps(
-            [{"repo_name": name, "rationale": "High value", "estimated_effort": "small"}]
+            [
+                {
+                    "repo_name": name,
+                    "rationale": "High value",
+                    "estimated_effort": "small",
+                }
+            ]
         )
         mock_provider = _MockProvider(canned)
         with patch(
-            "github_repo_auditor.suggest_initiatives._resolve_provider", return_value=(mock_provider, "test-model")
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=(mock_provider, "test-model"),
         ):
             suggestions, cost = generate_suggestions(repos, budget_usd=1.0)
         assert len(suggestions) >= 1
@@ -419,8 +441,7 @@ class TestGenerateSuggestions:
         """With target_tier=3, all returned suggestions have target_tier=3."""
         repos = [_near_silver_repo(f"R{i}") for i in range(3)]
         candidates = narrow_candidates(repos, target_tier=3, max_missing=10)
-        if not candidates:
-            pytest.skip("No candidates for target=3 in this environment")
+        assert candidates, "near-silver fixtures must produce target-tier-3 candidates"
         names = [
             (
                 c[0].get("identity", {}).get("display_name")
@@ -430,7 +451,10 @@ class TestGenerateSuggestions:
             for c in candidates
         ]
         canned = json.dumps(
-            [{"repo_name": n, "rationale": "ok", "estimated_effort": "medium"} for n in names]
+            [
+                {"repo_name": n, "rationale": "ok", "estimated_effort": "medium"}
+                for n in names
+            ]
         )
         mock_provider = _MockProvider(canned)
         with patch(
@@ -485,7 +509,10 @@ class TestCLISuggestInitiatives:
             llm_budget=None,
         )
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             from github_repo_auditor.cli import _run_suggest_initiatives_mode  # noqa: PLC0415
 
             _run_suggest_initiatives_mode(args)
@@ -518,7 +545,9 @@ class TestCLISuggestInitiatives:
 
         # _run_suggest_initiatives_mode imports generate_suggestions locally, so patch
         # the name in the cli module's namespace after the local import happens
-        with patch("github_repo_auditor.suggest_initiatives.generate_suggestions", _mock_gen):
+        with patch(
+            "github_repo_auditor.suggest_initiatives.generate_suggestions", _mock_gen
+        ):
             from github_repo_auditor.cli import _run_suggest_initiatives_mode
 
             _run_suggest_initiatives_mode(args)
@@ -546,7 +575,9 @@ class TestCLISuggestInitiatives:
             captured_budgets.append(budget_usd)
             return [], 0.0
 
-        with patch("github_repo_auditor.suggest_initiatives.generate_suggestions", _mock_gen):
+        with patch(
+            "github_repo_auditor.suggest_initiatives.generate_suggestions", _mock_gen
+        ):
             from github_repo_auditor.cli import _run_suggest_initiatives_mode
 
             _run_suggest_initiatives_mode(args)
@@ -584,7 +615,11 @@ class TestCLISuggestInitiatives:
 class TestBriefingSuggestedInitiatives:
     def _make_audit(self, name: str = "Repo") -> dict:
         return {
-            "metadata": {"name": name, "language": "Python", "pushed_at": "2026-05-01T00:00:00Z"},
+            "metadata": {
+                "name": name,
+                "language": "Python",
+                "pushed_at": "2026-05-01T00:00:00Z",
+            },
             "overall_score": 0.5,
             "analyzer_results": [
                 {
@@ -604,7 +639,11 @@ class TestBriefingSuggestedInitiatives:
         audits = [self._make_audit()]
         with patch("github_repo_auditor.narrative._resolve_provider") as mock_resolve:
             briefing = build_briefing(
-                audits, "user", "2026-05-11", use_history=False, include_suggestions=False
+                audits,
+                "user",
+                "2026-05-11",
+                use_history=False,
+                include_suggestions=False,
             )
         # _resolve_provider should NOT be called when include_suggestions=False
         mock_resolve.assert_not_called()
@@ -617,8 +656,7 @@ class TestBriefingSuggestedInitiatives:
         # Use near_silver repos which have only 1 missing requirement (passes max_missing=3 filter)
         audits = [_near_silver_repo(f"Repo{i}") for i in range(2)]
         candidates = narrow_candidates(audits)
-        if not candidates:
-            pytest.skip("No candidates in this environment")
+        assert candidates, "near-silver fixtures must produce briefing candidates"
         name = (
             candidates[0][0].get("identity", {}).get("display_name")
             or candidates[0][0].get("metadata", {}).get("name")
@@ -644,7 +682,11 @@ class TestBriefingSuggestedInitiatives:
 
     def test_render_markdown_includes_section_when_non_empty(self):
         """render_markdown includes '## Suggested Initiatives' when field is populated."""
-        from github_repo_auditor.briefing import Briefing, InitiativeSuggestionRow, render_markdown
+        from github_repo_auditor.briefing import (
+            Briefing,
+            InitiativeSuggestionRow,
+            render_markdown,
+        )
 
         briefing = Briefing(
             username="user",
@@ -755,7 +797,10 @@ class TestAcceptSuggestion:
         project = _near_silver_repo("Wavelength")
         projects = [project]
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             initiative = accept_suggestion(
                 repo_name="Wavelength",
                 projects=projects,
@@ -781,7 +826,10 @@ class TestAcceptSuggestion:
         project = _near_silver_repo("AutoRepo")
         projects = [project]
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             initiative = accept_suggestion(
                 repo_name="AutoRepo",
                 projects=projects,
@@ -801,7 +849,10 @@ class TestAcceptSuggestion:
         project = _near_silver_repo("DupRepo")
         projects = [project]
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             accept_suggestion(
                 repo_name="DupRepo",
                 projects=projects,
@@ -826,7 +877,10 @@ class TestAcceptSuggestion:
         project = _near_silver_repo("TierSwap")
         projects = [project]
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             accept_suggestion(
                 repo_name="TierSwap",
                 projects=projects,
@@ -875,8 +929,7 @@ class TestAcceptSuggestion:
 
         repo = _platinum_repo("MaxedOut")
         tier = compute_tier(repo)
-        if tier < 4:
-            pytest.skip("Platinum factory did not reach tier 4 in this environment")
+        assert tier == 4, "platinum fixture must remain tier 4"
         with pytest.raises(ValueError, match="already at Platinum"):
             accept_suggestion(
                 repo_name="MaxedOut",
@@ -940,7 +993,9 @@ class TestAcceptSuggestion:
 
 class TestCLIAcceptSuggestion:
     def _write_truth(self, tmp_path, projects: list[dict]) -> None:
-        (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps({"projects": projects}))
+        (tmp_path / "portfolio-truth-latest.json").write_text(
+            json.dumps({"projects": projects})
+        )
 
     def test_no_portfolio_truth_prints_warning(self, tmp_path, capsys):
         """Missing portfolio-truth-latest.json → warning printed, exit 0."""
@@ -972,7 +1027,10 @@ class TestCLIAcceptSuggestion:
             target_tier=2,
         )
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             from github_repo_auditor.cli import _run_accept_suggestion_mode
 
             _run_accept_suggestion_mode(args)
@@ -997,7 +1055,10 @@ class TestCLIAcceptSuggestion:
             target_tier=None,
         )
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             from github_repo_auditor.cli import _run_accept_suggestion_mode
 
             with pytest.raises(SystemExit) as exc_info:
@@ -1019,7 +1080,10 @@ class TestCLIAcceptSuggestion:
             target_tier=2,
         )
 
-        with patch("github_repo_auditor.suggest_initiatives._resolve_provider", return_value=None):
+        with patch(
+            "github_repo_auditor.suggest_initiatives._resolve_provider",
+            return_value=None,
+        ):
             from github_repo_auditor.cli import _run_accept_suggestion_mode
 
             _run_accept_suggestion_mode(args)
@@ -1066,7 +1130,10 @@ class TestSuggestionCache:
             for c in candidates
         ]
         canned = json.dumps(
-            [{"repo_name": n, "rationale": "ok", "estimated_effort": "small"} for n in names]
+            [
+                {"repo_name": n, "rationale": "ok", "estimated_effort": "small"}
+                for n in names
+            ]
         )
         return _MockProvider(canned)
 
@@ -1079,8 +1146,12 @@ class TestSuggestionCache:
             "github_repo_auditor.suggest_initiatives._resolve_provider",
             return_value=(mock_provider, "test-model"),
         ):
-            suggestions1, cost1 = generate_suggestions(repos, budget_usd=1.0, cache_key="k1")
-            suggestions2, cost2 = generate_suggestions(repos, budget_usd=1.0, cache_key="k1")
+            suggestions1, cost1 = generate_suggestions(
+                repos, budget_usd=1.0, cache_key="k1"
+            )
+            suggestions2, cost2 = generate_suggestions(
+                repos, budget_usd=1.0, cache_key="k1"
+            )
 
         assert mock_provider.call_count == 1
         assert suggestions1 == suggestions2
@@ -1138,13 +1209,17 @@ class TestSuggestionCache:
             "github_repo_auditor.suggest_initiatives._resolve_provider",
             return_value=(mock_provider, "test-model"),
         ):
-            _, cost_first = generate_suggestions(repos, budget_usd=1.0, cache_key="cost-k")
+            _, cost_first = generate_suggestions(
+                repos, budget_usd=1.0, cache_key="cost-k"
+            )
 
         with patch(
             "github_repo_auditor.suggest_initiatives._resolve_provider",
             return_value=(_MockProvider("[]"), "test-model"),
         ):
-            _, cost_second = generate_suggestions(repos, budget_usd=1.0, cache_key="cost-k")
+            _, cost_second = generate_suggestions(
+                repos, budget_usd=1.0, cache_key="cost-k"
+            )
 
         # Provider was not called on second invocation; cost must match
         assert cost_first == cost_second
@@ -1173,7 +1248,9 @@ class TestForceDeterministic:
         """force_deterministic=True never calls the LLM provider."""
 
         def _exploding_provider(*args, **kwargs):
-            raise AssertionError("Provider must not be called with force_deterministic=True")
+            raise AssertionError(
+                "Provider must not be called with force_deterministic=True"
+            )
 
         repos = [_near_silver_repo("NeverCall")]
         with patch(
@@ -1224,7 +1301,9 @@ class TestForceDeterministic:
         # force_deterministic=True skips the cost tracker entirely.
         # We verify by making _resolve_provider raise — if called, the test fails.
         def _exploding_provider(*args, **kwargs):
-            raise AssertionError("accept_suggestion must not call LLM for deadline derivation")
+            raise AssertionError(
+                "accept_suggestion must not call LLM for deadline derivation"
+            )
 
         with patch(
             "github_repo_auditor.suggest_initiatives._resolve_provider",
@@ -1305,7 +1384,9 @@ class TestPersistentSuggestionCache:
     def teardown_method(self):
         clear_suggestion_cache()
 
-    def _make_cache_entry(self, key: str = "k1") -> tuple[str, list[InitiativeSuggestion], float]:
+    def _make_cache_entry(
+        self, key: str = "k1"
+    ) -> tuple[str, list[InitiativeSuggestion], float]:
         s = InitiativeSuggestion(
             repo_name="Repo1",
             current_tier=1,
@@ -1345,7 +1426,9 @@ class TestPersistentSuggestionCache:
 
         bad = tmp_path / "suggestion-cache.json"
         bad.write_text("not valid json{{{", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="github_repo_auditor.suggest_initiatives"):
+        with caplog.at_level(
+            logging.WARNING, logger="github_repo_auditor.suggest_initiatives"
+        ):
             result = load_suggestion_cache(bad)
         assert result == OrderedDict()
         assert any("could not load cache" in r.message for r in caplog.records)
@@ -1379,7 +1462,10 @@ class TestPersistentSuggestionCache:
         ):
             # No provider → deterministic fallback; still writes to disk when output_dir set
             generate_suggestions(
-                repos, cache_key=cache_key, output_dir=tmp_path, force_deterministic=True
+                repos,
+                cache_key=cache_key,
+                output_dir=tmp_path,
+                force_deterministic=True,
             )
 
         path = suggestion_cache_path(tmp_path)
@@ -1400,7 +1486,10 @@ class TestPersistentSuggestionCache:
             return_value=(None, None),
         ):
             suggestions1, cost1 = generate_suggestions(
-                repos, cache_key=cache_key, output_dir=tmp_path, force_deterministic=True
+                repos,
+                cache_key=cache_key,
+                output_dir=tmp_path,
+                force_deterministic=True,
             )
 
         # Simulate a new process: clear in-memory cache and loaded-from-disk set
@@ -1415,7 +1504,10 @@ class TestPersistentSuggestionCache:
             side_effect=_exploding_provider,
         ):
             suggestions2, cost2 = generate_suggestions(
-                repos, cache_key=cache_key, output_dir=tmp_path, force_deterministic=True
+                repos,
+                cache_key=cache_key,
+                output_dir=tmp_path,
+                force_deterministic=True,
             )
 
         assert suggestions1 == suggestions2
@@ -1463,7 +1555,9 @@ class TestBoundedEviction:
         monkeypatch.setattr(_si_mod, "_CACHE_MAX_SIZE", 100)
         repos_base = [_near_silver_repo(f"Repo{i}") for i in range(n)]
         for i, repo in enumerate(repos_base):
-            generate_suggestions([repo], cache_key=f"fill-key-{i}", force_deterministic=True)
+            generate_suggestions(
+                [repo], cache_key=f"fill-key-{i}", force_deterministic=True
+            )
 
     def test_insert_101st_entry_evicts_oldest(self, monkeypatch):
         """Cache holding 100 entries: inserting 101st evicts the first entry."""
@@ -1474,7 +1568,9 @@ class TestBoundedEviction:
 
         # Insert the 101st entry
         generate_suggestions(
-            [_near_silver_repo("Evict101")], cache_key="evict-101-key", force_deterministic=True
+            [_near_silver_repo("Evict101")],
+            cache_key="evict-101-key",
+            force_deterministic=True,
         )
 
         assert len(_si_mod._suggestion_cache) == 100
@@ -1488,7 +1584,9 @@ class TestBoundedEviction:
         # Fill to exactly 5 entries: keys fill-key-0 .. fill-key-4
         for i in range(5):
             generate_suggestions(
-                [_near_silver_repo(f"R{i}")], cache_key=f"fill-key-{i}", force_deterministic=True
+                [_near_silver_repo(f"R{i}")],
+                cache_key=f"fill-key-{i}",
+                force_deterministic=True,
             )
         assert len(_si_mod._suggestion_cache) == 5
 
@@ -1503,8 +1601,12 @@ class TestBoundedEviction:
         )
 
         assert len(_si_mod._suggestion_cache) == 5
-        assert "fill-key-0" in _si_mod._suggestion_cache, "fill-key-0 should not be evicted"
-        assert "fill-key-1" not in _si_mod._suggestion_cache, "fill-key-1 should be evicted"
+        assert "fill-key-0" in _si_mod._suggestion_cache, (
+            "fill-key-0 should not be evicted"
+        )
+        assert "fill-key-1" not in _si_mod._suggestion_cache, (
+            "fill-key-1 should be evicted"
+        )
 
     def test_disk_serialization_caps_at_cache_max_size(self, tmp_path, monkeypatch):
         """save_suggestion_cache writes at most _CACHE_MAX_SIZE entries even if cache is larger."""
@@ -1597,7 +1699,9 @@ class TestDismissedPersistence:
 
         path = dismissed_path(tmp_path)
         path.write_text("not json{{{{", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="github_repo_auditor.suggest_initiatives"):
+        with caplog.at_level(
+            logging.WARNING, logger="github_repo_auditor.suggest_initiatives"
+        ):
             result = load_dismissed(path)
         assert result == []
         assert any("could not load dismissed" in r.message for r in caplog.records)
@@ -1735,7 +1839,9 @@ class TestGenerateSuggestionsDismissIntegration:
         repos = [self._bronze_repo("DismissMe"), self._bronze_repo("KeepMe")]
         dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="DismissMe")
 
-        suggestions, _ = generate_suggestions(repos, force_deterministic=True, output_dir=tmp_path)
+        suggestions, _ = generate_suggestions(
+            repos, force_deterministic=True, output_dir=tmp_path
+        )
         names = [s.repo_name for s in suggestions]
         assert "DismissMe" not in names
         # KeepMe should still appear (if it qualifies)
@@ -1745,7 +1851,9 @@ class TestGenerateSuggestionsDismissIntegration:
         """Missing dismissed file does not cause errors; all qualifying repos returned."""
         repos = [self._bronze_repo("Repo1"), self._bronze_repo("Repo2")]
         # No dismissed-suggestions.json written
-        suggestions, _ = generate_suggestions(repos, force_deterministic=True, output_dir=tmp_path)
+        suggestions, _ = generate_suggestions(
+            repos, force_deterministic=True, output_dir=tmp_path
+        )
         names = [s.repo_name for s in suggestions]
         assert "Repo1" in names or "Repo2" in names  # at least one qualifies
 
@@ -1762,7 +1870,9 @@ class TestGenerateSuggestionsDismissIntegration:
 
 
 class TestCLIDismissSuggestion:
-    def test_dismiss_suggestion_writes_file_and_prints_confirmation(self, tmp_path, capsys):
+    def test_dismiss_suggestion_writes_file_and_prints_confirmation(
+        self, tmp_path, capsys
+    ):
         """--dismiss-suggestion FooRepo writes dismissed file, stdout has confirmation."""
         import argparse
 
@@ -1842,8 +1952,12 @@ class TestCLIDismissSuggestion:
 
         from github_repo_auditor.cli import _run_list_dismissed_mode
 
-        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoA", reason="r1")
-        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoB", reason="r2")
+        dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoA", reason="r1"
+        )
+        dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoB", reason="r2"
+        )
 
         args = argparse.Namespace(output_dir=str(tmp_path))
         _run_list_dismissed_mode(args)
@@ -1890,7 +2004,13 @@ class TestDismissalEventDataclass:
             reason="too noisy",
         )
         result = e.to_dict()
-        assert set(result.keys()) == {"repo_name", "event_type", "occurred_at", "actor", "reason"}
+        assert set(result.keys()) == {
+            "repo_name",
+            "event_type",
+            "occurred_at",
+            "actor",
+            "reason",
+        }
         assert result["event_type"] == "dismissed"
         assert result["actor"] == "testuser"
 
@@ -2027,7 +2147,10 @@ class TestDismissSuggestionRecordExpiry:
     def test_dismiss_records_dismissed_event(self, tmp_path):
         """dismiss_suggestion_record appends a 'dismissed' DismissalEvent."""
         dismiss_suggestion_record(
-            dismissed_path(tmp_path), repo_name="RepoD", reason="testing", expires_days=7
+            dismissed_path(tmp_path),
+            repo_name="RepoD",
+            reason="testing",
+            expires_days=7,
         )
         events = load_dismissal_events(dismissed_path(tmp_path))
         assert len(events) == 1
@@ -2066,7 +2189,9 @@ class TestExpireDismissals:
 
     def test_all_permanent_items_returns_empty(self, tmp_path):
         """Items with expires_at=None are never expired."""
-        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="Perm", expires_days=None)
+        dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="Perm", expires_days=None
+        )
         result = expire_dismissals(dismissed_path(tmp_path), today=date(2099, 1, 1))
         assert result == []
 
@@ -2182,7 +2307,9 @@ class TestCLIAutoExpire:
 
         from github_repo_auditor.cli import _run_expire_dismissals_mode
 
-        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="ExpRepo", expires_days=0)
+        dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="ExpRepo", expires_days=0
+        )
         p = dismissed_path(tmp_path)
         data = json.loads(p.read_text(encoding="utf-8"))
         data["items"][0]["expires_at"] = (date.today() - timedelta(days=1)).isoformat()
@@ -2212,7 +2339,9 @@ class TestCLIAutoExpire:
 
         from github_repo_auditor.cli import _run_dismissal_history_mode
 
-        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoX", reason="noisy")
+        dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoX", reason="noisy"
+        )
         dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoY")
         undo_dismiss(dismissed_path(tmp_path), "RepoY")
 

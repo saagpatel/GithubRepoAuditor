@@ -3,6 +3,7 @@
 README staleness tests live in TestReadmeStaleness.
 Release-shipped signal tests live in TestActivityReleaseSignals.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -12,12 +13,16 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from github_repo_auditor.analyzers.activity import ActivityAnalyzer
-from github_repo_auditor.analyzers.readme import ReadmeAnalyzer, _compute_readme_staleness
+from github_repo_auditor.analyzers.readme import (
+    ReadmeAnalyzer,
+    _compute_readme_staleness,
+)
 from github_repo_auditor.models import RepoMetadata
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_metadata(**kwargs) -> RepoMetadata:
     defaults = dict(
@@ -86,7 +91,10 @@ def _make_git_repo(tmp_path: Path, readme_ts: int, code_ts: int) -> Path:
     run("git", "add", "main.py")
     ts_str = str(code_ts)
     run(
-        "git", "commit", "-m", "add code",
+        "git",
+        "commit",
+        "-m",
+        "add code",
         env_extra={
             "GIT_AUTHOR_DATE": ts_str,
             "GIT_COMMITTER_DATE": ts_str,
@@ -100,7 +108,10 @@ def _make_git_repo(tmp_path: Path, readme_ts: int, code_ts: int) -> Path:
     )
     run("git", "add", "README.md")
     run(
-        "git", "commit", "-m", "add readme",
+        "git",
+        "commit",
+        "-m",
+        "add readme",
         env_extra={
             "GIT_AUTHOR_DATE": str(readme_ts),
             "GIT_COMMITTER_DATE": str(readme_ts),
@@ -153,8 +164,8 @@ class TestReadmeStaleness:
         Low ratio means README is fresher than code, so docs are not lagging.
         """
         now = int(time.time())
-        readme_ts = now - 1 * 86400   # 1 day ago
-        code_ts = now - 60 * 86400    # 60 days ago
+        readme_ts = now - 1 * 86400  # 1 day ago
+        code_ts = now - 60 * 86400  # 60 days ago
         repo = _make_git_repo(tmp_path, readme_ts=readme_ts, code_ts=code_ts)
 
         staleness = _compute_readme_staleness(repo, "README.md")
@@ -186,7 +197,9 @@ class TestReadmeStaleness:
 
         def run(*args: str, env_extra: dict | None = None) -> None:
             env = {**env_base, **(env_extra or {})}
-            subprocess.run(list(args), cwd=repo, check=True, capture_output=True, env=env)
+            subprocess.run(
+                list(args), cwd=repo, check=True, capture_output=True, env=env
+            )
 
         run("git", "init")
         run("git", "config", "user.email", "t@t.com")
@@ -194,8 +207,13 @@ class TestReadmeStaleness:
         (repo / "README.md").write_text("# Docs\n")
         run("git", "add", "README.md")
         ts_str = str(readme_ts)
-        run("git", "commit", "-m", "docs",
-            env_extra={"GIT_AUTHOR_DATE": ts_str, "GIT_COMMITTER_DATE": ts_str})
+        run(
+            "git",
+            "commit",
+            "-m",
+            "docs",
+            env_extra={"GIT_AUTHOR_DATE": ts_str, "GIT_COMMITTER_DATE": ts_str},
+        )
 
         staleness = _compute_readme_staleness(repo, "README.md")
 
@@ -219,15 +237,12 @@ class TestReadmeStaleness:
         assert result.details.get("readme_staleness_ratio") is None
         assert result.details.get("readme_stale") is None
 
-    def test_analyze_with_readme_includes_staleness_keys(
-        self, tmp_path: Path
-    ) -> None:
+    def test_analyze_with_readme_includes_staleness_keys(self, tmp_path: Path) -> None:
         """ReadmeAnalyzer always includes staleness keys in details."""
         repo = tmp_path / "with-readme"
         repo.mkdir()
         (repo / "README.md").write_text(
-            "# Project\n\nA project.\n\n"
-            "## Install\n\n```bash\npip install x\n```\n"
+            "# Project\n\nA project.\n\n## Install\n\n```bash\npip install x\n```\n"
         )
         meta = _make_metadata()
 
@@ -308,6 +323,7 @@ class TestActivityReleaseSignals:
     def test_prerelease_flag_propagated(self, tmp_path: Path) -> None:
         """If latest release is a prerelease, latest_release_is_prerelease=True."""
         from datetime import timedelta
+
         now = datetime.now(timezone.utc)
         pub = (now - timedelta(days=5)).isoformat().replace("+00:00", "Z")
 

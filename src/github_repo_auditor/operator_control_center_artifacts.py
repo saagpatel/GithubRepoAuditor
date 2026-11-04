@@ -36,16 +36,22 @@ def should_print_control_center_item(item: dict) -> bool:
     lifecycle = str(catalog.get("lifecycle_state") or "").strip().lower()
     intended = str(catalog.get("intended_disposition") or "").strip().lower()
     program = str(catalog.get("maturity_program") or "").strip().lower()
-    operating_path = str(
-        item.get("operating_path") or catalog.get("operating_path") or ""
-    ).strip().lower()
+    operating_path = (
+        str(item.get("operating_path") or catalog.get("operating_path") or "")
+        .strip()
+        .lower()
+    )
     if lifecycle in {"archived", "archive"}:
         return False
     if intended == "archive" or program == "archive" or operating_path == "archive":
         return False
     if lifecycle in {"experiment", "experimental"}:
         return False
-    if intended == "experiment" or program == "experiment" or operating_path == "experiment":
+    if (
+        intended == "experiment"
+        or program == "experiment"
+        or operating_path == "experiment"
+    ):
         return False
     return True
 
@@ -248,15 +254,21 @@ def write_control_center_artifacts(
         raise ValueError("control-center artifacts must not persist credential fields")
     filter_snapshot_for_default_view(snapshot)
     json_path, md_path = control_center_paths(output_dir, username, generated_at)
-    snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_path)
+    snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(
+        json_path
+    )
     portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
     weekly_digest = build_weekly_command_center_digest(
         report_data,
         snapshot,
         diff_data=diff_dict,
         portfolio_truth=portfolio_truth,
-        portfolio_truth_history_dir=portfolio_truth_path.parent if portfolio_truth_path else None,
-        portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
+        portfolio_truth_history_dir=portfolio_truth_path.parent
+        if portfolio_truth_path
+        else None,
+        portfolio_truth_reference=str(portfolio_truth_path)
+        if portfolio_truth_path
+        else "",
         control_center_reference=str(json_path),
         report_reference=report_reference,
         generated_at=generated_at.isoformat(),

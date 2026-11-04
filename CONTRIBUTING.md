@@ -4,8 +4,8 @@ Thank you for your interest in contributing. This guide covers how to set up a l
 
 ## Prerequisites and local setup
 
-Use Git, `uv`, and Python 3.11 or later. The checked-in `.python-version` selects
-3.11.15 for the locked local/Cloud environment. Run commands from the repository
+Use Git, `uv`, and Python 3.12 or later. The checked-in `.python-version` selects
+3.12.15 for the locked local/Cloud environment. Run commands from the repository
 root; `uv` creates a project virtual environment and can download the selected
 interpreter and dependencies during setup. No GitHub, Anthropic, or Notion token
 is needed for the fixture checks below. Do not copy credential-bearing `.env`
@@ -14,19 +14,25 @@ files into a verification checkout.
 ```bash
 git clone https://github.com/<your-fork>/GithubRepoAuditor.git
 cd GithubRepoAuditor
-uv sync --locked --extra dev --extra serve --extra config
+make setup
+make check
 ```
 
 The `serve` extra is needed by web-route tests. `semantic` adds heavyweight ML
 and SQLite vector dependencies and remains opt-in for routine local checks.
-The older `make install-dev` / pip equivalent installs only `dev,config`, so it
-does not provision the full CI test environment.
+`make setup` provisions `dev,serve,config,build` and the frozen frontend dependencies.
+Use the pins in `.python-version`, `web/.node-version`, and `web/package.json`;
+uv is pinned by `[tool.uv] required-version`. `make install-dev` provisions the
+Python extras only. `requirements.txt` is a compatibility mirror of the runtime
+requirements, not the reproducible development environment; keep its declared
+ranges aligned with `pyproject.toml`. Existing packaging tests check coverage,
+so no lock export replaces that mirror.
 
 ## Safe smoke and focused tests
 
 ```bash
 uv run --locked python -m github_repo_auditor.cli --help
-uv run --locked --extra dev --extra serve --extra config pytest tests/test_scorer.py -q -p no:cacheprovider
+uv run --locked --extra dev --extra serve --extra config --extra build pytest tests/test_scorer.py -q -p no:cacheprovider
 ```
 
 The scorer tests use synthetic metadata and block live scorecard lookup. Replace
@@ -50,7 +56,7 @@ operator tasks, not a fixture verification pass.
 The lightweight local/Cloud suite excludes the optional semantic-index module:
 
 ```bash
-uv run --locked --extra dev --extra serve --extra config pytest tests/ -q -p no:cacheprovider -k 'not semantic_index'
+uv run --locked --extra dev --extra serve --extra config --extra build pytest tests/ -q -p no:cacheprovider -k 'not semantic_index'
 uv run --locked --extra dev ruff check src/ tests/
 uv run --locked --extra dev ruff format --check src/ tests/
 ```
@@ -58,17 +64,20 @@ uv run --locked --extra dev ruff format --check src/ tests/
 `ruff format --check` is read-only; omit `--check` only when deliberately
 formatting source. Ruff's actual settings are in `pyproject.toml`.
 
-[GitHub CI](.github/workflows/ci.yml) runs the full suite with `dev,serve,semantic`
-on Python 3.11 and 3.12. To reproduce that lane locally, include the semantic
-extra explicitly:
+[GitHub CI](.github/workflows/ci.yml) runs `make check` from locked environments
+on Python 3.12, 3.13, and 3.14. Python 3.15 is excluded because the locked
+libcst/PyO3 build supports at most 3.14. A separate semantic job installs the
+heavyweight extra and tests the semantic-index cases excluded from the baseline. Reproduce that lane with:
 
 ```bash
-uv run --locked --extra dev --extra serve --extra semantic --extra config pytest tests/ -q -p no:cacheprovider
+uv run --locked --extra dev --extra serve --extra semantic --extra config pytest -q -k semantic_index
 ```
 
-CI type-checks the operator-trend modules listed in that workflow. The broader
-`make type-check` target runs `mypy src/ --ignore-missing-imports`; it is a
-separate whole-source diagnostic, not a claim that CI checks every module.
+`make type-check` and the aggregate gate check the existing 15 operator-trend
+modules listed in `MYPY_MODULES` in the Makefile. Wider mypy coverage is separate.
+`make check-web` runs frontend typecheck, lint, tests, and production build.
+`make check` does not run live audits, writeback, or output regeneration.
+
 For wheel/sdist packaging, install the `build` extra and run
 `uv run --locked --extra build python -m build`; this writes local `dist/`
 artifacts and does not publish them. Mutation testing, workbook checks and
@@ -175,14 +184,13 @@ Tests should use real `Path` objects pointing to small fixture directories under
 
 Before opening a PR, verify:
 
-- [ ] `make test` passes with no failures.
-- [ ] `make lint` reports no errors.
-- [ ] `make type-check` reports no errors (or pre-existing errors only — do not introduce new ones).
+- [ ] `make check` passes, including the frozen frontend checks.
+- [ ] Focused tests cover changed behavior; golden fixtures stay unchanged.
 - [ ] No hardcoded GitHub usernames or API tokens anywhere in the diff.
 - [ ] New analyzer (if any) is registered in `ALL_ANALYZERS` and, if completeness-scored, has a weight in `WEIGHTS`.
 - [ ] New tests added for any new public functions or analyzer logic.
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` with a brief description of the change.
-- [ ] Commit messages follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`.
+- [ ] Commit messages follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`, `style:`, `build:`, `ci:`.
 
 ## Questions
 

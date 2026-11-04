@@ -16,7 +16,14 @@ from github_repo_auditor.repo_improver import (
 )
 
 
-def _make_audit(name: str, tier: str, score: float, *, description: str | None = "A desc", topics: list[str] | None = None) -> dict:
+def _make_audit(
+    name: str,
+    tier: str,
+    score: float,
+    *,
+    description: str | None = "A desc",
+    topics: list[str] | None = None,
+) -> dict:
     """Build a minimal audit dict for testing manifest generation."""
     return {
         "metadata": {
@@ -40,9 +47,17 @@ def _make_audit(name: str, tier: str, score: float, *, description: str | None =
                     "has_code_examples": False,
                 },
             },
-            {"dimension": "code_quality", "score": 0.6, "details": {"entry_point": "src/main.py"}},
+            {
+                "dimension": "code_quality",
+                "score": 0.6,
+                "details": {"entry_point": "src/main.py"},
+            },
             {"dimension": "cicd", "score": 0.8, "details": {}},
-            {"dimension": "structure", "score": 0.7, "details": {"has_license": True, "config_files": ["pyproject.toml"]}},
+            {
+                "dimension": "structure",
+                "score": 0.7,
+                "details": {"has_license": True, "config_files": ["pyproject.toml"]},
+            },
             {"dimension": "dependencies", "score": 0.5, "details": {"dep_count": 3}},
             {"dimension": "testing", "score": 0.6, "details": {}},
         ],
@@ -73,7 +88,9 @@ class TestGenerateManifest:
         assert manifest[0]["actions"]["needs_description"] is True
 
     def test_detects_existing_description(self):
-        report = _make_report(_make_audit("has-desc", "shipped", 0.8, description="My project"))
+        report = _make_report(
+            _make_audit("has-desc", "shipped", 0.8, description="My project")
+        )
         manifest = generate_manifest(report)
         assert manifest[0]["actions"]["needs_description"] is False
 
@@ -83,7 +100,9 @@ class TestGenerateManifest:
         assert manifest[0]["actions"]["needs_topics"] is True
 
     def test_detects_existing_topics(self):
-        report = _make_report(_make_audit("has-topics", "functional", 0.6, topics=["python", "cli"]))
+        report = _make_report(
+            _make_audit("has-topics", "functional", 0.6, topics=["python", "cli"])
+        )
         manifest = generate_manifest(report)
         assert manifest[0]["actions"]["needs_topics"] is False
 
@@ -148,8 +167,10 @@ class TestApplyMetadata:
     def test_dry_run_creates_no_api_calls(self):
         class FakeClient:
             calls = []
+
             def update_repo_metadata(self, *a, **kw):
                 self.calls.append(("metadata", a, kw))
+
             def replace_repo_topics(self, *a, **kw):
                 self.calls.append(("topics", a, kw))
 
@@ -162,13 +183,17 @@ class TestApplyMetadata:
 
     def test_applies_description_and_topics(self):
         class FakeClient:
-            def update_repo_metadata(self, owner, repo, *, description=None, homepage=None):
+            def update_repo_metadata(
+                self, owner, repo, *, description=None, homepage=None
+            ):
                 return {"ok": True}
+
             def replace_repo_topics(self, owner, repo, topics):
                 return {"ok": True}
 
         results = apply_metadata_updates(
-            FakeClient(), "owner",
+            FakeClient(),
+            "owner",
             [{"name": "repo1", "description": "New desc", "topics": ["python"]}],
         )
         assert len(results[0]["actions"]) == 2
@@ -179,8 +204,10 @@ class TestApplyReadmes:
     def test_dry_run_skips_api(self):
         class FakeClient:
             calls = []
+
             def get_file_sha(self, *a, **kw):
                 self.calls.append("get_sha")
+
             def update_repo_file(self, *a, **kw):
                 self.calls.append("update_file")
 
@@ -195,19 +222,24 @@ class TestApplyReadmes:
         class FakeClient:
             def get_file_sha(self, owner, repo, path):
                 return "abc123"
-            def update_repo_file(self, owner, repo, path, content_b64, message, *, sha=None):
+
+            def update_repo_file(
+                self, owner, repo, path, content_b64, message, *, sha=None
+            ):
                 decoded = base64.b64decode(content_b64).decode("utf-8")
                 return {"ok": True, "sha": "new_sha", "decoded": decoded}
 
         results = apply_readme_updates(
-            FakeClient(), "owner",
+            FakeClient(),
+            "owner",
             [{"name": "repo1", "readme": "# Updated README"}],
         )
         assert results[0]["ok"] is True
 
     def test_skips_empty_readme(self):
         results = apply_readme_updates(
-            None, "owner",  # client not used since readme is empty
+            None,
+            "owner",  # client not used since readme is empty
             [{"name": "repo1", "readme": ""}],
         )
         assert len(results) == 0
@@ -224,10 +256,20 @@ class TestApplyFileUpdates:
         class FakeClient:
             def get_file_sha(self, owner, repo, path):
                 return None
-            def update_repo_file(self, owner, repo, path, content_b64, message, *, sha=None):
+
+            def update_repo_file(
+                self, owner, repo, path, content_b64, message, *, sha=None
+            ):
                 return {"ok": True}
 
-        updates = [{"name": "repo1", "path": "LICENSE", "content": "MIT License", "message": "chore: add LICENSE"}]
+        updates = [
+            {
+                "name": "repo1",
+                "path": "LICENSE",
+                "content": "MIT License",
+                "message": "chore: add LICENSE",
+            }
+        ]
         results = apply_file_updates(FakeClient(), "owner", updates)
         assert results[0]["ok"] is True
 

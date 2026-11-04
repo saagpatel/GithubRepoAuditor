@@ -16,9 +16,13 @@ def _build_follow_through(resolution_trend: dict) -> dict:
 
 def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) -> dict:
     resolution_targets = resolution_trend.get("resolution_targets", [])
-    repeat_urgent_count = sum(1 for item in resolution_targets if item.get("repeat_urgent"))
+    repeat_urgent_count = sum(
+        1 for item in resolution_targets if item.get("repeat_urgent")
+    )
     stale_item_count = sum(1 for item in resolution_targets if item.get("stale"))
-    oldest_open_item_days = max((item.get("age_days", 0) for item in resolution_targets), default=0)
+    oldest_open_item_days = max(
+        (item.get("age_days", 0) for item in resolution_targets), default=0
+    )
     quiet_streak_runs = resolution_trend.get("quiet_streak_runs", 0)
     status_counts = {
         "untouched": 0,
@@ -202,7 +206,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if recovery_status not in recovery_counts:
             recovery_status = "insufficient-evidence"
         recovery_counts[recovery_status] += 1
-        recovery_persistence_status = item.get("follow_through_recovery_persistence_status", "none")
+        recovery_persistence_status = item.get(
+            "follow_through_recovery_persistence_status", "none"
+        )
         if recovery_persistence_status not in recovery_persistence_counts:
             recovery_persistence_status = "insufficient-evidence"
         recovery_persistence_counts[recovery_persistence_status] += 1
@@ -210,7 +216,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if relapse_churn_status not in relapse_churn_counts:
             relapse_churn_status = "insufficient-evidence"
         relapse_churn_counts[relapse_churn_status] += 1
-        recovery_freshness_status = item.get("follow_through_recovery_freshness_status", "none")
+        recovery_freshness_status = item.get(
+            "follow_through_recovery_freshness_status", "none"
+        )
         if recovery_freshness_status not in recovery_freshness_counts:
             recovery_freshness_status = "insufficient-evidence"
         recovery_freshness_counts[recovery_freshness_status] += 1
@@ -240,9 +248,14 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_recovery_reacquisition_durability_status",
             "none",
         )
-        if recovery_reacquisition_durability_status not in recovery_reacquisition_durability_counts:
+        if (
+            recovery_reacquisition_durability_status
+            not in recovery_reacquisition_durability_counts
+        ):
             recovery_reacquisition_durability_status = "insufficient-evidence"
-        recovery_reacquisition_durability_counts[recovery_reacquisition_durability_status] += 1
+        recovery_reacquisition_durability_counts[
+            recovery_reacquisition_durability_status
+        ] += 1
         recovery_reacquisition_consolidation_status = item.get(
             "follow_through_recovery_reacquisition_consolidation_status",
             "none",
@@ -259,7 +272,10 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_reacquisition_softening_decay_status",
             "none",
         )
-        if reacquisition_softening_decay_status not in reacquisition_softening_decay_counts:
+        if (
+            reacquisition_softening_decay_status
+            not in reacquisition_softening_decay_counts
+        ):
             reacquisition_softening_decay_status = "insufficient-evidence"
         reacquisition_softening_decay_counts[reacquisition_softening_decay_status] += 1
         reacquisition_confidence_retirement_status = item.get(
@@ -271,7 +287,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             not in reacquisition_confidence_retirement_counts
         ):
             reacquisition_confidence_retirement_status = "insufficient-evidence"
-        reacquisition_confidence_retirement_counts[reacquisition_confidence_retirement_status] += 1
+        reacquisition_confidence_retirement_counts[
+            reacquisition_confidence_retirement_status
+        ] += 1
         reacquisition_revalidation_recovery_status = item.get(
             "follow_through_reacquisition_revalidation_recovery_status",
             "none",
@@ -281,7 +299,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             not in reacquisition_revalidation_recovery_counts
         ):
             reacquisition_revalidation_recovery_status = "insufficient-evidence"
-        reacquisition_revalidation_recovery_counts[reacquisition_revalidation_recovery_status] += 1
+        reacquisition_revalidation_recovery_counts[
+            reacquisition_revalidation_recovery_status
+        ] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
@@ -291,14 +311,26 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_age_runs": item.get("follow_through_age_runs", 0),
             "follow_through_checkpoint_status": checkpoint_status,
             "follow_through_summary": item.get("follow_through_summary", ""),
-            "follow_through_next_checkpoint": item.get("follow_through_next_checkpoint", ""),
+            "follow_through_next_checkpoint": item.get(
+                "follow_through_next_checkpoint", ""
+            ),
             "follow_through_escalation_status": escalation_status,
-            "follow_through_escalation_summary": item.get("follow_through_escalation_summary", ""),
-            "follow_through_escalation_reason": item.get("follow_through_escalation_reason", ""),
-            "follow_through_recovery_age_runs": item.get("follow_through_recovery_age_runs", 0),
+            "follow_through_escalation_summary": item.get(
+                "follow_through_escalation_summary", ""
+            ),
+            "follow_through_escalation_reason": item.get(
+                "follow_through_escalation_reason", ""
+            ),
+            "follow_through_recovery_age_runs": item.get(
+                "follow_through_recovery_age_runs", 0
+            ),
             "follow_through_recovery_status": recovery_status,
-            "follow_through_recovery_summary": item.get("follow_through_recovery_summary", ""),
-            "follow_through_recovery_reason": item.get("follow_through_recovery_reason", ""),
+            "follow_through_recovery_summary": item.get(
+                "follow_through_recovery_summary", ""
+            ),
+            "follow_through_recovery_reason": item.get(
+                "follow_through_recovery_reason", ""
+            ),
             "follow_through_recovery_persistence_age_runs": item.get(
                 "follow_through_recovery_persistence_age_runs", 0
             ),
@@ -421,13 +453,25 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_stale_follow_through_items.append(compact_item)
         if checkpoint_status == "overdue" and len(top_overdue_follow_through_items) < 5:
             top_overdue_follow_through_items.append(compact_item)
-        if escalation_status in {"escalate-now", "nudge"} and len(top_escalation_items) < 5:
+        if (
+            escalation_status in {"escalate-now", "nudge"}
+            and len(top_escalation_items) < 5
+        ):
             top_escalation_items.append(compact_item)
-        if recovery_status == "recovering" and len(top_recovering_follow_through_items) < 5:
+        if (
+            recovery_status == "recovering"
+            and len(top_recovering_follow_through_items) < 5
+        ):
             top_recovering_follow_through_items.append(compact_item)
-        if recovery_status == "retiring-watch" and len(top_retiring_follow_through_items) < 5:
+        if (
+            recovery_status == "retiring-watch"
+            and len(top_retiring_follow_through_items) < 5
+        ):
             top_retiring_follow_through_items.append(compact_item)
-        if recovery_status == "relapsing" and len(top_relapsing_follow_through_items) < 5:
+        if (
+            recovery_status == "relapsing"
+            and len(top_relapsing_follow_through_items) < 5
+        ):
             top_relapsing_follow_through_items.append(compact_item)
         if (
             recovery_persistence_status == "fragile-recovery"
@@ -466,10 +510,14 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             and len(top_reset_recovery_items) < 5
         ):
             top_reset_recovery_items.append(compact_item)
-        if recovery_memory_reset_status == "rebuilding" and len(top_rebuilding_recovery_items) < 5:
+        if (
+            recovery_memory_reset_status == "rebuilding"
+            and len(top_rebuilding_recovery_items) < 5
+        ):
             top_rebuilding_recovery_items.append(compact_item)
         if (
-            recovery_rebuild_strength_status in {"just-rebuilding", "building", "holding-rebuild"}
+            recovery_rebuild_strength_status
+            in {"just-rebuilding", "building", "holding-rebuild"}
             and len(top_rebuilding_recovery_strength_items) < 5
         ):
             top_rebuilding_recovery_strength_items.append(compact_item)
@@ -479,7 +527,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         ):
             top_reacquiring_recovery_items.append(compact_item)
         if (
-            recovery_reacquisition_status in {"just-reacquired", "holding-reacquired", "reacquired"}
+            recovery_reacquisition_status
+            in {"just-reacquired", "holding-reacquired", "reacquired"}
             and len(top_reacquired_recovery_items) < 5
         ):
             top_reacquired_recovery_items.append(compact_item)
@@ -494,7 +543,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         ):
             top_just_reacquired_items.append(compact_item)
         if (
-            recovery_reacquisition_durability_status in {"consolidating", "holding-reacquired"}
+            recovery_reacquisition_durability_status
+            in {"consolidating", "holding-reacquired"}
             and len(top_holding_reacquired_items) < 5
         ):
             top_holding_reacquired_items.append(compact_item)
@@ -509,7 +559,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         ):
             top_softening_reacquired_items.append(compact_item)
         if (
-            recovery_reacquisition_consolidation_status in {"fragile-confidence", "reversing"}
+            recovery_reacquisition_consolidation_status
+            in {"fragile-confidence", "reversing"}
             and len(top_fragile_reacquisition_confidence_items) < 5
         ):
             top_fragile_reacquisition_confidence_items.append(compact_item)
@@ -535,7 +586,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         ):
             top_under_revalidation_recovery_items.append(compact_item)
         if (
-            reacquisition_revalidation_recovery_status == "rebuilding-restored-confidence"
+            reacquisition_revalidation_recovery_status
+            == "rebuilding-restored-confidence"
             and len(top_rebuilding_restored_confidence_items) < 5
         ):
             top_rebuilding_restored_confidence_items.append(compact_item)
@@ -576,25 +628,31 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         top_fragile_recovery_items,
         top_sustained_recovery_items,
     )
-    follow_through_recovery_persistence_summary = _follow_through_recovery_persistence_summary(
-        recovery_persistence_counts,
-        top_fragile_recovery_items,
-        top_sustained_recovery_items,
+    follow_through_recovery_persistence_summary = (
+        _follow_through_recovery_persistence_summary(
+            recovery_persistence_counts,
+            top_fragile_recovery_items,
+            top_sustained_recovery_items,
+        )
     )
     follow_through_relapse_churn_summary = _follow_through_relapse_churn_summary(
         relapse_churn_counts,
         top_churn_follow_through_items,
     )
-    follow_through_recovery_freshness_summary = _follow_through_recovery_freshness_summary(
-        recovery_freshness_counts,
-        top_fresh_recovery_items,
-        top_stale_recovery_items,
-        top_softening_recovery_items,
+    follow_through_recovery_freshness_summary = (
+        _follow_through_recovery_freshness_summary(
+            recovery_freshness_counts,
+            top_fresh_recovery_items,
+            top_stale_recovery_items,
+            top_softening_recovery_items,
+        )
     )
-    follow_through_recovery_memory_reset_summary = _follow_through_recovery_memory_reset_summary(
-        recovery_memory_reset_counts,
-        top_reset_recovery_items,
-        top_rebuilding_recovery_items,
+    follow_through_recovery_memory_reset_summary = (
+        _follow_through_recovery_memory_reset_summary(
+            recovery_memory_reset_counts,
+            top_reset_recovery_items,
+            top_rebuilding_recovery_items,
+        )
     )
     follow_through_recovery_rebuild_strength_summary = (
         _follow_through_recovery_rebuild_strength_summary(
@@ -603,11 +661,13 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_fragile_reacquisition_items,
         )
     )
-    follow_through_recovery_reacquisition_summary = _follow_through_recovery_reacquisition_summary(
-        recovery_reacquisition_counts,
-        top_reacquiring_recovery_items,
-        top_reacquired_recovery_items,
-        top_fragile_reacquisition_items,
+    follow_through_recovery_reacquisition_summary = (
+        _follow_through_recovery_reacquisition_summary(
+            recovery_reacquisition_counts,
+            top_reacquiring_recovery_items,
+            top_reacquired_recovery_items,
+            top_fragile_reacquisition_items,
+        )
     )
     follow_through_recovery_reacquisition_durability_summary = (
         _follow_through_reacquisition_durability_summary(
@@ -803,7 +863,9 @@ def _project_queue_follow_through(
     for item in queue:
         key = _queue_identity(item)
         memory = decision_memory_map.get(key, {})
-        previous_match = recent_runs[1]["items"].get(key) if len(recent_runs) > 1 else None
+        previous_match = (
+            recent_runs[1]["items"].get(key) if len(recent_runs) > 1 else None
+        )
         prior_matches = [
             snapshot.get("items", {}).get(key)
             for snapshot in recent_runs[1:]
@@ -1078,22 +1140,42 @@ def _project_queue_follow_through(
             follow_through_recovery_reacquisition_summary = neutral_recovery_summary
             follow_through_recovery_reacquisition_durability_age_runs = 0
             follow_through_recovery_reacquisition_durability_status = "none"
-            follow_through_recovery_reacquisition_durability_reason = neutral_recovery_reason
-            follow_through_recovery_reacquisition_durability_summary = neutral_recovery_summary
+            follow_through_recovery_reacquisition_durability_reason = (
+                neutral_recovery_reason
+            )
+            follow_through_recovery_reacquisition_durability_summary = (
+                neutral_recovery_summary
+            )
             follow_through_recovery_reacquisition_consolidation_status = "none"
-            follow_through_recovery_reacquisition_consolidation_reason = neutral_recovery_reason
-            follow_through_recovery_reacquisition_consolidation_summary = neutral_recovery_summary
+            follow_through_recovery_reacquisition_consolidation_reason = (
+                neutral_recovery_reason
+            )
+            follow_through_recovery_reacquisition_consolidation_summary = (
+                neutral_recovery_summary
+            )
             follow_through_reacquisition_softening_decay_age_runs = 0
             follow_through_reacquisition_softening_decay_status = "none"
-            follow_through_reacquisition_softening_decay_reason = neutral_recovery_reason
-            follow_through_reacquisition_softening_decay_summary = neutral_recovery_summary
+            follow_through_reacquisition_softening_decay_reason = (
+                neutral_recovery_reason
+            )
+            follow_through_reacquisition_softening_decay_summary = (
+                neutral_recovery_summary
+            )
             follow_through_reacquisition_confidence_retirement_status = "none"
-            follow_through_reacquisition_confidence_retirement_reason = neutral_recovery_reason
-            follow_through_reacquisition_confidence_retirement_summary = neutral_recovery_summary
+            follow_through_reacquisition_confidence_retirement_reason = (
+                neutral_recovery_reason
+            )
+            follow_through_reacquisition_confidence_retirement_summary = (
+                neutral_recovery_summary
+            )
             follow_through_reacquisition_revalidation_recovery_age_runs = 0
             follow_through_reacquisition_revalidation_recovery_status = "none"
-            follow_through_reacquisition_revalidation_recovery_reason = neutral_recovery_reason
-            follow_through_reacquisition_revalidation_recovery_summary = neutral_recovery_summary
+            follow_through_reacquisition_revalidation_recovery_reason = (
+                neutral_recovery_reason
+            )
+            follow_through_reacquisition_revalidation_recovery_summary = (
+                neutral_recovery_summary
+            )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -1183,7 +1265,9 @@ def _queue_item_follow_through_status(
     lane = item.get("lane", "")
     last_outcome = memory.get("last_outcome", "no-change")
     decision_memory_status = memory.get("decision_memory_status", "new")
-    aging_status = item.get("aging_status") or _aging_status(appearance_count, earliest_age_days)
+    aging_status = item.get("aging_status") or _aging_status(
+        appearance_count, earliest_age_days
+    )
     stale_signal = (
         item.get("newly_stale")
         or aging_status in {"stale", "chronic"}
@@ -1209,13 +1293,20 @@ def _queue_item_follow_through_status(
         and _is_recent_follow_through(latest_event, current_generated_at)
     ):
         return "waiting-on-evidence"
-    if stale_signal and (has_intervention or decision_memory_status in {"attempted", "persisting"}):
+    if stale_signal and (
+        has_intervention or decision_memory_status in {"attempted", "persisting"}
+    ):
         return "stale-follow-through"
     if has_intervention:
         return "attempted"
-    if stale_signal or (decision_memory_status == "persisting" and attention_appearances >= 2):
+    if stale_signal or (
+        decision_memory_status == "persisting" and attention_appearances >= 2
+    ):
         return "stale-follow-through"
-    if decision_memory_status in {"reopened", "new", "persisting"} or attention_appearances >= 1:
+    if (
+        decision_memory_status in {"reopened", "new", "persisting"}
+        or attention_appearances >= 1
+    ):
         return "untouched"
     if last_outcome in {"improved", "quieted"}:
         return "waiting-on-evidence"
@@ -1231,11 +1322,17 @@ def _is_quiet_maintain_monitor(item: dict) -> bool:
     scorecard = raw_scorecard if isinstance(raw_scorecard, dict) else {}
     if not scorecard:
         raw_catalog_scorecard = catalog_entry.get("scorecard")
-        scorecard = raw_catalog_scorecard if isinstance(raw_catalog_scorecard, dict) else {}
+        scorecard = (
+            raw_catalog_scorecard if isinstance(raw_catalog_scorecard, dict) else {}
+        )
     summary = str(item.get("summary") or "").lower()
-    material_change_text = "material changes" in summary and "no material changes" not in summary
+    material_change_text = (
+        "material changes" in summary and "no material changes" not in summary
+    )
     return (
-        str(item.get("intent_alignment") or catalog_entry.get("intent_alignment") or "").lower()
+        str(
+            item.get("intent_alignment") or catalog_entry.get("intent_alignment") or ""
+        ).lower()
         == "aligned"
         and str(catalog_entry.get("intended_disposition") or "").lower() == "maintain"
         and str(scorecard.get("status") or "").lower() == "on-track"
@@ -1249,7 +1346,8 @@ def _has_follow_through_intervention(event: dict | None) -> bool:
     if not event:
         return False
     return any(
-        event.get(key) for key in ("recorded_at", "event_type", "outcome", "item_id", "title")
+        event.get(key)
+        for key in ("recorded_at", "event_type", "outcome", "item_id", "title")
     )
 
 
@@ -1334,7 +1432,11 @@ def _follow_through_checkpoint_status(
     if follow_through_status == "stale-follow-through":
         return "overdue"
     if follow_through_status == "untouched":
-        return "overdue" if follow_through_age_runs >= 2 or earliest_age_days > 7 else "due-soon"
+        return (
+            "overdue"
+            if follow_through_age_runs >= 2 or earliest_age_days > 7
+            else "due-soon"
+        )
     if follow_through_status == "attempted":
         if recent_follow_up and follow_through_age_runs <= 1 and earliest_age_days <= 7:
             return "due-soon"
@@ -1387,7 +1489,9 @@ def _follow_through_escalation_reason(
 ) -> str:
     label = _target_label(item)
     latest_event = memory.get("last_intervention") or {}
-    recent_follow_up = latest_event.get("recorded_at") or memory.get("last_seen_at") or ""
+    recent_follow_up = (
+        latest_event.get("recorded_at") or memory.get("last_seen_at") or ""
+    )
     if follow_through_status == "resolved":
         if follow_through_age_runs <= 1:
             return f"{label} looks calmer after recent follow-through and does not need extra escalation yet."
@@ -1420,9 +1524,7 @@ def _follow_through_escalation_item_summary(
     if follow_through_escalation_status == "nudge":
         return f"{label} should be nudged again soon because the follow-through is still active without settling. {follow_through_escalation_reason}"
     if follow_through_escalation_status == "watch":
-        return (
-            f"{label} is not late yet, but it should stay visible until the next checkpoint lands."
-        )
+        return f"{label} is not late yet, but it should stay visible until the next checkpoint lands."
     if follow_through_escalation_status == "resolved-watch":
         return f"{label} looks calmer, but it should stay on resolved watch until one more quiet run confirms it."
     if follow_through_escalation_status == "none":
@@ -1486,7 +1588,9 @@ def _follow_through_is_recovery_candidate_state(
     return _follow_through_escalation_level(follow_through_escalation_status) >= 0
 
 
-def _follow_through_is_positive_recovery_status(follow_through_recovery_status: str) -> bool:
+def _follow_through_is_positive_recovery_status(
+    follow_through_recovery_status: str,
+) -> bool:
     return follow_through_recovery_status in {"recovering", "retiring-watch", "retired"}
 
 
@@ -1579,7 +1683,9 @@ def _follow_through_history_metrics(
             compressed_states.append(state)
 
     positive_segments = sum(1 for state in compressed_states if state == "positive")
-    elevated_segments = sum(1 for state in compressed_states if state in {"elevated", "relapse"})
+    elevated_segments = sum(
+        1 for state in compressed_states if state in {"elevated", "relapse"}
+    )
     repeated_flip = positive_segments >= 2 and elevated_segments >= 2
     mild_wobble = positive_segments >= 2 and elevated_segments == 1
     blocked_pressure = (
@@ -1725,7 +1831,9 @@ def _follow_through_recovery_projection(
         recent_elevated_index is not None
         and recent_elevated_index <= FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS
     )
-    current_escalation_level = _follow_through_escalation_level(follow_through_escalation_status)
+    current_escalation_level = _follow_through_escalation_level(
+        follow_through_escalation_status
+    )
 
     if current_is_elevated:
         prior_has_recent_calm = prior_calm_streak > 0
@@ -1738,10 +1846,12 @@ def _follow_through_recovery_projection(
                     entry.get("follow_through_status", "unknown") or "unknown"
                 ),
                 follow_through_checkpoint_status=str(
-                    entry.get("follow_through_checkpoint_status", "unknown") or "unknown"
+                    entry.get("follow_through_checkpoint_status", "unknown")
+                    or "unknown"
                 ),
                 follow_through_escalation_status=str(
-                    entry.get("follow_through_escalation_status", "unknown") or "unknown"
+                    entry.get("follow_through_escalation_status", "unknown")
+                    or "unknown"
                 ),
             )
         if prior_has_recent_calm and prior_elevated_after_calm:
@@ -1775,8 +1885,13 @@ def _follow_through_recovery_projection(
         )
 
     if current_is_calm and has_recent_elevated_context:
-        recovery_age_runs = max(1, min(calm_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS))
-        if follow_through_status == "resolved" or follow_through_checkpoint_status == "satisfied":
+        recovery_age_runs = max(
+            1, min(calm_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS)
+        )
+        if (
+            follow_through_status == "resolved"
+            or follow_through_checkpoint_status == "satisfied"
+        ):
             if calm_streak >= 2:
                 reason = f"{label} has stayed calm for {min(calm_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS)} consecutive run(s) after recent escalation, so the stronger resurfacing can retire."
                 return (
@@ -2086,7 +2201,8 @@ def _follow_through_recovery_freshness_projection(
         or follow_through_recovery_persistence_status == "insufficient-evidence"
         or (
             not prior_has_recovery_shape
-            and follow_through_recovery_status in {"recovering", "retiring-watch", "retired"}
+            and follow_through_recovery_status
+            in {"recovering", "retiring-watch", "retired"}
         )
     ):
         return (
@@ -2212,7 +2328,8 @@ def _follow_through_recovery_decay_projection(
                 f"{label}'s older recovery confidence is now expiring.",
             )
         if (
-            follow_through_relapse_churn_status in {"watch", "fragile", "blocked", "churn"}
+            follow_through_relapse_churn_status
+            in {"watch", "fragile", "blocked", "churn"}
             or follow_through_recovery_persistence_status == "fragile-recovery"
         ):
             return (
@@ -2267,7 +2384,10 @@ def _follow_through_recovery_memory_reset_projection(
             f"{label} may be calming down, but the recovery memory is still too thin to judge whether it should reset or rebuild.",
             f"{label} does not yet have enough history to judge recovery-memory reset.",
         )
-    if has_recent_reset and follow_through_recovery_freshness_status in {"fresh", "mixed-age"}:
+    if has_recent_reset and follow_through_recovery_freshness_status in {
+        "fresh",
+        "mixed-age",
+    }:
         return (
             "rebuilding",
             f"{label} had its older recovery confidence reset recently and is now rebuilding calmer support with fresh evidence.",
@@ -2291,7 +2411,10 @@ def _follow_through_recovery_memory_reset_projection(
             f"{label} no longer has enough fresh calmer confirmation to keep the earlier stronger recovery hold, so that older recovery memory should now be treated as reset.",
             f"{label}'s older recovery confidence has now reset.",
         )
-    if has_recent_reset and follow_through_recovery_status in {"recovering", "retiring-watch"}:
+    if has_recent_reset and follow_through_recovery_status in {
+        "recovering",
+        "retiring-watch",
+    }:
         return (
             "rebuilding",
             f"{label} had older recovery confidence reset earlier and is now starting to accumulate calmer evidence again.",
@@ -2432,7 +2555,8 @@ def _follow_through_recovery_reacquisition_projection(
 
     current_is_candidate = (
         follow_through_recovery_memory_reset_status == "rebuilding"
-        and follow_through_recovery_rebuild_strength_status in {"building", "holding-rebuild"}
+        and follow_through_recovery_rebuild_strength_status
+        in {"building", "holding-rebuild"}
         and follow_through_recovery_persistence_status
         in {
             "holding-recovery",
@@ -2448,7 +2572,12 @@ def _follow_through_recovery_reacquisition_projection(
         prior_status = str(
             entry.get("follow_through_recovery_reacquisition_status", "none") or "none"
         )
-        if prior_status in {"reacquiring", "just-reacquired", "holding-reacquired", "reacquired"}:
+        if prior_status in {
+            "reacquiring",
+            "just-reacquired",
+            "holding-reacquired",
+            "reacquired",
+        }:
             prior_reacquisition_streak += 1
             continue
         break
@@ -2546,7 +2675,12 @@ def _follow_through_reacquisition_durability_projection(
 
     had_recent_reacquisition = any(
         str(entry.get("follow_through_recovery_reacquisition_status", "none") or "none")
-        in {"just-reacquired", "holding-reacquired", "reacquired", "fragile-reacquisition"}
+        in {
+            "just-reacquired",
+            "holding-reacquired",
+            "reacquired",
+            "fragile-reacquisition",
+        }
         for entry in prior_window
     )
     weakening_signal = (
@@ -2554,7 +2688,8 @@ def _follow_through_reacquisition_durability_projection(
         or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
         or follow_through_recovery_decay_status
         in {"softening", "aging", "fragile-aging", "expired"}
-        or follow_through_recovery_memory_reset_status in {"reset-watch", "resetting", "reset"}
+        or follow_through_recovery_memory_reset_status
+        in {"reset-watch", "resetting", "reset"}
     )
 
     if follow_through_recovery_reacquisition_status == "none":
@@ -2620,7 +2755,10 @@ def _follow_through_reacquisition_durability_projection(
         age_runs = 1 + sum(
             1
             for entry in prior_window
-            if str(entry.get("follow_through_recovery_reacquisition_status", "none") or "none")
+            if str(
+                entry.get("follow_through_recovery_reacquisition_status", "none")
+                or "none"
+            )
             in {"just-reacquired", "holding-reacquired"}
         )
         return (
@@ -2633,7 +2771,8 @@ def _follow_through_reacquisition_durability_projection(
     durability_streak = 1
     for entry in prior_window:
         prior_status = str(
-            entry.get("follow_through_recovery_reacquisition_durability_status", "none") or "none"
+            entry.get("follow_through_recovery_reacquisition_durability_status", "none")
+            or "none"
         )
         if prior_status in {"holding-reacquired", "durable-reacquired"}:
             durability_streak += 1
@@ -2674,12 +2813,15 @@ def _follow_through_reacquisition_consolidation_projection(
     )
     had_confident_reacquisition = any(
         str(
-            entry.get("follow_through_recovery_reacquisition_consolidation_status", "none")
+            entry.get(
+                "follow_through_recovery_reacquisition_consolidation_status", "none"
+            )
             or "none"
         )
         in {"holding-confidence", "durable-confidence"}
         or str(
-            entry.get("follow_through_recovery_reacquisition_durability_status", "none") or "none"
+            entry.get("follow_through_recovery_reacquisition_durability_status", "none")
+            or "none"
         )
         in {"holding-reacquired", "durable-reacquired"}
         for entry in prior_window
@@ -2693,7 +2835,8 @@ def _follow_through_reacquisition_consolidation_projection(
         )
     if (
         follow_through_recovery_reacquisition_status == "insufficient-evidence"
-        or follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_durability_status
+        == "insufficient-evidence"
     ):
         return (
             "insufficient-evidence",
@@ -2766,10 +2909,15 @@ def _follow_through_reacquisition_softening_decay_projection(
     label = _target_label(item)
     prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
     had_recent_strong_posture = any(
-        str(entry.get("follow_through_recovery_reacquisition_durability_status", "none") or "none")
+        str(
+            entry.get("follow_through_recovery_reacquisition_durability_status", "none")
+            or "none"
+        )
         in {"holding-reacquired", "durable-reacquired"}
         or str(
-            entry.get("follow_through_recovery_reacquisition_consolidation_status", "none")
+            entry.get(
+                "follow_through_recovery_reacquisition_consolidation_status", "none"
+            )
             or "none"
         )
         in {"holding-confidence", "durable-confidence"}
@@ -2778,7 +2926,8 @@ def _follow_through_reacquisition_softening_decay_projection(
     prior_softening_streak = 0
     for entry in prior_window:
         prior_status = str(
-            entry.get("follow_through_reacquisition_softening_decay_status", "none") or "none"
+            entry.get("follow_through_reacquisition_softening_decay_status", "none")
+            or "none"
         )
         if prior_status in {"softening-watch", "step-down", "revalidation-needed"}:
             prior_softening_streak += 1
@@ -2802,8 +2951,10 @@ def _follow_through_reacquisition_softening_decay_projection(
             f"{label} is not currently carrying a softening restored posture.",
         )
     if (
-        follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
-        or follow_through_recovery_reacquisition_consolidation_status == "insufficient-evidence"
+        follow_through_recovery_reacquisition_durability_status
+        == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_consolidation_status
+        == "insufficient-evidence"
     ) and had_recent_strong_posture:
         return (
             1,
@@ -2869,7 +3020,9 @@ def _follow_through_reacquisition_confidence_retirement_projection(
     prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
     had_recent_strong_confidence = any(
         str(
-            entry.get("follow_through_recovery_reacquisition_consolidation_status", "none")
+            entry.get(
+                "follow_through_recovery_reacquisition_consolidation_status", "none"
+            )
             or "none"
         )
         in {"holding-confidence", "durable-confidence"}
@@ -2878,9 +3031,16 @@ def _follow_through_reacquisition_confidence_retirement_projection(
     prior_retirement_streak = 0
     for entry in prior_window:
         prior_status = str(
-            entry.get("follow_through_reacquisition_confidence_retirement_status", "none") or "none"
+            entry.get(
+                "follow_through_reacquisition_confidence_retirement_status", "none"
+            )
+            or "none"
         )
-        if prior_status in {"watch-retirement", "retiring-confidence", "revalidation-needed"}:
+        if prior_status in {
+            "watch-retirement",
+            "retiring-confidence",
+            "revalidation-needed",
+        }:
             prior_retirement_streak += 1
             continue
         break
@@ -2896,8 +3056,10 @@ def _follow_through_reacquisition_confidence_retirement_projection(
             f"{label}'s restored calmer confidence is still active and does not need retirement.",
         )
     if (
-        follow_through_recovery_reacquisition_consolidation_status == "insufficient-evidence"
-        or follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
+        follow_through_recovery_reacquisition_consolidation_status
+        == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_durability_status
+        == "insufficient-evidence"
     ) and had_recent_strong_confidence:
         return (
             "insufficient-evidence",
@@ -2916,14 +3078,20 @@ def _follow_through_reacquisition_confidence_retirement_projection(
     )
     if weakening_confidence and had_recent_strong_confidence:
         age_runs = prior_retirement_streak + 1
-        if follow_through_recovery_reacquisition_consolidation_status == "none" and age_runs >= 3:
+        if (
+            follow_through_recovery_reacquisition_consolidation_status == "none"
+            and age_runs >= 3
+        ):
             return (
                 "retired-confidence",
                 f"{label}'s earlier restored-confidence posture is no longer supported by recent evidence, so that carry-forward confidence has now been retired.",
                 f"{label}'s earlier restored calmer confidence has now been retired.",
             )
         if age_runs >= 2:
-            if follow_through_reacquisition_softening_decay_status == "revalidation-needed":
+            if (
+                follow_through_reacquisition_softening_decay_status
+                == "revalidation-needed"
+            ):
                 return (
                     "revalidation-needed",
                     f"{label}'s earlier restored-confidence posture was materially strong, but it now needs fresh confirmation before it should be trusted again.",
@@ -2973,12 +3141,16 @@ def _follow_through_reacquisition_revalidation_recovery_projection(
     prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
     current_under_revalidation = (
         follow_through_reacquisition_softening_decay_status == "revalidation-needed"
-        or follow_through_reacquisition_confidence_retirement_status == "revalidation-needed"
+        or follow_through_reacquisition_confidence_retirement_status
+        == "revalidation-needed"
     )
     prior_reearned_streak = 0
     for entry in prior_window:
         prior_status = str(
-            entry.get("follow_through_reacquisition_revalidation_recovery_status", "none") or "none"
+            entry.get(
+                "follow_through_reacquisition_revalidation_recovery_status", "none"
+            )
+            or "none"
         )
         if prior_status in {"just-reearned-confidence", "holding-reearned-confidence"}:
             prior_reearned_streak += 1
@@ -2986,14 +3158,23 @@ def _follow_through_reacquisition_revalidation_recovery_projection(
         break
 
     had_recent_revalidation = current_under_revalidation or any(
-        str(entry.get("follow_through_reacquisition_softening_decay_status", "none") or "none")
-        == "revalidation-needed"
-        or str(
-            entry.get("follow_through_reacquisition_confidence_retirement_status", "none") or "none"
+        str(
+            entry.get("follow_through_reacquisition_softening_decay_status", "none")
+            or "none"
         )
         == "revalidation-needed"
         or str(
-            entry.get("follow_through_reacquisition_revalidation_recovery_status", "none") or "none"
+            entry.get(
+                "follow_through_reacquisition_confidence_retirement_status", "none"
+            )
+            or "none"
+        )
+        == "revalidation-needed"
+        or str(
+            entry.get(
+                "follow_through_reacquisition_revalidation_recovery_status", "none"
+            )
+            or "none"
         )
         in {
             "under-revalidation",
@@ -3020,8 +3201,10 @@ def _follow_through_reacquisition_revalidation_recovery_projection(
             f"{label} is still under revalidation before restored confidence can be re-earned.",
         )
     if (
-        follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
-        or follow_through_recovery_reacquisition_consolidation_status == "insufficient-evidence"
+        follow_through_recovery_reacquisition_durability_status
+        == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_consolidation_status
+        == "insufficient-evidence"
     ):
         return (
             0,
@@ -3050,7 +3233,8 @@ def _follow_through_reacquisition_revalidation_recovery_projection(
     if (
         follow_through_recovery_reacquisition_durability_status
         in {"holding-reacquired", "durable-reacquired"}
-        and follow_through_recovery_reacquisition_consolidation_status == "building-confidence"
+        and follow_through_recovery_reacquisition_consolidation_status
+        == "building-confidence"
     ):
         return (
             0,
@@ -3103,7 +3287,9 @@ def _follow_through_item_summary(
         return f"{label} has stayed open long enough that the follow-through now looks stale. {follow_through_last_touch}."
     if follow_through_status == "resolved":
         return f"{label} looks calmer after follow-through and is now in a lower-pressure state. {follow_through_next_checkpoint}"
-    return f"{label} does not have enough follow-through evidence yet to classify cleanly."
+    return (
+        f"{label} does not have enough follow-through evidence yet to classify cleanly."
+    )
 
 
 def _target_label(item: dict) -> str:
@@ -3199,16 +3385,24 @@ def _follow_through_summary(
     recovery_memory_reset_counts = recovery_memory_reset_counts or {}
     recovery_rebuild_strength_counts = recovery_rebuild_strength_counts or {}
     recovery_reacquisition_counts = recovery_reacquisition_counts or {}
-    recovery_reacquisition_durability_counts = recovery_reacquisition_durability_counts or {}
-    recovery_reacquisition_consolidation_counts = recovery_reacquisition_consolidation_counts or {}
+    recovery_reacquisition_durability_counts = (
+        recovery_reacquisition_durability_counts or {}
+    )
+    recovery_reacquisition_consolidation_counts = (
+        recovery_reacquisition_consolidation_counts or {}
+    )
     reacquisition_softening_decay_counts = reacquisition_softening_decay_counts or {}
-    reacquisition_confidence_retirement_counts = reacquisition_confidence_retirement_counts or {}
+    reacquisition_confidence_retirement_counts = (
+        reacquisition_confidence_retirement_counts or {}
+    )
     top_fresh_recovery_items = top_fresh_recovery_items or []
     top_stale_recovery_items = top_stale_recovery_items or []
     top_softening_recovery_items = top_softening_recovery_items or []
     top_reset_recovery_items = top_reset_recovery_items or []
     top_rebuilding_recovery_items = top_rebuilding_recovery_items or []
-    top_rebuilding_recovery_strength_items = top_rebuilding_recovery_strength_items or []
+    top_rebuilding_recovery_strength_items = (
+        top_rebuilding_recovery_strength_items or []
+    )
     top_reacquiring_recovery_items = top_reacquiring_recovery_items or []
     top_reacquired_recovery_items = top_reacquired_recovery_items or []
     top_fragile_reacquisition_items = top_fragile_reacquisition_items or []
@@ -3216,10 +3410,16 @@ def _follow_through_summary(
     top_holding_reacquired_items = top_holding_reacquired_items or []
     top_durable_reacquired_items = top_durable_reacquired_items or []
     top_softening_reacquired_items = top_softening_reacquired_items or []
-    top_fragile_reacquisition_confidence_items = top_fragile_reacquisition_confidence_items or []
+    top_fragile_reacquisition_confidence_items = (
+        top_fragile_reacquisition_confidence_items or []
+    )
     top_softening_reacquisition_items = top_softening_reacquisition_items or []
-    top_revalidation_needed_reacquisition_items = top_revalidation_needed_reacquisition_items or []
-    top_retired_reacquisition_confidence_items = top_retired_reacquisition_confidence_items or []
+    top_revalidation_needed_reacquisition_items = (
+        top_revalidation_needed_reacquisition_items or []
+    )
+    top_retired_reacquisition_confidence_items = (
+        top_retired_reacquisition_confidence_items or []
+    )
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -3233,7 +3433,9 @@ def _follow_through_summary(
             f"{status_counts.get('stale-follow-through', 0)} item(s) now look stalled after earlier review-to-action handoff, "
             f"and {label} is the strongest case to close or escalate next."
         )
-        if checkpoint_counts.get("overdue", 0) or escalation_counts.get("escalate-now", 0):
+        if checkpoint_counts.get("overdue", 0) or escalation_counts.get(
+            "escalate-now", 0
+        ):
             detailed = (
                 f"{detailed} "
                 f"{checkpoint_counts.get('overdue', 0)} item(s) are now overdue and "
@@ -3247,7 +3449,9 @@ def _follow_through_summary(
             f"{status_counts.get('untouched', 0)} surfaced item(s) still have no recorded follow-through, "
             f"and {label} is the clearest place to start."
         )
-        if checkpoint_counts.get("overdue", 0) or escalation_counts.get("escalate-now", 0):
+        if checkpoint_counts.get("overdue", 0) or escalation_counts.get(
+            "escalate-now", 0
+        ):
             detailed = (
                 f"{detailed} "
                 f"{checkpoint_counts.get('overdue', 0)} item(s) are overdue and "

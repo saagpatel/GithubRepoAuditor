@@ -9,7 +9,9 @@ DEFAULT_VALIDATION_WINDOW_RUNS = 2
 
 
 def build_confidence_calibration(history: list[dict[str, Any]]) -> dict[str, Any]:
-    from github_repo_auditor import operator_resolution_trend as _operator_resolution_trend
+    from github_repo_auditor import (
+        operator_resolution_trend as _operator_resolution_trend,
+    )
 
     return _operator_resolution_trend._build_confidence_calibration(history)
 
@@ -21,7 +23,9 @@ def confidence_validation_status(
     reopened_recommendation_count: int,
     reopened_high_count: int,
 ) -> str:
-    from github_repo_auditor import operator_resolution_trend as _operator_resolution_trend
+    from github_repo_auditor import (
+        operator_resolution_trend as _operator_resolution_trend,
+    )
 
     return _operator_resolution_trend._confidence_validation_status(
         judged_count=judged_count,
@@ -40,7 +44,9 @@ def confidence_calibration_summary(
     reopened_recommendation_count: int,
     judged_count: int,
 ) -> str:
-    from github_repo_auditor import operator_resolution_trend as _operator_resolution_trend
+    from github_repo_auditor import (
+        operator_resolution_trend as _operator_resolution_trend,
+    )
 
     return _operator_resolution_trend._confidence_calibration_summary(
         confidence_validation_status=confidence_validation_status,
@@ -83,11 +89,13 @@ def build_decision_quality_v1(
         validation_status in {"mixed", "noisy", "insufficient-data"}
         or (
             has_active_target
-            and confidence.get("primary_target_trust_policy") in {"verify-first", "monitor"}
+            and confidence.get("primary_target_trust_policy")
+            in {"verify-first", "monitor"}
         )
         or (
             has_active_target
-            and confidence.get("next_action_trust_policy") in {"verify-first", "monitor"}
+            and confidence.get("next_action_trust_policy")
+            in {"verify-first", "monitor"}
         )
         or downgrade_reasons
     )
@@ -104,7 +112,8 @@ def build_decision_quality_v1(
             confidence_calibration.get("validated_recommendation_count", 0) or 0
         ),
         "partially_validated_recommendation_count": int(
-            confidence_calibration.get("partially_validated_recommendation_count", 0) or 0
+            confidence_calibration.get("partially_validated_recommendation_count", 0)
+            or 0
         ),
         "reopened_recommendation_count": int(
             confidence_calibration.get("reopened_recommendation_count", 0) or 0
@@ -153,7 +162,9 @@ def build_decision_quality_v1(
                 "No trust-policy reason is recorded yet.",
             )
         ),
-        "next_action_trust_policy": str(confidence.get("next_action_trust_policy", "monitor")),
+        "next_action_trust_policy": str(
+            confidence.get("next_action_trust_policy", "monitor")
+        ),
         "next_action_trust_policy_reason": str(
             confidence.get(
                 "next_action_trust_policy_reason",
@@ -184,7 +195,9 @@ def decision_quality_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
             or DEFAULT_EVIDENCE_WINDOW_RUNS
         ),
         "validation_window_runs": DEFAULT_VALIDATION_WINDOW_RUNS,
-        "judged_recommendation_count": int(summary.get("validated_recommendation_count", 0) or 0)
+        "judged_recommendation_count": int(
+            summary.get("validated_recommendation_count", 0) or 0
+        )
         + int(summary.get("partially_validated_recommendation_count", 0) or 0)
         + int(summary.get("unresolved_recommendation_count", 0) or 0)
         + int(summary.get("reopened_recommendation_count", 0) or 0),
@@ -194,12 +207,18 @@ def decision_quality_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "partially_validated_recommendation_count": int(
             summary.get("partially_validated_recommendation_count", 0) or 0
         ),
-        "reopened_recommendation_count": int(summary.get("reopened_recommendation_count", 0) or 0),
+        "reopened_recommendation_count": int(
+            summary.get("reopened_recommendation_count", 0) or 0
+        ),
         "unresolved_recommendation_count": int(
             summary.get("unresolved_recommendation_count", 0) or 0
         ),
-        "high_confidence_hit_rate": float(summary.get("high_confidence_hit_rate", 0.0) or 0.0),
-        "medium_confidence_hit_rate": float(summary.get("medium_confidence_hit_rate", 0.0) or 0.0),
+        "high_confidence_hit_rate": float(
+            summary.get("high_confidence_hit_rate", 0.0) or 0.0
+        ),
+        "medium_confidence_hit_rate": float(
+            summary.get("medium_confidence_hit_rate", 0.0) or 0.0
+        ),
         "low_confidence_caution_rate": float(
             summary.get("low_confidence_caution_rate", 0.0) or 0.0
         ),
@@ -208,8 +227,10 @@ def decision_quality_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
             validation_status=confidence_validation_status,
             human_skepticism_required=bool(
                 summary.get("human_skepticism_required", False)
-                or summary.get("primary_target_trust_policy") in {"verify-first", "monitor"}
-                or summary.get("next_action_trust_policy") in {"verify-first", "monitor"}
+                or summary.get("primary_target_trust_policy")
+                in {"verify-first", "monitor"}
+                or summary.get("next_action_trust_policy")
+                in {"verify-first", "monitor"}
             ),
             confidence=summary,
         ),
@@ -230,15 +251,21 @@ def decision_quality_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
                 "No confidence-calibration summary is recorded yet.",
             )
         ),
-        "recent_validation_outcomes": list(summary.get("recent_validation_outcomes") or []),
-        "primary_target_trust_policy": str(summary.get("primary_target_trust_policy", "monitor")),
+        "recent_validation_outcomes": list(
+            summary.get("recent_validation_outcomes") or []
+        ),
+        "primary_target_trust_policy": str(
+            summary.get("primary_target_trust_policy", "monitor")
+        ),
         "primary_target_trust_policy_reason": str(
             summary.get(
                 "primary_target_trust_policy_reason",
                 "No trust-policy reason is recorded yet.",
             )
         ),
-        "next_action_trust_policy": str(summary.get("next_action_trust_policy", "monitor")),
+        "next_action_trust_policy": str(
+            summary.get("next_action_trust_policy", "monitor")
+        ),
         "next_action_trust_policy_reason": str(
             summary.get(
                 "next_action_trust_policy_reason",
@@ -336,7 +363,11 @@ def _downgrade_reasons(
 
     primary_policy = str(confidence.get("primary_target_trust_policy", "monitor"))
     next_policy = str(confidence.get("next_action_trust_policy", "monitor"))
-    active_target = _has_active_target(resolution_trend) if has_active_target is None else has_active_target
+    active_target = (
+        _has_active_target(resolution_trend)
+        if has_active_target is None
+        else has_active_target
+    )
     if active_target:
         if primary_policy == "verify-first":
             reasons.append("primary-target-needs-verification")
@@ -347,13 +378,25 @@ def _downgrade_reasons(
         elif next_policy == "monitor":
             reasons.append("next-action-monitor-only")
 
-    if str(resolution_trend.get("primary_target_exception_status", "none")) not in {"", "none"}:
+    if str(resolution_trend.get("primary_target_exception_status", "none")) not in {
+        "",
+        "none",
+    }:
         reasons.append("trust-exception-active")
-    if str(resolution_trend.get("primary_target_trust_recovery_status", "none")) == "blocked":
+    if (
+        str(resolution_trend.get("primary_target_trust_recovery_status", "none"))
+        == "blocked"
+    ):
         reasons.append("trust-recovery-blocked")
-    if str(resolution_trend.get("primary_target_exception_retirement_status", "none")) == "blocked":
+    if (
+        str(resolution_trend.get("primary_target_exception_retirement_status", "none"))
+        == "blocked"
+    ):
         reasons.append("exception-retirement-blocked")
-    if str(resolution_trend.get("primary_target_policy_debt_status", "none")) == "class-debt":
+    if (
+        str(resolution_trend.get("primary_target_policy_debt_status", "none"))
+        == "class-debt"
+    ):
         reasons.append("class-policy-debt")
     if str(resolution_trend.get("recommendation_drift_status", "")) == "drifting":
         reasons.append("recommendation-drift")

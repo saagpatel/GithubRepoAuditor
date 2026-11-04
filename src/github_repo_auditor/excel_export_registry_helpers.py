@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from github_repo_auditor.excel_workbook_helpers import (
-    CORE_VISIBLE_SHEETS,
+    core_visible_sheets_for_overlay,
     DEFAULT_PREFERRED_SHEET_ORDER,
 )
 from github_repo_auditor.excel_workbook_helpers import (
@@ -70,11 +70,17 @@ def build_excel_workbook_runtime(
     finalize_workbook_structure: Callable[..., Any] | None = None,
     core_visible_sheets: set[str] | None = None,
     preferred_order: list[str] | None = None,
+    build_reckoning_sheet: Callable[..., Any] | None = None,
+    reckoning_present: bool = False,
 ) -> dict[str, Any]:
     build_steps_runner = run_workbook_build_steps or default_run_workbook_build_steps
-    workbook_finalizer = finalize_workbook_structure or default_finalize_workbook_structure
+    workbook_finalizer = (
+        finalize_workbook_structure or default_finalize_workbook_structure
+    )
     visible_sheets = set(
-        CORE_VISIBLE_SHEETS if core_visible_sheets is None else core_visible_sheets
+        core_visible_sheets_for_overlay(reckoning_present)
+        if core_visible_sheets is None
+        else core_visible_sheets
     )
     sheet_order = list(
         DEFAULT_PREFERRED_SHEET_ORDER if preferred_order is None else preferred_order
@@ -82,6 +88,7 @@ def build_excel_workbook_runtime(
 
     return {
         "run_workbook_build_steps": build_steps_runner,
+        "build_reckoning_sheet": build_reckoning_sheet,
         "build_dashboard": build_dashboard,
         "build_all_repos": build_all_repos,
         "build_portfolio_explorer": build_portfolio_explorer,

@@ -13,7 +13,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from github_repo_auditor.demo_portfolio import DEMO_PROJECTS, DemoProject, build_snapshot
+from github_repo_auditor.demo_portfolio import (
+    DEMO_PROJECTS,
+    DemoProject,
+    build_snapshot,
+)
 from github_repo_auditor.portfolio_truth_types import SCHEMA_VERSION
 
 CONTRACT_VERSION = "ghra-pcc-portfolio-truth.v1"
@@ -23,9 +27,7 @@ CONSUMER_REPOSITORY = "saagpatel/PortfolioCommandCenter"
 FIXTURE_RELATIVE_PATH = (
     "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json"
 )
-MANIFEST_RELATIVE_PATH = (
-    "fixtures/contracts/portfolio-command-center-v1/manifest.json"
-)
+MANIFEST_RELATIVE_PATH = "fixtures/contracts/portfolio-command-center-v1/manifest.json"
 PORTABLE_FIXTURE_RELATIVE_PATH = (
     "fixtures/contracts/portable-consumers-v1/portfolio-truth.json"
 )
@@ -142,9 +144,7 @@ def build_contract_manifest() -> dict[str, Any]:
             "project_count": len(_PROJECT_CODENAMES),
             "coverage_states": ["complete", "partial", "stale", "unknown"],
             "producer_evidence": "absent",
-            "security_evidence_semantics": (
-                "synthetic-cross-receipt-state-matrix"
-            ),
+            "security_evidence_semantics": ("synthetic-cross-receipt-state-matrix"),
             "additive_canary_paths": [
                 "contract_fixture",
                 "projects[0].additive_contract_canary",

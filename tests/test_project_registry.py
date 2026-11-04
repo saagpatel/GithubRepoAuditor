@@ -17,7 +17,8 @@ from github_repo_auditor.project_registry import (
 def _snapshot(*identities: dict) -> dict:
     return {
         "projects": [
-            {"identity": ident, "declared": {"lifecycle_state": "active"}} for ident in identities
+            {"identity": ident, "declared": {"lifecycle_state": "active"}}
+            for ident in identities
         ]
     }
 
@@ -35,16 +36,28 @@ def _ident(project_key: str, display_name: str, repo: str | None = None) -> dict
 # collision pair, a notion-os-style repo, and a Notion-orphan project.
 SNAPSHOT = _snapshot(
     _ident("MCPAudit", "MCPAudit", "saagpatel/MCPAudit"),
-    _ident("ScreenshottoDataSelect", "ScreenshottoDataSelect", "saagpatel/ScreenshottoDataSelect"),
     _ident(
-        "ITPRJsViaClaude/ScreenshotAnnotate", "ScreenshotAnnotate", "saagpatel/ScreenshotAnnotate"
+        "ScreenshottoDataSelect",
+        "ScreenshottoDataSelect",
+        "saagpatel/ScreenshottoDataSelect",
+    ),
+    _ident(
+        "ITPRJsViaClaude/ScreenshotAnnotate",
+        "ScreenshotAnnotate",
+        "saagpatel/ScreenshotAnnotate",
     ),
     _ident("JobCommandCenter", "JobCommandCenter", "saagpatel/JobCommandCenter"),
     _ident(
-        "BrowserHistoryVisualizer", "BrowserHistoryVisualizer", "saagpatel/BrowserHistoryVisualizer"
+        "BrowserHistoryVisualizer",
+        "BrowserHistoryVisualizer",
+        "saagpatel/BrowserHistoryVisualizer",
     ),
     _ident("Notion", "Notion", "saagpatel/notion-operating-system"),
-    _ident("PortfolioCommandCenter", "PortfolioCommandCenter", "saagpatel/PortfolioCommandCenter"),
+    _ident(
+        "PortfolioCommandCenter",
+        "PortfolioCommandCenter",
+        "saagpatel/PortfolioCommandCenter",
+    ),
     _ident("Fun:GamePrjs/DesktopPEt", "DesktopPEt", "saagpatel/DesktopPEt"),
 )
 
@@ -218,9 +231,12 @@ def test_configured_projection_policy_preserves_rag_planning_row_exclusion():
         overrides_config_path=Path("config/project-registry-overrides.json"),
     )
 
-    assert registry["projection_policy"]["notion_projection_only_rows"][
-        "RAG Knowledge Base"
-    ] == "notion planning row; not a portfolio-truth repo"
+    assert (
+        registry["projection_policy"]["notion_projection_only_rows"][
+            "RAG Knowledge Base"
+        ]
+        == "notion planning row; not a portfolio-truth repo"
+    )
 
 
 def test_resolve_returns_none_for_non_projects():
@@ -245,7 +261,9 @@ def test_build_degrades_gracefully_without_external_sources():
 
 
 def test_build_attaches_external_sources(tmp_path: Path):
-    bridge = _bridge_db(tmp_path, ["MCPAudit", "PortfolioCommandCenter", "weekly-review"])
+    bridge = _bridge_db(
+        tmp_path, ["MCPAudit", "PortfolioCommandCenter", "weekly-review"]
+    )
     snap = _pid_snapshot(
         tmp_path,
         [
@@ -285,7 +303,9 @@ def test_build_attaches_external_sources(tmp_path: Path):
         }
     ]
     # PortfolioCommandCenter resolves from bridge but has no Notion/memory row
-    assert by_key["PortfolioCommandCenter"]["bridge_project_names"] == ["PortfolioCommandCenter"]
+    assert by_key["PortfolioCommandCenter"]["bridge_project_names"] == [
+        "PortfolioCommandCenter"
+    ]
     assert by_key["PortfolioCommandCenter"]["notion_local_title"] is None
 
 
@@ -467,7 +487,9 @@ def test_explicit_override_still_binds_an_otherwise_ambiguous_title(
     # once the operator says which project the row is, the binding must work.
     snap = _pid_snapshot(tmp_path, [{"title": "Conductor", "page_id": "page-app"}])
     overrides = tmp_path / "overrides.json"
-    overrides.write_text(json.dumps({"overrides": {"Conductor": "VanityPRJs/Conductor"}}))
+    overrides.write_text(
+        json.dumps({"overrides": {"Conductor": "VanityPRJs/Conductor"}})
+    )
     registry = build_project_registry(
         COLLIDING,
         notion_snapshot_path=snap,
@@ -483,7 +505,10 @@ def test_explicit_override_still_binds_an_otherwise_ambiguous_title(
 def test_unambiguous_titles_are_unaffected_by_the_refusal(tmp_path: Path):
     snap = _pid_snapshot(
         tmp_path,
-        [{"title": "Conductor", "page_id": "page-app"}, {"title": "MCPAudit", "page_id": "page-mcp"}],
+        [
+            {"title": "Conductor", "page_id": "page-app"},
+            {"title": "MCPAudit", "page_id": "page-mcp"},
+        ],
     )
     registry = build_project_registry(
         COLLIDING,
@@ -504,7 +529,11 @@ def test_personal_ops_has_one_identity_not_a_supplementary_duplicate():
     _, supplementary, memory_meta, *_ = load_overrides_config(
         Path("config/project-registry-overrides.json")
     )
-    assert [s["canonical_key"] for s in supplementary if "personal-ops" in s["canonical_key"]] == []
+    assert [
+        s["canonical_key"]
+        for s in supplementary
+        if "personal-ops" in s["canonical_key"]
+    ] == []
     # Memory notes must point at the surviving identity, not the retired key.
     assert "supp:personal-ops" not in memory_meta.values()
 
@@ -516,7 +545,9 @@ def test_configured_overrides_settle_the_private_public_collisions():
     # binding must follow that decision rather than entry order.
     from github_repo_auditor.project_registry import load_overrides_config
 
-    overrides, *_ = load_overrides_config(Path("config/project-registry-overrides.json"))
+    overrides, *_ = load_overrides_config(
+        Path("config/project-registry-overrides.json")
+    )
     assert overrides["ReturnRadar"] == "ReturnRadar"
     assert overrides["cross-provider-egress-guard"] == "cross-provider-egress-guard"
     # conductor is deliberately absent: its two identities are unrelated projects
@@ -563,7 +594,9 @@ def test_title_aliases_point_from_the_notion_title_to_the_registry_key(tmp_path:
     # Notion row title, so the alias key must be the title and the value the
     # registry key. Reversed, the snapshot row stays an orphan and the project
     # never receives its page id.
-    snap = _pid_snapshot(tmp_path, [{"title": "MCP Audit Detector", "page_id": "live-mcp"}])
+    snap = _pid_snapshot(
+        tmp_path, [{"title": "MCP Audit Detector", "page_id": "live-mcp"}]
+    )
     overrides = tmp_path / "overrides.json"
     overrides.write_text(
         json.dumps({"notion_title_aliases": {"MCP Audit Detector": "MCPAudit"}})

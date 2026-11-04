@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from github_repo_auditor.operator_trend_closure_forecast_core import target_closure_forecast_history
+from github_repo_auditor.operator_trend_closure_forecast_core import (
+    target_closure_forecast_history,
+)
 
 
 def _target_class_key(item: dict) -> str:

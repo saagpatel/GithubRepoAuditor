@@ -25,7 +25,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from github_repo_auditor.automation_proposals import AutomationProposal, require_approved
+from github_repo_auditor.automation_proposals import (
+    AutomationProposal,
+    require_approved,
+)
 
 CONTRACT_VERSION = "automation_execution_v1"
 
@@ -168,7 +171,9 @@ def execute_context_pr(
         # retry isn't blocked by an "already exists" branch.
         runner(["git", "checkout", "-f", default_branch], plan.repo_path)
         runner(["git", "branch", "-D", branch], plan.repo_path)
-        return ExecutionResult(proposal.proposal_id, "failed", f"apply-change: {error}".strip())
+        return ExecutionResult(
+            proposal.proposal_id, "failed", f"apply-change: {error}".strip()
+        )
 
     for args in (
         ["git", "add", "-A"],
@@ -198,7 +203,9 @@ def execute_context_pr(
         plan.repo_path,
     )
     if pr.returncode != 0:
-        return ExecutionResult(proposal.proposal_id, "failed", f"gh pr create: {pr.stderr}".strip())
+        return ExecutionResult(
+            proposal.proposal_id, "failed", f"gh pr create: {pr.stderr}".strip()
+        )
 
     # gh prints the PR URL on success. If it somehow reported success with no
     # URL, the PR was still created (rc 0) so we must not fail and re-run (that

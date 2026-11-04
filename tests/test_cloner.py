@@ -10,7 +10,9 @@ from github_repo_auditor.cloner import clone_repo
 
 
 class TestCloneRepoHardening:
-    def test_clone_repo_uses_askpass_without_putting_token_in_git_command(self, monkeypatch, tmp_path):
+    def test_clone_repo_uses_askpass_without_putting_token_in_git_command(
+        self, monkeypatch, tmp_path
+    ):
         recorded: dict[str, object] = {}
 
         def fake_run(cmd, **kwargs):
@@ -36,7 +38,9 @@ class TestCloneRepoHardening:
         assert env["GITHUB_AUDITOR_CLONE_TOKEN"] == "super-secret-token"
         assert Path(env["GIT_ASKPASS"]).exists() is False
 
-    def test_clone_repo_logs_failure_without_leaking_token(self, monkeypatch, tmp_path, caplog):
+    def test_clone_repo_logs_failure_without_leaking_token(
+        self, monkeypatch, tmp_path, caplog
+    ):
         def fake_run(cmd, **kwargs):
             raise subprocess.CalledProcessError(
                 returncode=128,

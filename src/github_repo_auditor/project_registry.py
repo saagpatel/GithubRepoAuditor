@@ -328,7 +328,9 @@ def _read_notion_projects(
         if not title:
             continue
         page_id = project.get("page_id") if ids_are_trustworthy else None
-        page_id = page_id.strip() if isinstance(page_id, str) and page_id.strip() else None
+        page_id = (
+            page_id.strip() if isinstance(page_id, str) and page_id.strip() else None
+        )
         rows.append((title, page_id))
     return rows
 
@@ -336,7 +338,9 @@ def _read_notion_projects(
 def _read_memory_slugs(memory_dir: Path | None) -> list[str]:
     if memory_dir is None or not memory_dir.exists():
         return []
-    return sorted(p.name[len("project_") : -len(".md")] for p in memory_dir.glob("project_*.md"))
+    return sorted(
+        p.name[len("project_") : -len(".md")] for p in memory_dir.glob("project_*.md")
+    )
 
 
 class _Entry:
@@ -360,7 +364,9 @@ class _Entry:
         "aliases",
     )
 
-    def __init__(self, identity: dict, lifecycle_state: str | None, source: str, note: str | None):
+    def __init__(
+        self, identity: dict, lifecycle_state: str | None, source: str, note: str | None
+    ):
         self.canonical_key = identity["project_key"]
         self.display_name = identity.get("display_name") or self.canonical_key
         self.repo_full_name = identity.get("repo_full_name") or None
@@ -461,7 +467,12 @@ def build_project_registry(
     generated_at = generated_at or datetime.now(timezone.utc)
 
     entries: list[_Entry] = [
-        _Entry(p["identity"], (p.get("declared") or {}).get("lifecycle_state"), "auditor", None)
+        _Entry(
+            p["identity"],
+            (p.get("declared") or {}).get("lifecycle_state"),
+            "auditor",
+            None,
+        )
         for p in snapshot.get("projects", [])
     ]
     existing_keys = {entry.canonical_key for entry in entries}
@@ -506,9 +517,7 @@ def build_project_registry(
     title_alias_norm = {
         normalize(raw): target for raw, target in notion_title_aliases.items()
     }
-    projection_only_norm = {
-        normalize(raw): raw for raw in notion_projection_only_rows
-    }
+    projection_only_norm = {normalize(raw): raw for raw in notion_projection_only_rows}
 
     # Normalized forms two or more distinct projects share. The index keeps the
     # first and shadows the rest, so an implicit lookup on one of these forms
@@ -518,7 +527,9 @@ def build_project_registry(
     # another project's row. Notion joins therefore refuse these forms outright.
     collision_norms = {collision["normalized_form"] for collision in collisions}
 
-    def resolve_entry_direct(raw: str, *, refuse_ambiguous: bool = False) -> _Entry | None:
+    def resolve_entry_direct(
+        raw: str, *, refuse_ambiguous: bool = False
+    ) -> _Entry | None:
         norm = normalize(raw)
         if not norm:
             return None
@@ -577,7 +588,9 @@ def build_project_registry(
                 {
                     "title": title,
                     "reason": notion_projection_only_rows.get(title)
-                    or notion_projection_only_rows.get(projection_only_norm[normalize(title)])
+                    or notion_projection_only_rows.get(
+                        projection_only_norm[normalize(title)]
+                    )
                     or "",
                 }
             )
@@ -676,7 +689,8 @@ def build_index(registry: dict) -> dict:
             if form:
                 norm2entry.setdefault(form, entry)
     override_norm = {
-        normalize(raw): key for raw, key in registry.get("resolution_overrides", {}).items()
+        normalize(raw): key
+        for raw, key in registry.get("resolution_overrides", {}).items()
     }
     by_key = {e["canonical_key"]: e for e in registry["entries"]}
     return {"norm2entry": norm2entry, "override_norm": override_norm, "by_key": by_key}
@@ -726,7 +740,9 @@ def fetch_scoring_pageids(data_source_id: str, token: str) -> dict[str, str]:
             payload = response.json()
             for page in payload.get("results", []):
                 title_prop = page.get("properties", {}).get("Project Name", {})
-                segments = title_prop.get("title", []) if isinstance(title_prop, dict) else []
+                segments = (
+                    title_prop.get("title", []) if isinstance(title_prop, dict) else []
+                )
                 name = "".join(seg.get("plain_text", "") for seg in segments).strip()
                 if name and page.get("id"):
                     result[name] = page["id"]

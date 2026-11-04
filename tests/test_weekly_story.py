@@ -18,10 +18,18 @@ def _report() -> dict:
         "repos_audited": 1,
         "average_score": 0.61,
         "portfolio_grade": "C",
-        "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
-        "intent_alignment_summary": {"summary": "1 aligned, 0 needing review, and 0 missing a contract."},
-        "scorecards_summary": {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."},
-        "implementation_hotspots_summary": {"summary": "1 repo has concrete implementation pressure. Start with RepoA in src/core.py."},
+        "portfolio_catalog_summary": {
+            "summary": "1/1 repos have an explicit catalog contract."
+        },
+        "intent_alignment_summary": {
+            "summary": "1 aligned, 0 needing review, and 0 missing a contract."
+        },
+        "scorecards_summary": {
+            "summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."
+        },
+        "implementation_hotspots_summary": {
+            "summary": "1 repo has concrete implementation pressure. Start with RepoA in src/core.py."
+        },
         "audits": [
             {
                 "metadata": {
@@ -72,8 +80,18 @@ def _report() -> dict:
                     }
                 ],
                 "lenses": {
-                    "ship_readiness": {"score": 0.61, "orientation": "higher-is-better", "summary": "Ready enough", "drivers": []},
-                    "momentum": {"score": 0.55, "orientation": "higher-is-better", "summary": "Holding", "drivers": []},
+                    "ship_readiness": {
+                        "score": 0.61,
+                        "orientation": "higher-is-better",
+                        "summary": "Ready enough",
+                        "drivers": [],
+                    },
+                    "momentum": {
+                        "score": 0.55,
+                        "orientation": "higher-is-better",
+                        "summary": "Holding",
+                        "drivers": [],
+                    },
                 },
             }
         ],
@@ -124,7 +142,11 @@ def _report() -> dict:
                 "summary": "Review Governance: all next and decide whether to capture approval."
             },
             "top_preview_ready_campaigns": [
-                {"label": "Security Review", "reason": "1 action is ready for preview.", "recommended_target": "all"}
+                {
+                    "label": "Security Review",
+                    "reason": "1 action is ready for preview.",
+                    "recommended_target": "all",
+                }
             ],
             "top_ready_to_apply_packets": [
                 {
@@ -134,7 +156,10 @@ def _report() -> dict:
                 }
             ],
             "top_monitor_now_campaigns": [
-                {"label": "Security Review", "summary": "Still inside the short monitoring window."}
+                {
+                    "label": "Security Review",
+                    "summary": "Still inside the short monitoring window.",
+                }
             ],
             "top_proven_campaigns": [
                 {"label": "Security Review", "summary": "Recent outcomes are proven."}
@@ -211,7 +236,9 @@ def _approval_override_report() -> dict:
     }
 
 
-def test_weekly_review_pack_exposes_structured_story_and_compact_explainability() -> None:
+def test_weekly_review_pack_exposes_structured_story_and_compact_explainability() -> (
+    None
+):
     weekly_pack = build_weekly_review_pack(_report())
 
     story = weekly_pack["weekly_story_v1"]
@@ -219,10 +246,15 @@ def test_weekly_review_pack_exposes_structured_story_and_compact_explainability(
     assert story["headline"] == weekly_pack["portfolio_headline"]
     assert story["decision"] == weekly_pack["what_to_do_this_week"]
     assert "approval-workflow" in story["section_order"]
-    approval_section = next(section for section in story["sections"] if section["id"] == "approval-workflow")
+    approval_section = next(
+        section for section in story["sections"] if section["id"] == "approval-workflow"
+    )
     assert approval_section["state"] == "ready-for-review"
     assert approval_section["next_label"] == "Next Approval Review"
-    assert approval_section["evidence_items"][0]["command_hint"] == "audit testuser --approve-governance --governance-scope all"
+    assert (
+        approval_section["evidence_items"][0]["command_hint"]
+        == "audit testuser --approve-governance --governance-scope all"
+    )
 
     attention_item = weekly_pack["top_attention"][0]
     assert attention_item["why_it_won"] == "Approval review is now the clean next step."
@@ -233,24 +265,41 @@ def test_weekly_review_pack_exposes_structured_story_and_compact_explainability(
     assert repo_briefing["evidence_strip"][0]["label"] == "Where To Start"
 
 
-def test_weekly_review_pack_can_override_weekly_decision_with_approval_priority() -> None:
+def test_weekly_review_pack_can_override_weekly_decision_with_approval_priority() -> (
+    None
+):
     weekly_pack = build_weekly_review_pack(_approval_override_report())
 
     story = weekly_pack["weekly_story_v1"]
-    weekly_priority = next(section for section in story["sections"] if section["id"] == "weekly-priority")
+    weekly_priority = next(
+        section for section in story["sections"] if section["id"] == "weekly-priority"
+    )
 
-    assert story["decision"] == "Review Governance: all next and decide whether to capture approval."
-    assert story["why_this_week"] == "Governance: all is the strongest approval review candidate right now."
-    assert story["next_step"].startswith("Open the standard workbook first, then review Governance")
+    assert (
+        story["decision"]
+        == "Review Governance: all next and decide whether to capture approval."
+    )
+    assert (
+        story["why_this_week"]
+        == "Governance: all is the strongest approval review candidate right now."
+    )
+    assert story["next_step"].startswith(
+        "Open the standard workbook first, then review Governance"
+    )
     assert weekly_priority["reason_codes"] == [
         "approval-aware-scheduling",
         "approval-workflow",
         "ready-for-review",
     ]
-    assert weekly_priority["evidence_items"][0]["label"] == "Ready For Review: Governance: all"
+    assert (
+        weekly_priority["evidence_items"][0]["label"]
+        == "Ready For Review: Governance: all"
+    )
 
 
-def test_weekly_story_sections_render_across_review_pack_html_and_handoff(tmp_path: Path) -> None:
+def test_weekly_story_sections_render_across_review_pack_html_and_handoff(
+    tmp_path: Path,
+) -> None:
     report = _report()
     weekly_pack = build_weekly_review_pack(report)
 
@@ -271,8 +320,12 @@ def test_weekly_story_sections_render_across_review_pack_html_and_handoff(tmp_pa
         }
     )
 
-    expected_summary = "Governance: all is the strongest approval review candidate right now."
-    expected_next = "Review Governance: all next and decide whether to capture approval."
+    expected_summary = (
+        "Governance: all is the strongest approval review candidate right now."
+    )
+    expected_next = (
+        "Review Governance: all next and decide whether to capture approval."
+    )
 
     assert expected_summary in review_pack
     assert expected_next in review_pack
@@ -283,15 +336,26 @@ def test_weekly_story_sections_render_across_review_pack_html_and_handoff(tmp_pa
     assert "Weekly decision:" in handoff
 
 
-def test_weekly_story_visible_contract_reaches_workbook_html_markdown_and_handoff(tmp_path: Path) -> None:
+def test_weekly_story_visible_contract_reaches_workbook_html_markdown_and_handoff(
+    tmp_path: Path,
+) -> None:
     report = _report()
     weekly_pack = build_weekly_review_pack(report)
     approval_section = next(
-        section for section in weekly_pack["weekly_story_v1"]["sections"] if section["id"] == "approval-workflow"
+        section
+        for section in weekly_pack["weekly_story_v1"]["sections"]
+        if section["id"] == "approval-workflow"
     )
 
     wb = Workbook()
-    _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+    _build_print_pack(
+        wb,
+        report,
+        None,
+        portfolio_profile="default",
+        collection="showcase",
+        excel_mode="standard",
+    )
     print_ws = wb["Print Pack"]
 
     review_pack = export_review_pack(report, tmp_path)["review_pack_path"].read_text()
@@ -322,12 +386,21 @@ def test_weekly_story_visible_contract_reaches_workbook_html_markdown_and_handof
     assert approval_section["headline"] in handoff
 
 
-def test_approval_override_reaches_workbook_html_markdown_and_handoff(tmp_path: Path) -> None:
+def test_approval_override_reaches_workbook_html_markdown_and_handoff(
+    tmp_path: Path,
+) -> None:
     report = _approval_override_report()
     weekly_pack = build_weekly_review_pack(report)
 
     wb = Workbook()
-    _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+    _build_print_pack(
+        wb,
+        report,
+        None,
+        portfolio_profile="default",
+        collection="showcase",
+        excel_mode="standard",
+    )
     print_ws = wb["Print Pack"]
 
     review_pack = export_review_pack(report, tmp_path)["review_pack_path"].read_text()
@@ -347,8 +420,12 @@ def test_approval_override_reaches_workbook_html_markdown_and_handoff(tmp_path: 
         }
     )
 
-    expected_decision = "Review Governance: all next and decide whether to capture approval."
-    expected_reason = "Governance: all is the strongest approval review candidate right now."
+    expected_decision = (
+        "Review Governance: all next and decide whether to capture approval."
+    )
+    expected_reason = (
+        "Governance: all is the strongest approval review candidate right now."
+    )
 
     assert print_ws["B8"].value == expected_reason
     assert print_ws["B10"].value == expected_decision
@@ -387,7 +464,9 @@ def test_scheduled_handoff_falls_back_cleanly_when_weekly_story_is_missing() -> 
     assert weekly_pack["next_approval_review"] in handoff
 
 
-def test_scheduled_handoff_prefers_shared_weekly_story_fields_before_fallbacks() -> None:
+def test_scheduled_handoff_prefers_shared_weekly_story_fields_before_fallbacks() -> (
+    None
+):
     report = _report()
     weekly_pack = build_weekly_review_pack(report)
     weekly_story = dict(weekly_pack["weekly_story_v1"])
@@ -430,7 +509,9 @@ def test_scheduled_handoff_prefers_shared_weekly_story_fields_before_fallbacks()
                 "headline": "Operator summary headline should lose.",
                 "what_to_do_next": "Operator summary next step should lose.",
                 "why_it_matters": "Operator summary reason should lose.",
-                "action_sync_summary": {"summary": "Operator summary Action Sync should lose."},
+                "action_sync_summary": {
+                    "summary": "Operator summary Action Sync should lose."
+                },
                 "next_action_sync_step": "Operator summary Action Sync next step should lose.",
             },
             "operator_queue": report["operator_queue"],

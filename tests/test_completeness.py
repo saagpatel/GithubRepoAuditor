@@ -14,10 +14,7 @@ def test_documentation_analyzer_scores_complete_documentation(tmp_path: Path) ->
     (tmp_path / "CHANGELOG.md").write_text("## 1.0\n", encoding="utf-8")
     (tmp_path / "CONTRIBUTING.md").write_text("# Contributing\n", encoding="utf-8")
     (tmp_path / "module.py").write_text(
-        "# module notes\n"
-        "# implementation note\n"
-        "def answer():\n"
-        "    return 42\n",
+        "# module notes\n# implementation note\ndef answer():\n    return 42\n",
         encoding="utf-8",
     )
 
@@ -34,7 +31,9 @@ def test_documentation_analyzer_scores_complete_documentation(tmp_path: Path) ->
     assert result.details == {"comment_ratio": 0.5}
 
 
-def test_build_readiness_analyzer_scores_available_build_artifacts(tmp_path: Path) -> None:
+def test_build_readiness_analyzer_scores_available_build_artifacts(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
     (tmp_path / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
     (tmp_path / "justfile").write_text("test:\n  pytest\n", encoding="utf-8")
@@ -58,7 +57,9 @@ def test_build_readiness_analyzer_scores_available_build_artifacts(tmp_path: Pat
     }
 
 
-def test_analyzers_report_missing_documentation_and_build_artifacts(tmp_path: Path) -> None:
+def test_analyzers_report_missing_documentation_and_build_artifacts(
+    tmp_path: Path,
+) -> None:
     documentation = DocumentationAnalyzer().analyze(tmp_path, metadata=None)
     build_readiness = BuildReadinessAnalyzer().analyze(tmp_path, metadata=None)
 

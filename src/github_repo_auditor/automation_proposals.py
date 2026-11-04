@@ -31,7 +31,9 @@ STATUS_PENDING = "pending"
 STATUS_APPROVED = "approved"
 STATUS_REJECTED = "rejected"
 STATUS_EXECUTED = "executed"
-VALID_STATUSES = frozenset({STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_EXECUTED})
+VALID_STATUSES = frozenset(
+    {STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_EXECUTED}
+)
 
 _ACTION_DESCRIPTIONS = {
     ACTION_CONTEXT_PR: "Open an auto-PR improving the managed context block for {repo}.",
@@ -68,10 +70,14 @@ class AutomationProposal:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AutomationProposal:
         if not isinstance(data, dict):
-            raise ValueError(f"Proposal entry must be an object, got {type(data).__name__}.")
+            raise ValueError(
+                f"Proposal entry must be an object, got {type(data).__name__}."
+            )
         for required in ("proposal_id", "action_type"):
             if required not in data:
-                raise ValueError(f"Proposal entry is missing required field {required!r}.")
+                raise ValueError(
+                    f"Proposal entry is missing required field {required!r}."
+                )
         status = str(data.get("status", STATUS_PENDING))
         if status not in VALID_STATUSES:
             raise ValueError(
@@ -119,7 +125,9 @@ def proposal_for_candidate(
         action_type=action_type,
         display_name=candidate.display_name,
         repo_full_name=candidate.repo_full_name,
-        description=_ACTION_DESCRIPTIONS[action_type].format(repo=candidate.display_name),
+        description=_ACTION_DESCRIPTIONS[action_type].format(
+            repo=candidate.display_name
+        ),
         status=STATUS_PENDING,
         created_at=created_at,
     )

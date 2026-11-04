@@ -771,9 +771,7 @@ class TestStreamRoute:
         assert resp.status_code == 422
         assert "not available as a local run option" in resp.json()["detail"]
 
-    def test_run_control_is_scoped_to_server_output_root(
-        self, tmp_path: Path
-    ) -> None:
+    def test_run_control_is_scoped_to_server_output_root(self, tmp_path: Path) -> None:
         from github_repo_auditor.serve import runner as runner_mod
         from github_repo_auditor.serve.runner import spawn_run
 

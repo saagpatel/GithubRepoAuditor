@@ -1,5 +1,6 @@
 # tests/test_context_quality.py
 """Tests for the composite context_quality_score (Arc H H.4)."""
+
 import pytest
 
 from github_repo_auditor.context_quality import compute_context_quality_score
@@ -67,7 +68,9 @@ def test_score_clamped_to_zero_one():
     assert 0.0 <= score <= 1.0
 
 
-def test_repo_audit_context_quality_uses_portfolio_catalog(sample_metadata: RepoMetadata):
+def test_repo_audit_context_quality_uses_portfolio_catalog(
+    sample_metadata: RepoMetadata,
+):
     audit = RepoAudit(
         metadata=sample_metadata,
         analyzer_results=[

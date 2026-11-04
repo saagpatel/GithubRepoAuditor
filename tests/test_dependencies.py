@@ -5,7 +5,10 @@ from __future__ import annotations
 import sys
 import types
 
-from github_repo_auditor.analyzers.dependencies import DependenciesAnalyzer, _count_dependencies
+from github_repo_auditor.analyzers.dependencies import (
+    DependenciesAnalyzer,
+    _count_dependencies,
+)
 
 
 class TestDependenciesCacheInputsHash:
@@ -34,9 +37,14 @@ class TestDependenciesCacheInputsHash:
         assert isinstance(digest, str)
         assert len(digest) == 64
 
-    def test_hash_returns_none_without_dependency_files(self, empty_repo, sample_metadata):
+    def test_hash_returns_none_without_dependency_files(
+        self, empty_repo, sample_metadata
+    ):
         """Repos without dependency files do not receive a cache fingerprint."""
-        assert DependenciesAnalyzer().cache_inputs_hash(empty_repo, sample_metadata) is None
+        assert (
+            DependenciesAnalyzer().cache_inputs_hash(empty_repo, sample_metadata)
+            is None
+        )
 
     def test_hash_returns_none_without_repo_path(self, sample_metadata):
         """Missing local repo paths run uncached because there are no inputs to hash."""
@@ -114,7 +122,9 @@ class TestCountDependencies:
         repo = tmp_path / "repo"
         repo.mkdir()
         (repo / "Cargo.toml").symlink_to(repo / "missing-cargo.toml")
-        (repo / "go.mod").write_text("module example.test/demo\n\nrequire (\ngolang.org/x/text v0.14.0\n)\n")
+        (repo / "go.mod").write_text(
+            "module example.test/demo\n\nrequire (\ngolang.org/x/text v0.14.0\n)\n"
+        )
 
         assert _count_dependencies(repo, ["Cargo.toml", "go.mod"]) == 1
 
@@ -141,7 +151,9 @@ class TestCountDependencies:
         repo = tmp_path / "repo"
         repo.mkdir()
         (repo / "go.mod").symlink_to(repo / "missing-go.mod")
-        (repo / "pyproject.toml").write_text('[project]\ndependencies = [\n"requests",\n]\n')
+        (repo / "pyproject.toml").write_text(
+            '[project]\ndependencies = [\n"requests",\n]\n'
+        )
 
         assert _count_dependencies(repo, ["go.mod", "pyproject.toml"]) == 1
 
@@ -149,7 +161,9 @@ class TestCountDependencies:
         """pyproject.toml counts quoted dependency entries in a dependencies list."""
         repo = tmp_path / "repo"
         repo.mkdir()
-        (repo / "pyproject.toml").write_text('[project]\ndependencies = [\n"requests",\n"click",\n]\n')
+        (repo / "pyproject.toml").write_text(
+            '[project]\ndependencies = [\n"requests",\n"click",\n]\n'
+        )
 
         assert _count_dependencies(repo, ["pyproject.toml"]) == 2
 
@@ -171,7 +185,9 @@ class TestCountDependencies:
 
 
 class TestDependenciesAnalyzerFindings:
-    def test_excessive_dependencies_finding_for_large_package_json(self, tmp_path, sample_metadata):
+    def test_excessive_dependencies_finding_for_large_package_json(
+        self, tmp_path, sample_metadata
+    ):
         """More than 500 dependencies emits the excessive dependency finding."""
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -183,7 +199,9 @@ class TestDependenciesAnalyzerFindings:
         assert result.details["dep_count"] == 501
         assert "Excessive dependencies: 501" in result.findings
 
-    def test_zero_dependencies_finding_for_empty_cargo_manifest(self, tmp_path, sample_metadata):
+    def test_zero_dependencies_finding_for_empty_cargo_manifest(
+        self, tmp_path, sample_metadata
+    ):
         """A parseable manifest with zero dependencies emits the zero-dependencies finding."""
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -194,7 +212,9 @@ class TestDependenciesAnalyzerFindings:
         assert result.details["dep_count"] == 0
         assert "Zero dependencies declared" in result.findings
 
-    def test_unknown_dependency_count_finding_without_parseable_manifest(self, empty_repo, sample_metadata):
+    def test_unknown_dependency_count_finding_without_parseable_manifest(
+        self, empty_repo, sample_metadata
+    ):
         """No supported manifest count emits the could-not-determine finding."""
         result = DependenciesAnalyzer().analyze(empty_repo, sample_metadata)
 
@@ -217,7 +237,9 @@ class TestDependenciesAnalyzerFindings:
             "total_libyears": 4.5,
         }
         monkeypatch.setitem(sys.modules, "github_repo_auditor.cache", fake_cache_module)
-        monkeypatch.setitem(sys.modules, "github_repo_auditor.libyears", fake_libyears_module)
+        monkeypatch.setitem(
+            sys.modules, "github_repo_auditor.libyears", fake_libyears_module
+        )
 
         result = DependenciesAnalyzer().analyze(repo, sample_metadata)
 
@@ -225,7 +247,9 @@ class TestDependenciesAnalyzerFindings:
         assert result.details["total_libyears"] == 4.5
         assert "Libyears: 4.5" in result.findings
 
-    def test_libyears_failure_is_non_fatal(self, tmp_path, sample_metadata, monkeypatch):
+    def test_libyears_failure_is_non_fatal(
+        self, tmp_path, sample_metadata, monkeypatch
+    ):
         """Libyears exceptions are swallowed so dependency analysis still returns."""
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -240,7 +264,9 @@ class TestDependenciesAnalyzerFindings:
 
         fake_libyears_module.compute_libyears = fail_compute_libyears
         monkeypatch.setitem(sys.modules, "github_repo_auditor.cache", fake_cache_module)
-        monkeypatch.setitem(sys.modules, "github_repo_auditor.libyears", fake_libyears_module)
+        monkeypatch.setitem(
+            sys.modules, "github_repo_auditor.libyears", fake_libyears_module
+        )
 
         result = DependenciesAnalyzer().analyze(repo, sample_metadata)
 

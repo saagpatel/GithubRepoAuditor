@@ -11,7 +11,9 @@ def test_docs_reflect_bounded_automation_guidance_language() -> None:
     troubleshooting = Path("docs/operator-troubleshooting.md").read_text()
     history = Path("docs/project-history.md").read_text()
 
-    combined = "\n".join([architecture, modes, weekly, safety, troubleshooting, history])
+    combined = "\n".join(
+        [architecture, modes, weekly, safety, troubleshooting, history]
+    )
 
     assert "Automation Guidance" in combined
     assert "preview-safe" in combined

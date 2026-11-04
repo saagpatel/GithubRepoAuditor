@@ -61,7 +61,11 @@ def _report_data(**overrides) -> dict:
         ],
         "audits": [
             {
-                "metadata": {"name": "RepoSecure", "full_name": "user/RepoSecure", "topics": []},
+                "metadata": {
+                    "name": "RepoSecure",
+                    "full_name": "user/RepoSecure",
+                    "topics": [],
+                },
                 "overall_score": 0.42,
                 "completeness_tier": "wip",
                 "lenses": {"security_posture": {"score": 0.3}},
@@ -70,7 +74,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoPromo", "full_name": "user/RepoPromo", "topics": []},
+                "metadata": {
+                    "name": "RepoPromo",
+                    "full_name": "user/RepoPromo",
+                    "topics": [],
+                },
                 "overall_score": 0.58,
                 "completeness_tier": "functional",
                 "lenses": {"ship_readiness": {"score": 0.6}},
@@ -79,7 +87,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoMaint", "full_name": "user/RepoMaint", "topics": []},
+                "metadata": {
+                    "name": "RepoMaint",
+                    "full_name": "user/RepoMaint",
+                    "topics": [],
+                },
                 "overall_score": 0.51,
                 "completeness_tier": "functional",
                 "lenses": {"maintenance_risk": {"score": 0.4}},
@@ -88,7 +100,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoShow", "full_name": "user/RepoShow", "topics": []},
+                "metadata": {
+                    "name": "RepoShow",
+                    "full_name": "user/RepoShow",
+                    "topics": [],
+                },
                 "overall_score": 0.81,
                 "completeness_tier": "shipped",
                 "lenses": {"showcase_value": {"score": 0.85}},
@@ -97,7 +113,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoArchive", "full_name": "user/RepoArchive", "topics": []},
+                "metadata": {
+                    "name": "RepoArchive",
+                    "full_name": "user/RepoArchive",
+                    "topics": [],
+                },
                 "overall_score": 0.12,
                 "completeness_tier": "skeleton",
                 "lenses": {"maintenance_risk": {"score": 0.15}},
@@ -113,14 +133,18 @@ def _report_data(**overrides) -> dict:
 
 def _packet(bundle: dict, campaign_type: str) -> dict:
     return next(
-        item for item in bundle["action_sync_packets"] if item["campaign_type"] == campaign_type
+        item
+        for item in bundle["action_sync_packets"]
+        if item["campaign_type"] == campaign_type
     )
 
 
 def _bundle(report_data: dict, queue: list[dict] | None = None) -> dict:
     queue = queue or []
     readiness = build_action_sync_readiness_bundle(report_data, queue=queue)
-    return build_action_sync_packets_bundle(report_data, readiness, readiness["operator_queue"])
+    return build_action_sync_packets_bundle(
+        report_data, readiness, readiness["operator_queue"]
+    )
 
 
 def test_packet_is_stay_local_when_campaign_has_no_actions():
@@ -145,7 +169,10 @@ def test_packet_is_preview_next_when_campaign_is_preview_ready():
     packet = _packet(bundle, "security-review")
 
     assert packet["execution_state"] == "preview-next"
-    assert packet["preview_command"] == "audit testuser --campaign security-review --writeback-target all"
+    assert (
+        packet["preview_command"]
+        == "audit testuser --campaign security-review --writeback-target all"
+    )
     assert packet["apply_command"] == ""
 
 
@@ -305,7 +332,10 @@ def test_packet_is_ready_to_apply_when_readiness_and_rollback_are_healthy():
 
     assert packet["execution_state"] == "ready-to-apply"
     assert packet["rollback_status"] == "ready"
-    assert packet["apply_command"] == "audit testuser --campaign security-review --writeback-target all --writeback-apply"
+    assert (
+        packet["apply_command"]
+        == "audit testuser --campaign security-review --writeback-target all --writeback-apply"
+    )
 
 
 def test_packet_command_generation_respects_target_and_github_projects_health():
@@ -325,7 +355,10 @@ def test_packet_command_generation_respects_target_and_github_projects_health():
         ),
         "security-review",
     )
-    assert github_packet["preview_command"] == "audit testuser --campaign security-review --writeback-target github"
+    assert (
+        github_packet["preview_command"]
+        == "audit testuser --campaign security-review --writeback-target github"
+    )
 
     notion_packet = _packet(
         _bundle(
@@ -343,10 +376,16 @@ def test_packet_command_generation_respects_target_and_github_projects_health():
         ),
         "security-review",
     )
-    assert notion_packet["preview_command"] == "audit testuser --campaign security-review --writeback-target notion"
+    assert (
+        notion_packet["preview_command"]
+        == "audit testuser --campaign security-review --writeback-target notion"
+    )
 
     all_packet = _packet(_bundle(_report_data()), "security-review")
-    assert all_packet["preview_command"] == "audit testuser --campaign security-review --writeback-target all"
+    assert (
+        all_packet["preview_command"]
+        == "audit testuser --campaign security-review --writeback-target all"
+    )
 
     projects_packet = _packet(
         _bundle(
@@ -392,7 +431,10 @@ def test_packet_queue_items_gain_apply_handoff_fields():
 
     assert item["apply_packet_state"] == "preview-next"
     assert item["apply_packet_summary"]
-    assert item["apply_packet_command"] == "audit testuser --campaign security-review --writeback-target all"
+    assert (
+        item["apply_packet_command"]
+        == "audit testuser --campaign security-review --writeback-target all"
+    )
 
 
 def test_next_apply_candidate_uses_execution_priority_order():

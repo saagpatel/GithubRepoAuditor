@@ -57,7 +57,11 @@ def _report_data(**overrides) -> dict:
         ],
         "audits": [
             {
-                "metadata": {"name": "RepoSecure", "full_name": "user/RepoSecure", "topics": []},
+                "metadata": {
+                    "name": "RepoSecure",
+                    "full_name": "user/RepoSecure",
+                    "topics": [],
+                },
                 "overall_score": 0.42,
                 "completeness_tier": "wip",
                 "lenses": {"security_posture": {"score": 0.3}},
@@ -66,7 +70,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoPromo", "full_name": "user/RepoPromo", "topics": []},
+                "metadata": {
+                    "name": "RepoPromo",
+                    "full_name": "user/RepoPromo",
+                    "topics": [],
+                },
                 "overall_score": 0.58,
                 "completeness_tier": "functional",
                 "lenses": {"ship_readiness": {"score": 0.6}},
@@ -75,7 +83,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoMaint", "full_name": "user/RepoMaint", "topics": []},
+                "metadata": {
+                    "name": "RepoMaint",
+                    "full_name": "user/RepoMaint",
+                    "topics": [],
+                },
                 "overall_score": 0.51,
                 "completeness_tier": "functional",
                 "lenses": {"maintenance_risk": {"score": 0.4}},
@@ -84,7 +96,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoShow", "full_name": "user/RepoShow", "topics": []},
+                "metadata": {
+                    "name": "RepoShow",
+                    "full_name": "user/RepoShow",
+                    "topics": [],
+                },
                 "overall_score": 0.81,
                 "completeness_tier": "shipped",
                 "lenses": {"showcase_value": {"score": 0.85}},
@@ -93,7 +109,11 @@ def _report_data(**overrides) -> dict:
                 "portfolio_catalog": {},
             },
             {
-                "metadata": {"name": "RepoArchive", "full_name": "user/RepoArchive", "topics": []},
+                "metadata": {
+                    "name": "RepoArchive",
+                    "full_name": "user/RepoArchive",
+                    "topics": [],
+                },
                 "overall_score": 0.12,
                 "completeness_tier": "skeleton",
                 "lenses": {"maintenance_risk": {"score": 0.15}},
@@ -117,7 +137,10 @@ def _campaign(bundle: dict, campaign_type: str) -> dict:
 
 def test_preview_ready_and_apply_ready_are_distinguished():
     preview_bundle = build_action_sync_readiness_bundle(_report_data(), queue=[])
-    assert _campaign(preview_bundle, "security-review")["readiness_stage"] == "preview-ready"
+    assert (
+        _campaign(preview_bundle, "security-review")["readiness_stage"]
+        == "preview-ready"
+    )
 
     apply_bundle = build_action_sync_readiness_bundle(
         _report_data(
@@ -130,7 +153,9 @@ def test_preview_ready_and_apply_ready_are_distinguished():
         ),
         queue=[],
     )
-    assert _campaign(apply_bundle, "security-review")["readiness_stage"] == "apply-ready"
+    assert (
+        _campaign(apply_bundle, "security-review")["readiness_stage"] == "apply-ready"
+    )
 
 
 def test_active_campaign_with_missing_rollback_stays_blocked():
@@ -210,57 +235,78 @@ def test_blocked_when_governance_or_targets_are_not_ready():
 
 
 def test_recommended_target_uses_all_then_github_then_notion_then_none():
-    assert _campaign(build_action_sync_readiness_bundle(_report_data(), queue=[]), "security-review")[
-        "recommended_target"
-    ] == "all"
-    assert _campaign(
-        build_action_sync_readiness_bundle(
-            _report_data(
-                preflight_summary={
-                    "checks": [
-                        {
-                            "status": "error",
-                            "category": "notion-auth",
-                            "summary": "Notion token missing.",
-                        }
-                    ]
-                }
+    assert (
+        _campaign(
+            build_action_sync_readiness_bundle(_report_data(), queue=[]),
+            "security-review",
+        )["recommended_target"]
+        == "all"
+    )
+    assert (
+        _campaign(
+            build_action_sync_readiness_bundle(
+                _report_data(
+                    preflight_summary={
+                        "checks": [
+                            {
+                                "status": "error",
+                                "category": "notion-auth",
+                                "summary": "Notion token missing.",
+                            }
+                        ]
+                    }
+                ),
+                queue=[],
             ),
-            queue=[],
-        ),
-        "security-review",
-    )["recommended_target"] == "github"
-    assert _campaign(
-        build_action_sync_readiness_bundle(
-            _report_data(
-                preflight_summary={
-                    "checks": [
-                        {
-                            "status": "error",
-                            "category": "github-auth",
-                            "summary": "GitHub token missing.",
-                        }
-                    ]
-                }
+            "security-review",
+        )["recommended_target"]
+        == "github"
+    )
+    assert (
+        _campaign(
+            build_action_sync_readiness_bundle(
+                _report_data(
+                    preflight_summary={
+                        "checks": [
+                            {
+                                "status": "error",
+                                "category": "github-auth",
+                                "summary": "GitHub token missing.",
+                            }
+                        ]
+                    }
+                ),
+                queue=[],
             ),
-            queue=[],
-        ),
-        "security-review",
-    )["recommended_target"] == "notion"
-    assert _campaign(
-        build_action_sync_readiness_bundle(
-            _report_data(
-                preflight_summary={
-                    "checks": [
-                        {"status": "error", "category": "github-auth", "summary": "GitHub token missing."},
-                        {"status": "error", "category": "notion-auth", "summary": "Notion token missing."},
-                    ]
-                }
+            "security-review",
+        )["recommended_target"]
+        == "notion"
+    )
+    assert (
+        _campaign(
+            build_action_sync_readiness_bundle(
+                _report_data(
+                    preflight_summary={
+                        "checks": [
+                            {
+                                "status": "error",
+                                "category": "github-auth",
+                                "summary": "GitHub token missing.",
+                            },
+                            {
+                                "status": "error",
+                                "category": "notion-auth",
+                                "summary": "Notion token missing.",
+                            },
+                        ]
+                    }
+                ),
+                queue=[],
             ),
-            queue=[],
-        ),
-        "security-review",
-    )["recommended_target"] == "none"
+            "security-review",
+        )["recommended_target"]
+        == "none"
+    )
 
 
 def test_queue_items_gain_action_sync_handoff_fields():

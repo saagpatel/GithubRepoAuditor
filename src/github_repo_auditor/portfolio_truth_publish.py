@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Iterator
+from uuid import uuid4
 
 from github_repo_auditor.github_security_coverage import (
     DEFAULT_ATTENTION_STATES,
@@ -23,6 +24,7 @@ from github_repo_auditor.portfolio_cohort_plan_contract import (
     COHORT_TRANSITION_PROTOCOL,
 )
 from github_repo_auditor.portfolio_truth_reconcile import (
+    CohortR3Error,
     CohortTransitionOutcome,
     build_portfolio_truth_snapshot,
     load_prior_notion_context,
@@ -129,9 +131,12 @@ def _load_prior_security_alerts(
         current_security_metadata.get("produced_at"),
         field="Current security receipt produced_at",
     )
-    if evidence.generated_at > current_produced_at and not _is_same_bound_security_receipt(
-        evidence.prior_security_metadata or {},
-        current_security_metadata,
+    if (
+        evidence.generated_at > current_produced_at
+        and not _is_same_bound_security_receipt(
+            evidence.prior_security_metadata or {},
+            current_security_metadata,
+        )
     ):
         raise PortfolioTruthPublishError(
             "Prior PortfolioTruth was generated after the current security receipt."
@@ -499,10 +504,7 @@ def _publish_portfolio_truth_locked(
         and security_alerts_by_name is not None
         else None
     )
-    if (
-        prior_security_evidence is not None
-        and security_cohort_transition is not None
-    ):
+    if prior_security_evidence is not None and security_cohort_transition is not None:
         declared_prior_truth_sha256 = security_cohort_transition.get(
             "prior_truth_sha256"
         )
@@ -513,35 +515,55 @@ def _publish_portfolio_truth_locked(
                 f"receipt={declared_prior_truth_sha256!r}; "
                 f"observed={prior_security_evidence.content_sha256!r}."
             )
-    build_result = build_portfolio_truth_snapshot(
-        workspace_root=workspace_root,
-        catalog_path=catalog_path,
-        legacy_registry_path=legacy_registry_path,
-        include_notion=include_notion,
-        notion_context_fallback=notion_context_fallback,
-        release_count_by_name=release_count_by_name,
-        degraded_dimensions_by_name=degraded_dimensions_by_name,
-        security_alerts_by_name=security_alerts_by_name,
-        security_coverage_metadata=security_coverage_metadata,
-        prior_security_alerts_by_name=(
-            prior_security_evidence.alerts_by_full_name
-            if prior_security_evidence is not None
-            else None
-        ),
-        prior_security_cohort_repositories=(
-            prior_security_evidence.final_cohort_repositories
-            if prior_security_evidence is not None
-            else None
-        ),
-        security_cohort_required=security_cohort_required,
-        security_cohort_outgoing=security_cohort_outgoing,
-        security_cohort_transition=security_cohort_transition,
-        require_cohort_transition=require_cohort_transition,
-        repo_status_by_name=repo_status_by_name,
-        producer=producer_evidence.to_dict() if producer_evidence else {},
-        prior_notion_generated_at=prior_notion_generated_at,
-        now=now,
-    )
+    try:
+        build_result = build_portfolio_truth_snapshot(
+            workspace_root=workspace_root,
+            catalog_path=catalog_path,
+            legacy_registry_path=legacy_registry_path,
+            include_notion=include_notion,
+            notion_context_fallback=notion_context_fallback,
+            release_count_by_name=release_count_by_name,
+            degraded_dimensions_by_name=degraded_dimensions_by_name,
+            security_alerts_by_name=security_alerts_by_name,
+            security_coverage_metadata=security_coverage_metadata,
+            prior_security_alerts_by_name=(
+                prior_security_evidence.alerts_by_full_name
+                if prior_security_evidence is not None
+                else None
+            ),
+            prior_security_cohort_repositories=(
+                prior_security_evidence.final_cohort_repositories
+                if prior_security_evidence is not None
+                else None
+            ),
+            security_cohort_required=security_cohort_required,
+            security_cohort_outgoing=security_cohort_outgoing,
+            security_cohort_transition=security_cohort_transition,
+            require_cohort_transition=require_cohort_transition,
+            repo_status_by_name=repo_status_by_name,
+            producer=producer_evidence.to_dict() if producer_evidence else {},
+            prior_notion_generated_at=prior_notion_generated_at,
+            now=now,
+        )
+    except CohortR3Error as exc:
+        stamp = now.strftime("%Y-%m-%dT%H%M%SZ") if now else "unknown-clock"
+        diagnostics_path = (
+            output_dir / f"portfolio-cohort-r3-failure-{stamp}-{uuid4().hex}.json"
+        )
+        payload = {**exc.diagnostics, "error": str(exc)}
+        try:
+            staged = _stage_text(
+                diagnostics_path, json.dumps(payload, indent=2, sort_keys=True) + "\n"
+            )
+            staged.replace(diagnostics_path)
+            _fsync_directory(output_dir)
+        except OSError as write_error:
+            raise PortfolioTruthPublishError(
+                f"{exc} R3 diagnostics could not be written to {diagnostics_path}: {write_error}"
+            ) from exc
+        raise CohortR3Error(
+            f"{exc} R3 diagnostics: {diagnostics_path}", exc.diagnostics
+        ) from exc
     validate_truth_snapshot(
         build_result.snapshot,
         security_max_age_hours=security_max_age_hours,

@@ -41,7 +41,9 @@ def _write_snapshot(directory: Path, stamp: str, projects: list[dict]) -> dict:
     return snapshot
 
 
-def test_transition_ledger_reports_no_movement_and_activity_streaks(tmp_path: Path) -> None:
+def test_transition_ledger_reports_no_movement_and_activity_streaks(
+    tmp_path: Path,
+) -> None:
     _write_snapshot(tmp_path, "2026-07-10", [_project("Steady")])
     _write_snapshot(tmp_path, "2026-07-11", [_project("Steady")])
 
@@ -64,16 +66,26 @@ def test_transition_ledger_reports_no_movement_and_activity_streaks(tmp_path: Pa
     assert render_movement_summary(ledger).startswith("No verdict movement")
 
 
-def test_transition_ledger_reports_attention_activity_and_risk_changes(tmp_path: Path) -> None:
+def test_transition_ledger_reports_attention_activity_and_risk_changes(
+    tmp_path: Path,
+) -> None:
     _write_snapshot(
         tmp_path,
         "2026-07-10",
-        [_project("Moving", attention="decision-needed", activity="stale", risk="elevated")],
+        [
+            _project(
+                "Moving", attention="decision-needed", activity="stale", risk="elevated"
+            )
+        ],
     )
     current = _write_snapshot(
         tmp_path,
         "2026-07-11",
-        [_project("Moving", attention="active-infra", activity="active", risk="baseline")],
+        [
+            _project(
+                "Moving", attention="active-infra", activity="active", risk="baseline"
+            )
+        ],
     )
 
     ledger = build_verdict_transition_ledger(
@@ -82,7 +94,9 @@ def test_transition_ledger_reports_attention_activity_and_risk_changes(tmp_path:
         current_path=tmp_path / "portfolio-truth-latest.json",
     )
 
-    assert [(item["kind"], item["from"], item["to"]) for item in ledger["transitions"]] == [
+    assert [
+        (item["kind"], item["from"], item["to"]) for item in ledger["transitions"]
+    ] == [
         ("activity_status", "stale", "active"),
         ("attention_state", "decision-needed", "active-infra"),
         ("risk_tier", "elevated", "baseline"),
@@ -93,7 +107,9 @@ def test_transition_ledger_reports_attention_activity_and_risk_changes(tmp_path:
     assert "recovered decision-needed→active-infra" in render_movement_summary(ledger)
 
 
-def test_transition_ledger_reports_repos_appearing_and_disappearing(tmp_path: Path) -> None:
+def test_transition_ledger_reports_repos_appearing_and_disappearing(
+    tmp_path: Path,
+) -> None:
     _write_snapshot(tmp_path, "2026-07-10", [_project("Stays"), _project("Leaves")])
     _write_snapshot(tmp_path, "2026-07-11", [_project("Stays")])
     _write_snapshot(tmp_path, "2026-07-12", [_project("Stays"), _project("Arrives")])
@@ -132,7 +148,10 @@ def test_weekly_digest_surfaces_movement_section(tmp_path: Path) -> None:
         "operator_summary": {"decision_quality_v1": {}},
         "audits": [],
     }
-    snapshot = {"operator_summary": report_data["operator_summary"], "operator_queue": []}
+    snapshot = {
+        "operator_summary": report_data["operator_summary"],
+        "operator_queue": [],
+    }
 
     digest = build_weekly_command_center_digest(
         report_data,
@@ -144,7 +163,9 @@ def test_weekly_digest_surfaces_movement_section(tmp_path: Path) -> None:
     rendered = render_weekly_command_center_markdown(digest)
 
     assert digest["movement"]["attention_state_transitions"][0]["repo"] == "Moving"
-    assert "recovered decision-needed→active-infra" in digest["movement"]["summary_text"]
+    assert (
+        "recovered decision-needed→active-infra" in digest["movement"]["summary_text"]
+    )
     assert "## Movement" in rendered
     assert "Moving" in rendered
     assert "2026-07-11" in rendered

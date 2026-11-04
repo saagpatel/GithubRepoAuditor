@@ -241,7 +241,11 @@ def test_anthropic_provider_records_cost():
         mock_anthropic_cls.return_value = mock_client
 
         result = provider.generate(
-            "test prompt", "claude-haiku-4-5", 512, cost_tracker=tracker, feature="narrative"
+            "test prompt",
+            "claude-haiku-4-5",
+            512,
+            cost_tracker=tracker,
+            feature="narrative",
         )
 
     assert result == "generated text"
@@ -274,7 +278,11 @@ def test_github_models_provider_records_cost():
 
     with patch("requests.post", return_value=mock_response):
         result = provider.generate(
-            "test prompt", "gpt-4o-mini", 150, cost_tracker=tracker, feature="briefing-suggestion"
+            "test prompt",
+            "gpt-4o-mini",
+            150,
+            cost_tracker=tracker,
+            feature="briefing-suggestion",
         )
 
     assert result == "suggestion text"
@@ -298,7 +306,9 @@ def test_briefing_call_chain_records_feature():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "choices": [{"message": {"content": '["Add tests.", "Write README.", "Add CI."]'}}],
+        "choices": [
+            {"message": {"content": '["Add tests.", "Write README.", "Add CI."]'}}
+        ],
         "usage": {"prompt_tokens": 500, "completion_tokens": 30},
     }
     mock_response.raise_for_status.return_value = None
@@ -313,12 +323,22 @@ def test_briefing_call_chain_records_feature():
             "overall_score": 0.2,
             "hotspots": [],
         },
-        {"metadata": {"name": "repo-b", "language": "Rust"}, "overall_score": 0.3, "hotspots": []},
-        {"metadata": {"name": "repo-c", "language": "Swift"}, "overall_score": 0.4, "hotspots": []},
+        {
+            "metadata": {"name": "repo-b", "language": "Rust"},
+            "overall_score": 0.3,
+            "hotspots": [],
+        },
+        {
+            "metadata": {"name": "repo-c", "language": "Swift"},
+            "overall_score": 0.4,
+            "hotspots": [],
+        },
     ]
 
     with patch("requests.post", return_value=mock_response):
-        suggestions, _ = _build_suggestions(audits, provider, "gpt-4o-mini", cost_tracker=tracker)
+        suggestions, _ = _build_suggestions(
+            audits, provider, "gpt-4o-mini", cost_tracker=tracker
+        )
 
     assert len(tracker.records()) == 1
     assert tracker.records()[0].feature == "briefing-suggestion"

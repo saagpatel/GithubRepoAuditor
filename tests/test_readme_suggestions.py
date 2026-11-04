@@ -12,23 +12,41 @@ def _make_report(**overrides) -> dict:
         "audits": [
             {
                 "metadata": {"name": "NoReadme"},
-                "overall_score": 0.30, "grade": "D",
+                "overall_score": 0.30,
+                "grade": "D",
                 "analyzer_results": [
-                    {"dimension": "readme", "score": 0.0, "findings": ["No README found"], "details": {}},
+                    {
+                        "dimension": "readme",
+                        "score": 0.0,
+                        "findings": ["No README found"],
+                        "details": {},
+                    },
                 ],
             },
             {
                 "metadata": {"name": "WeakReadme"},
-                "overall_score": 0.50, "grade": "D",
+                "overall_score": 0.50,
+                "grade": "D",
                 "analyzer_results": [
-                    {"dimension": "readme", "score": 0.3, "findings": ["Short README"], "details": {}},
+                    {
+                        "dimension": "readme",
+                        "score": 0.3,
+                        "findings": ["Short README"],
+                        "details": {},
+                    },
                 ],
             },
             {
                 "metadata": {"name": "GoodReadme"},
-                "overall_score": 0.85, "grade": "A",
+                "overall_score": 0.85,
+                "grade": "A",
                 "analyzer_results": [
-                    {"dimension": "readme", "score": 0.9, "findings": ["Comprehensive README with images"], "details": {}},
+                    {
+                        "dimension": "readme",
+                        "score": 0.9,
+                        "findings": ["Comprehensive README with images"],
+                        "details": {},
+                    },
                 ],
             },
         ],
@@ -65,7 +83,9 @@ class TestReadmeSuggestions:
         assert result["total_suggestions"] >= 2
 
     def test_empty_audits(self, tmp_path):
-        result = generate_readme_suggestions({"audits": [], "generated_at": "2026-03-28T00:00:00Z"}, tmp_path)
+        result = generate_readme_suggestions(
+            {"audits": [], "generated_at": "2026-03-28T00:00:00Z"}, tmp_path
+        )
         assert result["total_suggestions"] == 0
         content = result["suggestions_path"].read_text()
         assert "No suggestions" in content

@@ -39,12 +39,18 @@ class TestHelpers:
         assert redact_sensitive_text("Authorization: Basic dXNlcjpwYXNz") == (
             "Authorization: <redacted>"
         )
-        assert redact_sensitive_text(
-            'Authorization: Digest username="user", response="opaque"'
-        ) == "Authorization: <redacted>"
-        assert redact_sensitive_text(
-            '{"Authorization": "Bearer opaque-value", "status": "failed"}'
-        ) == '{"Authorization": "<redacted>", "status": "failed"}'
+        assert (
+            redact_sensitive_text(
+                'Authorization: Digest username="user", response="opaque"'
+            )
+            == "Authorization: <redacted>"
+        )
+        assert (
+            redact_sensitive_text(
+                '{"Authorization": "Bearer opaque-value", "status": "failed"}'
+            )
+            == '{"Authorization": "<redacted>", "status": "failed"}'
+        )
 
     def test_redacts_quoted_credential_keys_and_values(self):
         assert redact_sensitive_text('{"access_token": "opaque-secret"}') == (
@@ -56,9 +62,9 @@ class TestHelpers:
         assert redact_sensitive_text('password = "secret with spaces"') == (
             'password = "<redacted>"'
         )
-        assert redact_sensitive_text("password = secret with spaces; status=failed") == (
-            "password = <redacted>; status=failed"
-        )
+        assert redact_sensitive_text(
+            "password = secret with spaces; status=failed"
+        ) == ("password = <redacted>; status=failed")
         assert redact_sensitive_text(r'{"token": "opaque\"tail"}') == (
             r'{"token": "<redacted>"}'
         )

@@ -1,22 +1,29 @@
 # AGENTS.md
 
-## What This Project Is
+## Purpose
 
 `GithubRepoAuditor` is the workbook-first portfolio operating system for repo truth and weekly review. It generates the canonical local portfolio truth snapshot consumed by downstream dashboards, reports, command-center surfaces, and planning lanes.
 
-## Current State
+## Layout
 
 The current machine-readable truth surface is `output/portfolio-truth-latest.json`. Compatibility Markdown, workbooks, dashboards, and reports are derived surfaces; do not treat them as canonical inputs unless a task is specifically about that artifact.
 
-## Stack
+- `src/github_repo_auditor/`: Python CLI, analyzers, exporters, and FastAPI server.
+- `web/`: Next.js frontend.
+- `tests/` and `fixtures/contracts/`: offline verification and consumer contracts.
+- `output/demo/`: committed synthetic demo artifacts.
 
-- Python
-- `uv`
-- pytest
-- ruff
-- Local JSON, Markdown, HTML, workbook, and control-center outputs
+## Setup
 
-## How To Run
+Run `make setup` using the pinned uv, Python, Node, and pnpm toolchains.
+Python development, serve, config, and build extras are provisioned together;
+the semantic extra is opt-in.
+
+## Checks
+
+Run `make check` for the aggregate offline Python and web gate. It checks the
+existing 15 mypy modules, consumer fixture, and non-semantic suite without
+regenerating operator outputs.
 
 For repository verification, start with the credential-free fixture commands in
 [CONTRIBUTING.md](CONTRIBUTING.md). That guide is authoritative for environment
@@ -57,18 +64,18 @@ filters timestamped local stores only: bridge-db activity, session-costs, and
 notification-hub durable events. Untimestamped Notion snapshot rows are skipped
 in since-window mode.
 
-## Cursor Cloud specific instructions
+### Cursor Cloud specific instructions
 
 Cursor Cloud builds start from this repository's checkout and must not depend on
 the local `.venv`, sibling repositories, generated `output/` artifacts, or
 credential-bearing files. The checked-in `.python-version` selects Python
-3.11.15; `.cursor/environment.json` pins `uv==0.12.12` and installs the locked
+3.12.15; `.cursor/environment.json` pins `uv==0.13.0` and installs the locked
 runtime and development dependencies with `uv sync --locked`.
 
 Use these repository-local, non-interactive checks in a Cloud build or agent:
 
 ```sh
-uv run --locked --extra dev --extra serve --extra config pytest -q -k 'not semantic_index'
+uv run --locked --extra dev --extra serve --extra config --extra build pytest -q -k 'not semantic_index'
 uv run --locked --extra dev ruff check src/ tests/
 ```
 
@@ -78,13 +85,13 @@ explicitly requested. GitHub, Anthropic, and Notion credentials are optional
 and must be supplied through Cursor Secrets when a task genuinely needs them;
 never copy local `.env` files or tokens into a Cloud build.
 
-## Known Risks
+## Boundaries
 
 - `output/portfolio-truth-latest.json` is generated state, but it is also the current truth surface for other local workflows. Regenerate it deliberately after catalog or context changes.
 - Do not let generated reports, old dashboards, or historical registry files override the latest portfolio truth snapshot.
 - Do not read or emit secrets, `.env` values, keychains, OAuth stores, raw private transcripts, raw logs, browser profiles, or credential-bearing configs while auditing repos.
 
-## Review guidelines
+### Review guidelines
 
 Focus Codex review on portfolio truth correctness, attention-state and maturity
 contract drift, generated-vs-canonical source confusion, identity-resolution
@@ -104,6 +111,10 @@ For docs-only PRs, comment only when a doc claims current portfolio state,
 published readiness, generated report truth, or operator guidance that is not
 backed by the latest canonical truth path or reviewed commands.
 
-## Next Recommended Move
+## Delivery
+
+Keep changes scoped, verify the affected behavior, and preserve consumer contracts.
+Do not publish, release, deploy, or run live operator workflows unless requested.
+When Git writes are unavailable, return an ordered commit plan for the dispatcher.
 
 When repairing portfolio context, keep the attention contract tight: improve default-attention repos only when the work supports a real publish, park, archive, security, release, dirty-worktree, owner, active-product, bridge/Notion/sync, or cost decision.

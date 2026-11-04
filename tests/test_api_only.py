@@ -73,7 +73,9 @@ class _RepoListClient:
 def test_list_user_repos_prefers_graphql_with_token() -> None:
     client = _RepoListClient(token="t", rest_repos=[{"name": "rest"}])
     gql = [{"name": "graphql"}]
-    with patch("github_repo_auditor.api_only.bulk_fetch_repos", return_value=gql) as mock_gql:
+    with patch(
+        "github_repo_auditor.api_only.bulk_fetch_repos", return_value=gql
+    ) as mock_gql:
         result = _list_user_repos("octocat", client)  # type: ignore[arg-type]
     assert result == gql
     assert client.list_repos_calls == 0
@@ -92,7 +94,10 @@ def test_list_user_repos_uses_rest_without_token() -> None:
 def test_list_user_repos_falls_back_when_graphql_user_null() -> None:
     # GraphQL returns user: null → mapping raises TypeError → fall back to REST.
     client = _RepoListClient(token="t", rest_repos=[{"name": "rest"}])
-    with patch("github_repo_auditor.api_only.bulk_fetch_repos", side_effect=TypeError("user is None")):
+    with patch(
+        "github_repo_auditor.api_only.bulk_fetch_repos",
+        side_effect=TypeError("user is None"),
+    ):
         result = _list_user_repos("ghost", client)  # type: ignore[arg-type]
     assert result == [{"name": "rest"}]
     assert client.list_repos_calls == 1

@@ -45,7 +45,10 @@ def build_approval_ledger_content(
         ("Overdue Follow-Up", data.get("top_overdue_approval_followups", []) or []),
         ("Ready For Review", data.get("top_ready_for_review_approvals", []) or []),
         ("Due Soon Follow-Up", data.get("top_due_soon_approval_followups", []) or []),
-        (approved_but_manual_label, data.get("top_approved_manual_approvals", []) or []),
+        (
+            approved_but_manual_label,
+            data.get("top_approved_manual_approvals", []) or [],
+        ),
         ("Blocked", data.get("top_blocked_approvals", []) or []),
     ]
     section_rows: list[tuple[str, list[list[Any]]]] = []
@@ -342,7 +345,13 @@ def write_review_history_table(
     max_row = len(history_rows) + start_row
     if history_rows:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(REVIEW_HISTORY_HEADERS))
-        add_table(ws, "tblReviewHistory", len(REVIEW_HISTORY_HEADERS), max_row, start_row=start_row)
+        add_table(
+            ws,
+            "tblReviewHistory",
+            len(REVIEW_HISTORY_HEADERS),
+            max_row,
+            start_row=start_row,
+        )
     return max_row
 
 
@@ -412,27 +421,44 @@ def build_governance_audit_rows(
         preview_count = len(data.get("security_governance_preview", []) or [])
     return [
         ["Status", display_operator_state(governance_summary.get("status", "preview"))],
-        ["Headline", governance_summary.get("headline", "Governance state is being tracked.")],
+        [
+            "Headline",
+            governance_summary.get("headline", "Governance state is being tracked."),
+        ],
         [
             "Approval Status",
-            display_operator_state(governance_summary.get("approval_status", "preview-only")),
+            display_operator_state(
+                governance_summary.get("approval_status", "preview-only")
+            ),
         ],
-        ["Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"],
+        [
+            "Needs Re-Approval",
+            "yes" if governance_summary.get("needs_reapproval") else "no",
+        ],
         ["Approval Age (days)", governance_summary.get("approval_age_days", "—")],
-        ["Fingerprint Mismatch", "yes" if governance_summary.get("fingerprint_mismatch") else "no"],
+        [
+            "Fingerprint Mismatch",
+            "yes" if governance_summary.get("fingerprint_mismatch") else "no",
+        ],
         ["Applyable Count", preview_count],
         [
             "Drift Count",
-            governance_summary.get("drift_count", len(data.get("governance_drift", []) or [])),
+            governance_summary.get(
+                "drift_count", len(data.get("governance_drift", []) or [])
+            ),
         ],
         [
             "Applied Count",
             governance_summary.get(
-                "applied_count", len(data.get("governance_results", {}).get("results", []) or [])
+                "applied_count",
+                len(data.get("governance_results", {}).get("results", []) or []),
             ),
         ],
         ["Rollback Available", governance_summary.get("rollback_available_count", 0)],
-        ["Selected View", data.get("governance_preview", {}).get("selected_view", "all")],
+        [
+            "Selected View",
+            data.get("governance_preview", {}).get("selected_view", "all"),
+        ],
     ]
 
 

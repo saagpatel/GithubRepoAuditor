@@ -36,7 +36,10 @@ def test_golden_is_non_empty_and_exercises_branches() -> None:
     # Guard against a degenerate golden (e.g. one that records only "none").
     assert GOLDEN, "golden contract is empty"
     nontrivial = sum(
-        1 for rows in GOLDEN.values() for value in rows.values() if value not in ("none", "")
+        1
+        for rows in GOLDEN.values()
+        for value in rows.values()
+        if value not in ("none", "")
     )
     assert nontrivial >= 1000, f"golden exercises too few real branches ({nontrivial})"
 

@@ -107,7 +107,9 @@ class TestQualifyRepos:
     def test_all_qualifying_returns_stale_and_short(self) -> None:
         """Three repos: one stale, one short, one fine → returns first two."""
         repos = [
-            _make_repo("stale-repo", readme_stale=True, readme_text="Some content here."),
+            _make_repo(
+                "stale-repo", readme_stale=True, readme_text="Some content here."
+            ),
             _make_repo("short-repo", readme_stale=False, readme_text="Hi."),
             _make_repo("fine-repo", readme_stale=False, readme_text="x" * 300),
         ]
@@ -219,7 +221,9 @@ class TestGenerateDraft:
         repo = _make_repo("happy-repo", readme_text="Old README")
         ctx = build_context(repo, semantic_index=None)
         provider = _EchoProvider()
-        packet = generate_draft(repo, context=ctx, provider=provider, model="fake-model")
+        packet = generate_draft(
+            repo, context=ctx, provider=provider, model="fake-model"
+        )
 
         assert isinstance(packet, DraftReadmePacket)
         assert packet.repo_name == "happy-repo"
@@ -284,7 +288,9 @@ class TestWritePacketsToLedger:
             # Read back — load_approval_records needs username
             records = load_approval_records(output_dir, "test-user")
             # At least one record with approval_subject_type="draft-readme"
-            draft_records = [r for r in records if r.get("approval_subject_type") == "draft-readme"]
+            draft_records = [
+                r for r in records if r.get("approval_subject_type") == "draft-readme"
+            ]
             assert len(draft_records) >= 1
             r = draft_records[0]
             assert r["subject_key"] == "test/repo"
@@ -443,7 +449,9 @@ class TestSuppressionCheck:
                 ]
             }
             result = is_suppressed(
-                prefs, action_type="draft-readme", target_context="owner/suppressed-repo"
+                prefs,
+                action_type="draft-readme",
+                target_context="owner/suppressed-repo",
             )
             assert result is not None
             assert result.action_type == "draft-readme"
@@ -473,7 +481,9 @@ class TestCostGuard:
             call_count = 0
 
             class _PartialProvider:
-                def generate(self, prompt, model, max_tokens, *, cost_tracker=None, feature="x"):
+                def generate(
+                    self, prompt, model, max_tokens, *, cost_tracker=None, feature="x"
+                ):
                     nonlocal call_count
                     call_count += 1
                     if call_count == 1:
@@ -493,7 +503,11 @@ class TestCostGuard:
                 ctx = build_context(repo, semantic_index=None)
                 try:
                     p = generate_draft(
-                        repo, context=ctx, provider=provider, model="m", cost_tracker=cost_tracker
+                        repo,
+                        context=ctx,
+                        provider=provider,
+                        model="m",
+                        cost_tracker=cost_tracker,
                     )
                     packets_written.append(p)
                 except BudgetExceededError:
@@ -505,7 +519,9 @@ class TestCostGuard:
             from github_repo_auditor.warehouse import load_approval_records
 
             records = load_approval_records(output_dir, "tester")
-            draft_records = [r for r in records if r.get("approval_subject_type") == "draft-readme"]
+            draft_records = [
+                r for r in records if r.get("approval_subject_type") == "draft-readme"
+            ]
             assert len(draft_records) == 1
             assert draft_records[0]["subject_key"] == "repo-ok"
 
@@ -670,12 +686,20 @@ class TestApplyImprovementsModeWithLedger:
 
             mock_apply = MagicMock(return_value=[{"repo": "target-repo", "ok": True}])
             with (
-                patch("github_repo_auditor.repo_improver.apply_readme_updates", mock_apply),
-                patch("github_repo_auditor.cli.apply_readme_updates", mock_apply, create=True),
+                patch(
+                    "github_repo_auditor.repo_improver.apply_readme_updates", mock_apply
+                ),
+                patch(
+                    "github_repo_auditor.cli.apply_readme_updates",
+                    mock_apply,
+                    create=True,
+                ),
             ):
                 from github_repo_auditor.cli import _run_apply_improvements_mode
 
-                args = self._make_args(str(output_dir), apply_readmes=True, dry_run=False)
+                args = self._make_args(
+                    str(output_dir), apply_readmes=True, dry_run=False
+                )
                 parser = MagicMock()
                 parser.error.side_effect = SystemExit(2)
 
@@ -683,8 +707,12 @@ class TestApplyImprovementsModeWithLedger:
 
             # apply_readme_updates was called with target-repo in the updates list
             assert mock_apply.called
-            call_updates = mock_apply.call_args[0][2]  # positional: client, owner, updates
-            repo_names = [u.get("name") or u.get("repo", "").split("/")[-1] for u in call_updates]
+            call_updates = mock_apply.call_args[0][
+                2
+            ]  # positional: client, owner, updates
+            repo_names = [
+                u.get("name") or u.get("repo", "").split("/")[-1] for u in call_updates
+            ]
             assert "target-repo" in repo_names
 
     def test_both_sources_combined(self) -> None:
@@ -718,7 +746,9 @@ class TestApplyImprovementsModeWithLedger:
 
             improvements_file = output_dir / "improvements.json"
             improvements_file.write_text(
-                _json.dumps({"file-repo": {"name": "file-repo", "readme": "# File Repo"}})
+                _json.dumps(
+                    {"file-repo": {"name": "file-repo", "readme": "# File Repo"}}
+                )
             )
 
             mock_apply = MagicMock(
@@ -727,7 +757,9 @@ class TestApplyImprovementsModeWithLedger:
                     {"repo": "ledger-repo", "ok": True},
                 ]
             )
-            with patch("github_repo_auditor.repo_improver.apply_readme_updates", mock_apply):
+            with patch(
+                "github_repo_auditor.repo_improver.apply_readme_updates", mock_apply
+            ):
                 from github_repo_auditor.cli import _run_apply_improvements_mode
 
                 args = self._make_args(
@@ -742,7 +774,9 @@ class TestApplyImprovementsModeWithLedger:
 
             assert mock_apply.called
             call_updates = mock_apply.call_args[0][2]
-            repo_names = [u.get("name") or u.get("repo", "").split("/")[-1] for u in call_updates]
+            repo_names = [
+                u.get("name") or u.get("repo", "").split("/")[-1] for u in call_updates
+            ]
             assert "file-repo" in repo_names
             assert "ledger-repo" in repo_names
 
@@ -775,12 +809,19 @@ class TestApplyImprovementsModeWithLedger:
             mock_apply = MagicMock(return_value=[{"repo": "dry-repo", "dry_run": True}])
             mock_mark_applied = MagicMock()
             with (
-                patch("github_repo_auditor.repo_improver.apply_readme_updates", mock_apply),
-                patch("github_repo_auditor.draft_readmes.mark_draft_applied", mock_mark_applied),
+                patch(
+                    "github_repo_auditor.repo_improver.apply_readme_updates", mock_apply
+                ),
+                patch(
+                    "github_repo_auditor.draft_readmes.mark_draft_applied",
+                    mock_mark_applied,
+                ),
             ):
                 from github_repo_auditor.cli import _run_apply_improvements_mode
 
-                args = self._make_args(str(output_dir), apply_readmes=True, dry_run=True)
+                args = self._make_args(
+                    str(output_dir), apply_readmes=True, dry_run=True
+                )
                 parser = MagicMock()
                 parser.error.side_effect = SystemExit(2)
                 _run_apply_improvements_mode(args, parser)
@@ -796,7 +837,9 @@ class TestApplyImprovementsModeWithLedger:
 
 
 class TestStateTransitions:
-    def _write_approved_packet(self, output_dir: Path, repo_name: str) -> DraftReadmePacket:
+    def _write_approved_packet(
+        self, output_dir: Path, repo_name: str
+    ) -> DraftReadmePacket:
         """Write a packet and manually set its status to approved-manual."""
         import json
         import sqlite3
@@ -829,7 +872,9 @@ class TestStateTransitions:
             output_dir = Path(tmp)
             packet = self._write_approved_packet(output_dir, "success-repo")
 
-            mark_draft_applied(output_dir, packet, apply_result={"ok": True, "sha": "abc"})
+            mark_draft_applied(
+                output_dir, packet, apply_result={"ok": True, "sha": "abc"}
+            )
 
             db = output_dir / "portfolio-warehouse.db"
             conn = sqlite3.connect(db)
@@ -861,7 +906,9 @@ class TestStateTransitions:
             conn.close()
             # Status must still be approved-manual (not changed to applied)
             statuses = [json.loads(r[0]).get("status") for r in rows]
-            assert all(s == "approved-manual" for s in statuses), f"unexpected statuses: {statuses}"
+            assert all(s == "approved-manual" for s in statuses), (
+                f"unexpected statuses: {statuses}"
+            )
 
     def test_failed_apply_writes_followup_event(self) -> None:
         """record_draft_apply_failure writes an approval_followup_event with event_type='apply-failure'."""

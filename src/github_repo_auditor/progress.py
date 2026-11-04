@@ -1,4 +1,5 @@
 """Audit progress persistence — save/resume partial audit runs."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,9 @@ from pathlib import Path
 PROGRESS_FILE = ".audit-progress.json"
 
 
-def save_progress(output_dir: Path, completed_audits: list[dict], run_metadata: dict) -> None:
+def save_progress(
+    output_dir: Path, completed_audits: list[dict], run_metadata: dict
+) -> None:
     """Atomically save completed repo audits to progress file."""
     output_dir.mkdir(parents=True, exist_ok=True)
     progress_path = output_dir / PROGRESS_FILE

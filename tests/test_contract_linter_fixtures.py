@@ -31,8 +31,6 @@ def test_contract_linter_fixtures_have_stable_expected_outcomes() -> None:
 
 
 def test_mixed_fixture_does_not_conflate_unknown_with_stale() -> None:
-    payload = json.loads(
-        (FIXTURE_ROOT / "mixed_stale_and_unresolved.json").read_text()
-    )
+    payload = json.loads((FIXTURE_ROOT / "mixed_stale_and_unresolved.json").read_text())
     assert payload["expected"]["CL-DECL-001:stale-one"] == "fail"
     assert payload["expected"]["CL-DECL-001:unresolved-one"] == "unknown"

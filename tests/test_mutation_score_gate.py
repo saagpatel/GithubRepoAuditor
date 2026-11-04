@@ -9,7 +9,11 @@ from scripts.check_mutation_score import classify_exit_codes, evaluate_score, ma
 def _write_meta(root: Path, values: list[int | None]) -> None:
     path = root / "src" / "example.py.meta"
     path.parent.mkdir(parents=True)
-    payload = {"exit_code_by_key": {f"mutant_{index}": value for index, value in enumerate(values)}}
+    payload = {
+        "exit_code_by_key": {
+            f"mutant_{index}": value for index, value in enumerate(values)
+        }
+    }
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 

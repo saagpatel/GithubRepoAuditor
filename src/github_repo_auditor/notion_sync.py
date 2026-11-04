@@ -3,15 +3,18 @@
 Uses raw requests (no SDK) consistent with the project's minimal dependency philosophy.
 Requires NOTION_TOKEN environment variable and config/notion-config.json.
 """
+
 from __future__ import annotations
 
 import json
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlencode
 
 from github_repo_auditor.notion_client import (
     DEFAULT_NOTION_VERSION,
+    NotionOutcomeUnknownError,
     REQUEST_DELAY,
     get_notion_token,
     load_notion_config,
@@ -83,7 +86,9 @@ def _query_existing_event_keys(
         if start_cursor:
             body["start_cursor"] = start_cursor
 
-        resp = _notion_request("POST", f"/databases/{events_db_id}/query", token, version, body)
+        resp = _notion_request(
+            "POST", f"/databases/{events_db_id}/query", token, version, body
+        )
         if not resp or resp.status_code != 200:
             status = getattr(resp, "status_code", "no-response")
             raise RuntimeError(
@@ -93,7 +98,9 @@ def _query_existing_event_keys(
         try:
             data = resp.json()
         except (ValueError, TypeError) as exc:
-            raise RuntimeError("existing-event enumeration returned invalid JSON") from exc
+            raise RuntimeError(
+                "existing-event enumeration returned invalid JSON"
+            ) from exc
         if not isinstance(data, dict) or not isinstance(data.get("results", []), list):
             raise RuntimeError("existing-event enumeration returned an invalid page")
         for page in data.get("results", []):
@@ -151,7 +158,10 @@ def _create_event_page(
     if resp and resp.status_code == 200:
         return resp.json().get("id")
     if resp:
-        print(f"  Failed to create event: {resp.status_code} {resp.text[:200]}", file=sys.stderr)
+        print(
+            f"  Failed to create event: {resp.status_code} {resp.text[:200]}",
+            file=sys.stderr,
+        )
     return None
 
 
@@ -170,11 +180,16 @@ def _update_project_fields(
         "Audit Date": {"date": {"start": audit_data.get("date", "")}},
     }
 
-    resp = _notion_request("PATCH", f"/pages/{project_id}", token, version, {"properties": properties})
+    resp = _notion_request(
+        "PATCH", f"/pages/{project_id}", token, version, {"properties": properties}
+    )
     if resp and resp.status_code == 200:
         return True
     if resp:
-        print(f"  Failed to update project {project_id}: {resp.status_code}", file=sys.stderr)
+        print(
+            f"  Failed to update project {project_id}: {resp.status_code}",
+            file=sys.stderr,
+        )
     return False
 
 
@@ -320,16 +335,30 @@ def sync_campaign_actions(
 
     token = get_notion_token()
     if not token:
-        return ([{"target": "notion-actions", "status": "skipped", "reason": "no token"}], {}, [])
+        return (
+            [{"target": "notion-actions", "status": "skipped", "reason": "no token"}],
+            {},
+            [],
+        )
 
     config = _load_notion_config(config_dir)
     if not config:
-        return ([{"target": "notion-actions", "status": "skipped", "reason": "no config"}], {}, [])
+        return (
+            [{"target": "notion-actions", "status": "skipped", "reason": "no config"}],
+            {},
+            [],
+        )
 
-    action_collection_id, action_is_data_source = _resolve_collection_config(config, "action_requests")
-    campaign_collection_id, campaign_is_data_source = _resolve_collection_config(config, "campaign_runs")
+    action_collection_id, action_is_data_source = _resolve_collection_config(
+        config, "action_requests"
+    )
+    campaign_collection_id, campaign_is_data_source = _resolve_collection_config(
+        config, "campaign_runs"
+    )
     if campaign_collection_id is None:
-        campaign_collection_id, campaign_is_data_source = _resolve_collection_config(config, "recommendation_runs")
+        campaign_collection_id, campaign_is_data_source = _resolve_collection_config(
+            config, "recommendation_runs"
+        )
 
     version = config.get("notion_version", DEFAULT_NOTION_VERSION)
     results: list[dict] = []
@@ -364,7 +393,9 @@ def sync_campaign_actions(
             }
             mapping = project_map.get(action["repo"], {})
             if mapping.get("localProjectId"):
-                properties["Local Project"] = {"relation": [{"id": mapping["localProjectId"]}]}
+                properties["Local Project"] = {
+                    "relation": [{"id": mapping["localProjectId"]}]
+                }
             properties["Summary"] = _rich_text_value(action["body"])
             body = {"properties": properties}
 
@@ -376,17 +407,33 @@ def sync_campaign_actions(
                     .get("select", {})
                     .get("name")
                 )
-                response = _notion_request("PATCH", f"/pages/{page_id}", token, version, body)
+                response = _notion_request(
+                    "PATCH", f"/pages/{page_id}", token, version, body
+                )
                 if response and response.status_code == 200:
-                    status = "reopened" if previous_status in {"Resolved", "Cancelled"} else ("unchanged" if previous_status == desired_status else "updated")
+                    status = (
+                        "reopened"
+                        if previous_status in {"Resolved", "Cancelled"}
+                        else (
+                            "unchanged"
+                            if previous_status == desired_status
+                            else "updated"
+                        )
+                    )
                 else:
                     status = "failed"
                 url = existing.get("url")
             else:
-                body["parent"] = _notion_parent_for_collection(action_collection_id, use_data_source=action_is_data_source)
+                body["parent"] = _notion_parent_for_collection(
+                    action_collection_id, use_data_source=action_is_data_source
+                )
                 response = _notion_request("POST", "/pages", token, version, body)
-                status = "created" if response and response.status_code == 200 else "failed"
-                payload = response.json() if response and response.status_code == 200 else {}
+                status = (
+                    "created" if response and response.status_code == 200 else "failed"
+                )
+                payload = (
+                    response.json() if response and response.status_code == 200 else {}
+                )
                 page_id = payload.get("id")
                 url = payload.get("url")
 
@@ -468,14 +515,22 @@ def sync_campaign_actions(
                     "action_id": action_id,
                     "repo_full_name": previous.get("repo_full_name", ""),
                     "campaign_type": previous.get("campaign_type", ""),
-                    "status": "closed" if response and response.status_code == 200 else "failed",
+                    "status": "closed"
+                    if response and response.status_code == 200
+                    else "failed",
                     "page_id": page_id,
                     "url": existing.get("url"),
                     "expected": {"status": "Resolved"},
                 }
             )
     else:
-        results.append({"target": "notion-action", "status": "skipped", "reason": "no action collection config"})
+        results.append(
+            {
+                "target": "notion-action",
+                "status": "skipped",
+                "reason": "no action collection config",
+            }
+        )
 
     if campaign_collection_id:
         name = f"Campaign Run — {campaign_summary.get('label', campaign_summary.get('campaign_type', 'Campaign'))}"
@@ -485,7 +540,9 @@ def sync_campaign_actions(
             "Status": _select_value("Succeeded"),
         }
         body = {
-            "parent": _notion_parent_for_collection(campaign_collection_id, use_data_source=campaign_is_data_source),
+            "parent": _notion_parent_for_collection(
+                campaign_collection_id, use_data_source=campaign_is_data_source
+            ),
             "properties": properties,
         }
         response = _notion_request("POST", "/pages", token, version, body)
@@ -493,12 +550,20 @@ def sync_campaign_actions(
         results.append(
             {
                 "target": "notion-campaign",
-                "status": "created" if response and response.status_code == 200 else "failed",
+                "status": "created"
+                if response and response.status_code == 200
+                else "failed",
                 "url": payload.get("url"),
             }
         )
     else:
-        results.append({"target": "notion-campaign", "status": "skipped", "reason": "no campaign collection config"})
+        results.append(
+            {
+                "target": "notion-campaign",
+                "status": "skipped",
+                "reason": "no campaign collection config",
+            }
+        )
 
     return results, external_refs, managed_state_drift
 
@@ -564,9 +629,7 @@ def create_recommendation_run(
         {
             "object": "block",
             "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": chunk}}]
-            },
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content": chunk}}]},
         }
         for chunk in _chunk_text(md, 2000)
     ]
@@ -583,7 +646,10 @@ def create_recommendation_run(
         print(f"  Recommendation run created: {page_id}", file=sys.stderr)
         return page_id
     if resp:
-        print(f"  Failed to create recommendation run: {resp.status_code}", file=sys.stderr)
+        print(
+            f"  Failed to create recommendation run: {resp.status_code}",
+            file=sys.stderr,
+        )
     return None
 
 
@@ -628,7 +694,9 @@ def create_audit_action_requests(
             }
 
             if mapping.get("localProjectId"):
-                properties["Local Project"] = {"relation": [{"id": mapping["localProjectId"]}]}
+                properties["Local Project"] = {
+                    "relation": [{"id": mapping["localProjectId"]}]
+                }
 
             body = {
                 "parent": {"database_id": db_id},
@@ -649,6 +717,7 @@ def create_audit_action_requests(
 
 WEEKLY_REVIEW_BEGIN_MARKER = "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
 WEEKLY_REVIEW_END_MARKER = "[GHRA-END-AUDIT-HIGHLIGHTS]"
+MAX_WEEKLY_REVIEW_CHILD_PAGES = 20
 
 
 def _render_audit_highlights(
@@ -677,17 +746,23 @@ def _render_audit_highlights(
         if changes:
             promos = [c for c in changes if c.get("direction") == "promotion"]
             demos = [c for c in changes if c.get("direction") == "demotion"]
-            lines.append(f"**Tier Changes:** {len(promos)} promotions, {len(demos)} demotions")
+            lines.append(
+                f"**Tier Changes:** {len(promos)} promotions, {len(demos)} demotions"
+            )
             for c in changes[:5]:
                 icon = "+" if c.get("direction") == "promotion" else "-"
-                lines.append(f"  {icon} {c['name']}: {c.get('old_tier', '?')} -> {c.get('new_tier', '?')}")
+                lines.append(
+                    f"  {icon} {c['name']}: {c.get('old_tier', '?')} -> {c.get('new_tier', '?')}"
+                )
             lines.append("")
 
     # Quick wins
     if quick_wins:
         lines.append("**Top Quick Wins:**")
         for w in quick_wins[:3]:
-            lines.append(f"  - {w['name']} needs {w['gap']:.3f} to reach {w['next_tier']}")
+            lines.append(
+                f"  - {w['name']} needs {w['gap']:.3f} to reach {w['next_tier']}"
+            )
         lines.append("")
 
     operator_summary = report_data.get("operator_summary") or {}
@@ -702,10 +777,14 @@ def _render_audit_highlights(
             f"Ready {counts.get('ready', 0)} | "
             f"Deferred {counts.get('deferred', 0)}"
         )
-        lines.append(f"  Headline: {operator_summary.get('headline', 'No operator triage items are currently surfaced.')}")
+        lines.append(
+            f"  Headline: {operator_summary.get('headline', 'No operator triage items are currently surfaced.')}"
+        )
         for item in operator_queue[:3]:
             repo = f"{item.get('repo')}: " if item.get("repo") else ""
-            lines.append(f"  - {repo}{item.get('title', 'Triage item')} -> {item.get('recommended_action', 'Review the latest state.')}")
+            lines.append(
+                f"  - {repo}{item.get('title', 'Triage item')} -> {item.get('recommended_action', 'Review the latest state.')}"
+            )
         lines.append("")
 
     return "\n".join(lines)
@@ -734,7 +813,9 @@ def _managed_section_block_ids(blocks: list[dict]) -> list[str]:
             break
     if start_index is None:
         return []
-    block_slice = blocks[start_index : (end_index + 1 if end_index is not None else len(blocks))]
+    block_slice = blocks[
+        start_index : (end_index + 1 if end_index is not None else len(blocks))
+    ]
     return [block.get("id", "") for block in block_slice if block.get("id")]
 
 
@@ -742,9 +823,7 @@ def _paragraph_block(text: str) -> dict:
     return {
         "object": "block",
         "type": "paragraph",
-        "paragraph": {
-            "rich_text": [{"type": "text", "text": {"content": text}}]
-        },
+        "paragraph": {"rich_text": [{"type": "text", "text": {"content": text}}]},
     }
 
 
@@ -753,6 +832,64 @@ def _build_weekly_review_section_blocks(highlights: str) -> list[dict]:
     blocks.extend(_paragraph_block(chunk) for chunk in _chunk_text(highlights, 2000))
     blocks.append(_paragraph_block(WEEKLY_REVIEW_END_MARKER))
     return blocks
+
+
+def _weekly_section_text(blocks: list[dict]) -> list[str]:
+    """Extract paragraph text used to verify a saved managed section."""
+    values: list[str] = []
+    for block in blocks:
+        paragraph = block.get("paragraph", {})
+        rich_text = paragraph.get("rich_text", [])
+        values.append(
+            "".join(
+                item.get("plain_text", item.get("text", {}).get("content", ""))
+                for item in rich_text
+            )
+        )
+    return values
+
+
+def _weekly_section_is_present(
+    existing: list[dict], expected: list[dict], excluded_ids: set[str]
+) -> bool:
+    candidates = [block for block in existing if block.get("id") not in excluded_ids]
+    actual_text = _weekly_section_text(candidates)
+    expected_text = _weekly_section_text(expected)
+    if not expected_text or len(actual_text) < len(expected_text):
+        return False
+    for index in range(len(actual_text) - len(expected_text) + 1):
+        section = candidates[index : index + len(expected_text)]
+        section_ids = [block.get("id") for block in section]
+        if (
+            actual_text[index : index + len(expected_text)] == expected_text
+            and all(section_ids)
+            and len(set(section_ids)) == len(expected_text)
+        ):
+            return True
+    return False
+
+
+def _list_weekly_review_children(
+    page_id: str, token: str, version: str
+) -> list[dict] | None:
+    """Read all child blocks, failing closed if pagination is incomplete or excessive."""
+    blocks: list[dict] = []
+    cursor = None
+    for page_number in range(MAX_WEEKLY_REVIEW_CHILD_PAGES):
+        path = f"/blocks/{page_id}/children"
+        if cursor:
+            path += "?" + urlencode({"start_cursor": cursor})
+        response = _notion_request("GET", path, token, version)
+        if response is None or response.status_code != 200:
+            return None
+        payload = response.json()
+        blocks.extend(payload.get("results", []))
+        if not payload.get("has_more", False):
+            return blocks
+        cursor = payload.get("next_cursor")
+        if not cursor:
+            return None
+    return None
 
 
 def patch_weekly_review(
@@ -775,7 +912,9 @@ def patch_weekly_review(
         "sorts": [{"timestamp": "created_time", "direction": "descending"}],
         "page_size": 1,
     }
-    resp = _notion_request("POST", f"/databases/{db_id}/query", token, version, query_body)
+    resp = _notion_request(
+        "POST", f"/databases/{db_id}/query", token, version, query_body
+    )
     if not resp or resp.status_code != 200:
         print("  Failed to query weekly reviews.", file=sys.stderr)
         return False
@@ -787,24 +926,84 @@ def patch_weekly_review(
 
     page_id = results[0]["id"]
     highlights = _render_audit_highlights(report_data, diff_data, quick_wins)
-    existing_blocks_resp = _notion_request("GET", f"/blocks/{page_id}/children", token, version)
-    if existing_blocks_resp and existing_blocks_resp.status_code == 200:
-        existing_blocks = existing_blocks_resp.json().get("results", [])
-        for block_id in _managed_section_block_ids(existing_blocks):
-            _notion_request("PATCH", f"/blocks/{block_id}", token, version, {"archived": True})
-            time.sleep(REQUEST_DELAY)
-
     children = _build_weekly_review_section_blocks(highlights)
+    existing_blocks = _list_weekly_review_children(page_id, token, version)
+    if existing_blocks is None:
+        print(
+            "  Failed to read all weekly review blocks; no changes made.",
+            file=sys.stderr,
+        )
+        return False
+    old_block_ids = _managed_section_block_ids(existing_blocks)
+    preexisting_block_ids = {
+        block["id"] for block in existing_blocks if block.get("id")
+    }
 
-    resp = _notion_request(
-        "PATCH", f"/blocks/{page_id}/children", token, version,
-        {"children": children},
-    )
-    if resp and resp.status_code == 200:
+    try:
+        resp = _notion_request(
+            "PATCH",
+            f"/blocks/{page_id}/children",
+            token,
+            version,
+            {"children": children},
+        )
+    except NotionOutcomeUnknownError as exc:
+        print(
+            f"  Weekly review append outcome unknown; existing section was preserved: {exc}",
+            file=sys.stderr,
+        )
+        return False
+    if resp is not None and resp.status_code == 200:
+        verified_blocks = _list_weekly_review_children(page_id, token, version)
+        if verified_blocks is None:
+            print(
+                "  Weekly review append succeeded, but verification pagination failed; "
+                "the old section was preserved.",
+                file=sys.stderr,
+            )
+            return False
+        if not _weekly_section_is_present(
+            verified_blocks, children, preexisting_block_ids
+        ):
+            print(
+                "  Weekly review append returned success, but the new section was not verified; "
+                "the old section was preserved.",
+                file=sys.stderr,
+            )
+            return False
+
+        archive_failures: list[str] = []
+        for block_id in old_block_ids:
+            try:
+                archive_resp = _notion_request(
+                    "PATCH", f"/blocks/{block_id}", token, version, {"archived": True}
+                )
+            except NotionOutcomeUnknownError as exc:
+                archive_failures.append(f"{block_id} (outcome unknown: {exc})")
+                continue
+            if archive_resp is None or archive_resp.status_code != 200:
+                status = getattr(archive_resp, "status_code", "no-response")
+                archive_failures.append(f"{block_id} (status {status})")
+            time.sleep(REQUEST_DELAY)
+        if archive_failures:
+            print(
+                "  New weekly review section is verified, but old section archival was partial: "
+                + ", ".join(archive_failures),
+                file=sys.stderr,
+            )
+            return False
         print("  Weekly review updated with managed audit highlights.", file=sys.stderr)
         return True
-    if resp:
-        print(f"  Failed to patch weekly review: {resp.status_code}", file=sys.stderr)
+    if resp is not None:
+        print(
+            f"  Failed to append weekly review section: {resp.status_code}; existing section was preserved.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            "  Failed to append weekly review section; existing section was preserved.",
+            file=sys.stderr,
+        )
     return False
 
 
@@ -889,17 +1088,24 @@ def patch_project_completeness_cards(
             f"Badges: {badges or 'none'}"
         )
 
-        children = [{
-            "object": "block",
-            "type": "callout",
-            "callout": {
-                "rich_text": [{"type": "text", "text": {"content": card_text[:2000]}}],
-                "icon": {"emoji": "📊"},
-            },
-        }]
+        children = [
+            {
+                "object": "block",
+                "type": "callout",
+                "callout": {
+                    "rich_text": [
+                        {"type": "text", "text": {"content": card_text[:2000]}}
+                    ],
+                    "icon": {"emoji": "📊"},
+                },
+            }
+        ]
 
         resp = _notion_request(
-            "PATCH", f"/blocks/{page_id}/children", token, version,
+            "PATCH",
+            f"/blocks/{page_id}/children",
+            token,
+            version,
             {"children": children},
         )
         if resp and resp.status_code == 200:
@@ -935,7 +1141,9 @@ def check_recommendation_followup(
         "sorts": [{"timestamp": "created_time", "direction": "descending"}],
         "page_size": 1,
     }
-    resp = _notion_request("POST", f"/databases/{db_id}/query", token, version, query_body)
+    resp = _notion_request(
+        "POST", f"/databases/{db_id}/query", token, version, query_body
+    )
     if not resp or resp.status_code != 200:
         return {"checked": 0}
 
@@ -958,7 +1166,9 @@ def check_recommendation_followup(
     page_id = results[0]["id"]
     blocks_resp = _notion_request("GET", f"/blocks/{page_id}/children", token, version)
     if not blocks_resp or blocks_resp.status_code != 200:
-        print("  Recommendation follow-up: could not fetch page blocks.", file=sys.stderr)
+        print(
+            "  Recommendation follow-up: could not fetch page blocks.", file=sys.stderr
+        )
         return {"checked": 0}
 
     # Extract text content from all blocks

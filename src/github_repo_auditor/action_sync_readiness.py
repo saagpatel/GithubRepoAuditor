@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from github_repo_auditor.ops_writeback import CAMPAIGN_DEFINITIONS, build_campaign_bundle
+from github_repo_auditor.ops_writeback import (
+    CAMPAIGN_DEFINITIONS,
+    build_campaign_bundle,
+)
 
 CAMPAIGN_DISPLAY_ORDER = [
     "security-review",
@@ -56,9 +59,9 @@ def _notion_ready(report_data: dict[str, Any]) -> bool:
 
 
 def _github_projects_ready(report_data: dict[str, Any]) -> bool:
-    github_projects = (
-        (report_data.get("writeback_preview") or {}).get("github_projects") or {}
-    )
+    github_projects = (report_data.get("writeback_preview") or {}).get(
+        "github_projects"
+    ) or {}
     if not github_projects.get("enabled"):
         return True
     return str(github_projects.get("status") or "").strip().lower() in {
@@ -77,7 +80,9 @@ def _governance_ready(report_data: dict[str, Any], campaign_type: str) -> bool:
         return False
     if report_data.get("governance_drift"):
         return False
-    preview_actions = list((report_data.get("governance_preview") or {}).get("actions") or [])
+    preview_actions = list(
+        (report_data.get("governance_preview") or {}).get("actions") or []
+    )
     if preview_actions and not report_data.get("governance_approval"):
         return False
     return True
@@ -95,8 +100,12 @@ def _recommended_target(report_data: dict[str, Any]) -> str:
     return "none"
 
 
-def _campaign_drift_items(report_data: dict[str, Any], campaign_type: str) -> list[dict[str, Any]]:
-    active_campaign = str((report_data.get("campaign_summary") or {}).get("campaign_type") or "")
+def _campaign_drift_items(
+    report_data: dict[str, Any], campaign_type: str
+) -> list[dict[str, Any]]:
+    active_campaign = str(
+        (report_data.get("campaign_summary") or {}).get("campaign_type") or ""
+    )
     drift_rows = []
     for item in report_data.get("managed_state_drift") or []:
         item_campaign = str(item.get("campaign_type") or "").strip()
@@ -109,7 +118,9 @@ def _campaign_drift_items(report_data: dict[str, Any], campaign_type: str) -> li
         for item in report_data.get("governance_drift") or []:
             drift_rows.append(
                 {
-                    "repo_full_name": item.get("repo_full_name") or item.get("repo") or "",
+                    "repo_full_name": item.get("repo_full_name")
+                    or item.get("repo")
+                    or "",
                     "target": "governance",
                     "drift_state": item.get("drift_type", "governance-drift"),
                 }
@@ -128,12 +139,18 @@ def _top_repos(actions: list[dict[str, Any]]) -> list[str]:
     return seen
 
 
-def _blocking_reason(report_data: dict[str, Any], campaign_type: str, recommended_target: str) -> str:
+def _blocking_reason(
+    report_data: dict[str, Any], campaign_type: str, recommended_target: str
+) -> str:
     if recommended_target == "none":
         return "Writeback prerequisites are missing, so this campaign should stay local until target access is healthy."
-    if campaign_type == "security-review" and not _governance_ready(report_data, campaign_type):
+    if campaign_type == "security-review" and not _governance_ready(
+        report_data, campaign_type
+    ):
         return "Governed security controls still need approval or drift review before this campaign should sync outward."
-    if recommended_target in {"github", "all"} and not _github_projects_ready(report_data):
+    if recommended_target in {"github", "all"} and not _github_projects_ready(
+        report_data
+    ):
         return "GitHub Projects mirror is enabled but not healthy yet, so the managed mirror should be reviewed before syncing."
     return ""
 
@@ -145,7 +162,9 @@ def _rollback_blocking_reason(
 ) -> str:
     if not actions:
         return ""
-    if campaign_type != str((report_data.get("campaign_summary") or {}).get("campaign_type") or ""):
+    if campaign_type != str(
+        (report_data.get("campaign_summary") or {}).get("campaign_type") or ""
+    ):
         return ""
 
     action_ids = {str(action.get("action_id") or "") for action in actions}
@@ -156,7 +175,9 @@ def _rollback_blocking_reason(
         for row in report_data.get("action_runs") or []
         if str(row.get("campaign_type") or "") == campaign_type
     )
-    matching = [item for item in items if str(item.get("action_id") or "") in action_ids]
+    matching = [
+        item for item in items if str(item.get("action_id") or "") in action_ids
+    ]
     mode = str((report_data.get("writeback_results") or {}).get("mode") or "")
     if not matching:
         if mode == "apply":
@@ -182,19 +203,27 @@ def _stage_reason(
     if stage == "idle":
         return f"No meaningful {label.lower()} actions are currently surfaced, so this campaign can stay local for now."
     if stage == "drift-review":
-        repo = str((drift_rows[0] or {}).get("repo_full_name") or (drift_rows[0] or {}).get("repo") or "").strip()
+        repo = str(
+            (drift_rows[0] or {}).get("repo_full_name")
+            or (drift_rows[0] or {}).get("repo")
+            or ""
+        ).strip()
         if repo:
             return f"Managed drift is active for {repo}, so {label} should be reviewed before any further sync."
         return f"Managed drift is active for {label}, so it should be reviewed before any further sync."
     if stage == "blocked":
         return ""
     if stage == "apply-ready":
-        target = recommended_target if recommended_target != "none" else "managed targets"
+        target = (
+            recommended_target if recommended_target != "none" else "managed targets"
+        )
         return f"{action_count} action(s) are already staged locally and {label} is healthy enough to apply to {target} if you choose."
     return f"{action_count} action(s) are ready for preview, but {label} should stay preview-first until you explicitly choose to sync it outward."
 
 
-def _readiness_record(report_data: dict[str, Any], campaign_type: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _readiness_record(
+    report_data: dict[str, Any], campaign_type: str
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     summary, actions = build_campaign_bundle(
         report_data,
         campaign_type=campaign_type,
@@ -206,11 +235,17 @@ def _readiness_record(report_data: dict[str, Any], campaign_type: str) -> tuple[
     drift_rows = _campaign_drift_items(report_data, campaign_type)
     actions_exist = bool(summary.get("action_count", 0))
     recommended_target = _recommended_target(report_data)
-    active_campaign = campaign_type == str((report_data.get("campaign_summary") or {}).get("campaign_type") or "")
+    active_campaign = campaign_type == str(
+        (report_data.get("campaign_summary") or {}).get("campaign_type") or ""
+    )
     blocking_reason = ""
     if actions_exist:
-        blocking_reason = _blocking_reason(report_data, campaign_type, recommended_target)
-        blocking_reason = blocking_reason or _rollback_blocking_reason(report_data, campaign_type, actions)
+        blocking_reason = _blocking_reason(
+            report_data, campaign_type, recommended_target
+        )
+        blocking_reason = blocking_reason or _rollback_blocking_reason(
+            report_data, campaign_type, actions
+        )
 
     if drift_rows:
         stage = "drift-review"
@@ -240,7 +275,9 @@ def _readiness_record(report_data: dict[str, Any], campaign_type: str) -> tuple[
         ),
         "recommended_target": recommended_target,
         "top_repos": _top_repos(actions),
-        "sync_mode": str((report_data.get("writeback_preview") or {}).get("sync_mode") or "reconcile"),
+        "sync_mode": str(
+            (report_data.get("writeback_preview") or {}).get("sync_mode") or "reconcile"
+        ),
     }
     return record, actions
 
@@ -295,7 +332,9 @@ def _repo_catalog(report_data: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def _infer_campaign(repo_name: str, queue_item: dict[str, Any], report_data: dict[str, Any]) -> str:
+def _infer_campaign(
+    repo_name: str, queue_item: dict[str, Any], report_data: dict[str, Any]
+) -> str:
     audits = _repo_catalog(report_data)
     audit = audits.get(repo_name, {})
     catalog = audit.get("portfolio_catalog") or {}
@@ -306,15 +345,25 @@ def _infer_campaign(repo_name: str, queue_item: dict[str, Any], report_data: dic
         str(queue_item.get(key) or "").lower()
         for key in ("kind", "title", "summary", "recommended_action", "lane_reason")
     )
-    if any(term in lower_blob for term in ("security", "governance", "secret", "dependency vulnerability")):
+    if any(
+        term in lower_blob
+        for term in ("security", "governance", "secret", "dependency vulnerability")
+    ):
         return "security-review"
-    if str(catalog.get("intended_disposition") or "").strip() == "archive" or "archive" in lower_blob:
+    if (
+        str(catalog.get("intended_disposition") or "").strip() == "archive"
+        or "archive" in lower_blob
+    ):
         return "archive-sweep"
     if "showcase" in collections:
         return "showcase-publish"
     if str(queue_item.get("operator_focus") or "").strip() in {"fragile", "revalidate"}:
         return "maintenance-cleanup"
-    if "hotspot" in lower_blob or "cleanup" in lower_blob or "maintenance" in lower_blob:
+    if (
+        "hotspot" in lower_blob
+        or "cleanup" in lower_blob
+        or "maintenance" in lower_blob
+    ):
         return "maintenance-cleanup"
     return "promotion-push"
 
@@ -336,10 +385,15 @@ def _queue_advice(
     for item in queue:
         mapped = dict(item)
         repo_name = str(mapped.get("repo") or mapped.get("repo_name") or "").strip()
-        campaign_type = repo_to_campaign.get(repo_name) or _infer_campaign(repo_name, mapped, report_data)
+        campaign_type = repo_to_campaign.get(repo_name) or _infer_campaign(
+            repo_name, mapped, report_data
+        )
         readiness = readiness_by_campaign.get(campaign_type, {})
         stage = str(readiness.get("readiness_stage") or "idle")
-        reason = str(readiness.get("reason") or "No current Action Sync guidance is surfaced for this item.")
+        reason = str(
+            readiness.get("reason")
+            or "No current Action Sync guidance is surfaced for this item."
+        )
         target = str(readiness.get("recommended_target") or "none")
         label = readiness.get("label", campaign_type)
         mapped["action_sync_stage"] = stage
@@ -347,9 +401,13 @@ def _queue_advice(
         mapped["suggested_campaign"] = campaign_type
         mapped["suggested_writeback_target"] = target
         if target == "none":
-            mapped["action_sync_line"] = f"Action Sync: {label} is {stage} — stay local until prerequisites are healthy."
+            mapped["action_sync_line"] = (
+                f"Action Sync: {label} is {stage} — stay local until prerequisites are healthy."
+            )
         else:
-            mapped["action_sync_line"] = f"Action Sync: {label} is {stage} — recommended target {target}."
+            mapped["action_sync_line"] = (
+                f"Action Sync: {label} is {stage} — recommended target {target}."
+            )
         enriched.append(mapped)
     return enriched
 
@@ -368,32 +426,42 @@ def build_action_sync_readiness_bundle(
         actions_by_campaign[campaign_type] = actions
 
     sorted_records = sorted(readiness_records, key=_campaign_sort_key)
-    top_apply_ready = [item for item in sorted_records if item["readiness_stage"] == "apply-ready"][:3]
-    top_preview_ready = [item for item in sorted_records if item["readiness_stage"] == "preview-ready"][:3]
-    top_drift_review = [item for item in sorted_records if item["readiness_stage"] == "drift-review"][:3]
-    top_blocked = [item for item in sorted_records if item["readiness_stage"] == "blocked"][:3]
-    enriched_queue = _queue_advice(queue, report_data, readiness_by_campaign, actions_by_campaign)
+    top_apply_ready = [
+        item for item in sorted_records if item["readiness_stage"] == "apply-ready"
+    ][:3]
+    top_preview_ready = [
+        item for item in sorted_records if item["readiness_stage"] == "preview-ready"
+    ][:3]
+    top_drift_review = [
+        item for item in sorted_records if item["readiness_stage"] == "drift-review"
+    ][:3]
+    top_blocked = [
+        item for item in sorted_records if item["readiness_stage"] == "blocked"
+    ][:3]
+    enriched_queue = _queue_advice(
+        queue, report_data, readiness_by_campaign, actions_by_campaign
+    )
 
     campaign_readiness_summary = {
         "campaigns": readiness_records,
         "counts": {
-            stage: sum(1 for item in readiness_records if item["readiness_stage"] == stage)
-            for stage in ("idle", "preview-ready", "apply-ready", "drift-review", "blocked")
+            stage: sum(
+                1 for item in readiness_records if item["readiness_stage"] == stage
+            )
+            for stage in (
+                "idle",
+                "preview-ready",
+                "apply-ready",
+                "drift-review",
+                "blocked",
+            )
         },
         "summary": _summary_line(
-            [
-                item
-                for item in readiness_records
-                if item["readiness_stage"] != "idle"
-            ]
+            [item for item in readiness_records if item["readiness_stage"] != "idle"]
         ),
     }
     next_step = _next_step(
-        [
-            item
-            for item in readiness_records
-            if item["readiness_stage"] != "idle"
-        ]
+        [item for item in readiness_records if item["readiness_stage"] != "idle"]
     )
     action_sync_summary = {
         "summary": campaign_readiness_summary["summary"],

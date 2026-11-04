@@ -50,7 +50,9 @@ def _score_row(repo: str, generated_at: str, score: float) -> dict:
     }
 
 
-def _hotspot_row(run_id: str, generated_at: str, repo: str, path: str = "src/core.py") -> dict:
+def _hotspot_row(
+    run_id: str, generated_at: str, repo: str, path: str = "src/core.py"
+) -> dict:
     return {
         "run_id": run_id,
         "generated_at": generated_at,
@@ -69,7 +71,9 @@ def _campaign_outcome(campaign_type: str, monitoring_state: str) -> dict:
     }
 
 
-def _report(repo: str = "RepoAlpha", *, lane: str = "ready", include_queue: bool = True) -> dict:
+def _report(
+    repo: str = "RepoAlpha", *, lane: str = "ready", include_queue: bool = True
+) -> dict:
     return {
         "username": "testuser",
         "generated_at": "2026-04-13T12:00:00+00:00",
@@ -87,7 +91,11 @@ def _report(repo: str = "RepoAlpha", *, lane: str = "ready", include_queue: bool
 
 
 def _record(bundle: dict, repo: str) -> dict:
-    return next(item for item in bundle["historical_portfolio_intelligence"] if item["repo"] == repo)
+    return next(
+        item
+        for item in bundle["historical_portfolio_intelligence"]
+        if item["repo"] == repo
+    )
 
 
 def test_intervention_ledger_marks_insufficient_evidence_when_history_is_thin() -> None:
@@ -102,9 +110,21 @@ def test_intervention_ledger_marks_relapsing_when_operator_evidence_reopens() ->
     bundle = build_intervention_ledger_bundle(
         _report(lane="urgent"),
         recent_runs=[
-            _snapshot("run-3", "2026-04-13T09:00:00+00:00", [_queue_item("RepoAlpha", lane="ready")]),
-            _snapshot("run-2", "2026-04-13T10:00:00+00:00", [_queue_item("RepoAlpha", lane="ready")]),
-            _snapshot("run-1", "2026-04-13T11:00:00+00:00", [_queue_item("RepoAlpha", lane="urgent")]),
+            _snapshot(
+                "run-3",
+                "2026-04-13T09:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="ready")],
+            ),
+            _snapshot(
+                "run-2",
+                "2026-04-13T10:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="ready")],
+            ),
+            _snapshot(
+                "run-1",
+                "2026-04-13T11:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="urgent")],
+            ),
         ],
         operator_evidence={
             "history": [],
@@ -120,13 +140,27 @@ def test_intervention_ledger_marks_relapsing_when_operator_evidence_reopens() ->
     assert bundle["next_historical_focus"]["repo"] == "RepoAlpha"
 
 
-def test_intervention_ledger_marks_persistent_pressure_when_pressure_and_hotspots_repeat() -> None:
+def test_intervention_ledger_marks_persistent_pressure_when_pressure_and_hotspots_repeat() -> (
+    None
+):
     bundle = build_intervention_ledger_bundle(
         _report(lane="ready"),
         recent_runs=[
-            _snapshot("run-3", "2026-04-13T09:00:00+00:00", [_queue_item("RepoAlpha", lane="ready")]),
-            _snapshot("run-2", "2026-04-13T10:00:00+00:00", [_queue_item("RepoAlpha", lane="ready")]),
-            _snapshot("run-1", "2026-04-13T11:00:00+00:00", [_queue_item("RepoAlpha", lane="ready")]),
+            _snapshot(
+                "run-3",
+                "2026-04-13T09:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="ready")],
+            ),
+            _snapshot(
+                "run-2",
+                "2026-04-13T10:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="ready")],
+            ),
+            _snapshot(
+                "run-1",
+                "2026-04-13T11:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="ready")],
+            ),
         ],
         implementation_hotspot_history=[
             _hotspot_row("run-3", "2026-04-13T09:00:00+00:00", "RepoAlpha"),
@@ -146,12 +180,22 @@ def test_intervention_ledger_marks_persistent_pressure_when_pressure_and_hotspot
     assert record["hotspot_persistence"] == "persistent"
 
 
-def test_intervention_ledger_marks_improving_after_intervention_when_pressure_and_score_trend_improve() -> None:
+def test_intervention_ledger_marks_improving_after_intervention_when_pressure_and_score_trend_improve() -> (
+    None
+):
     bundle = build_intervention_ledger_bundle(
         _report(lane="deferred", include_queue=False),
         recent_runs=[
-            _snapshot("run-3", "2026-04-13T09:00:00+00:00", [_queue_item("RepoAlpha", lane="blocked")]),
-            _snapshot("run-2", "2026-04-13T10:00:00+00:00", [_queue_item("RepoAlpha", lane="urgent")]),
+            _snapshot(
+                "run-3",
+                "2026-04-13T09:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="blocked")],
+            ),
+            _snapshot(
+                "run-2",
+                "2026-04-13T10:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="urgent")],
+            ),
             _snapshot("run-1", "2026-04-13T11:00:00+00:00", []),
         ],
         recent_action_runs=[
@@ -171,7 +215,9 @@ def test_intervention_ledger_marks_improving_after_intervention_when_pressure_an
     assert record["pressure_trend"] == "improving"
 
 
-def test_intervention_ledger_marks_holding_steady_when_earlier_intervention_is_quieting() -> None:
+def test_intervention_ledger_marks_holding_steady_when_earlier_intervention_is_quieting() -> (
+    None
+):
     bundle = build_intervention_ledger_bundle(
         _report(lane="deferred", include_queue=False),
         recent_runs=[
@@ -194,7 +240,9 @@ def test_intervention_ledger_marks_holding_steady_when_earlier_intervention_is_q
     assert record["pressure_trend"] == "flat"
 
 
-def test_intervention_ledger_marks_quiet_when_repo_has_no_active_pressure_story() -> None:
+def test_intervention_ledger_marks_quiet_when_repo_has_no_active_pressure_story() -> (
+    None
+):
     bundle = build_intervention_ledger_bundle(
         _report(lane="deferred", include_queue=False),
         recent_runs=[
@@ -209,16 +257,27 @@ def test_intervention_ledger_marks_quiet_when_repo_has_no_active_pressure_story(
     assert record["hotspot_persistence"] == "quiet"
 
 
-def test_intervention_ledger_uses_campaign_follow_through_as_supporting_signal() -> None:
+def test_intervention_ledger_uses_campaign_follow_through_as_supporting_signal() -> (
+    None
+):
     bundle = build_intervention_ledger_bundle(
         _report(lane="ready"),
         recent_runs=[
-            _snapshot("run-3", "2026-04-13T09:00:00+00:00", [_queue_item("RepoAlpha", lane="ready")]),
+            _snapshot(
+                "run-3",
+                "2026-04-13T09:00:00+00:00",
+                [_queue_item("RepoAlpha", lane="ready")],
+            ),
             _snapshot("run-2", "2026-04-13T10:00:00+00:00", []),
             _snapshot("run-1", "2026-04-13T11:00:00+00:00", []),
         ],
         recent_action_runs=[
-            _action_run("run-apply", "2026-04-13T08:00:00+00:00", "RepoAlpha", campaign_type="security-review"),
+            _action_run(
+                "run-apply",
+                "2026-04-13T08:00:00+00:00",
+                "RepoAlpha",
+                campaign_type="security-review",
+            ),
         ],
         campaign_outcomes=[
             _campaign_outcome("security-review", "holding-clean"),
@@ -239,4 +298,7 @@ def test_intervention_ledger_docs_explain_historical_portfolio_intelligence() ->
 
     assert "Historical Portfolio Intelligence" in combined
     assert "Intervention Ledger" in combined
-    assert "current-state portfolio intelligence" in architecture or "current-state portfolio layer" in architecture
+    assert (
+        "current-state portfolio intelligence" in architecture
+        or "current-state portfolio layer" in architecture
+    )

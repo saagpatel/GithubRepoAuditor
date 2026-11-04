@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import json
 
-from github_repo_auditor.diff import diff_reports, format_diff_markdown, print_diff_summary
+from github_repo_auditor.diff import (
+    diff_reports,
+    format_diff_markdown,
+    print_diff_summary,
+)
 
 
-def _make_report(audits: list[dict], avg: float = 0.5, date: str = "2026-03-20") -> dict:
+def _make_report(
+    audits: list[dict], avg: float = 0.5, date: str = "2026-03-20"
+) -> dict:
     tiers = {}
     for a in audits:
         t = a["completeness_tier"]
@@ -33,7 +39,9 @@ def _make_report(audits: list[dict], avg: float = 0.5, date: str = "2026-03-20")
         "collections": {
             "showcase": {
                 "description": "Best examples",
-                "repos": [{"name": audits[0]["metadata"]["name"], "reason": "leader"}] if audits else [],
+                "repos": [{"name": audits[0]["metadata"]["name"], "reason": "leader"}]
+                if audits
+                else [],
             }
         },
         "scenario_summary": {
@@ -75,7 +83,9 @@ def _make_audit(name: str, score: float, tier: str) -> dict:
 class TestDiffReports:
     def test_new_repo_detected(self, tmp_path):
         prev = _make_report([_make_audit("Alpha", 0.8, "shipped")])
-        curr = _make_report([_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.5, "wip")])
+        curr = _make_report(
+            [_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.5, "wip")]
+        )
         (tmp_path / "prev.json").write_text(json.dumps(prev))
         (tmp_path / "curr.json").write_text(json.dumps(curr))
 
@@ -84,7 +94,9 @@ class TestDiffReports:
         assert len(diff.removed_repos) == 0
 
     def test_removed_repo_detected(self, tmp_path):
-        prev = _make_report([_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.5, "wip")])
+        prev = _make_report(
+            [_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.5, "wip")]
+        )
         curr = _make_report([_make_audit("Alpha", 0.8, "shipped")])
         (tmp_path / "prev.json").write_text(json.dumps(prev))
         (tmp_path / "curr.json").write_text(json.dumps(curr))
@@ -138,7 +150,9 @@ class TestDiffReports:
             }
         ]
         curr = _make_report([curr_audit], avg=0.8)
-        curr["collections"]["showcase"]["repos"] = [{"name": "Alpha", "reason": "improved"}]
+        curr["collections"]["showcase"]["repos"] = [
+            {"name": "Alpha", "reason": "improved"}
+        ]
         curr["lenses"]["ship_readiness"]["average_score"] = 0.8
         (tmp_path / "prev.json").write_text(json.dumps(prev))
         (tmp_path / "curr.json").write_text(json.dumps(curr))
@@ -148,7 +162,10 @@ class TestDiffReports:
         assert diff.repo_changes
         assert "ship_readiness" in diff.lens_deltas
         assert diff.profile_leaderboards
-        assert diff.scenario_preview["portfolio_projection"]["projected_tier_promotions"] >= 1
+        assert (
+            diff.scenario_preview["portfolio_projection"]["projected_tier_promotions"]
+            >= 1
+        )
         assert diff.security_changes
         assert diff.hotspot_changes
 
@@ -156,7 +173,9 @@ class TestDiffReports:
 class TestDiffMarkdown:
     def test_format_produces_markdown(self, tmp_path):
         prev = _make_report([_make_audit("Alpha", 0.5, "wip")])
-        curr = _make_report([_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.3, "skeleton")])
+        curr = _make_report(
+            [_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.3, "skeleton")]
+        )
         curr["lenses"]["ship_readiness"]["average_score"] = 0.8
         (tmp_path / "prev.json").write_text(json.dumps(prev))
         (tmp_path / "curr.json").write_text(json.dumps(curr))

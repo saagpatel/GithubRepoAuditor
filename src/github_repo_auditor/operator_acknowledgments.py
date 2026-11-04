@@ -158,7 +158,9 @@ def find_sibling_changes(primary: dict, material_changes: list[dict]) -> list[di
             continue
         if change.get("repo_name") != primary_repo:
             continue
-        if _is_security_event_pair(primary_type, change.get("change_type"), primary, change):
+        if _is_security_event_pair(
+            primary_type, change.get("change_type"), primary, change
+        ):
             siblings.append(change)
     return siblings
 

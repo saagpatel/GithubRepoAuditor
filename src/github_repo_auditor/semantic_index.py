@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 # Public types
 # ---------------------------------------------------------------------------
 
-VOYAGE_API_BASE_URL = os.environ.get("VOYAGE_API_BASE_URL", "https://api.voyageai.com/v1")
+VOYAGE_API_BASE_URL = os.environ.get(
+    "VOYAGE_API_BASE_URL", "https://api.voyageai.com/v1"
+)
 VOYAGE_MODEL = "voyage-code-3"
 VOYAGE_DIM = 512
 LOCAL_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -51,7 +53,9 @@ class DuplicateGroup:
     """A set of repos whose pairwise cosine similarity exceeds the configured threshold."""
 
     members: list[str]
-    representative: str  # the member with the most recent push (or first alphabetically)
+    representative: (
+        str  # the member with the most recent push (or first alphabetically)
+    )
     min_pairwise_cosine: float
 
 
@@ -197,7 +201,9 @@ def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
     try:
         import sqlite_vec  # type: ignore[import]
     except ImportError as exc:
-        raise ImportError("sqlite-vec is not installed. Run: pip install -e '.[semantic]'") from exc
+        raise ImportError(
+            "sqlite-vec is not installed. Run: pip install -e '.[semantic]'"
+        ) from exc
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)
@@ -258,7 +264,9 @@ class SemanticIndex:
                 logger.warning("Semantic index unavailable: %s", exc)
                 return None
         else:
-            logger.warning("Unknown embedder '%s'. Choose 'voyage' or 'local'.", embedder_name)
+            logger.warning(
+                "Unknown embedder '%s'. Choose 'voyage' or 'local'.", embedder_name
+            )
             return None
 
         # Verify sqlite-vec is importable
@@ -287,7 +295,9 @@ class SemanticIndex:
     # Public API
     # ------------------------------------------------------------------
 
-    def reindex(self, audits: list[RepoAudit], *, force: bool = False) -> dict[str, object]:
+    def reindex(
+        self, audits: list[RepoAudit], *, force: bool = False
+    ) -> dict[str, object]:
         """Embed each repo's document.  Skip if doc_sha256 and embedder unchanged.
 
         Returns
@@ -340,7 +350,9 @@ class SemanticIndex:
             for (audit, doc, sha), vec in zip(batch, vectors):
                 repo_name = audit.metadata.name
                 pushed_at = (
-                    audit.metadata.pushed_at.isoformat() if audit.metadata.pushed_at else None
+                    audit.metadata.pushed_at.isoformat()
+                    if audit.metadata.pushed_at
+                    else None
                 )
                 indexed_at = datetime.now(timezone.utc).isoformat()
 
@@ -395,7 +407,9 @@ class SemanticIndex:
         finally:
             conn.close()
 
-    def _search_inner(self, conn: sqlite3.Connection, query: str, *, k: int) -> list[SearchResult]:
+    def _search_inner(
+        self, conn: sqlite3.Connection, query: str, *, k: int
+    ) -> list[SearchResult]:
         vec = self._embedder.embed([query])[0]
         vec_str = "[" + ", ".join(str(v) for v in vec) + "]"
 
@@ -414,7 +428,9 @@ class SemanticIndex:
         results = []
         for repo_name, distance, _sha in rows:
             snippet = f"repo: {repo_name}"
-            results.append(SearchResult(repo_name=repo_name, score=distance, snippet=snippet))
+            results.append(
+                SearchResult(repo_name=repo_name, score=distance, snippet=snippet)
+            )
         return results
 
     def find_neighbors(self, repo_name: str, k: int = 5) -> list[SearchResult]:
@@ -430,7 +446,9 @@ class SemanticIndex:
                 (repo_name,),
             ).fetchone()
             if row is None:
-                logger.debug("find_neighbors: repo %r not in index, returning []", repo_name)
+                logger.debug(
+                    "find_neighbors: repo %r not in index, returning []", repo_name
+                )
                 return []
 
             rowid = row[0]
@@ -439,7 +457,9 @@ class SemanticIndex:
                 (rowid,),
             ).fetchone()
             if vec_row is None:
-                logger.debug("find_neighbors: no embedding for repo %r, returning []", repo_name)
+                logger.debug(
+                    "find_neighbors: no embedding for repo %r, returning []", repo_name
+                )
                 return []
 
             vec_str = vec_row[0]
@@ -461,7 +481,9 @@ class SemanticIndex:
                 if rname == repo_name:
                     continue
                 snippet = f"repo: {rname}"
-                results.append(SearchResult(repo_name=rname, score=distance, snippet=snippet))
+                results.append(
+                    SearchResult(repo_name=rname, score=distance, snippet=snippet)
+                )
                 if len(results) >= k:
                     break
             return results
@@ -597,7 +619,9 @@ class SemanticIndex:
                 for (a, b), dist in pair_distances.items()
                 if a in members_idx and b in members_idx
             ]
-            min_pairwise_cosine = 1.0 - max(relevant_dists) if relevant_dists else threshold
+            min_pairwise_cosine = (
+                1.0 - max(relevant_dists) if relevant_dists else threshold
+            )
 
             # Representative = most recently pushed, or first alphabetically as tiebreak
             best_idx = members_idx[0]

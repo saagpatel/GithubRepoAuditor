@@ -37,7 +37,9 @@ NOW = "2026-04-14T12:00:00+00:00"
 class FakeRunner:
     """Records every command and returns canned results keyed by the first 2 args."""
 
-    def __init__(self, results: dict[tuple[str, ...], CommandResult] | None = None) -> None:
+    def __init__(
+        self, results: dict[tuple[str, ...], CommandResult] | None = None
+    ) -> None:
         self.calls: list[tuple[list[str], Path]] = []
         self._results = results or {}
 
@@ -104,7 +106,10 @@ def test_context_pr_refuses_protected_branch(tmp_path: Path, branch: str) -> Non
     runner = FakeRunner()
     with pytest.raises(AutomationExecutionError):
         execute_context_pr(
-            _approved(), _plan(tmp_path, [], branch_name=branch), dry_run=False, runner=runner
+            _approved(),
+            _plan(tmp_path, [], branch_name=branch),
+            dry_run=False,
+            runner=runner,
         )
     assert runner.calls == []
 
@@ -124,21 +129,31 @@ def test_context_pr_refuses_empty_branch(tmp_path: Path) -> None:
     runner = FakeRunner()
     with pytest.raises(AutomationExecutionError):
         execute_context_pr(
-            _approved(), _plan(tmp_path, [], branch_name=""), dry_run=False, runner=runner
+            _approved(),
+            _plan(tmp_path, [], branch_name=""),
+            dry_run=False,
+            runner=runner,
         )
 
 
 @pytest.mark.parametrize("branch", ["Main", "MASTER"])
-def test_context_pr_protected_branch_guard_is_case_insensitive(tmp_path: Path, branch: str) -> None:
+def test_context_pr_protected_branch_guard_is_case_insensitive(
+    tmp_path: Path, branch: str
+) -> None:
     runner = FakeRunner()
     with pytest.raises(AutomationExecutionError):
         execute_context_pr(
-            _approved(), _plan(tmp_path, [], branch_name=branch), dry_run=False, runner=runner
+            _approved(),
+            _plan(tmp_path, [], branch_name=branch),
+            dry_run=False,
+            runner=runner,
         )
     assert runner.calls == []
 
 
-def test_context_pr_refuses_branch_equal_to_default_case_insensitive(tmp_path: Path) -> None:
+def test_context_pr_refuses_branch_equal_to_default_case_insensitive(
+    tmp_path: Path,
+) -> None:
     runner = FakeRunner()
     with pytest.raises(AutomationExecutionError):
         execute_context_pr(
@@ -150,11 +165,16 @@ def test_context_pr_refuses_branch_equal_to_default_case_insensitive(tmp_path: P
 
 
 @pytest.mark.parametrize("branch", ["--force", "-q", "has space", "--head"])
-def test_context_pr_refuses_flag_like_or_unsafe_branch(tmp_path: Path, branch: str) -> None:
+def test_context_pr_refuses_flag_like_or_unsafe_branch(
+    tmp_path: Path, branch: str
+) -> None:
     runner = FakeRunner()
     with pytest.raises(AutomationExecutionError):
         execute_context_pr(
-            _approved(), _plan(tmp_path, [], branch_name=branch), dry_run=False, runner=runner
+            _approved(),
+            _plan(tmp_path, [], branch_name=branch),
+            dry_run=False,
+            runner=runner,
         )
     assert runner.calls == []
 
@@ -163,7 +183,10 @@ def test_context_pr_refuses_empty_default_branch(tmp_path: Path) -> None:
     runner = FakeRunner()
     with pytest.raises(AutomationExecutionError):
         execute_context_pr(
-            _approved(), _plan(tmp_path, [], default_branch=""), dry_run=False, runner=runner
+            _approved(),
+            _plan(tmp_path, [], default_branch=""),
+            dry_run=False,
+            runner=runner,
         )
 
 
@@ -194,7 +217,9 @@ def test_context_pr_apply_change_failure_returns_failed_and_restores_branch(
 def test_context_pr_skips_dirty_worktree(tmp_path: Path) -> None:
     runner = FakeRunner({("git", "status"): CommandResult(0, " M file.py\n")})
     applied: list[Path] = []
-    result = execute_context_pr(_approved(), _plan(tmp_path, applied), dry_run=False, runner=runner)
+    result = execute_context_pr(
+        _approved(), _plan(tmp_path, applied), dry_run=False, runner=runner
+    )
     assert result.outcome == "skipped"
     assert "dirty" in result.detail
     assert applied == []  # change never applied
@@ -206,7 +231,10 @@ def test_context_pr_skips_when_no_git(tmp_path: Path) -> None:
     runner = FakeRunner()
     applied: list[Path] = []
     result = execute_context_pr(
-        _approved(), _plan(tmp_path, applied, has_git=False), dry_run=False, runner=runner
+        _approved(),
+        _plan(tmp_path, applied, has_git=False),
+        dry_run=False,
+        runner=runner,
     )
     assert result.outcome == "skipped"
     assert applied == []
@@ -234,9 +262,13 @@ def test_context_pr_dry_run_is_default_and_mutates_nothing(tmp_path: Path) -> No
 
 
 def test_context_pr_apply_runs_full_sequence_and_opens_pr(tmp_path: Path) -> None:
-    runner = FakeRunner({("gh", "pr"): CommandResult(0, "https://github.com/owner/Repo/pull/7\n")})
+    runner = FakeRunner(
+        {("gh", "pr"): CommandResult(0, "https://github.com/owner/Repo/pull/7\n")}
+    )
     applied: list[Path] = []
-    result = execute_context_pr(_approved(), _plan(tmp_path, applied), dry_run=False, runner=runner)
+    result = execute_context_pr(
+        _approved(), _plan(tmp_path, applied), dry_run=False, runner=runner
+    )
     assert result.outcome == "applied"
     assert result.reference == "https://github.com/owner/Repo/pull/7"
     assert applied == [tmp_path]  # change applied exactly once
@@ -264,12 +296,16 @@ def test_context_pr_apply_runs_full_sequence_and_opens_pr(tmp_path: Path) -> Non
     ]
 
 
-def test_context_pr_applied_with_no_pr_url_surfaces_missing_reference(tmp_path: Path) -> None:
+def test_context_pr_applied_with_no_pr_url_surfaces_missing_reference(
+    tmp_path: Path,
+) -> None:
     # gh reports success (rc 0) but prints no URL: the PR was created, so the
     # outcome stays "applied" (re-running would duplicate it), but the empty
     # reference is made visible in the detail rather than silently recorded.
     runner = FakeRunner({("gh", "pr"): CommandResult(0, "")})
-    result = execute_context_pr(_approved(), _plan(tmp_path, []), dry_run=False, runner=runner)
+    result = execute_context_pr(
+        _approved(), _plan(tmp_path, []), dry_run=False, runner=runner
+    )
     assert result.outcome == "applied"
     assert result.reference == ""
     assert "no PR URL" in result.detail
@@ -296,11 +332,19 @@ def test_context_pr_apply_change_runs_after_branch_before_add(tmp_path: Path) ->
 
 def test_context_pr_aborts_on_commit_failure(tmp_path: Path) -> None:
     runner = FakeRunner({("git", "commit"): CommandResult(1, "", "nothing to commit")})
-    result = execute_context_pr(_approved(), _plan(tmp_path, []), dry_run=False, runner=runner)
+    result = execute_context_pr(
+        _approved(), _plan(tmp_path, []), dry_run=False, runner=runner
+    )
     assert result.outcome == "failed"
     assert "nothing to commit" in result.detail
     # push / pr create must NOT run after a failed commit.
-    assert ["git", "push", "-u", "origin", "auto/context-repo"] not in runner.command_args
+    assert [
+        "git",
+        "push",
+        "-u",
+        "origin",
+        "auto/context-repo",
+    ] not in runner.command_args
     assert not any(args[:2] == ["gh", "pr"] for args in runner.command_args)
 
 
@@ -379,7 +423,9 @@ def test_mark_executed_rejects_non_approved() -> None:
         status=STATUS_PENDING,
     )
     with pytest.raises(ProposalApprovalError):
-        mark_executed([pending], "context-pr:owner/Repo", executed_at=NOW, execution_ref="x")
+        mark_executed(
+            [pending], "context-pr:owner/Repo", executed_at=NOW, execution_ref="x"
+        )
 
 
 def test_mark_executed_unknown_id_raises() -> None:

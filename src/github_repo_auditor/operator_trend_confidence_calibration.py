@@ -51,24 +51,38 @@ def build_confidence_calibration(
             }
         )
 
-    judged = [item for item in evaluations if item.get("outcome") != "insufficient_future_runs"]
+    judged = [
+        item
+        for item in evaluations
+        if item.get("outcome") != "insufficient_future_runs"
+    ]
     high_judged = [item for item in judged if item.get("confidence_label") == "high"]
-    medium_judged = [item for item in judged if item.get("confidence_label") == "medium"]
+    medium_judged = [
+        item for item in judged if item.get("confidence_label") == "medium"
+    ]
     low_all = [item for item in evaluations if item.get("confidence_label") == "low"]
     high_hits = sum(1 for item in high_judged if item.get("health_state") == "healthy")
-    medium_hits = sum(1 for item in medium_judged if item.get("health_state") == "healthy")
+    medium_hits = sum(
+        1 for item in medium_judged if item.get("health_state") == "healthy"
+    )
     low_cautions = sum(1 for item in low_all if item.get("health_state") == "healthy")
     reopened_high_count = sum(
         1
         for item in evaluations
         if item.get("confidence_label") == "high" and item.get("outcome") == "reopened"
     )
-    high_confidence_hit_rate = round(high_hits / len(high_judged), 2) if high_judged else 0.0
+    high_confidence_hit_rate = (
+        round(high_hits / len(high_judged), 2) if high_judged else 0.0
+    )
     medium_confidence_hit_rate = (
         round(medium_hits / len(medium_judged), 2) if medium_judged else 0.0
     )
-    low_confidence_caution_rate = round(low_cautions / len(low_all), 2) if low_all else 0.0
-    reopened_recommendation_count = sum(1 for item in judged if item.get("outcome") == "reopened")
+    low_confidence_caution_rate = (
+        round(low_cautions / len(low_all), 2) if low_all else 0.0
+    )
+    reopened_recommendation_count = sum(
+        1 for item in judged if item.get("outcome") == "reopened"
+    )
     confidence_validation_status = _confidence_validation_status(
         judged_count=len(judged),
         high_confidence_hit_rate=high_confidence_hit_rate,
@@ -83,7 +97,9 @@ def build_confidence_calibration(
             "outcome": item.get("outcome", "unresolved"),
             "validated_in_runs": item.get("validated_in_runs"),
         }
-        for item in sorted(judged, key=lambda item: item.get("generated_at", ""), reverse=True)[:5]
+        for item in sorted(
+            judged, key=lambda item: item.get("generated_at", ""), reverse=True
+        )[:5]
     ]
     return {
         "confidence_validation_status": confidence_validation_status,
@@ -101,7 +117,9 @@ def build_confidence_calibration(
             1 for item in evaluations if item.get("outcome") == "reopened"
         ),
         "insufficient_future_runs_count": sum(
-            1 for item in evaluations if item.get("outcome") == "insufficient_future_runs"
+            1
+            for item in evaluations
+            if item.get("outcome") == "insufficient_future_runs"
         ),
         "high_confidence_hit_rate": high_confidence_hit_rate,
         "medium_confidence_hit_rate": medium_confidence_hit_rate,
@@ -155,7 +173,9 @@ def _calibration_outcome(
             return "validated", clear_index
         return "partially_validated", clear_index
     if _has_pressure_drop(original_lane, future_lanes):
-        return "partially_validated", _first_pressure_drop_run(original_lane, future_lanes)
+        return "partially_validated", _first_pressure_drop_run(
+            original_lane, future_lanes
+        )
     return "unresolved", VALIDATION_WINDOW_RUNS
 
 
@@ -198,10 +218,15 @@ def _lane_pressure(lane: str | None) -> int:
 
 def _has_pressure_drop(original_lane: str, future_lanes: list[str | None]) -> bool:
     origin_pressure = _lane_pressure(original_lane)
-    return any(lane is not None and _lane_pressure(lane) < origin_pressure for lane in future_lanes)
+    return any(
+        lane is not None and _lane_pressure(lane) < origin_pressure
+        for lane in future_lanes
+    )
 
 
-def _first_pressure_drop_run(original_lane: str, future_lanes: list[str | None]) -> int | None:
+def _first_pressure_drop_run(
+    original_lane: str, future_lanes: list[str | None]
+) -> int | None:
     origin_pressure = _lane_pressure(original_lane)
     for index, lane in enumerate(future_lanes, start=1):
         if lane is not None and _lane_pressure(lane) < origin_pressure:

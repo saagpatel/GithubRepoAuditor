@@ -15,8 +15,11 @@ def build_dependency_graph(audits: list[dict]) -> dict:
         if not repo_name:
             continue
         dep_details = next(
-            (r.get("details", {}) for r in audit.get("analyzer_results", [])
-             if r.get("dimension") == "dependencies"),
+            (
+                r.get("details", {})
+                for r in audit.get("analyzer_results", [])
+                if r.get("dimension") == "dependencies"
+            ),
             {},
         )
         dep_names = dep_details.get("dependency_names", [])
@@ -53,8 +56,11 @@ def find_vulnerability_impact(audits: list[dict], dep_name: str) -> list[str]:
     for audit in audits:
         repo_name = audit.get("metadata", {}).get("name", "")
         dep_details = next(
-            (r.get("details", {}) for r in audit.get("analyzer_results", [])
-             if r.get("dimension") == "dependencies"),
+            (
+                r.get("details", {})
+                for r in audit.get("analyzer_results", [])
+                if r.get("dimension") == "dependencies"
+            ),
             {},
         )
         if dep_name in dep_details.get("dependency_names", []):

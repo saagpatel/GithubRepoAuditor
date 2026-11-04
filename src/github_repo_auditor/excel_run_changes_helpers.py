@@ -12,7 +12,9 @@ from github_repo_auditor.report_enrichment import (
 def build_run_changes_content(
     data: dict,
     diff_data: dict | None,
-) -> tuple[str, str, list[tuple[str, object]], list[tuple[str, list[list[object]], list[str]]]]:
+) -> tuple[
+    str, str, list[tuple[str, object]], list[tuple[str, list[list[object]], list[str]]]
+]:
     counts = build_run_change_counts(diff_data)
     summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
     comparison_window = (
@@ -37,7 +39,8 @@ def build_run_changes_content(
         reverse=True,
     )
     regressions = sorted(
-        (diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0)
+        (diff_data or {}).get("score_changes", []),
+        key=lambda item: item.get("delta", 0.0),
     )[:5]
     sections.append(
         (
@@ -68,8 +71,12 @@ def build_run_changes_content(
         )
     )
     tier_changes = (diff_data or {}).get("tier_changes", [])
-    promotions = [item for item in tier_changes if item.get("direction") == "promotion"][:5]
-    demotions = [item for item in tier_changes if item.get("direction") == "demotion"][:5]
+    promotions = [
+        item for item in tier_changes if item.get("direction") == "promotion"
+    ][:5]
+    demotions = [item for item in tier_changes if item.get("direction") == "demotion"][
+        :5
+    ]
     sections.append(
         (
             "Tier Promotions / Demotions",
@@ -86,7 +93,9 @@ def build_run_changes_content(
         )
     )
     blocked_items = [
-        item for item in (data.get("operator_queue") or []) if item.get("lane") == "blocked"
+        item
+        for item in (data.get("operator_queue") or [])
+        if item.get("lane") == "blocked"
     ][:5]
     sections.append(
         (
@@ -111,7 +120,11 @@ def build_run_changes_content(
         (
             "Reopened Items",
             [
-                [item.get("repo", ""), item.get("title", ""), item.get("change_type", "")]
+                [
+                    item.get("repo", ""),
+                    item.get("title", ""),
+                    item.get("change_type", ""),
+                ]
                 for item in reopened
             ],
             ["Repo", "Title", "Type"],
@@ -123,7 +136,9 @@ def build_run_changes_content(
             [item.get("repo_full_name", ""), item.get("drift_type", ""), "governance"]
         )
     for item in (diff_data or {}).get("security_changes", [])[:5]:
-        pressure_rows.append([item.get("name", ""), item.get("new_label", ""), "security"])
+        pressure_rows.append(
+            [item.get("name", ""), item.get("new_label", ""), "security"]
+        )
     sections.append(
         (
             "New Security / Governance Pressure",
@@ -139,7 +154,9 @@ def normalize_run_changes_sections(
 ) -> list[tuple[str, list[list[object]], list[str]]]:
     normalized: list[tuple[str, list[list[object]], list[str]]] = []
     for title, rows, headers in sections:
-        section_rows = rows or [["No movement to call out yet.", "", ""][: len(headers)]]
+        section_rows = rows or [
+            ["No movement to call out yet.", "", ""][: len(headers)]
+        ]
         normalized.append((title, section_rows, headers))
     return normalized
 
@@ -192,7 +209,9 @@ def write_run_changes_sections(
                     "center" if isinstance(value, (int, float)) else "left",
                 )
         if rows:
-            apply_zebra_stripes(ws, header_row + 1, header_row + len(rows), len(headers))
+            apply_zebra_stripes(
+                ws, header_row + 1, header_row + len(rows), len(headers)
+            )
         row = header_row + len(rows) + 2
     return row
 

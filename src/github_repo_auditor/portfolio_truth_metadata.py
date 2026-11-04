@@ -105,8 +105,7 @@ def build_source_summary(
             )
         ),
         "archived_count": sum(
-            _field(_section(project, "derived"), "archived")
-            for project in projects
+            _field(_section(project, "derived"), "archived") for project in projects
         ),
         "attention_state_counts": dict(
             Counter(
@@ -218,9 +217,7 @@ def build_input_envelope(
                         now.astimezone(timezone.utc)
                         - parsed_produced_at.astimezone(timezone.utc)
                     ).total_seconds() / 3600
-                    github_security["age_hours"] = round(
-                        max(raw_age_hours, 0.0), 3
-                    )
+                    github_security["age_hours"] = round(max(raw_age_hours, 0.0), 3)
         inputs["github_security"] = github_security
     return inputs
 

@@ -50,7 +50,9 @@ def _current_run_snapshot(report_data: dict[str, Any]) -> dict[str, Any]:
         "campaign_history": list(report_data.get("campaign_history") or []),
         "operator_summary": operator_summary,
         "operator_queue": list(report_data.get("operator_queue") or []),
-        "campaign_outcomes_summary": _copy_mapping(report_data.get("campaign_outcomes_summary")),
+        "campaign_outcomes_summary": _copy_mapping(
+            report_data.get("campaign_outcomes_summary")
+        ),
     }
 
 
@@ -77,16 +79,36 @@ def _current_campaign_run_event(report_data: dict[str, Any]) -> dict[str, Any] |
     writeback_results = _copy_mapping(report_data.get("writeback_results"))
     writeback_preview = _copy_mapping(report_data.get("writeback_preview"))
     campaign_run = _copy_mapping(writeback_results.get("campaign_run"))
-    mode = str(campaign_run.get("mode") or writeback_results.get("mode") or writeback_preview.get("mode") or "preview")
-    target = str(campaign_run.get("writeback_target") or writeback_results.get("target") or writeback_preview.get("target") or "preview-only")
+    mode = str(
+        campaign_run.get("mode")
+        or writeback_results.get("mode")
+        or writeback_preview.get("mode")
+        or "preview"
+    )
+    target = str(
+        campaign_run.get("writeback_target")
+        or writeback_results.get("target")
+        or writeback_preview.get("target")
+        or "preview-only"
+    )
     generated_action_ids = list(campaign_run.get("generated_action_ids") or [])
     if not generated_action_ids:
-        generated_action_ids = [str(action.get("action_id") or "") for action in report_data.get("action_runs") or [] if str(action.get("campaign_type") or "") == str(campaign_summary.get("campaign_type") or "")]
+        generated_action_ids = [
+            str(action.get("action_id") or "")
+            for action in report_data.get("action_runs") or []
+            if str(action.get("campaign_type") or "")
+            == str(campaign_summary.get("campaign_type") or "")
+        ]
     return {
         "run_id": _current_run_id(report_data),
         "generated_at": str(report_data.get("generated_at") or ""),
         "campaign_type": str(campaign_summary.get("campaign_type") or ""),
-        "label": str(campaign_summary.get("label") or CAMPAIGN_DEFINITIONS.get(campaign_summary.get("campaign_type"), {}).get("label", "Campaign")),
+        "label": str(
+            campaign_summary.get("label")
+            or CAMPAIGN_DEFINITIONS.get(campaign_summary.get("campaign_type"), {}).get(
+                "label", "Campaign"
+            )
+        ),
         "writeback_target": target,
         "mode": mode,
         "generated_action_ids": generated_action_ids,
@@ -101,7 +123,10 @@ def _campaign_run_events(
     current_event = _current_campaign_run_event(report_data)
     if current_event:
         events.append(current_event)
-    seen = {(current_event or {}).get("run_id"), (current_event or {}).get("campaign_type")}
+    seen = {
+        (current_event or {}).get("run_id"),
+        (current_event or {}).get("campaign_type"),
+    }
     for event in recent_campaign_runs:
         key = (event.get("run_id"), event.get("campaign_type"))
         if key in seen:
@@ -141,7 +166,9 @@ def _current_drift_events(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     run_id = _current_run_id(report_data)
     generated_at = str(report_data.get("generated_at") or "")
     events = []
-    active_campaign = str((_copy_mapping(report_data.get("campaign_summary"))).get("campaign_type") or "")
+    active_campaign = str(
+        (_copy_mapping(report_data.get("campaign_summary"))).get("campaign_type") or ""
+    )
     for item in report_data.get("managed_state_drift") or []:
         row = dict(item)
         row["run_id"] = run_id
@@ -156,7 +183,7 @@ def _current_rollback_runs(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     source_run_id = _current_run_id(report_data)
     generated_at = str(report_data.get("generated_at") or "")
     results = []
-    for item in (_copy_mapping(report_data.get("rollback_preview")).get("items") or []):
+    for item in _copy_mapping(report_data.get("rollback_preview")).get("items") or []:
         results.append(
             {
                 "run_id": f"{source_run_id}:{item.get('action_id', item.get('repo_full_name', 'rollback'))}:{item.get('target', '')}",
@@ -185,7 +212,9 @@ def _high_pressure_count(snapshot: dict[str, Any]) -> int | None:
 
 
 def _sort_by_generated(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return sorted(rows, key=lambda item: str(item.get("generated_at") or ""), reverse=True)
+    return sorted(
+        rows, key=lambda item: str(item.get("generated_at") or ""), reverse=True
+    )
 
 
 def _latest_apply_event(
@@ -196,15 +225,19 @@ def _latest_apply_event(
     allow_thin_history_fallback: bool = False,
 ) -> dict[str, Any]:
     matching = [
-        row for row in campaign_runs
-        if row.get("campaign_type") == campaign_type and row.get("mode") == "apply" and str(row.get("run_id") or "") in run_ids
+        row
+        for row in campaign_runs
+        if row.get("campaign_type") == campaign_type
+        and row.get("mode") == "apply"
+        and str(row.get("run_id") or "") in run_ids
     ]
     if matching:
         return _sort_by_generated(matching)[0]
     if not allow_thin_history_fallback:
         return {}
     fallback = [
-        row for row in campaign_runs
+        row
+        for row in campaign_runs
         if row.get("campaign_type") == campaign_type and row.get("mode") == "apply"
     ]
     return _sort_by_generated(fallback)[0] if fallback else {}
@@ -218,28 +251,38 @@ def _latest_event(
     allow_thin_history_fallback: bool = False,
 ) -> dict[str, Any]:
     matching = [
-        row for row in campaign_runs
-        if row.get("campaign_type") == campaign_type and str(row.get("run_id") or "") in run_ids
+        row
+        for row in campaign_runs
+        if row.get("campaign_type") == campaign_type
+        and str(row.get("run_id") or "") in run_ids
     ]
     if matching:
         return _sort_by_generated(matching)[0]
     if not allow_thin_history_fallback:
         return {}
-    fallback = [row for row in campaign_runs if row.get("campaign_type") == campaign_type]
+    fallback = [
+        row for row in campaign_runs if row.get("campaign_type") == campaign_type
+    ]
     return _sort_by_generated(fallback)[0] if fallback else {}
 
 
-def _action_rows_for_run(action_runs: list[dict[str, Any]], run_id: str, campaign_type: str) -> list[dict[str, Any]]:
+def _action_rows_for_run(
+    action_runs: list[dict[str, Any]], run_id: str, campaign_type: str
+) -> list[dict[str, Any]]:
     return [
-        row for row in action_runs
-        if str(row.get("run_id") or "") == run_id and str(row.get("campaign_type") or "") == campaign_type
+        row
+        for row in action_runs
+        if str(row.get("run_id") or "") == run_id
+        and str(row.get("campaign_type") or "") == campaign_type
     ]
 
 
 def _top_repos(action_rows: list[dict[str, Any]]) -> list[str]:
     repos: list[str] = []
     for row in action_rows:
-        repo = str(row.get("repo_id") or row.get("repo_full_name") or row.get("repo") or "").strip()
+        repo = str(
+            row.get("repo_id") or row.get("repo_full_name") or row.get("repo") or ""
+        ).strip()
         if repo and repo not in repos:
             repos.append(repo)
         if len(repos) == 3:
@@ -247,7 +290,9 @@ def _top_repos(action_rows: list[dict[str, Any]]) -> list[str]:
     return repos
 
 
-def _monitoring_run_slices(run_snapshots: list[dict[str, Any]], apply_run_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _monitoring_run_slices(
+    run_snapshots: list[dict[str, Any]], apply_run_id: str
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     apply_snapshot = {}
     post_runs: list[dict[str, Any]] = []
     for index, snapshot in enumerate(run_snapshots):
@@ -277,7 +322,11 @@ def _campaign_drift_returned(
             continue
         if str(event.get("generated_at") or "") <= apply_generated_at:
             continue
-        if action_ids and str(event.get("action_id") or "") not in action_ids and str(event.get("action_id") or ""):
+        if (
+            action_ids
+            and str(event.get("action_id") or "") not in action_ids
+            and str(event.get("action_id") or "")
+        ):
             continue
         return True
     return False
@@ -293,7 +342,11 @@ def _campaign_reopened(
             continue
         if str(item.get("generated_at") or "") <= apply_generated_at:
             continue
-        if item.get("reopened_at") or str(item.get("lifecycle_state") or "") == "open" and str(item.get("reconciliation_outcome") or "") == "reopened":
+        if (
+            item.get("reopened_at")
+            or str(item.get("lifecycle_state") or "") == "open"
+            and str(item.get("reconciliation_outcome") or "") == "reopened"
+        ):
             return True
         if str(item.get("reconciliation_outcome") or "") == "reopened":
             return True
@@ -305,7 +358,11 @@ def _rollback_state(
     rollback_runs: list[dict[str, Any]],
     apply_run_id: str,
 ) -> str:
-    if any(str(item.get("source_run_id") or "") == apply_run_id and str(item.get("status") or "") not in {"preview", ""} for item in rollback_runs):
+    if any(
+        str(item.get("source_run_id") or "") == apply_run_id
+        and str(item.get("status") or "") not in {"preview", ""}
+        for item in rollback_runs
+    ):
         return "used"
     if not action_rows:
         return "not-applicable"
@@ -314,14 +371,20 @@ def _rollback_state(
         return "not-applicable"
     if states <= {"fully-reversible", "rollback-available"}:
         return "ready"
-    if "partial" in states or "fully-reversible" in states or "rollback-available" in states:
+    if (
+        "partial" in states
+        or "fully-reversible" in states
+        or "rollback-available" in states
+    ):
         return "partial"
     if states <= {"non-reversible"}:
         return "missing"
     return "partial"
 
 
-def _pressure_effect(apply_snapshot: dict[str, Any], post_runs: list[dict[str, Any]]) -> str:
+def _pressure_effect(
+    apply_snapshot: dict[str, Any], post_runs: list[dict[str, Any]]
+) -> str:
     if not apply_snapshot or not post_runs:
         return "insufficient-evidence"
     apply_pressure = _high_pressure_count(apply_snapshot)
@@ -389,7 +452,9 @@ def _summary(record: dict[str, Any]) -> str:
     if state == "drift-returned":
         return f"{label} drift returned after apply, so the managed mirror needs review before more Action Sync."
     if state == "reopened":
-        return f"{label} reopened after apply, so the original sync did not hold cleanly."
+        return (
+            f"{label} reopened after apply, so the original sync did not hold cleanly."
+        )
     if state == "rollback-watch":
         return f"{label} needs rollback watch because the apply path was not fully reversible or rollback was used."
     if state == "monitor-now":
@@ -405,7 +470,9 @@ def _summary(record: dict[str, Any]) -> str:
 
 def _outcome_sort_key(record: dict[str, Any]) -> tuple[int, int, str]:
     return (
-        MONITORING_PRIORITY.get(str(record.get("monitoring_state") or "no-recent-apply"), 99),
+        MONITORING_PRIORITY.get(
+            str(record.get("monitoring_state") or "no-recent-apply"), 99
+        ),
         -int(record.get("recent_apply_count", 0) or 0),
         str(record.get("campaign_type") or ""),
     )
@@ -415,7 +482,8 @@ def _next_monitoring_step(outcomes: list[dict[str, Any]]) -> dict[str, Any]:
     actionable = [
         record
         for record in outcomes
-        if str(record.get("monitoring_state") or "") not in {"no-recent-apply", "insufficient-evidence"}
+        if str(record.get("monitoring_state") or "")
+        not in {"no-recent-apply", "insufficient-evidence"}
     ]
     if not actionable:
         return {
@@ -455,8 +523,13 @@ def _queue_post_apply_lines(
         outcome = outcomes_by_campaign.get(campaign_type, {})
         state = str(outcome.get("monitoring_state") or "no-recent-apply")
         mapped["post_apply_state"] = state
-        mapped["post_apply_summary"] = str(outcome.get("summary") or "No post-apply monitoring is surfaced for this item yet.")
-        mapped["post_apply_line"] = f"Post-Apply Monitoring: {mapped['post_apply_summary']}"
+        mapped["post_apply_summary"] = str(
+            outcome.get("summary")
+            or "No post-apply monitoring is surfaced for this item yet."
+        )
+        mapped["post_apply_line"] = (
+            f"Post-Apply Monitoring: {mapped['post_apply_summary']}"
+        )
         enriched.append(mapped)
     return enriched
 
@@ -476,7 +549,9 @@ def build_action_sync_outcomes_bundle(
     run_ids = {str(item.get("run_id") or "") for item in run_snapshots}
     campaign_runs = _campaign_run_events(report_data, recent_campaign_runs)
     action_runs = _current_action_runs(report_data) + list(recent_action_runs)
-    campaign_history = _current_campaign_history(report_data) + list(recent_campaign_history)
+    campaign_history = _current_campaign_history(report_data) + list(
+        recent_campaign_history
+    )
     drift_events = _current_drift_events(report_data) + list(recent_drift_events)
     rollback_runs = _current_rollback_runs(report_data) + list(recent_rollback_runs)
     history_is_thin = len(run_snapshots) < FOLLOW_UP_WINDOW_RUNS
@@ -497,7 +572,9 @@ def build_action_sync_outcomes_bundle(
             allow_thin_history_fallback=history_is_thin,
         )
         latest_run_mode = str((latest_event or {}).get("mode") or "preview")
-        latest_target = str((latest_apply or latest_event or {}).get("writeback_target") or "none")
+        latest_target = str(
+            (latest_apply or latest_event or {}).get("writeback_target") or "none"
+        )
         recent_apply_count = sum(
             1
             for event in campaign_runs
@@ -508,8 +585,16 @@ def build_action_sync_outcomes_bundle(
         if recent_apply_count <= 0 and history_is_thin and latest_apply:
             recent_apply_count = 1
         apply_run_id = str(latest_apply.get("run_id") or "")
-        apply_snapshot, post_runs = _monitoring_run_slices(run_snapshots, apply_run_id) if apply_run_id else ({}, [])
-        action_rows = _action_rows_for_run(action_runs, apply_run_id, campaign_type) if apply_run_id else []
+        apply_snapshot, post_runs = (
+            _monitoring_run_slices(run_snapshots, apply_run_id)
+            if apply_run_id
+            else ({}, [])
+        )
+        action_rows = (
+            _action_rows_for_run(action_runs, apply_run_id, campaign_type)
+            if apply_run_id
+            else []
+        )
         top_repos = _top_repos(action_rows)
         action_ids = {
             str(row.get("action_id") or "")
@@ -520,7 +605,13 @@ def build_action_sync_outcomes_bundle(
             for action_id in (latest_apply.get("generated_action_ids") or [])
             if str(action_id)
         }
-        monitored_repo_count = len({str(row.get("repo_id") or "") for row in action_rows if str(row.get("repo_id") or "")})
+        monitored_repo_count = len(
+            {
+                str(row.get("repo_id") or "")
+                for row in action_rows
+                if str(row.get("repo_id") or "")
+            }
+        )
         if not monitored_repo_count:
             monitored_repo_count = len(top_repos)
         if not top_repos:
@@ -531,7 +622,8 @@ def build_action_sync_outcomes_bundle(
             ]
         drift_state = (
             "returned"
-            if latest_apply and _campaign_drift_returned(
+            if latest_apply
+            and _campaign_drift_returned(
                 campaign_type,
                 post_runs,
                 drift_events,
@@ -542,7 +634,8 @@ def build_action_sync_outcomes_bundle(
         )
         reopen_state = (
             "reopened"
-            if latest_apply and _campaign_reopened(
+            if latest_apply
+            and _campaign_reopened(
                 campaign_type,
                 campaign_history,
                 str(latest_apply.get("generated_at") or ""),
@@ -586,7 +679,9 @@ def build_action_sync_outcomes_bundle(
         "campaign_outcomes_summary": {
             "summary": _summary_line(outcomes),
             "counts": {
-                state: sum(1 for record in outcomes if record.get("monitoring_state") == state)
+                state: sum(
+                    1 for record in outcomes if record.get("monitoring_state") == state
+                )
                 for state in (
                     "no-recent-apply",
                     "monitor-now",
@@ -599,23 +694,45 @@ def build_action_sync_outcomes_bundle(
             },
         },
         "next_monitoring_step": next_step,
-        "top_monitor_now_campaigns": [record for record in ordered if record.get("monitoring_state") == "monitor-now"][:3],
-        "top_holding_clean_campaigns": [record for record in ordered if record.get("monitoring_state") == "holding-clean"][:3],
-        "top_reopened_campaigns": [record for record in ordered if record.get("monitoring_state") == "reopened"][:3],
-        "top_drift_returned_campaigns": [record for record in ordered if record.get("monitoring_state") == "drift-returned"][:3],
+        "top_monitor_now_campaigns": [
+            record
+            for record in ordered
+            if record.get("monitoring_state") == "monitor-now"
+        ][:3],
+        "top_holding_clean_campaigns": [
+            record
+            for record in ordered
+            if record.get("monitoring_state") == "holding-clean"
+        ][:3],
+        "top_reopened_campaigns": [
+            record for record in ordered if record.get("monitoring_state") == "reopened"
+        ][:3],
+        "top_drift_returned_campaigns": [
+            record
+            for record in ordered
+            if record.get("monitoring_state") == "drift-returned"
+        ][:3],
         "operator_queue": _queue_post_apply_lines(queue, outcomes_by_campaign),
     }
 
 
-def load_action_sync_outcomes_bundle(output_dir: Any, report_data: dict[str, Any], queue: list[dict[str, Any]]) -> dict[str, Any]:
+def load_action_sync_outcomes_bundle(
+    output_dir: Any, report_data: dict[str, Any], queue: list[dict[str, Any]]
+) -> dict[str, Any]:
     username = str(report_data.get("username") or "")
     return build_action_sync_outcomes_bundle(
         report_data,
         queue,
-        recent_runs=load_latest_audit_runs(output_dir, username, limit=FOLLOW_UP_WINDOW_RUNS),
+        recent_runs=load_latest_audit_runs(
+            output_dir, username, limit=FOLLOW_UP_WINDOW_RUNS
+        ),
         recent_campaign_runs=load_recent_campaign_runs(output_dir, username, limit=30),
         recent_action_runs=load_recent_action_runs(output_dir, username, limit=400),
-        recent_campaign_history=load_recent_campaign_history(output_dir, username, limit=200),
-        recent_drift_events=load_recent_campaign_drift_events(output_dir, username, limit=200),
+        recent_campaign_history=load_recent_campaign_history(
+            output_dir, username, limit=200
+        ),
+        recent_drift_events=load_recent_campaign_drift_events(
+            output_dir, username, limit=200
+        ),
         recent_rollback_runs=load_recent_rollback_runs(output_dir, username, limit=200),
     )

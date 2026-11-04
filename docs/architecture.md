@@ -262,7 +262,7 @@ The new contract is `decision_quality_v1`. It is assembled in `src/github_repo_a
 
 - it summarizes measured recommendation quality and trust posture
 - it exposes downgrade reasons and a `human_skepticism_required` flag
-- it carries a hard `authority_cap` of `advisory-only`
+- it carries a hard `authority_cap` of `bounded-automation`
 - it does not grant stronger automation, approval, or execution rights
 
 The architecture rule for this layer is strict:

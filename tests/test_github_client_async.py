@@ -129,7 +129,9 @@ class TestConcurrencyBound:
         # 5 repos × 6 endpoints = 30 requests with concurrency cap = 3
         repo_pairs = [(f"owner{i}", f"repo{i}") for i in range(5)]
         transport = httpx.MockTransport(handler)
-        fetch_enrichment_sync(repo_pairs, max_concurrency=max_concurrency, _transport=transport)
+        fetch_enrichment_sync(
+            repo_pairs, max_concurrency=max_concurrency, _transport=transport
+        )
 
         assert max_inflight <= max_concurrency, (
             f"Concurrency exceeded: max inflight was {max_inflight}, limit was {max_concurrency}"
@@ -140,6 +142,50 @@ class TestConcurrencyBound:
 
 
 class TestRateLimitBackoff:
+    @pytest.mark.parametrize(
+        "headers", [{"X-RateLimit-Remaining": "0"}, {"Retry-After": "1"}]
+    )
+    def test_403_rate_limit_retried_before_unavailable(self, monkeypatch, headers):
+        from unittest.mock import AsyncMock
+
+        sleep = AsyncMock()
+        monkeypatch.setattr(asyncio, "sleep", sleep)
+        calls = []
+
+        def handler(request):
+            calls.append(request)
+            if len(calls) == 1:
+                return httpx.Response(
+                    403, json={"message": "rate limited"}, headers=headers
+                )
+            return _make_json_response({"retried": True})
+
+        async def run():
+            async with AsyncGitHubClient(
+                transport=httpx.MockTransport(handler)
+            ) as client:
+                return await client._fetch("https://api.github.com/repos/o/r")
+
+        assert asyncio.run(run()) == {"retried": True}
+        assert len(calls) == 2
+        sleep.assert_awaited_once()
+
+    def test_generic_403_returns_none_without_retry(self):
+        calls = []
+
+        def handler(request):
+            calls.append(request)
+            return httpx.Response(403, json={"message": "Forbidden"})
+
+        async def run():
+            async with AsyncGitHubClient(
+                transport=httpx.MockTransport(handler)
+            ) as client:
+                return await client._fetch("https://api.github.com/repos/o/r")
+
+        assert asyncio.run(run()) is None
+        assert len(calls) == 1
+
     def test_429_retry_after_succeeds_on_second_attempt(self):
         """A 429 with Retry-After: 0 followed by a 200 is retried and succeeds."""
         call_counts: dict[str, int] = {}

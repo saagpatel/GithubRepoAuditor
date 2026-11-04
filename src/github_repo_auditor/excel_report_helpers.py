@@ -2,7 +2,9 @@ def collection_memberships(data: dict) -> dict[str, list[str]]:
     memberships: dict[str, list[str]] = {}
     for collection_name, collection_data in data.get("collections", {}).items():
         for repo_data in collection_data.get("repos", []):
-            repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            repo_name = (
+                repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            )
             memberships.setdefault(repo_name, []).append(collection_name)
     return memberships
 

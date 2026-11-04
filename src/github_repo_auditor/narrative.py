@@ -98,7 +98,11 @@ class GitHubModelsProvider:
 
         if response.status_code == 403:
             text = response.text or ""
-            if "models" in text.lower() or "scope" in text.lower() or response.status_code == 403:
+            if (
+                "models" in text.lower()
+                or "scope" in text.lower()
+                or response.status_code == 403
+            ):
                 raise PermissionError(
                     "GitHub Models requires PAT scope `models: read` — "
                     "regenerate your token with this scope enabled."
@@ -214,19 +218,25 @@ def generate_narrative(
         return {"skipped": True, "reason": str(exc)}
 
     if result is None:
-        print("  No narrative credentials available. Skipping narrative.", file=sys.stderr)
+        print(
+            "  No narrative credentials available. Skipping narrative.", file=sys.stderr
+        )
         return {"skipped": True, "reason": "no credentials"}
 
     provider, resolved_model = result
     prompt = _build_prompt(report_data)
     username = report_data.get("username", "unknown")
-    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime(
-        "%Y-%m-%d"
-    )
+    date = report_data.get("generated_at", "")[:10] or datetime.now(
+        timezone.utc
+    ).strftime("%Y-%m-%d")
 
     try:
         narrative_text = provider.generate(
-            prompt, resolved_model, max_tokens=1024, cost_tracker=cost_tracker, feature="narrative"
+            prompt,
+            resolved_model,
+            max_tokens=1024,
+            cost_tracker=cost_tracker,
+            feature="narrative",
         )
     except PermissionError as exc:
         print(f"  Narrative generation failed: {exc}", file=sys.stderr)

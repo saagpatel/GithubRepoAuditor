@@ -35,7 +35,8 @@ def build_print_pack_summary_rows(
             weekly_pack.get(
                 "portfolio_headline",
                 operator_summary.get(
-                    "headline", "Review the latest workbook surfaces for change and drift."
+                    "headline",
+                    "Review the latest workbook surfaces for change and drift.",
                 ),
             ),
         ),
@@ -51,10 +52,15 @@ def build_print_pack_summary_rows(
                 else "",
             ),
         ),
-        ("Run Changes", weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))),
+        (
+            "Run Changes",
+            weekly_pack.get("run_change_summary", build_run_change_summary(diff_data)),
+        ),
         (
             "What To Do This Week",
-            weekly_story.get("decision", weekly_pack.get("what_to_do_this_week", next_action)),
+            weekly_story.get(
+                "decision", weekly_pack.get("what_to_do_this_week", next_action)
+            ),
         ),
         (
             "Trust / Actionability",
@@ -65,14 +71,20 @@ def build_print_pack_summary_rows(
         ("Top Attention Items", len(weekly_pack.get("top_attention", []))),
         (
             "What Changed",
-            what_changed or weekly_pack.get("run_change_summary", build_run_change_summary(diff_data)),
+            what_changed
+            or weekly_pack.get(
+                "run_change_summary", build_run_change_summary(diff_data)
+            ),
         ),
         (
             "Why It Matters",
             why_it_matters
             or weekly_story.get(
                 "why_this_week",
-                weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(data, diff_data)),
+                weekly_pack.get(
+                    "queue_pressure_summary",
+                    build_queue_pressure_summary(data, diff_data),
+                ),
             ),
         ),
         (
@@ -80,7 +92,9 @@ def build_print_pack_summary_rows(
             next_action
             or weekly_story.get(
                 "decision",
-                weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data)),
+                weekly_pack.get(
+                    "what_to_do_this_week", build_top_recommendation_summary(data)
+                ),
             ),
         ),
         (
@@ -113,7 +127,10 @@ def build_print_pack_summary_rows(
                     "Recovery Rebuild Strength",
                     operator_context["follow_through_rebuild_strength"],
                 ),
-                ("Recovery Reacquisition", operator_context["follow_through_reacquisition"]),
+                (
+                    "Recovery Reacquisition",
+                    operator_context["follow_through_reacquisition"],
+                ),
                 (
                     "Reacquisition Durability",
                     operator_context["follow_through_reacquisition_durability"],
@@ -172,9 +189,15 @@ def build_print_pack_summary_rows(
                 ("Class Momentum", operator_context["class_momentum_status"]),
                 ("Reweight Stability", operator_context["class_reweight_stability"]),
                 ("Transition Health", operator_context["class_transition_health"]),
-                ("Transition Resolution", operator_context["class_transition_resolution"]),
+                (
+                    "Transition Resolution",
+                    operator_context["class_transition_resolution"],
+                ),
                 ("Transition Summary", operator_context["class_transition_summary"]),
-                ("Transition Closure", operator_context["transition_closure_confidence"]),
+                (
+                    "Transition Closure",
+                    operator_context["transition_closure_confidence"],
+                ),
                 (
                     "Transition Likely Outcome",
                     operator_context["transition_likely_outcome"],
@@ -193,7 +216,10 @@ def build_print_pack_summary_rows(
                         "reset_reentry_rebuild_reentry_restore_rerererestore_churn"
                     ],
                 ),
-                ("Closure Forecast Summary", operator_context["transition_closure_summary"]),
+                (
+                    "Closure Forecast Summary",
+                    operator_context["transition_closure_summary"],
+                ),
                 ("Momentum Summary", operator_context["class_momentum_summary"]),
                 (
                     "Exception Learning",
@@ -203,7 +229,10 @@ def build_print_pack_summary_rows(
                     "Recommendation Drift",
                     f"{operator_context['drift_status']} — {operator_context['drift_summary']}",
                 ),
-                ("Adaptive Confidence", operator_context["adaptive_confidence_summary"]),
+                (
+                    "Adaptive Confidence",
+                    operator_context["adaptive_confidence_summary"],
+                ),
                 ("Recommendation Quality", operator_context["recommendation_quality"]),
                 (
                     "Confidence Validation",
@@ -236,7 +265,9 @@ def build_print_pack_top_attention_rows(
     return rows
 
 
-def build_print_pack_drilldown_rows(weekly_pack: dict[str, Any]) -> list[tuple[str, str]]:
+def build_print_pack_drilldown_rows(
+    weekly_pack: dict[str, Any],
+) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         rows.append(
@@ -271,13 +302,24 @@ def build_print_pack_page2_content(
             )
         ],
         "governance_rows": [
-            ("Status", display_operator_state(governance_summary.get("status", "preview"))),
-            ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
+            (
+                "Status",
+                display_operator_state(governance_summary.get("status", "preview")),
+            ),
+            (
+                "Needs Re-Approval",
+                "yes" if governance_summary.get("needs_reapproval") else "no",
+            ),
             (
                 "Drift Count",
-                governance_summary.get("drift_count", len(data.get("governance_drift", []) or [])),
+                governance_summary.get(
+                    "drift_count", len(data.get("governance_drift", []) or [])
+                ),
             ),
-            ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
+            (
+                "Rollback Available",
+                governance_summary.get("rollback_available_count", 0),
+            ),
         ],
         "compare_snapshot_rows": []
         if not diff_data
@@ -286,7 +328,10 @@ def build_print_pack_page2_content(
             ("Repo Changes", len(diff_data.get("repo_changes", []) or [])),
         ],
         "preflight_rows": []
-        if not (preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)))
+        if not (
+            preflight
+            and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0))
+        )
         else [
             ("Status", preflight.get("status", "unknown")),
             ("Errors", preflight.get("blocking_errors", 0)),
@@ -314,7 +359,9 @@ def build_print_pack_sheet_content(
     counts = operator_summary.get("counts", {})
     weekly_pack = build_weekly_review_pack(data, diff_data)
     weekly_story = weekly_pack.get("weekly_story_v1") or {}
-    weekly_sections = {section.get("id"): section for section in weekly_story.get("sections") or []}
+    weekly_sections = {
+        section.get("id"): section for section in weekly_story.get("sections") or []
+    }
     operator_context = build_executive_operator_context(data, weekly_pack)
     summary_rows, top_attention_header_row, page2_row = build_print_pack_summary_rows(
         data=data,
@@ -342,7 +389,9 @@ def build_print_pack_sheet_content(
     if page2_content["preflight_rows"]:
         max_print_row = max(max_print_row, page2_row + 15)
     return {
-        "workflow_rows": print_pack_workflow_guidance_rows(weekly_pack, weekly_sections),
+        "workflow_rows": print_pack_workflow_guidance_rows(
+            weekly_pack, weekly_sections
+        ),
         "summary_rows": summary_rows,
         "top_attention_header_row": top_attention_header_row,
         "top_attention_rows": build_print_pack_top_attention_rows(weekly_pack),
@@ -532,13 +581,19 @@ def _write_print_pack_page2(
     section_font,
     subheader_font,
 ) -> None:
-    ws.cell(row=page2_row, column=1, value="Page 2: Changes and Governance").font = section_font
-    ws.cell(row=page2_row + 1, column=1, value="Top Material Change Families").font = subheader_font
+    ws.cell(
+        row=page2_row, column=1, value="Page 2: Changes and Governance"
+    ).font = section_font
+    ws.cell(
+        row=page2_row + 1, column=1, value="Top Material Change Families"
+    ).font = subheader_font
     for offset, (label, count) in enumerate(page2_content["change_rows"], 1):
         ws.cell(row=page2_row + 1 + offset, column=1, value=label)
         ws.cell(row=page2_row + 1 + offset, column=2, value=count)
 
-    ws.cell(row=page2_row + 1, column=4, value="Governance Highlights").font = subheader_font
+    ws.cell(
+        row=page2_row + 1, column=4, value="Governance Highlights"
+    ).font = subheader_font
     for offset, (label, value) in enumerate(page2_content["governance_rows"], 1):
         ws.cell(row=page2_row + 1 + offset, column=4, value=label)
         ws.cell(row=page2_row + 1 + offset, column=5, value=value)
@@ -546,7 +601,9 @@ def _write_print_pack_page2(
     if page2_content["compare_snapshot_rows"]:
         row = page2_row + 8
         ws.cell(row=row, column=1, value="Compare Snapshot").font = section_font
-        for offset, (label, value) in enumerate(page2_content["compare_snapshot_rows"], 1):
+        for offset, (label, value) in enumerate(
+            page2_content["compare_snapshot_rows"], 1
+        ):
             ws.cell(row=row + offset, column=1, value=label)
             ws.cell(row=row + offset, column=2, value=value)
 

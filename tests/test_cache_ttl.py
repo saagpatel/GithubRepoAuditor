@@ -66,7 +66,9 @@ class TestV1LegacyMigration:
             ),
             encoding="utf-8",
         )
-        with caplog.at_level(logging.INFO, logger="github_repo_auditor.suggest_initiatives"):
+        with caplog.at_level(
+            logging.INFO, logger="github_repo_auditor.suggest_initiatives"
+        ):
             result = load_suggestion_cache(path)
 
         assert result == OrderedDict()
@@ -80,10 +82,14 @@ class TestV1LegacyMigration:
             json.dumps({"version": 1, "entries": []}),
             encoding="utf-8",
         )
-        with caplog.at_level(logging.INFO, logger="github_repo_auditor.suggest_initiatives"):
+        with caplog.at_level(
+            logging.INFO, logger="github_repo_auditor.suggest_initiatives"
+        ):
             load_suggestion_cache(path)
 
-        assert any("v1" in r.message and "dropping" in r.message for r in caplog.records)
+        assert any(
+            "v1" in r.message and "dropping" in r.message for r in caplog.records
+        )
 
 
 class TestV2FreshEntries:
@@ -238,7 +244,9 @@ class TestSaveLoadRoundTrip:
     def test_round_trip_preserves_entries(self, tmp_path):
         """save → load returns the same keys and suggestion data."""
         path = tmp_path / "suggestion-cache.json"
-        cache: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict()
+        cache: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = (
+            OrderedDict()
+        )
         ts = _fresh_ts()
         cache["key1"] = ([_make_suggestion("RepoA")], 0.05, ts)
         cache["key2"] = ([_make_suggestion("RepoB")], 0.10, ts)
@@ -252,13 +260,17 @@ class TestSaveLoadRoundTrip:
             orig_suggestions, orig_cost, orig_ts = cache[k]
             assert cost == orig_cost
             assert loaded_ts == orig_ts
-            assert [s.repo_name for s in suggestions] == [s.repo_name for s in orig_suggestions]
+            assert [s.repo_name for s in suggestions] == [
+                s.repo_name for s in orig_suggestions
+            ]
 
     def test_save_writes_v2_schema(self, tmp_path):
         """save_suggestion_cache writes version=2 with timestamp fields."""
         path = tmp_path / "suggestion-cache.json"
         ts = _fresh_ts()
-        cache: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict()
+        cache: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = (
+            OrderedDict()
+        )
         cache["k"] = ([_make_suggestion()], 0.0, ts)
 
         save_suggestion_cache(path, cache)
@@ -271,7 +283,9 @@ class TestSaveLoadRoundTrip:
         """save_suggestion_cache writes atomically (no .json tmp file left behind)."""
         path = tmp_path / "suggestion-cache.json"
         ts = _fresh_ts()
-        cache: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict()
+        cache: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = (
+            OrderedDict()
+        )
         cache["k"] = ([_make_suggestion()], 0.0, ts)
 
         save_suggestion_cache(path, cache)

@@ -8,8 +8,13 @@ from pathlib import Path
 from github_repo_auditor.baseline_context import build_watch_guidance
 from github_repo_auditor.governance_activation import build_governance_summary
 from github_repo_auditor.intervention_ledger import load_intervention_ledger_bundle
-from github_repo_auditor.operator_acknowledgments import is_change_acknowledged, load_acknowledgments
-from github_repo_auditor.operator_effectiveness import build_operator_effectiveness_bundle
+from github_repo_auditor.operator_acknowledgments import (
+    is_change_acknowledged,
+    load_acknowledgments,
+)
+from github_repo_auditor.operator_effectiveness import (
+    build_operator_effectiveness_bundle,
+)
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
 from github_repo_auditor.recurring_review import build_review_bundle
 from github_repo_auditor.warehouse import (
@@ -30,7 +35,9 @@ LANE_LABELS = {
     "ready": "Ready for Manual Action",
     "deferred": "Safe to Defer",
 }
-QUIET_HANDOFF = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+QUIET_HANDOFF = (
+    "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+)
 ATTENTION_LANES = {"blocked", "urgent"}
 HISTORY_WINDOW_RUNS = 10
 CALIBRATION_WINDOW_RUNS = 20
@@ -81,7 +88,10 @@ GENERIC_RECOMMENDATION_PHRASES = (
     "monitor future audits",
     "open the repo queue details",
 )
-GENERIC_MONITOR_PHRASES = ("keep the operator loop light", "keep the operator loop lightweight")
+GENERIC_MONITOR_PHRASES = (
+    "keep the operator loop light",
+    "keep the operator loop lightweight",
+)
 GENERIC_BASELINE_PHRASES = (
     "run the next full audit to refresh the baseline",
     "refresh the baseline before relying on incremental results",
@@ -103,9 +113,12 @@ def normalize_review_state(
             _normalize_review_target(item) for item in data.get("review_targets") or []
         ]
         data["review_history"] = [
-            _normalize_review_history_item(item) for item in data.get("review_history") or []
+            _normalize_review_history_item(item)
+            for item in data.get("review_history") or []
         ]
-        data["review_summary"] = _normalize_review_summary(data.get("review_summary") or {})
+        data["review_summary"] = _normalize_review_summary(
+            data.get("review_summary") or {}
+        )
         _apply_acknowledgment_filter(data, output_dir)
         return data
     try:
@@ -137,9 +150,12 @@ def normalize_review_state(
         _normalize_review_target(item) for item in bundle.get("review_targets") or []
     ]
     bundle["review_history"] = [
-        _normalize_review_history_item(item) for item in bundle.get("review_history") or []
+        _normalize_review_history_item(item)
+        for item in bundle.get("review_history") or []
     ]
-    bundle["review_summary"] = _normalize_review_summary(bundle.get("review_summary") or {})
+    bundle["review_summary"] = _normalize_review_summary(
+        bundle.get("review_summary") or {}
+    )
     data.update(bundle)
     _apply_acknowledgment_filter(data, output_dir)
     return data
@@ -151,13 +167,19 @@ def _apply_acknowledgment_filter(data: dict, output_dir: Path) -> None:
         return
     raw_changes = data.get("material_changes") or []
     filtered_changes = [
-        change for change in raw_changes if not is_change_acknowledged(change, acknowledgments)
+        change
+        for change in raw_changes
+        if not is_change_acknowledged(change, acknowledgments)
     ]
     if len(filtered_changes) == len(raw_changes):
         return
-    raw_repos = {change.get("repo_name") for change in raw_changes if change.get("repo_name")}
+    raw_repos = {
+        change.get("repo_name") for change in raw_changes if change.get("repo_name")
+    }
     remaining_repos = {
-        change.get("repo_name") for change in filtered_changes if change.get("repo_name")
+        change.get("repo_name")
+        for change in filtered_changes
+        if change.get("repo_name")
     }
     fully_acknowledged_repos = raw_repos - remaining_repos
     data["material_changes"] = filtered_changes
@@ -193,18 +215,18 @@ def build_operator_snapshot(
     semantic_index: object | None = None,
 ) -> dict:
     queue: list[dict] = []
-    age_reference = _parse_report_datetime(report_data.get("generated_at")) or datetime.now(
-        timezone.utc
-    )
+    age_reference = _parse_report_datetime(
+        report_data.get("generated_at")
+    ) or datetime.now(timezone.utc)
     preflight = report_data.get("preflight_summary") or {}
     review_summary = report_data.get("review_summary") or {}
     review_targets = report_data.get("review_targets") or []
     managed_state_drift = report_data.get("managed_state_drift") or []
     governance_drift = report_data.get("governance_drift") or []
     governance_preview = report_data.get("governance_preview") or {}
-    governance_summary = report_data.get("governance_summary") or build_governance_summary(
-        report_data
-    )
+    governance_summary = report_data.get(
+        "governance_summary"
+    ) or build_governance_summary(report_data)
     campaign_summary = report_data.get("campaign_summary") or {}
     writeback_preview = report_data.get("writeback_preview") or {}
     rollback_preview = report_data.get("rollback_preview") or {}
@@ -242,7 +264,8 @@ def build_operator_snapshot(
                 repo=_repo_name(drift),
                 title=f"{_repo_name(drift) or 'Campaign'} drift needs review",
                 summary=drift.get(
-                    "drift_state", drift.get("drift_type", "Managed state drift detected.")
+                    "drift_state",
+                    drift.get("drift_type", "Managed state drift detected."),
                 ),
                 recommended_action="Inspect the managed issue, topics, or custom properties before closing or applying more campaign work.",
                 source_run_id=review_summary.get("source_run_id", ""),
@@ -254,7 +277,8 @@ def build_operator_snapshot(
     for drift in governance_drift:
         lane = (
             "blocked"
-            if drift.get("drift_type") in {"approval-invalidated", "requires-reapproval"}
+            if drift.get("drift_type")
+            in {"approval-invalidated", "requires-reapproval"}
             else "urgent"
         )
         queue.append(
@@ -283,7 +307,8 @@ def build_operator_snapshot(
                 repo="",
                 title="Governed controls need re-approval",
                 summary=governance_summary.get(
-                    "headline", "Governed controls need re-approval before any apply step."
+                    "headline",
+                    "Governed controls need re-approval before any apply step.",
                 ),
                 recommended_action="Review the governed controls and re-approve them before the next manual apply step.",
                 source_run_id=review_summary.get("source_run_id", ""),
@@ -307,7 +332,8 @@ def build_operator_snapshot(
                 title=change.get("title", "High-severity review change"),
                 summary=change.get("summary", ""),
                 recommended_action=change.get(
-                    "recommended_next_step", "Review the repo before reprioritizing work."
+                    "recommended_next_step",
+                    "Review the repo before reprioritizing work.",
                 ),
                 source_run_id=review_summary.get("source_run_id", ""),
                 age_reference=age_reference,
@@ -321,7 +347,9 @@ def build_operator_snapshot(
         recommended = target.get("recommended_next_step", "")
         safe_to_defer = "safe to defer" in recommended.lower()
         lane = "deferred" if safe_to_defer else "ready"
-        priority = 30 if safe_to_defer else int(round(target.get("severity", 0.0) * 100)) or 60
+        priority = (
+            30 if safe_to_defer else int(round(target.get("severity", 0.0) * 100)) or 60
+        )
         queue.append(
             _queue_item(
                 item_id=f"review-target:{target.get('repo', 'portfolio')}:{target.get('reason', '')}",
@@ -371,7 +399,9 @@ def build_operator_snapshot(
                 priority=75,
                 repo=_repo_name(action),
                 title=action.get("title", "Governed control ready"),
-                summary=action.get("why", "A governed control is ready for operator review."),
+                summary=action.get(
+                    "why", "A governed control is ready for operator review."
+                ),
                 recommended_action="Review prerequisites and approve the governed control if the repo is ready.",
                 source_run_id=review_summary.get("source_run_id", ""),
                 age_reference=age_reference,
@@ -379,7 +409,9 @@ def build_operator_snapshot(
             )
         )
 
-    if rollback_preview.get("available") and not rollback_preview.get("fully_reversible_count", 0):
+    if rollback_preview.get("available") and not rollback_preview.get(
+        "fully_reversible_count", 0
+    ):
         queue.append(
             _queue_item(
                 item_id="rollback-exposure",
@@ -402,7 +434,8 @@ def build_operator_snapshot(
         meta = audit.get("metadata", {})
         repo_name = meta.get("name", "")
         details_map = {
-            r["dimension"]: r.get("details", {}) for r in audit.get("analyzer_results", [])
+            r["dimension"]: r.get("details", {})
+            for r in audit.get("analyzer_results", [])
         }
         # README stale → Needs Attention Now
         readme_details = details_map.get("readme", {})
@@ -419,7 +452,9 @@ def build_operator_snapshot(
                         f"README last touched {readme_details.get('readme_last_touched_days', '?')} days ago "
                         f"vs code last touched {readme_details.get('code_last_touched_days', '?')} days ago "
                         f"(ratio {readme_details.get('readme_staleness_ratio', '?'):.1f}x)."
-                        if isinstance(readme_details.get("readme_staleness_ratio"), (int, float))
+                        if isinstance(
+                            readme_details.get("readme_staleness_ratio"), (int, float)
+                        )
                         else "README has not been updated to reflect recent code activity."
                     ),
                     recommended_action="Update the README to reflect the current state of the project.",
@@ -437,9 +472,18 @@ def build_operator_snapshot(
             cs_critical = ghas_entry.get("code_scanning", {}).get("critical", 0) or 0
             ss_open = ghas_entry.get("secret_scanning", {}).get("open", 0) or 0
             if (
-                (ghas_entry.get("dependabot", {}).get("available") and dep_critical >= 1)
-                or (ghas_entry.get("code_scanning", {}).get("available") and cs_critical >= 1)
-                or (ghas_entry.get("secret_scanning", {}).get("available") and ss_open >= 1)
+                (
+                    ghas_entry.get("dependabot", {}).get("available")
+                    and dep_critical >= 1
+                )
+                or (
+                    ghas_entry.get("code_scanning", {}).get("available")
+                    and cs_critical >= 1
+                )
+                or (
+                    ghas_entry.get("secret_scanning", {}).get("available")
+                    and ss_open >= 1
+                )
             ):
                 parts = []
                 if dep_critical:
@@ -522,7 +566,9 @@ def build_operator_snapshot(
                     )
                 )
         except Exception as exc:
-            logger.warning("arc-f:duplicate-groups: failed to build lane entries: %s", exc)
+            logger.warning(
+                "arc-f:duplicate-groups: failed to build lane entries: %s", exc
+            )
 
     queue = _dedupe_queue(queue)
     queue.sort(
@@ -555,17 +601,25 @@ def build_operator_snapshot(
         "blocking_errors": preflight.get("blocking_errors", 0),
         "warnings": preflight.get("warnings", 0),
     }
-    counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
+    counts = {
+        lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER
+    }
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
     calibration_history = load_operator_calibration_history(
         output_dir,
         report_data.get("username", ""),
         limit=CALIBRATION_WINDOW_RUNS,
     )
-    from github_repo_auditor import operator_decision_quality as _operator_decision_quality
+    from github_repo_auditor import (
+        operator_decision_quality as _operator_decision_quality,
+    )
     from github_repo_auditor import operator_follow_through as _operator_follow_through
-    from github_repo_auditor import operator_resolution_trend as _operator_resolution_trend
-    from github_repo_auditor import operator_snapshot_packaging as _operator_snapshot_packaging
+    from github_repo_auditor import (
+        operator_resolution_trend as _operator_resolution_trend,
+    )
+    from github_repo_auditor import (
+        operator_snapshot_packaging as _operator_snapshot_packaging,
+    )
 
     confidence_calibration = _operator_decision_quality.build_confidence_calibration(
         calibration_history
@@ -590,7 +644,9 @@ def build_operator_snapshot(
         ),
         evidence_events=evidence_bundle.get("events") or [],
     )
-    queue = _operator_resolution_trend._attach_portfolio_catalog_context(queue, report_data)
+    queue = _operator_resolution_trend._attach_portfolio_catalog_context(
+        queue, report_data
+    )
     resolution_trend = _operator_resolution_trend._build_resolution_trend(
         queue,
         history,
@@ -613,10 +669,16 @@ def build_operator_snapshot(
         resolution_trend=resolution_trend,
         current_generated_at=report_data.get("generated_at", ""),
     )
-    from github_repo_auditor.action_sync_automation import build_action_sync_automation_bundle
-    from github_repo_auditor.action_sync_outcomes import load_action_sync_outcomes_bundle
+    from github_repo_auditor.action_sync_automation import (
+        build_action_sync_automation_bundle,
+    )
+    from github_repo_auditor.action_sync_outcomes import (
+        load_action_sync_outcomes_bundle,
+    )
     from github_repo_auditor.action_sync_packets import build_action_sync_packets_bundle
-    from github_repo_auditor.action_sync_readiness import build_action_sync_readiness_bundle
+    from github_repo_auditor.action_sync_readiness import (
+        build_action_sync_readiness_bundle,
+    )
     from github_repo_auditor.action_sync_tuning import load_action_sync_tuning_bundle
     from github_repo_auditor.approval_ledger import load_approval_ledger_bundle
 
@@ -626,8 +688,12 @@ def build_operator_snapshot(
         action_sync,
         action_sync.get("operator_queue", queue),
     )
-    queue = action_sync_packets.get("operator_queue", action_sync.get("operator_queue", queue))
-    action_sync_outcomes = load_action_sync_outcomes_bundle(output_dir, report_data, queue)
+    queue = action_sync_packets.get(
+        "operator_queue", action_sync.get("operator_queue", queue)
+    )
+    action_sync_outcomes = load_action_sync_outcomes_bundle(
+        output_dir, report_data, queue
+    )
     queue = action_sync_outcomes.get("operator_queue", queue)
     action_sync_tuning = load_action_sync_tuning_bundle(
         output_dir,
@@ -638,7 +704,9 @@ def build_operator_snapshot(
         queue,
     )
     queue = action_sync_tuning.get("operator_queue", queue)
-    intervention_ledger = load_intervention_ledger_bundle(output_dir, report_data, queue)
+    intervention_ledger = load_intervention_ledger_bundle(
+        output_dir, report_data, queue
+    )
     queue = intervention_ledger.get("operator_queue", queue) or queue
     action_sync_automation = build_action_sync_automation_bundle(
         report_data,
@@ -721,9 +789,15 @@ def build_operator_snapshot(
         "operator_queue": queue,
         "operator_setup_health": setup_health,
         "operator_recent_changes": recent_changes,
-        "portfolio_outcomes_summary": operator_effectiveness["portfolio_outcomes_summary"],
-        "operator_effectiveness_summary": operator_effectiveness["operator_effectiveness_summary"],
-        "high_pressure_queue_history": operator_effectiveness["high_pressure_queue_history"],
+        "portfolio_outcomes_summary": operator_effectiveness[
+            "portfolio_outcomes_summary"
+        ],
+        "operator_effectiveness_summary": operator_effectiveness[
+            "operator_effectiveness_summary"
+        ],
+        "high_pressure_queue_history": operator_effectiveness[
+            "high_pressure_queue_history"
+        ],
         "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
         "action_sync_summary": action_sync["action_sync_summary"],
         "next_action_sync_step": action_sync_tuning["next_action_sync_step"],
@@ -740,46 +814,84 @@ def build_operator_snapshot(
         "top_needs_approval_packets": action_sync_tuning["top_needs_approval_packets"],
         "top_review_drift_packets": action_sync_tuning["top_review_drift_packets"],
         "top_monitor_now_campaigns": action_sync_outcomes["top_monitor_now_campaigns"],
-        "top_holding_clean_campaigns": action_sync_outcomes["top_holding_clean_campaigns"],
+        "top_holding_clean_campaigns": action_sync_outcomes[
+            "top_holding_clean_campaigns"
+        ],
         "top_reopened_campaigns": action_sync_outcomes["top_reopened_campaigns"],
-        "top_drift_returned_campaigns": action_sync_outcomes["top_drift_returned_campaigns"],
+        "top_drift_returned_campaigns": action_sync_outcomes[
+            "top_drift_returned_campaigns"
+        ],
         "top_apply_ready_campaigns": action_sync_tuning["top_apply_ready_campaigns"],
-        "top_preview_ready_campaigns": action_sync_tuning["top_preview_ready_campaigns"],
+        "top_preview_ready_campaigns": action_sync_tuning[
+            "top_preview_ready_campaigns"
+        ],
         "top_drift_review_campaigns": action_sync_tuning["top_drift_review_campaigns"],
         "top_blocked_campaigns": action_sync_tuning["top_blocked_campaigns"],
         "top_proven_campaigns": action_sync_tuning["top_proven_campaigns"],
         "top_caution_campaigns": action_sync_tuning["top_caution_campaigns"],
-        "top_thin_evidence_campaigns": action_sync_tuning["top_thin_evidence_campaigns"],
+        "top_thin_evidence_campaigns": action_sync_tuning[
+            "top_thin_evidence_campaigns"
+        ],
         "historical_portfolio_intelligence": intervention_ledger[
             "historical_portfolio_intelligence"
         ],
-        "intervention_ledger_summary": intervention_ledger["intervention_ledger_summary"],
+        "intervention_ledger_summary": intervention_ledger[
+            "intervention_ledger_summary"
+        ],
         "next_historical_focus": intervention_ledger["next_historical_focus"],
         "top_relapsing_repos": intervention_ledger["top_relapsing_repos"],
-        "top_persistent_pressure_repos": intervention_ledger["top_persistent_pressure_repos"],
+        "top_persistent_pressure_repos": intervention_ledger[
+            "top_persistent_pressure_repos"
+        ],
         "top_improving_repos": intervention_ledger["top_improving_repos"],
         "top_holding_repos": intervention_ledger["top_holding_repos"],
         "action_sync_automation": action_sync_automation["action_sync_automation"],
-        "automation_guidance_summary": action_sync_automation["automation_guidance_summary"],
-        "next_safe_automation_step": action_sync_automation["next_safe_automation_step"],
-        "top_preview_safe_campaigns": action_sync_automation["top_preview_safe_campaigns"],
-        "top_apply_manual_campaigns": action_sync_automation["top_apply_manual_campaigns"],
-        "top_approval_first_campaigns": action_sync_automation["top_approval_first_campaigns"],
-        "top_follow_up_safe_campaigns": action_sync_automation["top_follow_up_safe_campaigns"],
-        "top_manual_only_campaigns": action_sync_automation["top_manual_only_campaigns"],
+        "automation_guidance_summary": action_sync_automation[
+            "automation_guidance_summary"
+        ],
+        "next_safe_automation_step": action_sync_automation[
+            "next_safe_automation_step"
+        ],
+        "top_preview_safe_campaigns": action_sync_automation[
+            "top_preview_safe_campaigns"
+        ],
+        "top_apply_manual_campaigns": action_sync_automation[
+            "top_apply_manual_campaigns"
+        ],
+        "top_approval_first_campaigns": action_sync_automation[
+            "top_approval_first_campaigns"
+        ],
+        "top_follow_up_safe_campaigns": action_sync_automation[
+            "top_follow_up_safe_campaigns"
+        ],
+        "top_manual_only_campaigns": action_sync_automation[
+            "top_manual_only_campaigns"
+        ],
         "approval_ledger": approval_ledger["approval_ledger"],
         "approval_workflow_summary": approval_ledger["approval_workflow_summary"],
         "next_approval_review": approval_ledger["next_approval_review"],
-        "top_ready_for_review_approvals": approval_ledger["top_ready_for_review_approvals"],
-        "top_needs_reapproval_approvals": approval_ledger["top_needs_reapproval_approvals"],
-        "top_overdue_approval_followups": approval_ledger["top_overdue_approval_followups"],
-        "top_due_soon_approval_followups": approval_ledger["top_due_soon_approval_followups"],
-        "top_approved_manual_approvals": approval_ledger["top_approved_manual_approvals"],
+        "top_ready_for_review_approvals": approval_ledger[
+            "top_ready_for_review_approvals"
+        ],
+        "top_needs_reapproval_approvals": approval_ledger[
+            "top_needs_reapproval_approvals"
+        ],
+        "top_overdue_approval_followups": approval_ledger[
+            "top_overdue_approval_followups"
+        ],
+        "top_due_soon_approval_followups": approval_ledger[
+            "top_due_soon_approval_followups"
+        ],
+        "top_approved_manual_approvals": approval_ledger[
+            "top_approved_manual_approvals"
+        ],
         "top_blocked_approvals": approval_ledger["top_blocked_approvals"],
     }
 
 
-def render_control_center_markdown(snapshot: dict, username: str, generated_at: str) -> str:
+def render_control_center_markdown(
+    snapshot: dict, username: str, generated_at: str
+) -> str:
     from github_repo_auditor.operator_control_center_rendering import (
         render_control_center_markdown as _render_control_center_markdown,
     )
@@ -879,7 +991,9 @@ def _latest_truth_cleared_security_repos(output_dir: Path) -> set[str]:
     return repos
 
 
-def _is_cleared_security_posture_item(item: dict, cleared_security_repos: set[str]) -> bool:
+def _is_cleared_security_posture_item(
+    item: dict, cleared_security_repos: set[str]
+) -> bool:
     repo = str(item.get("repo_name") or item.get("repo") or "")
     if not repo or repo not in cleared_security_repos:
         return False
@@ -895,7 +1009,11 @@ def _is_cleared_security_posture_item(item: dict, cleared_security_repos: set[st
             details.get("lens") if isinstance(details, dict) else "",
         )
     ).lower()
-    return "security-change" in text or "security_posture" in text or "security posture" in text
+    return (
+        "security-change" in text
+        or "security_posture" in text
+        or "security posture" in text
+    )
 
 
 def _normalize_review_summary(summary: dict) -> dict:
@@ -903,7 +1021,9 @@ def _normalize_review_summary(summary: dict) -> dict:
     decision_state = normalized.get("decision_state")
     if not decision_state:
         decisions = normalized.get("decisions") or []
-        decision_values = [item.get("decision") for item in decisions if isinstance(item, dict)]
+        decision_values = [
+            item.get("decision") for item in decisions if isinstance(item, dict)
+        ]
         if "approve-governance" in decision_values:
             decision_state = "ready-for-governance-approval"
         elif "preview-campaign" in decision_values:
@@ -921,13 +1041,18 @@ def _normalize_review_summary(summary: dict) -> dict:
 
 def _normalize_review_target(item: dict) -> dict:
     normalized = dict(item)
-    next_step = normalized.get("next_step") or normalized.get("recommended_next_step") or ""
+    next_step = (
+        normalized.get("next_step") or normalized.get("recommended_next_step") or ""
+    )
     normalized.setdefault("title", normalized.get("repo", "Portfolio review target"))
-    normalized.setdefault("reason", normalized.get("summary", normalized.get("reason", "")))
+    normalized.setdefault(
+        "reason", normalized.get("summary", normalized.get("reason", ""))
+    )
     normalized["recommended_next_step"] = next_step
     normalized["next_step"] = next_step
     normalized.setdefault(
-        "decision_hint", "safe-to-defer" if "safe to defer" in next_step.lower() else "needs-review"
+        "decision_hint",
+        "safe-to-defer" if "safe to defer" in next_step.lower() else "needs-review",
     )
     normalized.setdefault("safe_to_defer", "safe to defer" in next_step.lower())
     return normalized
@@ -938,12 +1063,16 @@ def _normalize_review_history_item(item: dict) -> dict:
     normalized.setdefault("status", "open")
     normalized.setdefault("decision_state", "needs-review")
     normalized.setdefault("sync_state", "local-only")
-    normalized.setdefault("safe_to_defer", normalized.get("decision_state") == "safe-to-defer")
+    normalized.setdefault(
+        "safe_to_defer", normalized.get("decision_state") == "safe-to-defer"
+    )
     return normalized
 
 
 def _build_confidence_calibration(history: list[dict]) -> dict:
-    from github_repo_auditor import operator_decision_quality as _operator_decision_quality
+    from github_repo_auditor import (
+        operator_decision_quality as _operator_decision_quality,
+    )
 
     return _operator_decision_quality.build_confidence_calibration(history)
 
@@ -955,7 +1084,9 @@ def _calibration_outcome(run: dict, future_runs: list[dict]) -> tuple[str, int |
     target = summary.get("primary_target") or {}
     target_key = _queue_identity(target)
     original_lane = _target_lane(run, target_key, target)
-    future_matches = [_run_target_match(candidate, target_key) for candidate in future_runs]
+    future_matches = [
+        _run_target_match(candidate, target_key) for candidate in future_runs
+    ]
     future_lanes = [match.get("lane") if match else None for match in future_matches]
     clear_index = next(
         (
@@ -975,7 +1106,9 @@ def _calibration_outcome(run: dict, future_runs: list[dict]) -> tuple[str, int |
             return "validated", clear_index
         return "partially_validated", clear_index
     if _has_pressure_drop(original_lane, future_lanes):
-        return "partially_validated", _first_pressure_drop_run(original_lane, future_lanes)
+        return "partially_validated", _first_pressure_drop_run(
+            original_lane, future_lanes
+        )
     return "unresolved", VALIDATION_WINDOW_RUNS
 
 
@@ -1023,10 +1156,15 @@ def _lane_pressure(lane: str | None) -> int:
 
 def _has_pressure_drop(original_lane: str, future_lanes: list[str | None]) -> bool:
     origin_pressure = _lane_pressure(original_lane)
-    return any(lane is not None and _lane_pressure(lane) < origin_pressure for lane in future_lanes)
+    return any(
+        lane is not None and _lane_pressure(lane) < origin_pressure
+        for lane in future_lanes
+    )
 
 
-def _first_pressure_drop_run(original_lane: str, future_lanes: list[str | None]) -> int | None:
+def _first_pressure_drop_run(
+    original_lane: str, future_lanes: list[str | None]
+) -> int | None:
     origin_pressure = _lane_pressure(original_lane)
     for index, lane in enumerate(future_lanes, start=1):
         if lane is not None and _lane_pressure(lane) < origin_pressure:
@@ -1059,7 +1197,9 @@ def _confidence_validation_status(
     reopened_recommendation_count: int,
     reopened_high_count: int,
 ) -> str:
-    from github_repo_auditor import operator_decision_quality as _operator_decision_quality
+    from github_repo_auditor import (
+        operator_decision_quality as _operator_decision_quality,
+    )
 
     return _operator_decision_quality.confidence_validation_status(
         judged_count=judged_count,
@@ -1078,7 +1218,9 @@ def _confidence_calibration_summary(
     reopened_recommendation_count: int,
     judged_count: int,
 ) -> str:
-    from github_repo_auditor import operator_decision_quality as _operator_decision_quality
+    from github_repo_auditor import (
+        operator_decision_quality as _operator_decision_quality,
+    )
 
     return _operator_decision_quality.confidence_calibration_summary(
         confidence_validation_status=confidence_validation_status,
@@ -1134,7 +1276,9 @@ def _parse_report_datetime(value: object) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
-def _age_days_from_run_id(source_run_id: str, *, age_reference: datetime | None = None) -> int:
+def _age_days_from_run_id(
+    source_run_id: str, *, age_reference: datetime | None = None
+) -> int:
     if not source_run_id or ":" not in source_run_id:
         return 0
     timestamp = source_run_id.split(":", 1)[1]
@@ -1147,7 +1291,9 @@ def _age_days_from_run_id(source_run_id: str, *, age_reference: datetime | None 
     reference = age_reference or datetime.now(timezone.utc)
     if reference.tzinfo is None:
         reference = reference.replace(tzinfo=timezone.utc)
-    return max(0, (reference.astimezone(timezone.utc) - dt.astimezone(timezone.utc)).days)
+    return max(
+        0, (reference.astimezone(timezone.utc) - dt.astimezone(timezone.utc)).days
+    )
 
 
 def _dedupe_queue(queue: list[dict]) -> list[dict]:

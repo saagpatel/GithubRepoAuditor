@@ -36,7 +36,13 @@ def _repo(tmp_path: Path) -> tuple[Path, str]:
     (repo / "README.md").write_text("fixture\n")
     _git(repo, "add", "README.md")
     _git(repo, "commit", "-m", "fixture")
-    _git(repo, "remote", "add", "origin", "git@github.com:saagpatel/GithubRepoAuditor.git")
+    _git(
+        repo,
+        "remote",
+        "add",
+        "origin",
+        "git@github.com:saagpatel/GithubRepoAuditor.git",
+    )
     commit = _git(repo, "rev-parse", "HEAD")
     _git(repo, "update-ref", "refs/remotes/origin/main", commit)
     return repo, commit
@@ -282,9 +288,7 @@ def test_producer_receipt_identity_is_not_delimiter_ambiguous() -> None:
     }
     assert "\n".join(left.values()) == "\n".join(right.values())
 
-    assert producer_evidence_receipt_id(**left) != producer_evidence_receipt_id(
-        **right
-    )
+    assert producer_evidence_receipt_id(**left) != producer_evidence_receipt_id(**right)
 
 
 def test_load_producer_evidence_rejects_nonpassing_receipt(tmp_path: Path) -> None:

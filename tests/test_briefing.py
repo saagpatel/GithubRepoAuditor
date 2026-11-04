@@ -43,7 +43,9 @@ def _make_audit(
 ) -> dict:
     pushed_at = _days_ago_iso(pushed_days_ago)
     days_since = (
-        days_since_push_override if days_since_push_override is not None else pushed_days_ago
+        days_since_push_override
+        if days_since_push_override is not None
+        else pushed_days_ago
     )
     return {
         "metadata": {
@@ -107,7 +109,9 @@ class TestBuildBriefingHappyPath:
 
     def test_suggestions_empty_without_provider(self):
         audits = [_make_audit("RepoA")]
-        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False, provider=None)
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, provider=None
+        )
         assert briefing.suggestions == []
 
     def test_automation_status_eligible(self):
@@ -116,7 +120,9 @@ class TestBuildBriefingHappyPath:
         assert briefing.shipped_this_week[0].automation_status == "eligible"
 
     def test_automation_status_not_eligible(self):
-        audits = [_make_audit("ManualRepo", pushed_days_ago=1, automation_eligible=False)]
+        audits = [
+            _make_audit("ManualRepo", pushed_days_ago=1, automation_eligible=False)
+        ]
         briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
         assert briefing.shipped_this_week[0].automation_status == "not-eligible"
 
@@ -165,7 +171,10 @@ class TestNoWarehouseHistory:
 
     def test_health_delta_graceful_on_load_error(self):
         audits = [_make_audit("Repo")]
-        with patch("github_repo_auditor.history.load_repo_score_history", side_effect=OSError("no file")):
+        with patch(
+            "github_repo_auditor.history.load_repo_score_history",
+            side_effect=OSError("no file"),
+        ):
             result = _build_health_delta(audits, use_history=True)
         assert result == {"up": [], "down": []}
 
@@ -179,8 +188,12 @@ class TestMarkdownRendering:
             username="alice",
             date="2026-05-11",
             shipped_this_week=[
-                ShippedRepo(name="Alpha", language="Python", automation_status="eligible"),
-                ShippedRepo(name="Beta", language="TypeScript", automation_status="not-eligible"),
+                ShippedRepo(
+                    name="Alpha", language="Python", automation_status="eligible"
+                ),
+                ShippedRepo(
+                    name="Beta", language="TypeScript", automation_status="not-eligible"
+                ),
             ],
             needs_attention=[
                 NeedsAttentionRepo(
@@ -191,8 +204,14 @@ class TestMarkdownRendering:
                 )
             ],
             health_delta={
-                "up": [ScoreMover(name="UpRepo", old_score=0.5, new_score=0.65, delta=0.15)],
-                "down": [ScoreMover(name="DownRepo", old_score=0.8, new_score=0.7, delta=-0.1)],
+                "up": [
+                    ScoreMover(name="UpRepo", old_score=0.5, new_score=0.65, delta=0.15)
+                ],
+                "down": [
+                    ScoreMover(
+                        name="DownRepo", old_score=0.8, new_score=0.7, delta=-0.1
+                    )
+                ],
             },
             suggestions=[
                 Suggestion(name="Alpha", action="Add unit tests to improve coverage."),
@@ -236,7 +255,9 @@ class TestVoiceRendering:
             username="alice",
             date="2026-05-11",
             shipped_this_week=[
-                ShippedRepo(name="Alpha", language="Python", automation_status="eligible"),
+                ShippedRepo(
+                    name="Alpha", language="Python", automation_status="eligible"
+                ),
             ],
             needs_attention=[
                 NeedsAttentionRepo(
@@ -247,7 +268,9 @@ class TestVoiceRendering:
                 )
             ],
             health_delta={
-                "up": [ScoreMover(name="UpRepo", old_score=0.5, new_score=0.65, delta=0.15)],
+                "up": [
+                    ScoreMover(name="UpRepo", old_score=0.5, new_score=0.65, delta=0.15)
+                ],
                 "down": [],
             },
             suggestions=[
@@ -319,7 +342,9 @@ class TestLLMJsonParseFail:
         return [_make_audit("RepoA"), _make_audit("RepoB")]
 
     def test_non_json_returns_empty(self):
-        result = _parse_suggestions_json("Sure, I cannot provide that.", self._top_repos())
+        result = _parse_suggestions_json(
+            "Sure, I cannot provide that.", self._top_repos()
+        )
         assert result == []
 
     def test_partial_json_uses_regex_fallback(self):
@@ -337,7 +362,9 @@ class TestLLMJsonParseFail:
 
     def test_provider_returns_non_json_no_crash(self):
         mock_provider = MagicMock()
-        mock_provider.generate.return_value = "I think you should work on documentation."
+        mock_provider.generate.return_value = (
+            "I think you should work on documentation."
+        )
 
         audits = [_make_audit("RepoA", overall_score=0.1)]
         briefing = build_briefing(
@@ -411,7 +438,11 @@ class TestBriefingSemanticEnrichment:
     def _make_low_score_audit(self, name: str) -> dict:
         """Return a minimal audit dict with a low overall_score to reach top-3."""
         return {
-            "metadata": {"name": name, "language": "Python", "pushed_at": _days_ago_iso(5)},
+            "metadata": {
+                "name": name,
+                "language": "Python",
+                "pushed_at": _days_ago_iso(5),
+            },
             "overall_score": 0.1,
             "hotspots": [{"category": "readme", "title": "No README"}],
             "analyzer_results": [
@@ -551,7 +582,9 @@ class TestInitiativesBriefing:
         assert briefing.initiatives == []
 
     def test_one_on_track_initiative_populates_list(self, tmp_path):
-        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        initiative = self._make_initiative(
+            "Wavelength", target_tier=2, deadline=self._future(60)
+        )
         self._write_initiatives(tmp_path, [initiative])
         audits = [_make_audit("Wavelength")]
         briefing = build_briefing(
@@ -568,7 +601,9 @@ class TestInitiativesBriefing:
         assert ini.status in ("on-track", "at-risk", "overdue", "met")
 
     def test_closed_initiative_excluded(self, tmp_path):
-        closed = self._make_initiative("Closed-Repo", closed_at="2026-05-01T00:00:00+00:00")
+        closed = self._make_initiative(
+            "Closed-Repo", closed_at="2026-05-01T00:00:00+00:00"
+        )
         self._write_initiatives(tmp_path, [closed])
         audits = [_make_audit("Closed-Repo")]
         briefing = build_briefing(
@@ -590,7 +625,9 @@ class TestInitiativesBriefing:
         assert "## Initiatives this week" not in md
 
     def test_markdown_includes_section_with_one_initiative(self, tmp_path):
-        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        initiative = self._make_initiative(
+            "Wavelength", target_tier=2, deadline=self._future(60)
+        )
         self._write_initiatives(tmp_path, [initiative])
         audits = [_make_audit("Wavelength")]
         briefing = build_briefing(
@@ -601,7 +638,9 @@ class TestInitiativesBriefing:
         assert "Wavelength" in md
 
     def test_markdown_includes_status_counts_line(self, tmp_path):
-        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        initiative = self._make_initiative(
+            "Wavelength", target_tier=2, deadline=self._future(60)
+        )
         self._write_initiatives(tmp_path, [initiative])
         audits = [_make_audit("Wavelength")]
         briefing = build_briefing(
@@ -612,7 +651,9 @@ class TestInitiativesBriefing:
         assert "on-track" in md
 
     def test_markdown_initiatives_section_comes_before_shipped(self, tmp_path):
-        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        initiative = self._make_initiative(
+            "Wavelength", target_tier=2, deadline=self._future(60)
+        )
         self._write_initiatives(tmp_path, [initiative])
         audits = [_make_audit("Wavelength", pushed_days_ago=1)]
         briefing = build_briefing(
@@ -621,7 +662,9 @@ class TestInitiativesBriefing:
         md = render_markdown(briefing)
         idx_initiatives = md.index("## Initiatives this week")
         idx_shipped = md.index("## Shipped This Week")
-        assert idx_initiatives < idx_shipped, "Initiatives section must appear before Shipped"
+        assert idx_initiatives < idx_shipped, (
+            "Initiatives section must appear before Shipped"
+        )
 
     def test_render_voice_no_initiatives_no_line(self, tmp_path):
         self._write_initiatives(tmp_path, [])
@@ -633,7 +676,9 @@ class TestInitiativesBriefing:
         assert "initiative" not in voice.lower() or "0 initiatives" not in voice.lower()
 
     def test_render_voice_includes_initiative_summary(self, tmp_path):
-        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        initiative = self._make_initiative(
+            "Wavelength", target_tier=2, deadline=self._future(60)
+        )
         self._write_initiatives(tmp_path, [initiative])
         audits = [_make_audit("Wavelength")]
         briefing = build_briefing(
@@ -747,7 +792,10 @@ class TestBuildDismissedRepos:
         assert result == []
 
     def test_valid_dismissed_file_returns_rows(self, tmp_path):
-        from github_repo_auditor.briefing import DismissedRepoRow, _build_dismissed_repos
+        from github_repo_auditor.briefing import (
+            DismissedRepoRow,
+            _build_dismissed_repos,
+        )
 
         _write_dismissed_json(
             tmp_path,
@@ -819,7 +867,10 @@ class TestBuildDismissedRepos:
 
     def test_keeps_entries_with_malformed_expiry(self, tmp_path):
         """Malformed expires_at is preserved defensively (not filtered)."""
-        from github_repo_auditor.briefing import DismissedRepoRow, _build_dismissed_repos
+        from github_repo_auditor.briefing import (
+            DismissedRepoRow,
+            _build_dismissed_repos,
+        )
 
         _write_dismissed_json(
             tmp_path,
@@ -883,7 +934,9 @@ class TestRenderMarkdownDismissedSection:
             date="2026-05-12",
             dismissed_repos=[
                 DismissedRepoRow(repo_name="SilencedRepo", reason="low priority"),
-                DismissedRepoRow(repo_name="TempRepo", reason="blocked", expires_at="2026-06-01"),
+                DismissedRepoRow(
+                    repo_name="TempRepo", reason="blocked", expires_at="2026-06-01"
+                ),
             ],
         )
         md = render_markdown(briefing)

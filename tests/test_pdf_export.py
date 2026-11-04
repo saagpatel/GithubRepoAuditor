@@ -35,7 +35,12 @@ class TestPdfExport:
         assert path.name.startswith("audit-report-")
 
     def test_minimal_report(self, tmp_path):
-        data = {"username": "u", "audits": [], "average_score": 0, "tier_distribution": {}}
+        data = {
+            "username": "u",
+            "audits": [],
+            "average_score": 0,
+            "tier_distribution": {},
+        }
         path = export_pdf_report(data, tmp_path)
         assert path is not None
 

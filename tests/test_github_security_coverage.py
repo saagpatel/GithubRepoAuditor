@@ -31,7 +31,9 @@ from github_repo_auditor.github_security_coverage import (
     write_security_coverage_receipt,
 )
 from github_repo_auditor.portfolio_truth_reconcile import _select_security_entry
-from github_repo_auditor.portfolio_truth_status import load_security_coverage_by_full_name
+from github_repo_auditor.portfolio_truth_status import (
+    load_security_coverage_by_full_name,
+)
 
 NOW = datetime(2026, 7, 16, 12, tzinfo=timezone.utc)
 OUTCOME_FIXTURES = json.loads(
@@ -501,13 +503,16 @@ def test_normalized_provider_freshness_honors_configured_window() -> None:
         counts={"critical": 0, "high": 0, "medium": 0, "low": 0},
     )
 
-    assert validate_normalized_security_provider(
-        "dependabot",
-        observed,
-        produced_at=observed_at,
-        current=NOW,
-        max_age_hours=48,
-    ) == observed
+    assert (
+        validate_normalized_security_provider(
+            "dependabot",
+            observed,
+            produced_at=observed_at,
+            current=NOW,
+            max_age_hours=48,
+        )
+        == observed
+    )
     with pytest.raises(SecurityCoverageError, match="freshness window"):
         validate_normalized_security_provider(
             "dependabot",
@@ -530,21 +535,27 @@ def test_normalized_stale_provider_requires_receipt_or_provider_age() -> None:
     old_stale = deepcopy(recent_stale)
     old_stale["observed_at"] = (NOW - timedelta(hours=30)).isoformat()
 
-    assert validate_normalized_security_provider(
-        "dependabot",
-        recent_stale,
-        produced_at=NOW,
-        current=NOW,
-        max_age_hours=24,
-        receipt_is_stale=True,
-    ) == recent_stale
-    assert validate_normalized_security_provider(
-        "dependabot",
-        old_stale,
-        produced_at=NOW,
-        current=NOW,
-        max_age_hours=24,
-    ) == old_stale
+    assert (
+        validate_normalized_security_provider(
+            "dependabot",
+            recent_stale,
+            produced_at=NOW,
+            current=NOW,
+            max_age_hours=24,
+            receipt_is_stale=True,
+        )
+        == recent_stale
+    )
+    assert (
+        validate_normalized_security_provider(
+            "dependabot",
+            old_stale,
+            produced_at=NOW,
+            current=NOW,
+            max_age_hours=24,
+        )
+        == old_stale
+    )
     with pytest.raises(SecurityCoverageError, match="not justified"):
         validate_normalized_security_provider(
             "dependabot",
@@ -565,13 +576,16 @@ def test_normalized_unavailable_provider_preserves_old_observation() -> None:
         conditional_result="failed",
     )
 
-    assert validate_normalized_security_provider(
-        "dependabot",
-        unavailable,
-        produced_at=NOW,
-        current=NOW,
-        max_age_hours=24,
-    ) == unavailable
+    assert (
+        validate_normalized_security_provider(
+            "dependabot",
+            unavailable,
+            produced_at=NOW,
+            current=NOW,
+            max_age_hours=24,
+        )
+        == unavailable
+    )
 
 
 def _truth(count: int = 16) -> dict[str, Any]:
@@ -853,10 +867,7 @@ def test_valid_prior_for_old_cohort_is_ignored_during_contraction() -> None:
     )
 
     provider_request_count = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT * 3
-    assert (
-        receipt["cohort"]["repository_count"]
-        == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
-    )
+    assert receipt["cohort"]["repository_count"] == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     assert len(session.calls) == provider_request_count + 1
     assert all(
         kwargs.get("headers") == {}
@@ -995,14 +1006,12 @@ def test_remote_repository_accepts_canonical_git_tokens(
     head_sha: str,
 ) -> None:
     receipt = _collect()
-    receipt["repositories"]["owner/repo-00"]["repository"] = (
-        _remote_repository_result(
-            state="observed",
-            observed_at=NOW.isoformat(),
-            default_branch=branch,
-            head_sha=head_sha,
-            archived=False,
-        )
+    receipt["repositories"]["owner/repo-00"]["repository"] = _remote_repository_result(
+        state="observed",
+        observed_at=NOW.isoformat(),
+        default_branch=branch,
+        head_sha=head_sha,
+        archived=False,
     )
 
     loaded = validate_security_coverage_receipt(
@@ -1118,12 +1127,15 @@ def test_remote_repository_rejects_impossible_git_tokens(
     ),
 )
 def test_shared_branch_validator_matches_git_check_ref_format(branch: str) -> None:
-    git_accepts = subprocess.run(
-        ["git", "check-ref-format", "--branch", branch],
-        check=False,
-        capture_output=True,
-        text=True,
-    ).returncode == 0
+    git_accepts = (
+        subprocess.run(
+            ["git", "check-ref-format", "--branch", branch],
+            check=False,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
 
     assert _valid_git_branch(branch) is git_accepts
 
@@ -1143,12 +1155,15 @@ def test_shared_branch_validator_matches_git_check_ref_format(branch: str) -> No
     ),
 )
 def test_shared_upstream_validator_matches_git_ref_format(upstream: str) -> None:
-    git_accepts = subprocess.run(
-        ["git", "check-ref-format", f"refs/remotes/{upstream}"],
-        check=False,
-        capture_output=True,
-        text=True,
-    ).returncode == 0
+    git_accepts = (
+        subprocess.run(
+            ["git", "check-ref-format", f"refs/remotes/{upstream}"],
+            check=False,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
 
     assert _valid_git_upstream(upstream) is git_accepts
 
@@ -1215,9 +1230,7 @@ def test_incremental_eligibility_preflight_skips_plan_blocked_providers() -> Non
             assert providers[provider]["http_status"] == 200
             assert providers[provider]["http_classification"] == "eligibility"
             assert providers[provider]["counts"] is None
-    validate_security_coverage_receipt(
-        receipt, expected_cohort_count=16, now=NOW
-    )
+    validate_security_coverage_receipt(receipt, expected_cohort_count=16, now=NOW)
 
 
 def test_eligibility_claim_requires_matching_embedded_provenance() -> None:
@@ -1232,9 +1245,7 @@ def test_eligibility_claim_requires_matching_embedded_provenance() -> None:
         SecurityCoverageError,
         match="eligibility-based unavailability is unproven",
     ):
-        validate_security_coverage_receipt(
-            receipt, expected_cohort_count=16, now=NOW
-        )
+        validate_security_coverage_receipt(receipt, expected_cohort_count=16, now=NOW)
 
 
 def test_malformed_eligibility_preflight_falls_back_without_exceeding_budget() -> None:
@@ -1440,9 +1451,7 @@ def test_stale_provider_observation_becomes_unknown_count() -> None:
     receipt = _collect()
     receipt["produced_at"] = NOW.isoformat()
     provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
-    provider["observed_at"] = (
-        NOW - timedelta(hours=outcome["age_hours"])
-    ).isoformat()
+    provider["observed_at"] = (NOW - timedelta(hours=outcome["age_hours"])).isoformat()
 
     loaded = validate_security_coverage_receipt(
         receipt, expected_cohort_count=16, now=NOW
@@ -1497,8 +1506,9 @@ def test_known_vulnerable_dependency_survives_partial_provider_coverage() -> Non
     assert providers["dependabot"]["state"] == "observed"
     assert providers["dependabot"]["reason_code"] == dependabot_outcome["reason_code"]
     assert providers["dependabot"]["completed"] is True
-    assert providers["dependabot"]["zero_findings"] is (
-        dependabot_outcome["zero_findings"]
+    assert (
+        providers["dependabot"]["zero_findings"]
+        is (dependabot_outcome["zero_findings"])
     )
     assert providers["dependabot"]["counts"] == dependabot_outcome["counts"]
     assert providers["code_scanning"]["state"] == "forbidden"
@@ -1507,10 +1517,7 @@ def test_known_vulnerable_dependency_survives_partial_provider_coverage() -> Non
     assert providers["code_scanning"]["zero_findings"] is None
     assert providers["code_scanning"]["counts"] is None
     assert providers["secret_scanning"]["state"] == "not_found"
-    assert (
-        providers["secret_scanning"]["reason_code"]
-        == missing_outcome["reason_code"]
-    )
+    assert providers["secret_scanning"]["reason_code"] == missing_outcome["reason_code"]
     assert providers["secret_scanning"]["completed"] is False
     assert providers["secret_scanning"]["zero_findings"] is None
     assert providers["secret_scanning"]["counts"] is None
@@ -1549,10 +1556,7 @@ def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
 
     assert loaded is not None
     assert loaded.source_path == str(canonical)
-    assert (
-        len(loaded.entries_by_full_name)
-        == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
-    )
+    assert len(loaded.entries_by_full_name) == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
 
 
 def test_written_receipt_binds_semantic_identity_and_exact_bytes(
@@ -1645,7 +1649,9 @@ def test_collector_cli_holds_writer_intent_before_truth_read_and_replacement(
     )
 
     main()
-    loaded = load_security_coverage_receipt(receipt_path, now=NOW + timedelta(minutes=1))
+    loaded = load_security_coverage_receipt(
+        receipt_path, now=NOW + timedelta(minutes=1)
+    )
 
     assert observed == {
         "publisher_blocked_during_truth_read": True,
@@ -1772,9 +1778,7 @@ def test_receipt_provenance_and_provider_timestamps_fail_closed(tmp_path: Path) 
     provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
     provider["observed_at"] = (NOW + timedelta(minutes=1)).isoformat()
     with pytest.raises(SecurityCoverageError, match="later than receipt produced_at"):
-        validate_security_coverage_receipt(
-            receipt, expected_cohort_count=16, now=NOW
-        )
+        validate_security_coverage_receipt(receipt, expected_cohort_count=16, now=NOW)
 
 
 def test_receipt_producer_must_match_expected_canonical_commit() -> None:

@@ -246,7 +246,9 @@ def test_close_initiative_custom_reason(tmp_path: Path):
 
 
 def test_derive_status_closed_returns_met():
-    initiative = _sample_initiative(closed_at="2026-05-01T00:00:00+00:00", closed_reason="met")
+    initiative = _sample_initiative(
+        closed_at="2026-05-01T00:00:00+00:00", closed_reason="met"
+    )
     status = derive_status(initiative, _repo_at_tier(1))
     assert status == "met"
 
@@ -327,7 +329,9 @@ def test_initiative_frozen():
 # ── CLI integration tests ─────────────────────────────────────────────────────
 
 
-def _build_portfolio_truth(tmp_path: Path, repo_name: str = "Wavelength", tier: int = 2) -> Path:
+def _build_portfolio_truth(
+    tmp_path: Path, repo_name: str = "Wavelength", tier: int = 2
+) -> Path:
     """Write a minimal portfolio-truth-latest.json for CLI tests."""
     from datetime import timedelta as td
 
@@ -335,7 +339,9 @@ def _build_portfolio_truth(tmp_path: Path, repo_name: str = "Wavelength", tier: 
     project: dict = {
         "identity": {"display_name": repo_name, "has_git": True},
         "derived": {
-            "last_meaningful_activity_at": (date.today() - td(days=days_ago)).isoformat(),
+            "last_meaningful_activity_at": (
+                date.today() - td(days=days_ago)
+            ).isoformat(),
             "activity_status": "active",
             "context_quality": "strong" if tier >= 3 else "weak",
             "context_files": ["README.md", "LICENSE"] if tier >= 3 else ["README.md"],
@@ -464,7 +470,9 @@ def test_cli_list_initiatives_empty_exits_cleanly(tmp_path: Path):
 def test_cli_list_initiatives_shows_entries(tmp_path: Path, capsys):
     _build_portfolio_truth(tmp_path, "TideEngine", tier=1)
     p = tmp_path / "initiatives.json"
-    save_initiatives(p, [_sample_initiative("TideEngine", target_tier=3, deadline=_future(10))])
+    save_initiatives(
+        p, [_sample_initiative("TideEngine", target_tier=3, deadline=_future(10))]
+    )
     exit_code = _run_cli(
         [
             "triage",

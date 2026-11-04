@@ -6,7 +6,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from github_repo_auditor.excel_detail_helpers import repo_detail_lookup_formula, set_internal_hyperlink
+from github_repo_auditor.excel_detail_helpers import (
+    repo_detail_lookup_formula,
+    set_internal_hyperlink,
+)
 
 REPO_DETAIL_DIMENSION_HEADERS = ["Rank", "Dimension", "Score", "Summary"]
 
@@ -51,7 +54,11 @@ def repo_detail_explanation_rows() -> list[tuple[str, int]]:
 def repo_detail_implementation_rows() -> list[tuple[str, int, str]]:
     return [
         ("Summary", 66, "No meaningful implementation hotspot is currently surfaced."),
-        ("Implementation Hotspot 1", 67, "No implementation hotspot is currently surfaced."),
+        (
+            "Implementation Hotspot 1",
+            67,
+            "No implementation hotspot is currently surfaced.",
+        ),
         (
             "Implementation Hotspot 2",
             68,
@@ -74,7 +81,9 @@ def build_repo_detail_sheet_content(
         if existing_selection in repo_names
         else (repo_names[0] if repo_names else "")
     )
-    validation_formula = f"=Data_RepoDetail!$A$2:$A${len(repo_names) + 1}" if repo_names else None
+    validation_formula = (
+        f"=Data_RepoDetail!$A$2:$A${len(repo_names) + 1}" if repo_names else None
+    )
     return {
         "default_repo": default_repo,
         "validation_formula": validation_formula,
@@ -90,14 +99,20 @@ def build_repo_detail_sheet_content(
             }
             for label, column_index, row_base, col_base, fallback in repo_detail_summary_fields()
         ],
-        "description_formula": repo_detail_lookup_formula(4, "No description recorded yet."),
+        "description_formula": repo_detail_lookup_formula(
+            4, "No description recorded yet."
+        ),
         "current_state_rows": [
             {
                 "row": 13 + offset,
                 "label": label,
-                "formula": repo_detail_lookup_formula(column_index, "No summary recorded yet."),
+                "formula": repo_detail_lookup_formula(
+                    column_index, "No summary recorded yet."
+                ),
             }
-            for offset, (label, column_index) in enumerate(repo_detail_current_state_rows(), 1)
+            for offset, (label, column_index) in enumerate(
+                repo_detail_current_state_rows(), 1
+            )
         ],
         "explanation_rows": [
             {
@@ -107,7 +122,9 @@ def build_repo_detail_sheet_content(
                     column_index, "No briefing detail recorded yet."
                 ),
             }
-            for offset, (label, column_index) in enumerate(repo_detail_explanation_rows(), 1)
+            for offset, (label, column_index) in enumerate(
+                repo_detail_explanation_rows(), 1
+            )
         ],
         "dimension_rows": [
             {
@@ -129,7 +146,9 @@ def build_repo_detail_sheet_content(
             {
                 "row": 20 + idx,
                 "label": f"Hotspot {idx}",
-                "formula": repo_detail_lookup_formula(23 + idx, "No hotspot recorded yet."),
+                "formula": repo_detail_lookup_formula(
+                    23 + idx, "No hotspot recorded yet."
+                ),
             }
             for idx in range(1, 4)
         ],
@@ -146,7 +165,9 @@ def build_repo_detail_sheet_content(
     }
 
 
-def write_repo_detail_summary_rows(ws, summary_rows, *, style_data_cell, subheader_font) -> None:
+def write_repo_detail_summary_rows(
+    ws, summary_rows, *, style_data_cell, subheader_font
+) -> None:
     for item in summary_rows:
         ws.cell(
             row=item["row"], column=item["label_col"], value=item["label"]
@@ -167,8 +188,12 @@ def write_repo_detail_labeled_rows(
 ) -> None:
     for item in rows:
         row = item["row"]
-        ws.cell(row=row, column=value_column - 1, value=item["label"]).font = subheader_font
-        style_data_cell(ws.cell(row=row, column=value_column, value=item["formula"]), "left")
+        ws.cell(
+            row=row, column=value_column - 1, value=item["label"]
+        ).font = subheader_font
+        style_data_cell(
+            ws.cell(row=row, column=value_column, value=item["formula"]), "left"
+        )
 
 
 def write_repo_detail_dimension_table(
@@ -189,7 +214,9 @@ def write_repo_detail_dimension_table(
         ws.cell(row=row, column=3, value=item["score_formula"])
         ws.cell(row=row, column=4, value=item["summary_formula"])
         for col in range(1, len(REPO_DETAIL_DIMENSION_HEADERS) + 1):
-            style_data_cell(ws.cell(row=row, column=col), "center" if col in {1, 3} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col), "center" if col in {1, 3} else "left"
+            )
 
 
 def write_repo_detail_handoff_section(ws) -> int:
@@ -201,7 +228,11 @@ def write_repo_detail_handoff_section(ws) -> int:
         ("Follow-Through Summary", 33, "No follow-through evidence is recorded yet."),
         ("Checkpoint Timing", 34, "Unknown"),
         ("Escalation", 35, "Unknown"),
-        ("Escalation Summary", 36, "No stronger follow-through escalation is currently surfaced."),
+        (
+            "Escalation Summary",
+            36,
+            "No stronger follow-through escalation is currently surfaced.",
+        ),
         ("Recovery / Retirement", 37, "None"),
         (
             "Recovery Summary",
@@ -302,7 +333,11 @@ def repo_detail_handoff_rows() -> list[tuple[str, int, str]]:
         ("Follow-Through Summary", 33, "No follow-through evidence is recorded yet."),
         ("Checkpoint Timing", 34, "Unknown"),
         ("Escalation", 35, "Unknown"),
-        ("Escalation Summary", 36, "No stronger follow-through escalation is currently surfaced."),
+        (
+            "Escalation Summary",
+            36,
+            "No stronger follow-through escalation is currently surfaced.",
+        ),
         ("Recovery / Retirement", 37, "None"),
         (
             "Recovery Summary",
@@ -402,13 +437,19 @@ def populate_repo_detail_handoff_section(ws, style_data_cell, subheader_font) ->
         row = 25 + offset
         ws.cell(row=row, column=6, value=label).font = subheader_font
         style_data_cell(
-            ws.cell(row=row, column=7, value=repo_detail_lookup_formula(column_index, fallback)),
+            ws.cell(
+                row=row,
+                column=7,
+                value=repo_detail_lookup_formula(column_index, fallback),
+            ),
             "left",
         )
     nav_row = 26 + len(handoff_rows)
     ws.cell(row=nav_row, column=1, value="Use Score Explainer")
     set_internal_hyperlink(
-        ws.cell(row=nav_row, column=2), "Score Explainer", display="Open Score Explainer"
+        ws.cell(row=nav_row, column=2),
+        "Score Explainer",
+        display="Open Score Explainer",
     )
     ws.cell(row=nav_row, column=4, value="Go To Explorer")
     set_internal_hyperlink(

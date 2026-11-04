@@ -98,16 +98,14 @@ def build_coverage_envelope(
     }
     provider_zero_finding_counts = {
         provider: sum(
-            _provider_zero_findings(project, provider)
-            for project in workspace_projects
+            _provider_zero_findings(project, provider) for project in workspace_projects
         )
         for provider in ("dependabot", "code_scanning", "secret_scanning")
     }
     remote_default_branch_counts = {
         state: sum(
             (
-                _section(project, "repository_state").get("remote_default_branch")
-                or {}
+                _section(project, "repository_state").get("remote_default_branch") or {}
             ).get("state")
             == state
             for project in workspace_projects

@@ -18,14 +18,30 @@ def _clamp_round(value: float, lower: float, upper: float) -> float:
 
 
 def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return bool(target.get("local_noise") or history_meta.get("current_transition_reversed"))
+    return bool(
+        target.get("local_noise") or history_meta.get("current_transition_reversed")
+    )
 
 
 def test_pending_debt_event_outcome_classifies_resolution_states() -> None:
-    assert pending_debt_event_outcome({"class_transition_resolution_status": "confirmed"}) == "confirmed"
-    assert pending_debt_event_outcome({"class_transition_health_status": "stalled"}) == "stalled"
-    assert pending_debt_event_outcome({"class_reweight_transition_status": "pending-support"}) == "pending"
-    assert pending_debt_event_outcome({"class_transition_resolution_status": "blocked"}) == "blocked"
+    assert (
+        pending_debt_event_outcome({"class_transition_resolution_status": "confirmed"})
+        == "confirmed"
+    )
+    assert (
+        pending_debt_event_outcome({"class_transition_health_status": "stalled"})
+        == "stalled"
+    )
+    assert (
+        pending_debt_event_outcome(
+            {"class_reweight_transition_status": "pending-support"}
+        )
+        == "pending"
+    )
+    assert (
+        pending_debt_event_outcome({"class_transition_resolution_status": "blocked"})
+        == "blocked"
+    )
 
 
 def test_class_pending_debt_for_target_detects_active_debt() -> None:
@@ -128,7 +144,9 @@ def test_class_pending_debt_hotspots_prefers_strongest_class_signal() -> None:
     assert hotspots[0]["class_pending_debt_rate"] == 0.9
 
 
-def test_closure_forecast_reweight_scores_for_target_balances_support_and_caution() -> None:
+def test_closure_forecast_reweight_scores_for_target_balances_support_and_caution() -> (
+    None
+):
     target = {
         "class_reweight_transition_status": "pending-support",
         "class_transition_health_status": "building",

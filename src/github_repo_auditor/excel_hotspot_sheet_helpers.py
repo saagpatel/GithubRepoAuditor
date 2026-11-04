@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 DEPENDENCY_GRAPH_HEADERS = ["Dependency", "Repo Count", "Repos Using It"]
-HOTSPOTS_HEADERS = ["Repo", "Category", "Severity", "Title", "Summary", "Recommended Action", "Tier"]
+HOTSPOTS_HEADERS = [
+    "Repo",
+    "Category",
+    "Severity",
+    "Title",
+    "Summary",
+    "Recommended Action",
+    "Tier",
+]
 IMPLEMENTATION_HOTSPOTS_HEADERS = [
     "Repo",
     "Scope",
@@ -19,7 +27,9 @@ IMPLEMENTATION_HOTSPOTS_HEADERS = [
 ]
 
 
-def build_dependency_graph_rows(shared_dependencies: list[dict[str, Any]]) -> list[list[Any]]:
+def build_dependency_graph_rows(
+    shared_dependencies: list[dict[str, Any]],
+) -> list[list[Any]]:
     return [
         [
             item.get("name", ""),
@@ -120,7 +130,9 @@ def build_hotspot_rows(hotspots: list[dict[str, Any]]) -> list[list[Any]]:
     return rows
 
 
-def build_implementation_hotspot_rows(hotspots: list[dict[str, Any]]) -> list[list[Any]]:
+def build_implementation_hotspot_rows(
+    hotspots: list[dict[str, Any]],
+) -> list[list[Any]]:
     rows: list[list[Any]] = []
     for hotspot in hotspots:
         rows.append(
@@ -208,7 +220,11 @@ def build_hotspots_sheet(
         ws.conditional_formatting.add(
             f"C2:C{max_row}",
             data_bar_rule(
-                start_type="num", start_value=0, end_type="num", end_value=1, color="DC2626"
+                start_type="num",
+                start_value=0,
+                end_type="num",
+                end_value=1,
+                color="DC2626",
             ),
         )
     auto_width(ws, len(HOTSPOTS_HEADERS), max_row)

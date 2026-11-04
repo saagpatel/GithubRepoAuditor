@@ -73,9 +73,10 @@ def test_decision_quality_from_summary_backfills_legacy_operator_fields() -> Non
     assert decision_quality["contract_version"] == "decision_quality_v1"
     assert decision_quality["decision_quality_status"] == "trusted"
     assert decision_quality["judged_recommendation_count"] == 4
-    assert decision_quality["recommendation_quality_summary"] == summary[
-        "recommendation_quality_summary"
-    ]
+    assert (
+        decision_quality["recommendation_quality_summary"]
+        == summary["recommendation_quality_summary"]
+    )
 
 
 def test_build_decision_quality_trusts_healthy_quiet_monitor_runs() -> None:
@@ -99,7 +100,10 @@ def test_build_decision_quality_trusts_healthy_quiet_monitor_runs() -> None:
             "next_action_trust_policy": "verify-first",
             "adaptive_confidence_summary": "Keep monitoring instead of forcing action.",
         },
-        resolution_trend={"primary_target": {}, "recommendation_drift_status": "stable"},
+        resolution_trend={
+            "primary_target": {},
+            "recommendation_drift_status": "stable",
+        },
     )
 
     assert decision_quality["decision_quality_status"] == "trusted"

@@ -589,78 +589,181 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     )
     _ensure_column(conn, "audit_runs", "report_path", "TEXT")
     _ensure_column(
-        conn, "audit_runs", "security_governance_preview_json", "TEXT NOT NULL DEFAULT '[]'"
+        conn,
+        "audit_runs",
+        "security_governance_preview_json",
+        "TEXT NOT NULL DEFAULT '[]'",
     )
-    _ensure_column(conn, "audit_runs", "campaign_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "writeback_preview_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "writeback_results_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "managed_state_drift_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "rollback_preview_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "campaign_history_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "governance_preview_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "governance_approval_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "governance_results_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "governance_history_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "governance_drift_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "governance_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "preflight_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(
+        conn, "audit_runs", "campaign_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "writeback_preview_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "writeback_results_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "managed_state_drift_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "rollback_preview_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "campaign_history_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "governance_preview_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "governance_approval_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "governance_results_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "governance_history_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "governance_drift_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "governance_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "preflight_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
     _ensure_column(conn, "audit_runs", "baseline_signature", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "audit_runs", "baseline_context_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(
-        conn, "audit_runs", "portfolio_catalog_summary_json", "TEXT NOT NULL DEFAULT '{}'"
-    )
-    _ensure_column(conn, "audit_runs", "operating_paths_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(
-        conn, "audit_runs", "intent_alignment_summary_json", "TEXT NOT NULL DEFAULT '{}'"
-    )
-    _ensure_column(conn, "audit_runs", "scorecards_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "scorecard_programs_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(
-        conn, "audit_runs", "portfolio_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn, "audit_runs", "baseline_context_json", "TEXT NOT NULL DEFAULT '{}'"
     )
     _ensure_column(
-        conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn,
+        "audit_runs",
+        "portfolio_catalog_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
     )
     _ensure_column(
-        conn, "audit_runs", "decision_quality_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn, "audit_runs", "operating_paths_summary_json", "TEXT NOT NULL DEFAULT '{}'"
     )
     _ensure_column(
-        conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'"
+        conn,
+        "audit_runs",
+        "intent_alignment_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
     )
     _ensure_column(
-        conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'"
-    )
-    _ensure_column(conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(
-        conn, "audit_runs", "historical_portfolio_intelligence_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn, "audit_runs", "scorecards_summary_json", "TEXT NOT NULL DEFAULT '{}'"
     )
     _ensure_column(
-        conn, "audit_runs", "automation_guidance_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn, "audit_runs", "scorecard_programs_json", "TEXT NOT NULL DEFAULT '{}'"
     )
     _ensure_column(
-        conn, "audit_runs", "approval_workflow_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn,
+        "audit_runs",
+        "portfolio_outcomes_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
     )
     _ensure_column(
-        conn, "audit_runs", "implementation_hotspots_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+        conn,
+        "audit_runs",
+        "operator_effectiveness_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
     )
     _ensure_column(
-        conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
+        conn,
+        "audit_runs",
+        "decision_quality_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
     )
-    _ensure_column(conn, "portfolio_catalog_entries", "target_maturity", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "portfolio_catalog_entries", "operating_path", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "portfolio_catalog_entries", "path_override", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "portfolio_catalog_entries", "path_confidence", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "portfolio_catalog_entries", "path_rationale", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "review_targets_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "review_history_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(
+        conn,
+        "audit_runs",
+        "high_pressure_queue_history_json",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )
+    _ensure_column(
+        conn,
+        "audit_runs",
+        "action_sync_outcomes_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _ensure_column(
+        conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn,
+        "audit_runs",
+        "historical_portfolio_intelligence_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _ensure_column(
+        conn,
+        "audit_runs",
+        "automation_guidance_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _ensure_column(
+        conn,
+        "audit_runs",
+        "approval_workflow_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _ensure_column(
+        conn,
+        "audit_runs",
+        "implementation_hotspots_summary_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _ensure_column(
+        conn,
+        "portfolio_catalog_entries",
+        "maturity_program",
+        "TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        conn, "portfolio_catalog_entries", "target_maturity", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        conn, "portfolio_catalog_entries", "operating_path", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        conn, "portfolio_catalog_entries", "path_override", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        conn, "portfolio_catalog_entries", "path_confidence", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        conn, "portfolio_catalog_entries", "path_rationale", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "review_targets_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "review_history_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
     _ensure_column(conn, "audit_runs", "watch_state_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "operator_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "operator_queue_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "action_runs", "lifecycle_state", "TEXT NOT NULL DEFAULT 'planned'")
-    _ensure_column(conn, "action_runs", "reconciliation_outcome", "TEXT NOT NULL DEFAULT 'preview'")
+    _ensure_column(
+        conn, "audit_runs", "operator_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "operator_queue_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "action_runs", "lifecycle_state", "TEXT NOT NULL DEFAULT 'planned'"
+    )
+    _ensure_column(
+        conn, "action_runs", "reconciliation_outcome", "TEXT NOT NULL DEFAULT 'preview'"
+    )
     _ensure_column(conn, "action_runs", "closed_at", "TEXT")
     _ensure_column(conn, "action_runs", "closed_reason", "TEXT")
     _ensure_column(conn, "action_runs", "reopened_at", "TEXT")
@@ -681,12 +784,16 @@ def _ensure_column(
         raise ValueError(f"Unknown table: {table_name!r}")
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", column_name):
         raise ValueError(f"Invalid column name: {column_name!r}")
-    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    existing = {
+        row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
     if column_name not in existing:
         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
 
 
-def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path | None) -> None:
+def _insert_run(
+    conn: sqlite3.Connection, report: AuditReport, report_path: Path | None
+) -> None:
     run_id = f"{report.username}:{report.generated_at.isoformat()}"
     conn.execute(
         """
@@ -915,10 +1022,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 "details": {"has_dependabot": security.get("has_dependabot", False)},
             },
             "dependency_graph": {
-                "status": security.get("github", {}).get("dependency_graph_status", "unavailable"),
+                "status": security.get("github", {}).get(
+                    "dependency_graph_status", "unavailable"
+                ),
                 "source": "github",
                 "details": {
-                    "enabled": security.get("github", {}).get("dependency_graph_enabled"),
+                    "enabled": security.get("github", {}).get(
+                        "dependency_graph_enabled"
+                    ),
                 },
             },
             "sbom_export": {
@@ -929,17 +1040,25 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 },
             },
             "code_scanning": {
-                "status": security.get("github", {}).get("code_scanning_status", "unavailable"),
+                "status": security.get("github", {}).get(
+                    "code_scanning_status", "unavailable"
+                ),
                 "source": "github",
                 "details": {
-                    "open_alerts": security.get("github", {}).get("code_scanning_alerts"),
+                    "open_alerts": security.get("github", {}).get(
+                        "code_scanning_alerts"
+                    ),
                 },
             },
             "secret_scanning": {
-                "status": security.get("github", {}).get("secret_scanning_status", "unavailable"),
+                "status": security.get("github", {}).get(
+                    "secret_scanning_status", "unavailable"
+                ),
                 "source": "github",
                 "details": {
-                    "open_alerts": security.get("github", {}).get("secret_scanning_alerts"),
+                    "open_alerts": security.get("github", {}).get(
+                        "secret_scanning_alerts"
+                    ),
                 },
             },
         }
@@ -962,14 +1081,18 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
 
         alerts = {
             "code_scanning": {
-                "open_count": security.get("github", {}).get("code_scanning_alerts") or 0,
+                "open_count": security.get("github", {}).get("code_scanning_alerts")
+                or 0,
                 "source": "github",
                 "details": {
-                    "status": security.get("github", {}).get("code_scanning_status", "unavailable")
+                    "status": security.get("github", {}).get(
+                        "code_scanning_status", "unavailable"
+                    )
                 },
             },
             "secret_scanning": {
-                "open_count": security.get("github", {}).get("secret_scanning_alerts") or 0,
+                "open_count": security.get("github", {}).get("secret_scanning_alerts")
+                or 0,
                 "source": "github",
                 "details": {
                     "status": security.get("github", {}).get(
@@ -1039,13 +1162,20 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             )
 
         dep_result = next(
-            (result for result in audit.analyzer_results if result.dimension == "dependencies"),
+            (
+                result
+                for result in audit.analyzer_results
+                if result.dimension == "dependencies"
+            ),
             None,
         )
         dep_details = dep_result.details if dep_result else {}
-        manifest_files = dep_details.get("manifest_files", []) or dep_details.get("manifests", [])
+        manifest_files = dep_details.get("manifest_files", []) or dep_details.get(
+            "manifests", []
+        )
         dependency_count = (
-            dep_details.get("total_dependencies", dep_details.get("manifest_count", 0)) or 0
+            dep_details.get("total_dependencies", dep_details.get("manifest_count", 0))
+            or 0
         )
         libyears = dep_details.get("total_libyears", 0.0) or 0.0
         conn.execute(
@@ -1162,7 +1292,9 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
     for collection_name, collection_data in report.collections.items():
         repos = collection_data.get("repos", [])
         for rank_index, repo_data in enumerate(repos, start=1):
-            repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            repo_name = (
+                repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            )
             reason = repo_data.get("reason", "") if isinstance(repo_data, dict) else ""
             conn.execute(
                 """
@@ -1217,13 +1349,17 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 report.campaign_summary.get("campaign_type", ""),
                 report.campaign_summary.get("label", ""),
                 campaign_run.get(
-                    "portfolio_profile", report.campaign_summary.get("portfolio_profile", "default")
+                    "portfolio_profile",
+                    report.campaign_summary.get("portfolio_profile", "default"),
                 ),
                 campaign_run.get("collection_name"),
                 campaign_run.get(
-                    "writeback_target", report.writeback_results.get("target", "preview-only")
+                    "writeback_target",
+                    report.writeback_results.get("target", "preview-only"),
                 ),
-                campaign_run.get("mode", report.writeback_results.get("mode", "preview")),
+                campaign_run.get(
+                    "mode", report.writeback_results.get("mode", "preview")
+                ),
                 campaign_run.get("generated_at", report.generated_at.isoformat()),
                 json.dumps(campaign_run.get("generated_action_ids", [])),
             ),
@@ -1246,7 +1382,9 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 action_run.get("target", "preview-only"),
                 action_run.get("status", "preview"),
                 action_run.get("lifecycle_state", "planned"),
-                action_run.get("reconciliation_outcome", action_run.get("status", "preview")),
+                action_run.get(
+                    "reconciliation_outcome", action_run.get("status", "preview")
+                ),
                 action_run.get("closed_at"),
                 action_run.get("closed_reason"),
                 action_run.get("reopened_at"),
@@ -1294,7 +1432,9 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 run_id,
                 drift.get("action_id", ""),
                 drift.get("repo_full_name", ""),
-                drift.get("campaign_type", report.campaign_summary.get("campaign_type", "")),
+                drift.get(
+                    "campaign_type", report.campaign_summary.get("campaign_type", "")
+                ),
                 drift.get("target", ""),
                 drift.get("drift_state", drift.get("drift_type", "drifted")),
                 json.dumps(drift),
@@ -1554,7 +1694,9 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             """,
             (
                 report.governance_approval.get("source_run_id", ""),
-                report.governance_approval.get("approved_at", report.generated_at.isoformat()),
+                report.governance_approval.get(
+                    "approved_at", report.generated_at.isoformat()
+                ),
                 report.governance_approval.get("scope", "all"),
                 report.governance_approval.get("fingerprint", ""),
                 report.governance_approval.get("action_count", 0),
@@ -1631,7 +1773,10 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
 
 
 def _row_dict(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
-    return {description[0]: row[index] for index, description in enumerate(cursor.description)}
+    return {
+        description[0]: row[index]
+        for index, description in enumerate(cursor.description)
+    }
 
 
 def _connect(output_dir: Path) -> sqlite3.Connection | None:
@@ -1761,7 +1906,10 @@ def save_approval_record(output_dir: Path, record: dict) -> None:
                     record.get("subject_key", "all"),
                     record.get("fingerprint", ""),
                     int((record.get("details_json") or {}).get("action_count", 0) or 0),
-                    int((record.get("details_json") or {}).get("applyable_count", 0) or 0),
+                    int(
+                        (record.get("details_json") or {}).get("applyable_count", 0)
+                        or 0
+                    ),
                     "approved",
                     json.dumps(
                         {
@@ -1770,10 +1918,16 @@ def save_approval_record(output_dir: Path, record: dict) -> None:
                             "scope": record.get("subject_key", "all"),
                             "fingerprint": record.get("fingerprint", ""),
                             "action_count": int(
-                                (record.get("details_json") or {}).get("action_count", 0) or 0
+                                (record.get("details_json") or {}).get(
+                                    "action_count", 0
+                                )
+                                or 0
                             ),
                             "applyable_count": int(
-                                (record.get("details_json") or {}).get("applyable_count", 0) or 0
+                                (record.get("details_json") or {}).get(
+                                    "applyable_count", 0
+                                )
+                                or 0
                             ),
                             "status": "approved",
                             "approved_by": record.get("approved_by", ""),
@@ -1819,7 +1973,9 @@ def save_approval_followup_event(output_dir: Path, event: dict) -> None:
         conn.close()
 
 
-def load_approval_records(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+def load_approval_records(
+    output_dir: Path, username: str, limit: int = 200
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -1886,7 +2042,9 @@ def load_approval_records(output_dir: Path, username: str, limit: int = 200) -> 
     return records[:limit]
 
 
-def load_approval_followup_events(output_dir: Path, username: str, limit: int = 400) -> list[dict]:
+def load_approval_followup_events(
+    output_dir: Path, username: str, limit: int = 400
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -1932,7 +2090,9 @@ def load_approval_followup_events(output_dir: Path, username: str, limit: int = 
     return events[:limit]
 
 
-def load_governance_history(output_dir: Path, *, source_run_id: str, limit: int = 10) -> list[dict]:
+def load_governance_history(
+    output_dir: Path, *, source_run_id: str, limit: int = 10
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -1952,7 +2112,9 @@ def load_governance_history(output_dir: Path, *, source_run_id: str, limit: int 
     return [json.loads(row["summary_json"] or "{}") for row in rows]
 
 
-def load_campaign_history(output_dir: Path, campaign_type: str, limit: int = 30) -> list[dict]:
+def load_campaign_history(
+    output_dir: Path, campaign_type: str, limit: int = 30
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2098,7 +2260,9 @@ def _coerce_action_sync_snapshot_field(operator_summary: dict, key: str, default
     return value
 
 
-def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
+def load_latest_audit_runs(
+    output_dir: Path, username: str, limit: int = 20
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2128,9 +2292,13 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
     results: list[dict] = []
     for row in rows:
         operator_summary = json.loads(row["operator_summary_json"] or "{}")
-        decision_quality_summary = json.loads(row["decision_quality_summary_json"] or "{}")
+        decision_quality_summary = json.loads(
+            row["decision_quality_summary_json"] or "{}"
+        )
         if not decision_quality_summary:
-            from github_repo_auditor import operator_decision_quality as _operator_decision_quality
+            from github_repo_auditor import (
+                operator_decision_quality as _operator_decision_quality,
+            )
 
             decision_quality_summary = (
                 _operator_decision_quality.historical_decision_quality_from_summary(
@@ -2149,16 +2317,24 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "baseline_context": json.loads(row["baseline_context_json"] or "{}"),
                 "report_path": row["report_path"],
                 "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
-                "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+                "governance_summary": json.loads(
+                    row["governance_summary_json"] or "{}"
+                ),
                 "portfolio_catalog_summary": json.loads(
                     row["portfolio_catalog_summary_json"] or "{}"
                 ),
-                "operating_paths_summary": json.loads(row["operating_paths_summary_json"] or "{}"),
+                "operating_paths_summary": json.loads(
+                    row["operating_paths_summary_json"] or "{}"
+                ),
                 "intent_alignment_summary": json.loads(
                     row["intent_alignment_summary_json"] or "{}"
                 ),
-                "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
-                "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
+                "scorecards_summary": json.loads(
+                    row["scorecards_summary_json"] or "{}"
+                ),
+                "scorecard_programs": json.loads(
+                    row["scorecard_programs_json"] or "{}"
+                ),
                 "portfolio_outcomes_summary": json.loads(
                     row["portfolio_outcomes_summary_json"] or "{}"
                 ),
@@ -2172,7 +2348,9 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "campaign_outcomes_summary": json.loads(
                     row["action_sync_outcomes_summary_json"] or "{}"
                 ),
-                "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
+                "campaign_tuning_summary": json.loads(
+                    row["campaign_tuning_summary_json"] or "{}"
+                ),
                 "automation_guidance_summary": json.loads(
                     row["automation_guidance_summary_json"] or "{}"
                 ),
@@ -2188,7 +2366,9 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "campaign_summary": json.loads(row["campaign_summary_json"] or "{}"),
                 "writeback_preview": json.loads(row["writeback_preview_json"] or "{}"),
                 "writeback_results": json.loads(row["writeback_results_json"] or "{}"),
-                "managed_state_drift": json.loads(row["managed_state_drift_json"] or "[]"),
+                "managed_state_drift": json.loads(
+                    row["managed_state_drift_json"] or "[]"
+                ),
                 "rollback_preview": json.loads(row["rollback_preview_json"] or "{}"),
                 "campaign_history": json.loads(row["campaign_history_json"] or "[]"),
                 "review_summary": json.loads(row["review_summary_json"] or "{}"),
@@ -2273,7 +2453,9 @@ def load_review_history(output_dir: Path, username: str, limit: int = 10) -> lis
     return history
 
 
-def load_recent_campaign_history(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+def load_recent_campaign_history(
+    output_dir: Path, username: str, limit: int = 200
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2323,7 +2505,9 @@ def load_recent_campaign_history(output_dir: Path, username: str, limit: int = 2
     return history
 
 
-def load_recent_campaign_runs(output_dir: Path, username: str, limit: int = 50) -> list[dict]:
+def load_recent_campaign_runs(
+    output_dir: Path, username: str, limit: int = 50
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2355,13 +2539,17 @@ def load_recent_campaign_runs(output_dir: Path, username: str, limit: int = 50) 
             "label": row["label"],
             "writeback_target": row["writeback_target"],
             "mode": row["mode"],
-            "generated_action_ids": json.loads(row["generated_action_ids_json"] or "[]"),
+            "generated_action_ids": json.loads(
+                row["generated_action_ids_json"] or "[]"
+            ),
         }
         for row in rows
     ]
 
 
-def load_recent_action_runs(output_dir: Path, username: str, limit: int = 400) -> list[dict]:
+def load_recent_action_runs(
+    output_dir: Path, username: str, limit: int = 400
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2430,7 +2618,9 @@ def load_recent_campaign_drift_events(
     return events
 
 
-def load_recent_rollback_runs(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+def load_recent_rollback_runs(
+    output_dir: Path, username: str, limit: int = 200
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2468,7 +2658,9 @@ def load_recent_rollback_runs(output_dir: Path, username: str, limit: int = 200)
     return rollback_runs
 
 
-def load_campaign_outcomes(output_dir: Path, username: str, limit: int = 50) -> list[dict]:
+def load_campaign_outcomes(
+    output_dir: Path, username: str, limit: int = 50
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2503,7 +2695,9 @@ def load_campaign_outcomes(output_dir: Path, username: str, limit: int = 50) -> 
     return outcomes
 
 
-def load_campaign_tuning(output_dir: Path, username: str, limit: int = 60) -> list[dict]:
+def load_campaign_tuning(
+    output_dir: Path, username: str, limit: int = 60
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2540,7 +2734,9 @@ def load_campaign_tuning(output_dir: Path, username: str, limit: int = 60) -> li
     return tuning_rows
 
 
-def load_action_sync_automation(output_dir: Path, username: str, limit: int = 60) -> list[dict]:
+def load_action_sync_automation(
+    output_dir: Path, username: str, limit: int = 60
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2575,7 +2771,9 @@ def load_action_sync_automation(output_dir: Path, username: str, limit: int = 60
     return automation_rows
 
 
-def load_recent_repo_scorecards(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+def load_recent_repo_scorecards(
+    output_dir: Path, username: str, limit: int = 200
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2641,7 +2839,9 @@ def load_recent_implementation_hotspots(
     return history
 
 
-def load_intervention_ledger(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+def load_intervention_ledger(
+    output_dir: Path, username: str, limit: int = 200
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2735,10 +2935,14 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
     operator_summary = json.loads(row["operator_summary_json"] or "{}")
     decision_quality_summary = json.loads(row["decision_quality_summary_json"] or "{}")
     if not decision_quality_summary:
-        from github_repo_auditor import operator_decision_quality as _operator_decision_quality
+        from github_repo_auditor import (
+            operator_decision_quality as _operator_decision_quality,
+        )
 
         decision_quality_summary = (
-            _operator_decision_quality.historical_decision_quality_from_summary(operator_summary)
+            _operator_decision_quality.historical_decision_quality_from_summary(
+                operator_summary
+            )
         )
     return {
         "run_id": row["run_id"],
@@ -2748,21 +2952,39 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "baseline_context": json.loads(row["baseline_context_json"] or "{}"),
         "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
         "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
-        "portfolio_catalog_summary": json.loads(row["portfolio_catalog_summary_json"] or "{}"),
-        "operating_paths_summary": json.loads(row["operating_paths_summary_json"] or "{}"),
-        "intent_alignment_summary": json.loads(row["intent_alignment_summary_json"] or "{}"),
+        "portfolio_catalog_summary": json.loads(
+            row["portfolio_catalog_summary_json"] or "{}"
+        ),
+        "operating_paths_summary": json.loads(
+            row["operating_paths_summary_json"] or "{}"
+        ),
+        "intent_alignment_summary": json.loads(
+            row["intent_alignment_summary_json"] or "{}"
+        ),
         "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
         "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
-        "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
+        "portfolio_outcomes_summary": json.loads(
+            row["portfolio_outcomes_summary_json"] or "{}"
+        ),
         "operator_effectiveness_summary": json.loads(
             row["operator_effectiveness_summary_json"] or "{}"
         ),
         "decision_quality_summary": decision_quality_summary,
-        "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
-        "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
-        "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
-        "automation_guidance_summary": json.loads(row["automation_guidance_summary_json"] or "{}"),
-        "approval_workflow_summary": json.loads(row["approval_workflow_summary_json"] or "{}"),
+        "high_pressure_queue_history": json.loads(
+            row["high_pressure_queue_history_json"] or "[]"
+        ),
+        "campaign_outcomes_summary": json.loads(
+            row["action_sync_outcomes_summary_json"] or "{}"
+        ),
+        "campaign_tuning_summary": json.loads(
+            row["campaign_tuning_summary_json"] or "{}"
+        ),
+        "automation_guidance_summary": json.loads(
+            row["automation_guidance_summary_json"] or "{}"
+        ),
+        "approval_workflow_summary": json.loads(
+            row["approval_workflow_summary_json"] or "{}"
+        ),
         "intervention_ledger_summary": json.loads(
             row["historical_portfolio_intelligence_json"] or "{}"
         ),
@@ -2828,7 +3050,9 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
     }
 
 
-def load_recent_operator_changes(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
+def load_recent_operator_changes(
+    output_dir: Path, username: str, limit: int = 20
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2861,7 +3085,9 @@ def load_recent_operator_changes(output_dir: Path, username: str, limit: int = 2
     return changes
 
 
-def load_operator_state_history(output_dir: Path, username: str, limit: int = 5) -> list[dict]:
+def load_operator_state_history(
+    output_dir: Path, username: str, limit: int = 5
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2997,13 +3223,19 @@ def load_recent_operator_evidence(
 def _normalize_operator_evidence_event(row: sqlite3.Row) -> dict:
     details = json.loads(row["details_json"] or "{}")
     repo_full_name = details.get("repo_full_name") or row["repo_id"] or ""
-    repo = details.get("repo") or (repo_full_name.split("/")[-1] if repo_full_name else "")
+    repo = details.get("repo") or (
+        repo_full_name.split("/")[-1] if repo_full_name else ""
+    )
     action_id = row["action_id"] or details.get("action_id", "")
-    target = details.get("target") or details.get("control_key") or row["event_group"] or ""
+    target = (
+        details.get("target") or details.get("control_key") or row["event_group"] or ""
+    )
     source = row["source"]
     if source == "campaign" and action_id:
         item_id = (
-            f"campaign-drift:{action_id}:{target}" if target else f"campaign-drift:{action_id}"
+            f"campaign-drift:{action_id}:{target}"
+            if target
+            else f"campaign-drift:{action_id}"
         )
         title = details.get("title") or f"{repo or 'Campaign'} drift needs review"
     elif source == "governance":

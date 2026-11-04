@@ -38,13 +38,19 @@ def test_pending_debt_summaries_preserve_label_specific_language() -> None:
     )
 
     assert debt_summary.startswith("RepoA blocker belongs to a class")
-    assert freshness_summary.startswith("RepoA blocker is leaning on older pending-debt patterns")
+    assert freshness_summary.startswith(
+        "RepoA blocker is leaning on older pending-debt patterns"
+    )
 
 
 def test_generic_guidance_helpers_cover_empty_and_baseline_refresh_cases() -> None:
     assert is_generic_recommendation("")
-    assert is_generic_recommendation("Continue the normal operator loop after this run.")
-    assert is_generic_monitor_guidance("Keep the operator loop lightweight while this settles.")
+    assert is_generic_recommendation(
+        "Continue the normal operator loop after this run."
+    )
+    assert is_generic_monitor_guidance(
+        "Keep the operator loop lightweight while this settles."
+    )
     assert is_generic_baseline_guidance(
         "",
         {"full_refresh_due": True},

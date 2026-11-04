@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from github_repo_auditor.operator_trend_closure_forecast_core import class_closure_forecast_events
+from github_repo_auditor.operator_trend_closure_forecast_core import (
+    class_closure_forecast_events,
+)
 
 
 def _queue_identity(item: dict) -> str:

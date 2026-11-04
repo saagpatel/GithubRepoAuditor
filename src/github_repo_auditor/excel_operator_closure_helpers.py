@@ -4,7 +4,9 @@ from __future__ import annotations
 def operator_class_normalization_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     policy_debt = (
-        (summary.get("primary_target_policy_debt_status", "") or "none").replace("-", " ").title()
+        (summary.get("primary_target_policy_debt_status", "") or "none")
+        .replace("-", " ")
+        .title()
     )
     class_normalization = (
         (summary.get("primary_target_class_normalization_status", "") or "none")
@@ -12,7 +14,8 @@ def operator_class_normalization_values(data: dict) -> tuple[str, str, str, str]
         .title()
     )
     debt_reason = (
-        summary.get("primary_target_policy_debt_reason") or "No policy-debt reason is recorded yet."
+        summary.get("primary_target_policy_debt_reason")
+        or "No policy-debt reason is recorded yet."
     )
     normalization_summary = (
         summary.get("trust_normalization_summary")
@@ -25,7 +28,10 @@ def operator_class_normalization_values(data: dict) -> tuple[str, str, str, str]
 def operator_class_memory_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     freshness_status = (
-        (summary.get("primary_target_class_memory_freshness_status", "") or "insufficient-data")
+        (
+            summary.get("primary_target_class_memory_freshness_status", "")
+            or "insufficient-data"
+        )
         .replace("-", " ")
         .title()
     )
@@ -34,7 +40,9 @@ def operator_class_memory_values(data: dict) -> tuple[str, str, str, str]:
         or "No class-memory freshness reason is recorded yet."
     )
     class_decay_status = (
-        (summary.get("primary_target_class_decay_status", "") or "none").replace("-", " ").title()
+        (summary.get("primary_target_class_decay_status", "") or "none")
+        .replace("-", " ")
+        .title()
     )
     class_decay_summary = (
         summary.get("class_decay_summary")
@@ -51,12 +59,17 @@ def operator_class_reweight_values(data: dict) -> tuple[str, str, str, str]:
         .replace("-", " ")
         .title()
     )
-    reweight_score = f"{summary.get('primary_target_class_trust_reweight_score', 0.0):.2f}"
-    reasons = ", ".join(summary.get("primary_target_class_trust_reweight_reasons") or [])
+    reweight_score = (
+        f"{summary.get('primary_target_class_trust_reweight_score', 0.0):.2f}"
+    )
+    reasons = ", ".join(
+        summary.get("primary_target_class_trust_reweight_reasons") or []
+    )
     if not reasons:
         reasons = "No class reweighting rationale is recorded yet."
     reweight_summary = (
-        summary.get("class_reweighting_summary") or "No class reweighting summary is recorded yet."
+        summary.get("class_reweighting_summary")
+        or "No class reweighting summary is recorded yet."
     )
     return direction, reweight_score, reasons, reweight_summary
 
@@ -64,7 +77,10 @@ def operator_class_reweight_values(data: dict) -> tuple[str, str, str, str]:
 def operator_class_momentum_values(data: dict) -> tuple[str, str, str]:
     summary = data.get("operator_summary") or {}
     momentum_status = (
-        (summary.get("primary_target_class_trust_momentum_status", "") or "insufficient-data")
+        (
+            summary.get("primary_target_class_trust_momentum_status", "")
+            or "insufficient-data"
+        )
         .replace("-", " ")
         .title()
     )
@@ -126,12 +142,18 @@ def operator_transition_closure_values(
         .title()
     )
     pending_debt_freshness = (
-        (summary.get("primary_target_pending_debt_freshness_status", "") or "insufficient-data")
+        (
+            summary.get("primary_target_pending_debt_freshness_status", "")
+            or "insufficient-data"
+        )
         .replace("-", " ")
         .title()
     )
     closure_forecast_direction = (
-        (summary.get("primary_target_closure_forecast_reweight_direction", "") or "neutral")
+        (
+            summary.get("primary_target_closure_forecast_reweight_direction", "")
+            or "neutral"
+        )
         .replace("-", " ")
         .title()
     )
@@ -207,7 +229,9 @@ def operator_transition_closure_values(
         or summary.get(
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary"
         )
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary")
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary"
+        )
         or summary.get(
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"
         )
@@ -223,16 +247,30 @@ def operator_transition_closure_values(
         or summary.get(
             "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"
         )
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary")
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary"
+        )
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_freshness_summary")
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_freshness_summary"
+        )
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_reset_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_persistence_summary")
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_persistence_summary"
+        )
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_churn_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_refresh_recovery_summary")
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_refresh_recovery_summary"
+        )
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_freshness_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_reset_summary")
@@ -277,7 +315,9 @@ def operator_transition_closure_values(
 
 def operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    validation_status = summary.get("confidence_validation_status", "") or "insufficient-data"
+    validation_status = (
+        summary.get("confidence_validation_status", "") or "insufficient-data"
+    )
     calibration_summary = (
         summary.get("confidence_calibration_summary")
         or "No confidence-calibration summary is recorded yet."

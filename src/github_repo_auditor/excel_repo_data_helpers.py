@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from github_repo_auditor.excel_detail_helpers import repo_detail_last_movement
-from github_repo_auditor.excel_report_helpers import collection_memberships, severity_rank
+from github_repo_auditor.excel_report_helpers import (
+    collection_memberships,
+    severity_rank,
+)
 from github_repo_auditor.excel_timeline_helpers import extend_score_history_with_current
 from github_repo_auditor.report_enrichment import (
     build_repo_briefing,
@@ -60,9 +63,13 @@ def _arc_f_detail_cols(audit: dict, ghas_lookup: dict | None) -> list[object]:
 
     ossf = audit.get("ossf_scorecard", {})
     ossf_score_val: object = (
-        round(ossf["score"], 1) if ossf.get("available") and ossf.get("score") is not None else "—"
+        round(ossf["score"], 1)
+        if ossf.get("available") and ossf.get("score") is not None
+        else "—"
     )
-    failing = [c.get("name", "") for c in (ossf.get("checks") or []) if c.get("score", 1) == 0][:3]
+    failing = [
+        c.get("name", "") for c in (ossf.get("checks") or []) if c.get("score", 1) == 0
+    ][:3]
     ossf_failing_val: str = ", ".join(f for f in failing if f) or "—"
 
     return [
@@ -90,13 +97,16 @@ def repo_detail_rows(
     history_rows: list[list[object]] = []
 
     for audit in sorted(
-        data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")
+        data.get("audits", []),
+        key=lambda item: item.get("metadata", {}).get("name", ""),
     ):
         metadata = audit.get("metadata", {})
         repo_name = metadata.get("name", "")
         explanation = score_explanation_for_audit(audit)
         briefing = build_repo_briefing(audit, data, None)
-        hotspot_titles = [item.get("title", "") for item in (audit.get("hotspots") or [])[:3]]
+        hotspot_titles = [
+            item.get("title", "") for item in (audit.get("hotspots") or [])[:3]
+        ]
         implementation_hotspot_lines = [
             f"{item.get('path', 'repo root')}: {item.get('signal_summary', 'No signal summary recorded yet.')}"
             for item in (briefing.get("implementation_hotspots") or [])[:3]
@@ -131,7 +141,9 @@ def repo_detail_rows(
                 or "No portfolio-fit summary recorded yet.",
                 render_sparkline(scores)
                 if scores
-                else briefing.get("current_state", {}).get("trend", "No trend history yet."),
+                else briefing.get("current_state", {}).get(
+                    "trend", "No trend history yet."
+                ),
                 briefing.get("why_this_repo_looks_this_way", {}).get(
                     "strongest_drivers",
                     ", ".join(explanation.get("top_positive_drivers", [])[:3])
@@ -159,12 +171,16 @@ def repo_detail_rows(
                 ),
                 briefing.get("what_changed", {}).get(
                     "top_hotspot_context",
-                    hotspot_titles[0] if len(hotspot_titles) > 0 else "No hotspot recorded yet.",
+                    hotspot_titles[0]
+                    if len(hotspot_titles) > 0
+                    else "No hotspot recorded yet.",
                 ),
                 hotspot_titles[1]
                 if len(hotspot_titles) > 1
                 else "No secondary hotspot recorded yet.",
-                hotspot_titles[2] if len(hotspot_titles) > 2 else "No third hotspot recorded yet.",
+                hotspot_titles[2]
+                if len(hotspot_titles) > 2
+                else "No third hotspot recorded yet.",
                 briefing.get("what_to_do_next", {}).get(
                     "next_best_action",
                     action_titles[0]
@@ -183,9 +199,12 @@ def repo_detail_rows(
                 briefing.get("what_changed", {}).get(
                     "recent_change_summary", "No recent change summary is recorded yet."
                 ),
-                briefing.get("what_to_do_next", {}).get("follow_through_status", "Unknown"),
                 briefing.get("what_to_do_next", {}).get(
-                    "follow_through_summary", "No follow-through evidence is recorded yet."
+                    "follow_through_status", "Unknown"
+                ),
+                briefing.get("what_to_do_next", {}).get(
+                    "follow_through_summary",
+                    "No follow-through evidence is recorded yet.",
                 ),
                 briefing.get("what_to_do_next", {}).get("checkpoint_timing", "Unknown"),
                 briefing.get("what_to_do_next", {}).get("escalation", "Unknown"),
@@ -212,32 +231,44 @@ def repo_detail_rows(
                     "recovery_freshness_summary",
                     "No follow-through recovery freshness signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("recovery_memory_reset", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_memory_reset", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "recovery_memory_reset_summary",
                     "No follow-through recovery memory reset signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("recovery_rebuild_strength", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_rebuild_strength", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "recovery_rebuild_strength_summary",
                     "No follow-through recovery rebuild-strength signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("recovery_reacquisition", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_reacquisition", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "recovery_reacquisition_summary",
                     "No follow-through recovery reacquisition signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("reacquisition_durability", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_durability", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "reacquisition_durability_summary",
                     "No follow-through reacquisition durability signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("reacquisition_confidence", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_confidence", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "reacquisition_confidence_summary",
                     "No follow-through reacquisition confidence-consolidation signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("reacquisition_softening_decay", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_softening_decay", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "reacquisition_softening_decay_summary",
                     "No reacquisition softening-decay signal is currently surfaced.",
@@ -249,7 +280,9 @@ def repo_detail_rows(
                     "reacquisition_confidence_retirement_summary",
                     "No reacquisition confidence-retirement signal is currently surfaced.",
                 ),
-                briefing.get("what_to_do_next", {}).get("revalidation_recovery", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "revalidation_recovery", "None"
+                ),
                 briefing.get("what_to_do_next", {}).get(
                     "revalidation_recovery_summary",
                     "No post-revalidation recovery or confidence re-earning signal is currently surfaced.",
@@ -258,7 +291,9 @@ def repo_detail_rows(
                     "what_would_count_as_progress",
                     "Use the next run or linked artifact to confirm whether the recommendation moved.",
                 ),
-                briefing.get("catalog_line", "No portfolio catalog contract is recorded yet."),
+                briefing.get(
+                    "catalog_line", "No portfolio catalog contract is recorded yet."
+                ),
                 briefing.get(
                     "operating_path_line",
                     "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.",
@@ -267,8 +302,13 @@ def repo_detail_rows(
                     "intent_alignment_line",
                     "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.",
                 ),
-                briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."),
-                briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
+                briefing.get(
+                    "scorecard_line",
+                    "Scorecard: No maturity scorecard is recorded yet.",
+                ),
+                briefing.get(
+                    "maturity_gap_summary", "No maturity gap summary is recorded yet."
+                ),
                 briefing.get(
                     "where_to_start_summary",
                     "No meaningful implementation hotspot is currently surfaced.",
@@ -292,7 +332,8 @@ def repo_detail_rows(
                 (
                     result.get("dimension", ""),
                     round(result.get("score", 0.0), 3),
-                    "; ".join((result.get("findings") or [])[:2]) or "No major concerns recorded.",
+                    "; ".join((result.get("findings") or [])[:2])
+                    or "No major concerns recorded.",
                 )
                 for result in audit.get("analyzer_results", [])
                 if result.get("dimension") != "interest"
@@ -302,7 +343,14 @@ def repo_detail_rows(
         for rank, (dimension, score, summary) in enumerate(ranked_dimensions, 1):
             lookup_key = f"{repo_name}::{rank}"
             dimension_rows.append(
-                [lookup_key, repo_name, rank, display_dimension(dimension), score, summary]
+                [
+                    lookup_key,
+                    repo_name,
+                    rank,
+                    display_dimension(dimension),
+                    score,
+                    summary,
+                ]
             )
 
         for run_index, score in enumerate(scores, 1):
@@ -327,8 +375,16 @@ def run_change_rows(
             counts.get("score_regressions", 0),
             "Repos that regressed since the last run.",
         ],
-        ["Tier Promotions", counts.get("tier_promotions", 0), "Repos that moved up a tier."],
-        ["Tier Demotions", counts.get("tier_demotions", 0), "Repos that moved down a tier."],
+        [
+            "Tier Promotions",
+            counts.get("tier_promotions", 0),
+            "Repos that moved up a tier.",
+        ],
+        [
+            "Tier Demotions",
+            counts.get("tier_demotions", 0),
+            "Repos that moved down a tier.",
+        ],
         ["New Repos", counts.get("new_repos", 0), "Repos that are new in this run."],
         [
             "Removed Repos",

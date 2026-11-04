@@ -44,7 +44,15 @@ def _compute_signature(payload: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def build_filter_signature(*, username: str, scoring_profile: str, skip_forks: bool, skip_archived: bool, scorecard: bool, security_offline: bool) -> str:
+def build_filter_signature(
+    *,
+    username: str,
+    scoring_profile: str,
+    skip_forks: bool,
+    skip_archived: bool,
+    scorecard: bool,
+    security_offline: bool,
+) -> str:
     payload = {
         "username": username,
         "scoring_profile": normalize_scoring_profile(scoring_profile),
@@ -90,7 +98,9 @@ def build_baseline_context(
     return context
 
 
-def build_baseline_context_from_args(args, *, scoring_profile: str, portfolio_baseline_size: int) -> dict:
+def build_baseline_context_from_args(
+    args, *, scoring_profile: str, portfolio_baseline_size: int
+) -> dict:
     return build_baseline_context(
         username=getattr(args, "username", ""),
         scoring_profile=scoring_profile,
@@ -110,7 +120,9 @@ def build_requested_baseline_context(args, *, scoring_profile: str) -> dict:
         "skip_archived": bool(getattr(args, "skip_archived", False)),
         "scorecard": bool(getattr(args, "scorecard", False)),
         "security_offline": bool(getattr(args, "security_offline", False)),
-        "filter_signature": build_filter_signature_from_args(args, scoring_profile=scoring_profile),
+        "filter_signature": build_filter_signature_from_args(
+            args, scoring_profile=scoring_profile
+        ),
     }
 
 
@@ -131,8 +143,12 @@ def build_watch_state(
         portfolio_baseline_size=portfolio_baseline_size,
     )
     watch_enabled = bool(getattr(args, "watch", False))
-    requested_strategy = getattr(args, "watch_strategy", "adaptive") if watch_enabled else "manual"
-    chosen_mode = run_mode or ("incremental" if getattr(args, "incremental", False) else "full")
+    requested_strategy = (
+        getattr(args, "watch_strategy", "adaptive") if watch_enabled else "manual"
+    )
+    chosen_mode = run_mode or (
+        "incremental" if getattr(args, "incremental", False) else "full"
+    )
     reason = f"manual-{chosen_mode}-run"
     full_refresh_due = False
     if watch_plan is not None:
@@ -146,11 +162,15 @@ def build_watch_state(
         "chosen_mode": chosen_mode,
         "next_recommended_run_mode": chosen_mode,
         "reason": reason,
-        "reason_summary": summarize_watch_reason(reason, full_refresh_days=full_refresh_interval_days),
+        "reason_summary": summarize_watch_reason(
+            reason, full_refresh_days=full_refresh_interval_days
+        ),
         "full_refresh_due": full_refresh_due,
         "full_refresh_interval_days": full_refresh_interval_days,
         "latest_trusted_baseline": dict(latest_trusted_baseline or {}),
-        "filter_signature": build_filter_signature_from_args(args, scoring_profile=scoring_profile),
+        "filter_signature": build_filter_signature_from_args(
+            args, scoring_profile=scoring_profile
+        ),
         "baseline_signature": baseline_context["baseline_signature"],
         "baseline_context": baseline_context,
     }
@@ -165,13 +185,17 @@ def extract_baseline_context(report_data: dict | None) -> dict:
         return {}
 
     if "scoring_profile" in context:
-        context["scoring_profile"] = normalize_scoring_profile(context.get("scoring_profile"))
+        context["scoring_profile"] = normalize_scoring_profile(
+            context.get("scoring_profile")
+        )
     if "baseline_signature" not in context and report_data.get("baseline_signature"):
         context["baseline_signature"] = report_data.get("baseline_signature")
     return context
 
 
-def compare_baseline_context(expected: dict, actual: dict, *, include_size: bool = True) -> list[dict]:
+def compare_baseline_context(
+    expected: dict, actual: dict, *, include_size: bool = True
+) -> list[dict]:
     fields = BASELINE_CONTEXT_FIELDS if include_size else BASELINE_SIGNATURE_FIELDS
     mismatches: list[dict] = []
     for field in fields:
@@ -208,7 +232,9 @@ def format_mismatch_value(value: object) -> str:
 
 
 def summarize_watch_reason(reason: str, *, full_refresh_days: int | None = None) -> str:
-    summary = WATCH_REASON_SUMMARIES.get(reason, "The latest watch decision is recorded in the report.")
+    summary = WATCH_REASON_SUMMARIES.get(
+        reason, "The latest watch decision is recorded in the report."
+    )
     if reason == "full-refresh-due" and full_refresh_days:
         return f"{summary} Full refreshes are due every {full_refresh_days} days."
     return summary
@@ -216,16 +242,21 @@ def summarize_watch_reason(reason: str, *, full_refresh_days: int | None = None)
 
 def build_watch_guidance(watch_state: dict | None) -> dict:
     state = dict(watch_state or {})
-    chosen_mode = state.get("chosen_mode") or state.get("next_recommended_run_mode") or ""
+    chosen_mode = (
+        state.get("chosen_mode") or state.get("next_recommended_run_mode") or ""
+    )
     reason = state.get("reason", "")
     return {
         "watch_enabled": bool(state.get("watch_enabled", False)),
         "requested_strategy": state.get("requested_strategy", "manual"),
         "chosen_mode": chosen_mode,
-        "next_recommended_run_mode": state.get("next_recommended_run_mode") or chosen_mode,
+        "next_recommended_run_mode": state.get("next_recommended_run_mode")
+        or chosen_mode,
         "reason": reason,
         "reason_summary": state.get("reason_summary")
-        or summarize_watch_reason(reason, full_refresh_days=state.get("full_refresh_interval_days")),
+        or summarize_watch_reason(
+            reason, full_refresh_days=state.get("full_refresh_interval_days")
+        ),
         "full_refresh_due": bool(state.get("full_refresh_due", False)),
         "latest_trusted_baseline": dict(state.get("latest_trusted_baseline") or {}),
     }

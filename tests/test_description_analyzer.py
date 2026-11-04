@@ -49,7 +49,9 @@ def test_misclassified_ios_repo_with_python_description(tmp_path: Path) -> None:
     from github_repo_auditor.analyzers.description_analyzer import DescriptionAnalyzer
 
     (tmp_path / "MyApp.xcodeproj").mkdir()
-    meta = _meta(description="A Python CLI script for data processing", language="Swift")
+    meta = _meta(
+        description="A Python CLI script for data processing", language="Swift"
+    )
     result = DescriptionAnalyzer().analyze(tmp_path, meta)
     assert result.details["description_confidence"] == 0.2
     assert "Python" in result.details["conflicting_languages"]

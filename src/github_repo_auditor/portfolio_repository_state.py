@@ -134,9 +134,7 @@ def _observe_working_tree(path: Path) -> dict[str, Any]:
     head = _git(path, "rev-parse", "HEAD")
     branch = _git(path, "branch", "--show-current") or None
     dirty = _git(path, "status", "--porcelain", "--untracked-files=all")
-    resolved_upstream = _git_optional(
-        path, "rev-parse", "--abbrev-ref", "@{upstream}"
-    )
+    resolved_upstream = _git_optional(path, "rev-parse", "--abbrev-ref", "@{upstream}")
     upstream_remote, upstream_branch = _upstream_identity(
         path, branch=branch, upstream=resolved_upstream
     )
@@ -191,9 +189,7 @@ def _upstream_identity(
     prefix = "refs/heads/"
     if not merge_ref or not merge_ref.startswith(prefix) or merge_ref == prefix:
         raise ValueError("tracked branch has no exact refs/heads merge target")
-    upstream_remote = _git_optional(
-        path, "config", "--get", f"branch.{branch}.remote"
-    )
+    upstream_remote = _git_optional(path, "config", "--get", f"branch.{branch}.remote")
     if not upstream_remote:
         raise ValueError("tracked branch has no exact configured remote")
     return upstream_remote, merge_ref.removeprefix(prefix)
@@ -230,9 +226,7 @@ def _observe_worktrees(
                 {
                     "state": "unknown",
                     "reason_code": "external_worktree_outside_workspace",
-                    "reason": (
-                        "the linked worktree is outside the observed workspace"
-                    ),
+                    "reason": ("the linked worktree is outside the observed workspace"),
                     "path": opaque_path,
                     "head": None,
                     "branch": None,

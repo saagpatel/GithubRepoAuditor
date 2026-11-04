@@ -20,7 +20,13 @@ OPERATOR_OUTCOMES_MONITORING_HEADERS = [
     "Reopen",
     "Summary",
 ]
-OPERATOR_OUTCOMES_HISTORY_HEADERS = ["Run", "Generated", "Blocked", "Urgent", "High Pressure"]
+OPERATOR_OUTCOMES_HISTORY_HEADERS = [
+    "Run",
+    "Generated",
+    "Blocked",
+    "Urgent",
+    "High Pressure",
+]
 
 
 def build_operator_outcomes_content(
@@ -141,7 +147,9 @@ def build_operator_outcomes_content(
         ),
         (
             "Regression Examples",
-            join_outcome_examples(operator_summary.get("recent_regression_examples", [])),
+            join_outcome_examples(
+                operator_summary.get("recent_regression_examples", [])
+            ),
         ),
     ]
 
@@ -220,4 +228,6 @@ def write_operator_outcomes_sections(
             cell = ws.cell(row=row, column=col, value=value)
             style_data_cell(cell, "center" if col >= 3 else "left")
 
-    return max(history_row + len(content["history"]), example_row + 3, monitoring_row + 3, 15)
+    return max(
+        history_row + len(content["history"]), example_row + 3, monitoring_row + 3, 15
+    )

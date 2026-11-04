@@ -8,7 +8,10 @@ from typing import Any
 
 from github_repo_auditor.portfolio_automation import select_automation_candidates
 from github_repo_auditor.portfolio_decision_queue import build_decision_digest
-from github_repo_auditor.portfolio_truth_types import display_activity_status, truth_latest_path
+from github_repo_auditor.portfolio_truth_types import (
+    display_activity_status,
+    truth_latest_path,
+)
 from github_repo_auditor.portfolio_truth_trends import (
     build_verdict_transition_ledger,
     render_movement_summary,
@@ -23,6 +26,7 @@ MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
 MAX_RISK_ATTENTION_ITEMS = 5
 MAX_SECURITY_ATTENTION_ITEMS = 5
+ATTENTION_STATE_RANK = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
 _PERSISTED_DIGEST_SCHEMA = "weekly_command_center_digest_v2"
 _PERSISTED_REDACTED_TEXT = "<redacted>"
 _PERSISTED_WEEKLY_DIGEST = {
@@ -491,6 +495,12 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
             "- Security overlay not run for this snapshot "
             "(re-run with `--portfolio-truth-include-security`)."
         )
+    pending = list(security_posture.get("pending_coverage_repositories") or [])
+    if pending:
+        lines.append(
+            f"- Security coverage PENDING for {len(pending)} repo(s) that entered attention "
+            f"after the last receipt ({', '.join(pending)}); do not treat them as clear."
+        )
 
     lines.extend(["", "## Movement"])
     lines.append(
@@ -608,7 +618,6 @@ def _build_path_attention_items(
 ) -> list[dict[str, Any]]:
     projects = list(portfolio_truth.get("projects") or [])
     candidates: list[dict[str, Any]] = []
-    status_rank = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
     context_rank = {
         "none": 0,
         "boilerplate": 1,
@@ -659,7 +668,7 @@ def _build_path_attention_items(
 
     candidates.sort(
         key=lambda item: (
-            status_rank.get(item["attention_state"], 9),
+            ATTENTION_STATE_RANK.get(item["attention_state"], 9),
             0 if item["operating_path"] == "unspecified" else 1,
             0 if item["path_confidence"] == "low" else 1,
             context_rank.get(item["context_quality"], 9),
@@ -722,8 +731,19 @@ def _build_security_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
         total_secrets += admission.total_open_secrets
         if admission.has_findings:
             repos_with_open += 1
+    # Repos that entered attention after the last security receipt are not
+    # cohort members yet, so the loop above cannot see them. Carry them
+    # explicitly so the digest never reports "all clear" over uncovered repos.
+    clock = _mapping(
+        _mapping(portfolio_truth.get("source_summary")).get("security_coverage_clock")
+    )
+    pending = [
+        str(name) for name in clock.get("pending_security_coverage_repositories") or []
+    ]
     return {
         "scanned_count": scanned,
+        "pending_coverage_count": len(pending),
+        "pending_coverage_repositories": pending,
         "repos_with_open_high_critical": repos_with_open,
         "repos_with_blocking_findings": repos_with_open,
         "unadmitted_count": unadmitted,

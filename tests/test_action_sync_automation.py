@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from github_repo_auditor.action_sync_automation import build_action_sync_automation_bundle
+from github_repo_auditor.action_sync_automation import (
+    build_action_sync_automation_bundle,
+)
 
 
-def _readiness_record(campaign_type: str, readiness_stage: str, *, action_count: int = 2) -> dict:
+def _readiness_record(
+    campaign_type: str, readiness_stage: str, *, action_count: int = 2
+) -> dict:
     return {
         "campaign_type": campaign_type,
         "label": campaign_type.replace("-", " ").title(),
@@ -57,7 +61,9 @@ def _outcome_record(campaign_type: str, monitoring_state: str) -> dict:
         "pressure_effect": "reduced",
         "drift_state": "returned" if monitoring_state == "drift-returned" else "clear",
         "reopen_state": "reopened" if monitoring_state == "reopened" else "none",
-        "rollback_state": "partial" if monitoring_state == "rollback-watch" else "ready",
+        "rollback_state": "partial"
+        if monitoring_state == "rollback-watch"
+        else "ready",
         "follow_up_recommendation": f"Follow up on {campaign_type}.",
         "top_repos": [f"user/{campaign_type}"],
         "summary": f"{campaign_type} monitoring summary",
@@ -98,9 +104,14 @@ def _bundle(
         "showcase-publish",
         "maintenance-cleanup",
     ]
-    readiness = [_readiness_record(campaign, "idle", action_count=0) for campaign in campaign_types]
+    readiness = [
+        _readiness_record(campaign, "idle", action_count=0)
+        for campaign in campaign_types
+    ]
     packets = [_packet_record(campaign, "stay-local") for campaign in campaign_types]
-    outcomes = [_outcome_record(campaign, "no-recent-apply") for campaign in campaign_types]
+    outcomes = [
+        _outcome_record(campaign, "no-recent-apply") for campaign in campaign_types
+    ]
     tuning = [_tuning_record(campaign) for campaign in campaign_types]
 
     for record in packets:
@@ -128,7 +139,11 @@ def _bundle(
 
 
 def _automation(bundle: dict, campaign_type: str) -> dict:
-    return next(item for item in bundle["action_sync_automation"] if item["campaign_type"] == campaign_type)
+    return next(
+        item
+        for item in bundle["action_sync_automation"]
+        if item["campaign_type"] == campaign_type
+    )
 
 
 def test_automation_classifies_preview_apply_approval_follow_up_and_quiet() -> None:
@@ -148,22 +163,44 @@ def test_automation_classifies_preview_apply_approval_follow_up_and_quiet() -> N
         },
     )
 
-    assert _automation(bundle, "security-review")["automation_posture"] == "preview-safe"
-    assert _automation(bundle, "security-review")["recommended_command"].endswith("--writeback-target all")
-    assert "--writeback-apply" not in _automation(bundle, "security-review")["recommended_command"]
+    assert (
+        _automation(bundle, "security-review")["automation_posture"] == "preview-safe"
+    )
+    assert _automation(bundle, "security-review")["recommended_command"].endswith(
+        "--writeback-target all"
+    )
+    assert (
+        "--writeback-apply"
+        not in _automation(bundle, "security-review")["recommended_command"]
+    )
 
     assert _automation(bundle, "promotion-push")["automation_posture"] == "apply-manual"
-    assert _automation(bundle, "promotion-push")["recommended_command"].startswith("Manual apply only: audit testuser")
-    assert "--writeback-apply" in _automation(bundle, "promotion-push")["recommended_command"]
+    assert _automation(bundle, "promotion-push")["recommended_command"].startswith(
+        "Manual apply only: audit testuser"
+    )
+    assert (
+        "--writeback-apply"
+        in _automation(bundle, "promotion-push")["recommended_command"]
+    )
 
-    assert _automation(bundle, "archive-sweep")["automation_posture"] == "approval-first"
+    assert (
+        _automation(bundle, "archive-sweep")["automation_posture"] == "approval-first"
+    )
     assert _automation(bundle, "archive-sweep")["recommended_command"] == ""
     assert _automation(bundle, "archive-sweep")["requires_approval"] is True
 
-    assert _automation(bundle, "showcase-publish")["automation_posture"] == "follow-up-safe"
-    assert _automation(bundle, "showcase-publish")["recommended_command"] == "audit testuser --control-center"
+    assert (
+        _automation(bundle, "showcase-publish")["automation_posture"]
+        == "follow-up-safe"
+    )
+    assert (
+        _automation(bundle, "showcase-publish")["recommended_command"]
+        == "audit testuser --control-center"
+    )
 
-    assert _automation(bundle, "maintenance-cleanup")["automation_posture"] == "quiet-safe"
+    assert (
+        _automation(bundle, "maintenance-cleanup")["automation_posture"] == "quiet-safe"
+    )
     assert _automation(bundle, "maintenance-cleanup")["recommended_command"] == ""
 
 
@@ -201,14 +238,19 @@ def test_automation_downgrades_to_manual_only_for_monitoring_or_history_risk() -
             "security-review": _outcome_record("security-review", "drift-returned"),
         },
     )
-    assert _automation(monitoring_bundle, "security-review")["automation_posture"] == "manual-only"
+    assert (
+        _automation(monitoring_bundle, "security-review")["automation_posture"]
+        == "manual-only"
+    )
 
     history_bundle = _bundle(
         packet_overrides={
             "security-review": _packet_record("security-review", "preview-next"),
         },
         intervention_bundle={
-            "top_relapsing_repos": [{"repo": "RepoSecure", "suggested_campaign": "security-review"}],
+            "top_relapsing_repos": [
+                {"repo": "RepoSecure", "suggested_campaign": "security-review"}
+            ],
             "top_persistent_pressure_repos": [],
             "top_improving_repos": [],
             "top_holding_repos": [],
@@ -219,7 +261,9 @@ def test_automation_downgrades_to_manual_only_for_monitoring_or_history_risk() -
     assert "relapse or persistent pressure" in automation["automation_reason"].lower()
 
 
-def test_automation_next_step_priority_prefers_approval_then_manual_then_preview() -> None:
+def test_automation_next_step_priority_prefers_approval_then_manual_then_preview() -> (
+    None
+):
     bundle = _bundle(
         packet_overrides={
             "security-review": _packet_record("security-review", "preview-next"),
@@ -251,6 +295,8 @@ def test_queue_items_receive_automation_fields() -> None:
 
     queue_item = bundle["operator_queue"][0]
     assert queue_item["automation_posture"] == "preview-safe"
-    assert queue_item["automation_summary"].startswith("Security Review is preview-safe")
+    assert queue_item["automation_summary"].startswith(
+        "Security Review is preview-safe"
+    )
     assert queue_item["automation_line"].startswith("Automation Guidance:")
     assert queue_item["automation_command"].endswith("--writeback-target all")

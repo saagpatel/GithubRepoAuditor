@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from github_repo_auditor.operator_trend_topline_payload import build_resolution_trend_topline_payload
+from github_repo_auditor.operator_trend_topline_payload import (
+    build_resolution_trend_topline_payload,
+)
 
 
 def test_build_resolution_trend_topline_payload_packages_core_summary() -> None:
@@ -81,7 +83,9 @@ def test_build_resolution_trend_topline_payload_packages_core_summary() -> None:
             "caution_class_hotspots": [],
             "class_reweighting_window_runs": 7,
         },
-        attention_age_bands_fn=lambda current_attention: {"fresh": len(current_attention)},
+        attention_age_bands_fn=lambda current_attention: {
+            "fresh": len(current_attention)
+        },
         longest_persisting_item_fn=lambda resolution_targets: resolution_targets[0],
         policy_debt_summary_fn=lambda primary_target, hotspots: "pds",
         trust_normalization_summary_fn=lambda primary_target, normalized, debt: "tns",

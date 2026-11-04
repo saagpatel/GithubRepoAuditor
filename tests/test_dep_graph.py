@@ -1,7 +1,11 @@
 """Tests for src/github_repo_auditor/dep_graph.py — cross-repo dependency graph."""
+
 from __future__ import annotations
 
-from github_repo_auditor.dep_graph import build_dependency_graph, find_vulnerability_impact
+from github_repo_auditor.dep_graph import (
+    build_dependency_graph,
+    find_vulnerability_impact,
+)
 
 
 def _make_audit(name: str, dep_names: list[str]) -> dict:
@@ -72,9 +76,16 @@ class TestBuildDependencyGraph:
 
     def test_repo_without_name_skipped(self):
         audits = [
-            {"metadata": {}, "analyzer_results": [
-                {"dimension": "dependencies", "score": 0.5, "details": {"dependency_names": ["x"]}}
-            ]},
+            {
+                "metadata": {},
+                "analyzer_results": [
+                    {
+                        "dimension": "dependencies",
+                        "score": 0.5,
+                        "details": {"dependency_names": ["x"]},
+                    }
+                ],
+            },
         ]
         result = build_dependency_graph(audits)
         assert result["repo_dep_counts"] == {}

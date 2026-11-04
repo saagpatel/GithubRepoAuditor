@@ -105,6 +105,34 @@ audit triage <github-username> --approval-center
 
 Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, scorecards overrides, and `--excel-mode template` as advanced paths.
 
+Private family verdicts can be displayed in a visible `Reckoning` workbook sheet
+with `--reckoning-overlay PATH` or `GHRA_RECKONING_OVERLAY` (the flag takes
+precedence). The YAML's `schema` value is `reckoning-verdicts`, then a slash, then
+`1`; invalid verdicts stop CLI preflight before the GitHub audit. The overlay is
+read once at startup, so a long `--watch` run picks up edits after a restart. Export also requires the saved
+`portfolio-truth-latest.json` beside the audit report, or in the exporter API's
+`truth_dir`. Each overlay family gets one row in overlay order, including
+families with no saved truth match. `Members` lists the family's member keys;
+`Matched projects` counts matched truth projects and `Unmatched members` lists
+member keys with no match. Matching retains a GitHub repository ID tier, but
+canonical truth carries no repository ID today, so current truth matches by
+`owner/repo`, then workspace-relative path. `Truth attention state` is a single
+value using the existing urgency order (`decision-needed`, `active-product`,
+`active-infra`), with unranked ties resolved in saved-truth order. `Attention states`
+lists all distinct matched states. Last activity is the
+latest matched timestamp. An `Unreckoned projects` block below the family table
+reports the count and first 50 keys of truth projects with no family.
+
+Keep the overlay outside this repository and published artifacts. It is read
+only, is never copied into output, and adds no fields to canonical truth. The
+resulting workbook contains private verdicts and should be treated as private.
+Without an overlay, no `Reckoning` sheet is added. Both workbook modes can be
+checked without private inputs using
+`make workbook-gate ARGS="--synthetic-reckoning-overlay"`. This gate writes to
+`output/workbook-gate/synthetic-reckoning/`, keeping the normal desktop signoff
+artifacts separate. The environment variable is read only by the audit CLI;
+demo, benchmark, and direct exporter calls require an explicit overlay argument.
+
 ## Demo and Guides
 
 - Safe demo path: run `make demo` after a local clone to generate sample artifacts from the committed fixture without a GitHub token.
@@ -148,7 +176,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - A GitHub account (public repos work without a token)
 - `GITHUB_TOKEN` env var or `gh` CLI authenticated (for private repos and higher rate limits)
 
@@ -327,6 +355,32 @@ For a full description of all flags grouped by workflow, see
 Use the [contributor verification lanes](CONTRIBUTING.md#safe-smoke-and-focused-tests)
 for the focused fixture check and broader suites with their required extras.
 
+## Status
+
+### Stack
+
+Python 3.12+ with uv, pytest, Ruff, and a FastAPI `serve` extra; the `web/`
+frontend uses Next.js 15 and React 19 with pinned Node and pnpm toolchains.
+JSON, Markdown, HTML, workbooks, and Notion payloads share the audit model.
+The canonical local portfolio truth path is `output/portfolio-truth-latest.json`.
+
+For a contributor checkout, run `make setup` and then `make check`. These use
+locked dependencies and offline fixtures; semantic-index checks are a separate
+opt-in lane. See [CONTRIBUTING.md](CONTRIBUTING.md) for focused checks.
+
+### Known risks
+
+- Generated reports and dashboards can be stale; use canonical truth for portfolio decisions and regenerate it only in a deliberate operator workflow.
+- An ambiguous Notion write reports an unknown outcome and requires reconciliation before retrying. Weekly review replacement preserves the old section until the new section is verified and reports partial archival.
+- Python 3.15 is excluded from CI while the locked libcst/PyO3 dependency does not support it.
+- Browser-hosted reports score up to 20 public repositories; they provide metadata-only analysis rather than clone-based analysis.
+
+### Next steps
+
+Keep operator-trend refactoring behind golden tests. Requests/httpx consolidation,
+Ruff 0.16 migration, wider mypy coverage, and the frontend future require separate
+owner decisions. Activation of merged code remains a separate operator task.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the locked local environment, safe
@@ -339,7 +393,7 @@ smokes. [docs/release-gates.md](docs/release-gates.md) retains the release gates
 
 | Layer | Technology |
 |-------|------------|
-| Language | Python 3.11+ |
+| Language | Python 3.12+ |
 | GitHub API | REST v3 + GraphQL (raw requests) |
 | Excel output | openpyxl + committed workbook template |
 | PDF output | fpdf2 |

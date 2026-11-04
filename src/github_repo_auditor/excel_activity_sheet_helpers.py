@@ -32,8 +32,14 @@ def build_activity_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
 
     rows: list[list[Any]] = []
     for audit in sorted_audits:
-        details = {result["dimension"]: result.get("details", {}) for result in audit.get("analyzer_results", [])}
-        scores = {result["dimension"]: result["score"] for result in audit.get("analyzer_results", [])}
+        details = {
+            result["dimension"]: result.get("details", {})
+            for result in audit.get("analyzer_results", [])
+        }
+        scores = {
+            result["dimension"]: result["score"]
+            for result in audit.get("analyzer_results", [])
+        }
         activity = details.get("activity", {})
         pattern = activity.get("commit_pattern", "—")
         rows.append(

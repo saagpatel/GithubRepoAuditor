@@ -21,7 +21,9 @@ def build_review_queue_summary_content(
     format_lane_counts,
     format_repo_rollup_counts,
     summarize_top_actions,
-) -> tuple[list[tuple[str, object]], list[list[object]], list[list[object]], list[list[object]]]:
+) -> tuple[
+    list[tuple[str, object]], list[list[object]], list[list[object]], list[list[object]]
+]:
     summary_rows = [
         (
             "Headline",
@@ -34,7 +36,10 @@ def build_review_queue_summary_content(
         ("Total Queue Items", len(queue)),
         (
             "Immediate Focus",
-            (ordered_queue[0].get("recommended_action") or ordered_queue[0].get("title", ""))
+            (
+                ordered_queue[0].get("recommended_action")
+                or ordered_queue[0].get("title", "")
+            )
             if ordered_queue
             else "No immediate queue item is open.",
         ),
@@ -49,7 +54,10 @@ def build_review_queue_summary_content(
     if excel_mode == "standard":
         summary_rows.extend(
             [
-                ("Trend", f"{operator_context['trend_status']} — {operator_context['trend_summary']}"),
+                (
+                    "Trend",
+                    f"{operator_context['trend_status']} — {operator_context['trend_summary']}",
+                ),
                 ("Primary Target", operator_context["primary_target"]),
                 ("Resolution Counts", operator_context["resolution_counts"]),
                 ("Why Top Target", operator_context["primary_target_reason"]),
@@ -102,10 +110,19 @@ def build_review_queue_summary_content(
                 ("Class Momentum", operator_context["class_momentum_status"]),
                 ("Reweight Stability", operator_context["class_reweight_stability"]),
                 ("Transition Health", operator_context["class_transition_health"]),
-                ("Transition Resolution", operator_context["class_transition_resolution"]),
+                (
+                    "Transition Resolution",
+                    operator_context["class_transition_resolution"],
+                ),
                 ("Transition Summary", operator_context["class_transition_summary"]),
-                ("Transition Closure", operator_context["transition_closure_confidence"]),
-                ("Transition Likely Outcome", operator_context["transition_likely_outcome"]),
+                (
+                    "Transition Closure",
+                    operator_context["transition_closure_confidence"],
+                ),
+                (
+                    "Transition Likely Outcome",
+                    operator_context["transition_likely_outcome"],
+                ),
                 ("Pending Debt Freshness", operator_context["pending_debt_freshness"]),
                 ("Closure Forecast", operator_context["closure_forecast_direction"]),
                 (
@@ -120,7 +137,10 @@ def build_review_queue_summary_content(
                         "reset_reentry_rebuild_reentry_restore_rerererestore_churn"
                     ],
                 ),
-                ("Closure Forecast Summary", operator_context["transition_closure_summary"]),
+                (
+                    "Closure Forecast Summary",
+                    operator_context["transition_closure_summary"],
+                ),
                 ("Momentum Summary", operator_context["class_momentum_summary"]),
                 (
                     "Exception Learning",
@@ -130,17 +150,25 @@ def build_review_queue_summary_content(
                     "Recommendation Drift",
                     f"{operator_context['drift_status']} — {operator_context['drift_summary']}",
                 ),
-                ("Adaptive Confidence", operator_context["adaptive_confidence_summary"]),
+                (
+                    "Adaptive Confidence",
+                    operator_context["adaptive_confidence_summary"],
+                ),
                 ("Recommendation Quality", operator_context["recommendation_quality"]),
                 (
                     "Confidence Validation",
                     f"{operator_context['calibration_status']} — {operator_context['calibration_summary']}",
                 ),
                 ("High-Confidence Hit Rate", operator_context["high_hit_rate"]),
-                ("Reopened Recommendations", operator_context["reopened_recommendations"]),
+                (
+                    "Reopened Recommendations",
+                    operator_context["reopened_recommendations"],
+                ),
             ]
         )
-    summary_rows.append(("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")))
+    summary_rows.append(
+        ("Source Run", (data.get("operator_summary") or {}).get("source_run_id", ""))
+    )
 
     top_repo_rows = [
         [
@@ -150,13 +178,25 @@ def build_review_queue_summary_content(
             title or "See detailed queue rows below.",
             action or "Open the repo queue details.",
         ]
-        for repo, _total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[:10]
+        for repo, _total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[
+            :10
+        ]
     ] or [
-        ["Portfolio", "Clear", "0 blocked, 0 urgent, 0 ready, 0 deferred", "No open review items.", "Monitor future audits."]
+        [
+            "Portfolio",
+            "Clear",
+            "0 blocked, 0 urgent, 0 ready, 0 deferred",
+            "No open review items.",
+            "Monitor future audits.",
+        ]
     ]
 
-    issue_family_rows = [[label, count] for label, count in top_issue_families] or [["No material change families", 0]]
-    action_rows = [[action, count] for action, count in summarize_top_actions(queue)] or [["No recommended actions", 0]]
+    issue_family_rows = [[label, count] for label, count in top_issue_families] or [
+        ["No material change families", 0]
+    ]
+    action_rows = [
+        [action, count] for action, count in summarize_top_actions(queue)
+    ] or [["No recommended actions", 0]]
     return summary_rows, top_repo_rows, issue_family_rows, action_rows
 
 
@@ -187,23 +227,27 @@ def build_review_queue_sheet_content(
     top_issue_families = summarize_top_issue_families(material_changes)
     weekly_pack = build_weekly_review_pack(data, None)
     operator_context = build_executive_operator_context(data, weekly_pack)
-    summary_rows, top_repo_rows, issue_family_rows, action_rows = build_review_queue_summary_content(
-        data=data,
-        excel_mode=excel_mode,
-        counts=counts,
-        queue=queue,
-        ordered_queue=ordered_queue,
-        repo_rollups=repo_rollups,
-        top_issue_families=top_issue_families,
-        top_recommendation_summary=top_recommendation_summary,
-        queue_pressure_summary=queue_pressure_summary,
-        operator_context=operator_context,
-        format_lane_counts=format_lane_counts,
-        format_repo_rollup_counts=format_repo_rollup_counts,
-        summarize_top_actions=summarize_top_actions,
+    summary_rows, top_repo_rows, issue_family_rows, action_rows = (
+        build_review_queue_summary_content(
+            data=data,
+            excel_mode=excel_mode,
+            counts=counts,
+            queue=queue,
+            ordered_queue=ordered_queue,
+            repo_rollups=repo_rollups,
+            top_issue_families=top_issue_families,
+            top_recommendation_summary=top_recommendation_summary,
+            queue_pressure_summary=queue_pressure_summary,
+            operator_context=operator_context,
+            format_lane_counts=format_lane_counts,
+            format_repo_rollup_counts=format_repo_rollup_counts,
+            summarize_top_actions=summarize_top_actions,
+        )
     )
     targets = ordered_queue or data.get("review_targets", [])
-    table_rows = build_review_queue_table_rows(targets, data.get("review_summary") or {})
+    table_rows = build_review_queue_table_rows(
+        targets, data.get("review_summary") or {}
+    )
     return {
         "summary_rows": summary_rows,
         "top_repo_rows": top_repo_rows,
@@ -224,7 +268,9 @@ def write_review_queue_overview(
     subtitle_font,
     wrap_alignment,
 ) -> int:
-    summary_end = write_key_value_block(ws, 4, 1, content["summary_rows"], title="Summary")
+    summary_end = write_key_value_block(
+        ws, 4, 1, content["summary_rows"], title="Summary"
+    )
     top_repo_end = write_ranked_list(
         ws,
         4,
@@ -251,7 +297,9 @@ def write_review_queue_overview(
         content["action_rows"],
     )
     guidance_row = max(issue_family_end, action_end) + 2
-    ws.merge_cells(start_row=guidance_row, start_column=1, end_row=guidance_row, end_column=8)
+    ws.merge_cells(
+        start_row=guidance_row, start_column=1, end_row=guidance_row, end_column=8
+    )
     ws.cell(row=guidance_row, column=1, value=guidance_text).font = subtitle_font
     ws.cell(row=guidance_row, column=1).alignment = wrap_alignment
     return guidance_row + 1
@@ -288,7 +336,9 @@ def write_review_queue_table(
         artifact_cell = ws.cell(row=row, column=40)
         if item["artifact_url"]:
             artifact_cell.hyperlink = item["artifact_url"]
-            artifact_cell.font = Font("Calibri", 10, color=link_color, underline="single")
+            artifact_cell.font = Font(
+                "Calibri", 10, color=link_color, underline="single"
+            )
         apply_lane_row_fill(ws, row, len(headers), item["lane"])
 
     max_row = len(content["targets"]) + start_row
@@ -301,7 +351,9 @@ def write_review_queue_table(
     return max_row
 
 
-def _primary_lane_label(blocked: object, urgent: object, ready: object, deferred: object) -> str:
+def _primary_lane_label(
+    blocked: object, urgent: object, ready: object, deferred: object
+) -> str:
     if blocked:
         return "Blocked"
     if urgent:

@@ -6,7 +6,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from github_repo_auditor.approval_ledger import load_approval_ledger_bundle, render_approval_center_markdown
+from github_repo_auditor.approval_ledger import (
+    load_approval_ledger_bundle,
+    render_approval_center_markdown,
+)
 from github_repo_auditor.models import AuditReport
 from github_repo_auditor.operator_artifact_paths import (
     approval_center_paths,
@@ -102,7 +105,9 @@ def write_followup_review_receipt(
     generated_at: datetime,
     receipt: dict,
 ) -> tuple[Path, Path]:
-    json_path, md_path = followup_review_receipt_paths(output_dir, username, generated_at)
+    json_path, md_path = followup_review_receipt_paths(
+        output_dir, username, generated_at
+    )
     json_path.write_text(json.dumps(receipt, indent=2))
     lines = [
         f"# Approval Follow-Up Receipt: {username}",

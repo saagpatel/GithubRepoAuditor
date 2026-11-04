@@ -1,4 +1,5 @@
 """Config file support — loads audit-config.yaml and merges with CLI args."""
+
 from __future__ import annotations
 
 import sys
@@ -158,7 +159,13 @@ _EXPECTED_TYPES = {
 
 _CHOICE_VALIDATORS = {
     "excel_mode": {"template", "standard"},
-    "campaign": {"security-review", "promotion-push", "archive-sweep", "showcase-publish", "maintenance-cleanup"},
+    "campaign": {
+        "security-review",
+        "promotion-push",
+        "archive-sweep",
+        "showcase-publish",
+        "maintenance-cleanup",
+    },
     "writeback_target": {"github", "notion", "all"},
     "campaign_sync_mode": {"reconcile", "append-only", "close-missing"},
     "governance_view": {"all", "ready", "drifted", "approved", "applied"},

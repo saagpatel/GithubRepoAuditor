@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from github_repo_auditor.operator_control_center import build_operator_snapshot, control_center_artifact_payload
+from github_repo_auditor.operator_control_center import (
+    build_operator_snapshot,
+    control_center_artifact_payload,
+)
 
 
 def _make_contract_report(**overrides) -> dict:
@@ -74,7 +77,11 @@ def _make_contract_report(**overrides) -> dict:
         },
         "writeback_preview": {"sync_mode": "reconcile"},
         "governance_preview": {"actions": []},
-        "rollback_preview": {"available": False, "item_count": 0, "fully_reversible_count": 0},
+        "rollback_preview": {
+            "available": False,
+            "item_count": 0,
+            "fully_reversible_count": 0,
+        },
         "audits": [],
     }
     report.update(overrides)

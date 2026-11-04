@@ -13,15 +13,25 @@ from github_repo_auditor.registry_parser import (
 
 def _make_audit(name: str, tier: str = "functional", score: float = 0.6) -> RepoAudit:
     meta = RepoMetadata(
-        name=name, full_name=f"user/{name}", description=None,
-        language="Python", languages={}, private=False, fork=False,
+        name=name,
+        full_name=f"user/{name}",
+        description=None,
+        language="Python",
+        languages={},
+        private=False,
+        fork=False,
         archived=False,
         created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=0, forks=0, open_issues=0,
-        size_kb=100, html_url=f"https://github.com/user/{name}",
-        clone_url="", topics=[],
+        default_branch="main",
+        stars=0,
+        forks=0,
+        open_issues=0,
+        size_kb=100,
+        html_url=f"https://github.com/user/{name}",
+        clone_url="",
+        topics=[],
     )
     return RepoAudit(
         metadata=meta,

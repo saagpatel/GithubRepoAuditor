@@ -62,7 +62,9 @@ def test_validate_cli_mode_args_applies_implied_flags() -> None:
     assert args.notion is True
 
 
-def test_validate_cli_mode_args_rejects_standalone_portfolio_mode_combinations() -> None:
+def test_validate_cli_mode_args_rejects_standalone_portfolio_mode_combinations() -> (
+    None
+):
     args = _make_args(portfolio_truth=True, control_center=True)
 
     with pytest.raises(ValueError) as exc:
@@ -81,7 +83,9 @@ def test_validate_cli_mode_args_rejects_action_sync_without_campaign() -> None:
 
 
 def test_validate_cli_mode_args_rejects_read_only_mode_with_writeback_flags() -> None:
-    args = _make_args(approval_center=True, campaign="security-review", writeback_target="github")
+    args = _make_args(
+        approval_center=True, campaign="security-review", writeback_target="github"
+    )
 
     with pytest.raises(ValueError) as exc:
         validate_cli_mode_args(args, _raising_error)

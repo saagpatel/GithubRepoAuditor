@@ -28,7 +28,9 @@ def apply_portfolio_catalog(report: AuditReport, args: Any) -> AuditReport:
     }
     for audit in report.audits:
         base_entry = catalog_entry_for_repo(audit.metadata.to_dict(), catalog_data)
-        operator_focus = build_operator_focus(queue_by_repo.get(audit.metadata.name, {}))
+        operator_focus = build_operator_focus(
+            queue_by_repo.get(audit.metadata.name, {})
+        )
         intent_alignment, intent_alignment_reason = evaluate_intent_alignment(
             base_entry,
             completeness_tier=audit.completeness_tier,
@@ -43,20 +45,28 @@ def apply_portfolio_catalog(report: AuditReport, args: Any) -> AuditReport:
             "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
             "operator_focus": operator_focus,
         }
-    audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+    audit_lookup = {
+        audit.metadata.name: audit.portfolio_catalog for audit in report.audits
+    }
     for item in report.operator_queue:
         repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
         catalog_entry = audit_lookup.get(repo_name, {})
         if catalog_entry:
             item["portfolio_catalog"] = dict(catalog_entry)
             item["catalog_line"] = catalog_entry.get("catalog_line", "")
-            item["intent_alignment"] = catalog_entry.get("intent_alignment", "missing-contract")
-            item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
+            item["intent_alignment"] = catalog_entry.get(
+                "intent_alignment", "missing-contract"
+            )
+            item["intent_alignment_reason"] = catalog_entry.get(
+                "intent_alignment_reason", ""
+            )
     report.portfolio_catalog_summary = build_portfolio_catalog_summary(
         report.audits,
         catalog_path=str(catalog_path),
     )
-    report.portfolio_catalog_summary["catalog_exists"] = catalog_data.get("exists", False)
+    report.portfolio_catalog_summary["catalog_exists"] = catalog_data.get(
+        "exists", False
+    )
     report.portfolio_catalog_summary["errors"] = catalog_data.get("errors", [])
     report.portfolio_catalog_summary["warnings"] = catalog_data.get("warnings", [])
     report.intent_alignment_summary = build_intent_alignment_summary(report.audits)

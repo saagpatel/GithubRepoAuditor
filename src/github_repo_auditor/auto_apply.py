@@ -46,7 +46,9 @@ def build_trust_bar_index(
         automation_eligible = bool(
             (project.get("declared") or {}).get("automation_eligible", False)
         )
-        risk_tier = str((project.get("risk") or {}).get("risk_tier", "elevated") or "elevated")
+        risk_tier = str(
+            (project.get("risk") or {}).get("risk_tier", "elevated") or "elevated"
+        )
         passes = portfolio_trusted and automation_eligible and risk_tier == "baseline"
         index[repo_name] = passes
     return index
@@ -85,7 +87,9 @@ def summarize_trust_bar(
     }
 
 
-def get_approved_manual_campaigns(ledger_bundle: dict[str, Any]) -> list[dict[str, Any]]:
+def get_approved_manual_campaigns(
+    ledger_bundle: dict[str, Any],
+) -> list[dict[str, Any]]:
     """Return approval ledger records with approval_state: approved-manual."""
     return [
         item
@@ -130,5 +134,7 @@ def filter_trusted_repo_actions(
     Actions that carry no repo identifier are excluded (conservative).
     """
     return [
-        action for action in actions if trust_bar_index.get(str(action.get("repo") or ""), False)
+        action
+        for action in actions
+        if trust_bar_index.get(str(action.get("repo") or ""), False)
     ]

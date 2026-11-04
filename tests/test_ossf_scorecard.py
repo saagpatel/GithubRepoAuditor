@@ -120,7 +120,12 @@ class TestFetchOne:
         """When a cache entry exists the HTTP call is skipped."""
         cache = ResponseCache(cache_dir=tmp_path / ".cache", ttl=86400)
         url = f"{OSSF_SCORECARD_BASE_URL}/projects/github.com/owner/repo"
-        cached_data = {"available": True, "score": 9.0, "checks": [], "date": "2026-04-01"}
+        cached_data = {
+            "available": True,
+            "score": 9.0,
+            "checks": [],
+            "date": "2026-04-01",
+        }
         cache.put(url, _OSSF_CACHE_PARAMS, cached_data)
 
         mock_session = MagicMock(spec=requests.Session)
@@ -252,7 +257,12 @@ class TestOssfScorecardCLIIntegration:
         output_dir.mkdir()
 
         scorecard_data = {
-            "owner/repo": {"available": True, "score": 7.5, "checks": [], "date": "2026-05-01"}
+            "owner/repo": {
+                "available": True,
+                "score": 7.5,
+                "checks": [],
+                "date": "2026-05-01",
+            }
         }
 
         # Simulate the cli.py write step directly

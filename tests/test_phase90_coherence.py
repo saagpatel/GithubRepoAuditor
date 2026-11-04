@@ -23,7 +23,10 @@ def test_docs_reflect_phase_90_canonical_action_sync_language() -> None:
 def test_architecture_describes_three_action_sync_layers_plus_tuning() -> None:
     architecture = Path("docs/architecture.md").read_text()
 
-    assert "Action Sync now has three operational layers plus one bounded recommendation overlay." in architecture
+    assert (
+        "Action Sync now has three operational layers plus one bounded recommendation overlay."
+        in architecture
+    )
     assert "### 1. `Action Sync Readiness`" in architecture
     assert "### 2. `Apply Packet`" in architecture
     assert "### 3. `Post-Apply Monitoring`" in architecture

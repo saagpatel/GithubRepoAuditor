@@ -10,6 +10,7 @@ from types import UnionType
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from github_repo_auditor.github_security_coverage import (
+    DEFAULT_ATTENTION_STATES,
     DEFAULT_COHORT_POLICY,
     GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
     PROVIDER_NAMES,
@@ -20,7 +21,9 @@ from github_repo_auditor.github_security_coverage import (
     _validate_remote_repository,
     validate_normalized_security_provider,
 )
-from github_repo_auditor.portfolio_checkout_authority import validate_checkout_authority_envelope
+from github_repo_auditor.portfolio_checkout_authority import (
+    validate_checkout_authority_envelope,
+)
 from github_repo_auditor.portfolio_pathing import (
     VALID_MATURITY_PROGRAMS,
     VALID_OPERATING_PATHS,
@@ -41,7 +44,9 @@ from github_repo_auditor.portfolio_truth_metadata import (
     build_warnings,
 )
 from github_repo_auditor.portfolio_truth_precedence import PRECEDENCE_MATRIX
-from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_provenance import (
+    REQUIRED_PROJECT_PROVENANCE_KEYS,
+)
 from github_repo_auditor.portfolio_truth_render import registry_project_labels
 from github_repo_auditor.portfolio_truth_sources import WORKSPACE_EXCLUSION_REASONS
 from github_repo_auditor.portfolio_truth_types import (
@@ -537,6 +542,68 @@ def _validate_snapshot_metadata(
         notion_context_carried_forward=notion_context_carried_forward,
         checkout_collisions=summary["checkout_collisions"]["groups"],
     )
+    if "security_coverage_clock" in summary:
+        clock = summary["security_coverage_clock"]
+        security_input = snapshot.inputs.get("github_security") or {}
+        if not isinstance(clock, dict) or set(clock) != {
+            "receipt_observed_at",
+            "evaluated_at",
+            "pending_security_coverage_count",
+            "pending_security_coverage_repositories",
+            "clock_departed_count",
+            "clock_departed_repositories",
+        }:
+            raise ValueError("PortfolioTruth security coverage clock is invalid.")
+        if clock[
+            "evaluated_at"
+        ] != snapshot.generated_at.isoformat() or _parse_datetime(
+            clock["receipt_observed_at"], "security_coverage_clock.receipt_observed_at"
+        ) != _parse_datetime(
+            security_input.get("produced_at"), "inputs.github_security.produced_at"
+        ):
+            raise ValueError(
+                "PortfolioTruth security coverage clock binding is invalid."
+            )
+        projects_by_repo = {
+            project.identity.repo_full_name: project for project in snapshot.projects
+        }
+        for prefix in ("pending_security_coverage", "clock_departed"):
+            repositories = clock[f"{prefix}_repositories"]
+            count = clock[f"{prefix}_count"]
+            if (
+                not isinstance(repositories, list)
+                or any(
+                    not isinstance(repo, str) or repo not in projects_by_repo
+                    for repo in repositories
+                )
+                or repositories != sorted(set(repositories), key=str.lower)
+                or type(count) is not int
+                or count != len(repositories)
+            ):
+                raise ValueError(
+                    "PortfolioTruth security coverage clock repositories are invalid."
+                )
+            for repo in repositories:
+                project = projects_by_repo[repo]
+                if prefix == "pending_security_coverage":
+                    if (
+                        project.security.cohort_member
+                        or project.derived.attention_state
+                        not in DEFAULT_ATTENTION_STATES
+                    ):
+                        raise ValueError(
+                            "PortfolioTruth pending security coverage is invalid."
+                        )
+                elif (
+                    not project.security.cohort_member
+                    or project.derived.attention_state in DEFAULT_ATTENTION_STATES
+                ):
+                    raise ValueError("PortfolioTruth clock departure is invalid.")
+        if set(clock["pending_security_coverage_repositories"]) & set(
+            clock["clock_departed_repositories"]
+        ):
+            raise ValueError("PortfolioTruth security coverage clock sets overlap.")
+        expected_summary["security_coverage_clock"] = clock
     if summary != expected_summary:
         raise ValueError("PortfolioTruth source summary differs from producer facts.")
     expected_warnings = build_warnings(

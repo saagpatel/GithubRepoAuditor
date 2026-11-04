@@ -61,7 +61,9 @@ def _queue_pressure_weight(item: dict[str, Any]) -> float:
     return 0.0
 
 
-def _dedupe_snapshots(current: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _dedupe_snapshots(
+    current: dict[str, Any], rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     snapshots = [current]
     seen = {str(current.get("run_id") or "")}
     for row in rows:
@@ -101,7 +103,9 @@ def _trend_from_series(series: list[float]) -> str:
     return "flat"
 
 
-def _distinct_repo_names(report_data: dict[str, Any], sources: dict[str, list[dict[str, Any]]]) -> list[str]:
+def _distinct_repo_names(
+    report_data: dict[str, Any], sources: dict[str, list[dict[str, Any]]]
+) -> list[str]:
     names: list[str] = []
     for audit in report_data.get("audits") or []:
         repo = str(_copy_mapping(audit.get("metadata")).get("name") or "").strip()
@@ -113,7 +117,13 @@ def _distinct_repo_names(report_data: dict[str, Any], sources: dict[str, list[di
             names.append(repo)
     for key in ("scorecards", "hotspots", "actions"):
         for row in sources.get(key, []):
-            repo = str(row.get("repo") or row.get("repo_name") or row.get("repo_id") or row.get("repo_full_name") or "").strip()
+            repo = str(
+                row.get("repo")
+                or row.get("repo_name")
+                or row.get("repo_id")
+                or row.get("repo_full_name")
+                or ""
+            ).strip()
             if "/" in repo:
                 repo = repo.rsplit("/", 1)[-1]
             if repo and repo not in names:
@@ -137,15 +147,25 @@ def _repo_score_series(
     history_output_dir: Any,
 ) -> list[float]:
     rows = sorted(
-        [row for row in score_rows if str(row.get("repo") or row.get("repo_name") or "") == repo],
+        [
+            row
+            for row in score_rows
+            if str(row.get("repo") or row.get("repo_name") or "") == repo
+        ],
         key=lambda item: str(item.get("generated_at") or ""),
     )
     if rows:
-        return [float(row.get("score", 0.0) or 0.0) for row in rows][-DISPLAY_LOOKBACK_RUNS:]
+        return [float(row.get("score", 0.0) or 0.0) for row in rows][
+            -DISPLAY_LOOKBACK_RUNS:
+        ]
     if history_output_dir:
-        history = load_repo_score_history(history_output_dir, max_runs=DISPLAY_LOOKBACK_RUNS)
+        history = load_repo_score_history(
+            history_output_dir, max_runs=DISPLAY_LOOKBACK_RUNS
+        )
         if repo in history:
-            return [float(value or 0.0) for value in history[repo]][-DISPLAY_LOOKBACK_RUNS:]
+            return [float(value or 0.0) for value in history[repo]][
+                -DISPLAY_LOOKBACK_RUNS:
+            ]
     scorecard = _copy_mapping((audit_by_repo.get(repo) or {}).get("scorecard"))
     if scorecard:
         return [float(scorecard.get("score", 0.0) or 0.0)]
@@ -163,16 +183,23 @@ def _scorecard_trend(scores: list[float]) -> str:
     return "flat"
 
 
-def _hotspot_persistence(repo: str, hotspot_rows: list[dict[str, Any]], run_count: int) -> str:
+def _hotspot_persistence(
+    repo: str, hotspot_rows: list[dict[str, Any]], run_count: int
+) -> str:
     if run_count < MIN_HISTORICAL_RUNS:
         return "insufficient-evidence"
     repo_rows = [
-        row for row in hotspot_rows
+        row
+        for row in hotspot_rows
         if str(row.get("repo") or row.get("repo_name") or "").strip() == repo
     ]
     if not repo_rows:
         return "quiet"
-    run_ids = {str(row.get("run_id") or "") for row in repo_rows if str(row.get("run_id") or "")}
+    run_ids = {
+        str(row.get("run_id") or "")
+        for row in repo_rows
+        if str(row.get("run_id") or "")
+    }
     if len(run_ids) >= max(2, run_count // 2):
         latest_run = max(run_ids)
         if any(str(row.get("run_id") or "") == latest_run for row in repo_rows):
@@ -180,7 +207,9 @@ def _hotspot_persistence(repo: str, hotspot_rows: list[dict[str, Any]], run_coun
     return "changing"
 
 
-def _recent_interventions(repo: str, action_rows: list[dict[str, Any]]) -> tuple[int, str]:
+def _recent_interventions(
+    repo: str, action_rows: list[dict[str, Any]]
+) -> tuple[int, str]:
     repo_rows = []
     for row in action_rows:
         names = {
@@ -192,8 +221,14 @@ def _recent_interventions(repo: str, action_rows: list[dict[str, Any]]) -> tuple
             repo_rows.append(row)
     if not repo_rows:
         return 0, ""
-    ordered = sorted(repo_rows, key=lambda item: str(item.get("generated_at") or ""), reverse=True)
-    run_ids = {str(row.get("run_id") or "") for row in repo_rows if str(row.get("run_id") or "")}
+    ordered = sorted(
+        repo_rows, key=lambda item: str(item.get("generated_at") or ""), reverse=True
+    )
+    run_ids = {
+        str(row.get("run_id") or "")
+        for row in repo_rows
+        if str(row.get("run_id") or "")
+    }
     return len(run_ids), str(ordered[0].get("generated_at") or "")
 
 
@@ -218,7 +253,9 @@ def _has_reopened_operator_event(repo: str, operator_evidence: dict[str, Any]) -
     return False
 
 
-def _campaign_follow_through(repo: str, action_rows: list[dict[str, Any]], outcome_rows: list[dict[str, Any]]) -> str:
+def _campaign_follow_through(
+    repo: str, action_rows: list[dict[str, Any]], outcome_rows: list[dict[str, Any]]
+) -> str:
     repo_campaigns: set[str] = set()
     for row in action_rows:
         names = {
@@ -231,7 +268,11 @@ def _campaign_follow_through(repo: str, action_rows: list[dict[str, Any]], outco
     repo_campaigns.discard("")
     if not repo_campaigns:
         return "not-applicable"
-    relevant = [row for row in outcome_rows if str(row.get("campaign_type") or "") in repo_campaigns]
+    relevant = [
+        row
+        for row in outcome_rows
+        if str(row.get("campaign_type") or "") in repo_campaigns
+    ]
     if not relevant:
         return "insufficient-evidence"
     states = {str(row.get("monitoring_state") or "") for row in relevant}
@@ -244,7 +285,9 @@ def _campaign_follow_through(repo: str, action_rows: list[dict[str, Any]], outco
     return "insufficient-evidence"
 
 
-def _latest_tier_and_score(repo: str, audit_by_repo: dict[str, dict[str, Any]]) -> tuple[str, float]:
+def _latest_tier_and_score(
+    repo: str, audit_by_repo: dict[str, dict[str, Any]]
+) -> tuple[str, float]:
     audit = audit_by_repo.get(repo) or {}
     return (
         str(audit.get("completeness_tier") or ""),
@@ -266,12 +309,16 @@ def _status_for_repo(
 ) -> str:
     if run_count < MIN_HISTORICAL_RUNS:
         return "insufficient-evidence"
-    if campaign_follow_through == "relapsing" or reopened or (
-        recent_intervention_count > 0 and pressure_trend == "worsening"
+    if (
+        campaign_follow_through == "relapsing"
+        or reopened
+        or (recent_intervention_count > 0 and pressure_trend == "worsening")
     ):
         return "relapsing"
     if recurring_pressure_count >= max(3, run_count // 2) and (
-        current_pressure or hotspot_persistence == "persistent" or scorecard_trend in {"flat", "worsening"}
+        current_pressure
+        or hotspot_persistence == "persistent"
+        or scorecard_trend in {"flat", "worsening"}
     ):
         return "persistent-pressure"
     if recent_intervention_count > 0 and (
@@ -281,7 +328,11 @@ def _status_for_repo(
         or campaign_follow_through == "helping"
     ):
         return "improving-after-intervention"
-    if recent_intervention_count > 0 and not current_pressure and pressure_trend in {"flat", "improving"}:
+    if (
+        recent_intervention_count > 0
+        and not current_pressure
+        and pressure_trend in {"flat", "improving"}
+    ):
         return "holding-steady"
     if not current_pressure and hotspot_persistence == "quiet":
         return "quiet"
@@ -290,7 +341,9 @@ def _status_for_repo(
 
 def _summary(record: dict[str, Any]) -> str:
     repo = str(record.get("repo") or "Repo")
-    status = str(record.get("historical_intelligence_status") or "insufficient-evidence")
+    status = str(
+        record.get("historical_intelligence_status") or "insufficient-evidence"
+    )
     if status == "relapsing":
         return f"{repo} is relapsing after intervention: recent pressure or follow-through has turned back upward and needs a closer historical read."
     if status == "persistent-pressure":
@@ -306,7 +359,11 @@ def _summary(record: dict[str, Any]) -> str:
 
 def _ledger_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     counts = {
-        status: sum(1 for record in records if record.get("historical_intelligence_status") == status)
+        status: sum(
+            1
+            for record in records
+            if record.get("historical_intelligence_status") == status
+        )
         for status in (
             "relapsing",
             "persistent-pressure",
@@ -320,7 +377,9 @@ def _ledger_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "summary": (
             f"{counts['relapsing']} repo(s) are relapsing, {counts['persistent-pressure']} show persistent pressure, "
             f"{counts['improving-after-intervention']} are improving after intervention, and {counts['holding-steady']} are holding steady."
-        ) if records else "Historical portfolio intelligence is still empty because no repo-level evidence is available yet.",
+        )
+        if records
+        else "Historical portfolio intelligence is still empty because no repo-level evidence is available yet.",
         "counts": counts,
     }
 
@@ -329,7 +388,13 @@ def _next_focus(records: list[dict[str, Any]]) -> dict[str, Any]:
     ordered = sorted(
         records,
         key=lambda item: (
-            STATUS_PRIORITY.get(str(item.get("historical_intelligence_status") or "insufficient-evidence"), 99),
+            STATUS_PRIORITY.get(
+                str(
+                    item.get("historical_intelligence_status")
+                    or "insufficient-evidence"
+                ),
+                99,
+            ),
             -int(item.get("recent_intervention_count", 0) or 0),
             str(item.get("repo") or ""),
         ),
@@ -339,21 +404,31 @@ def _next_focus(records: list[dict[str, Any]]) -> dict[str, Any]:
         repo = str(record.get("repo") or "")
         if status == "relapsing":
             payload = dict(record)
-            payload["summary"] = f"Read {repo} first: the historical story points to relapse after earlier intervention."
+            payload["summary"] = (
+                f"Read {repo} first: the historical story points to relapse after earlier intervention."
+            )
             return payload
         if status == "persistent-pressure":
             payload = dict(record)
-            payload["summary"] = f"Read {repo} next: it keeps resurfacing and still lacks durable quieting."
+            payload["summary"] = (
+                f"Read {repo} next: it keeps resurfacing and still lacks durable quieting."
+            )
             return payload
         if status == "improving-after-intervention":
             payload = dict(record)
-            payload["summary"] = f"Read {repo} next: it is the clearest current example of improvement after intervention."
+            payload["summary"] = (
+                f"Read {repo} next: it is the clearest current example of improvement after intervention."
+            )
             return payload
         if status == "holding-steady":
             payload = dict(record)
-            payload["summary"] = f"Read {repo} next if you want proof that earlier pressure is now holding steady."
+            payload["summary"] = (
+                f"Read {repo} next if you want proof that earlier pressure is now holding steady."
+            )
             return payload
-    return {"summary": "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."}
+    return {
+        "summary": "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."
+    }
 
 
 def build_intervention_ledger_bundle(
@@ -370,18 +445,83 @@ def build_intervention_ledger_bundle(
     implementation_hotspot_history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     data = dict(report_data)
-    queue = list(operator_queue if operator_queue is not None else data.get("operator_queue") or [])
+    queue = list(
+        operator_queue
+        if operator_queue is not None
+        else data.get("operator_queue") or []
+    )
     output_dir = data.get("output_dir")
     username = str(data.get("username") or "")
 
-    recent_runs = list(recent_runs or (load_latest_audit_runs(output_dir, username, limit=HISTORY_LOOKBACK_RUNS) if output_dir else []))
-    operator_history = list(operator_history or (load_operator_state_history(output_dir, username, limit=HISTORY_LOOKBACK_RUNS) if output_dir else []))
-    operator_evidence = dict(operator_evidence or (load_recent_operator_evidence(output_dir, username, snapshot_limit=DISPLAY_LOOKBACK_RUNS, event_limit=30) if output_dir else {"history": [], "events": []}))
-    review_history = list(review_history or (load_review_history(output_dir, username, limit=DISPLAY_LOOKBACK_RUNS) if output_dir else []))
-    campaign_outcomes = list(campaign_outcomes or (load_campaign_outcomes(output_dir, username, limit=60) if output_dir else []))
-    recent_action_runs = list(recent_action_runs or (load_recent_action_runs(output_dir, username, limit=400) if output_dir else []))
-    repo_scorecard_history = list(repo_scorecard_history or (load_recent_repo_scorecards(output_dir, username, limit=200) if output_dir else []))
-    implementation_hotspot_history = list(implementation_hotspot_history or (load_recent_implementation_hotspots(output_dir, username, limit=400) if output_dir else []))
+    recent_runs = list(
+        recent_runs
+        or (
+            load_latest_audit_runs(output_dir, username, limit=HISTORY_LOOKBACK_RUNS)
+            if output_dir
+            else []
+        )
+    )
+    operator_history = list(
+        operator_history
+        or (
+            load_operator_state_history(
+                output_dir, username, limit=HISTORY_LOOKBACK_RUNS
+            )
+            if output_dir
+            else []
+        )
+    )
+    operator_evidence = dict(
+        operator_evidence
+        or (
+            load_recent_operator_evidence(
+                output_dir,
+                username,
+                snapshot_limit=DISPLAY_LOOKBACK_RUNS,
+                event_limit=30,
+            )
+            if output_dir
+            else {"history": [], "events": []}
+        )
+    )
+    review_history = list(
+        review_history
+        or (
+            load_review_history(output_dir, username, limit=DISPLAY_LOOKBACK_RUNS)
+            if output_dir
+            else []
+        )
+    )
+    campaign_outcomes = list(
+        campaign_outcomes
+        or (
+            load_campaign_outcomes(output_dir, username, limit=60) if output_dir else []
+        )
+    )
+    recent_action_runs = list(
+        recent_action_runs
+        or (
+            load_recent_action_runs(output_dir, username, limit=400)
+            if output_dir
+            else []
+        )
+    )
+    repo_scorecard_history = list(
+        repo_scorecard_history
+        or (
+            load_recent_repo_scorecards(output_dir, username, limit=200)
+            if output_dir
+            else []
+        )
+    )
+    implementation_hotspot_history = list(
+        implementation_hotspot_history
+        or (
+            load_recent_implementation_hotspots(output_dir, username, limit=400)
+            if output_dir
+            else []
+        )
+    )
     _ = review_history
 
     snapshots = _dedupe_snapshots(_current_queue_snapshot(data), recent_runs)
@@ -412,14 +552,22 @@ def build_intervention_ledger_bundle(
         pressure_trend = _trend_from_series(pressure_series)
         current_pressure = bool(pressure_series and pressure_series[-1] > 0)
         recurring_pressure_count = sum(1 for value in pressure_series if value > 0)
-        score_series = _repo_score_series(repo, audit_by_repo, repo_scorecard_history, history_output_dir)
-        scorecard_trend = _scorecard_trend(score_series)
-        hotspot_persistence = _hotspot_persistence(repo, implementation_hotspot_history, len(snapshots))
-        campaign_follow_through = _campaign_follow_through(repo, recent_action_runs, campaign_outcomes)
-        recent_intervention_count, last_intervention = _recent_interventions(repo, recent_action_runs)
-        reopened = _has_reopened_action(repo, recent_action_runs) or _has_reopened_operator_event(
-            repo, operator_evidence
+        score_series = _repo_score_series(
+            repo, audit_by_repo, repo_scorecard_history, history_output_dir
         )
+        scorecard_trend = _scorecard_trend(score_series)
+        hotspot_persistence = _hotspot_persistence(
+            repo, implementation_hotspot_history, len(snapshots)
+        )
+        campaign_follow_through = _campaign_follow_through(
+            repo, recent_action_runs, campaign_outcomes
+        )
+        recent_intervention_count, last_intervention = _recent_interventions(
+            repo, recent_action_runs
+        )
+        reopened = _has_reopened_action(
+            repo, recent_action_runs
+        ) or _has_reopened_operator_event(repo, operator_evidence)
         latest_tier, latest_score = _latest_tier_and_score(repo, audit_by_repo)
         record = {
             "repo": repo,
@@ -448,24 +596,51 @@ def build_intervention_ledger_bundle(
 
     records.sort(
         key=lambda item: (
-            STATUS_PRIORITY.get(str(item.get("historical_intelligence_status") or "insufficient-evidence"), 99),
+            STATUS_PRIORITY.get(
+                str(
+                    item.get("historical_intelligence_status")
+                    or "insufficient-evidence"
+                ),
+                99,
+            ),
             -int(item.get("recent_intervention_count", 0) or 0),
             str(item.get("repo") or ""),
         )
     )
 
     grouped = {
-        "top_relapsing_repos": [item for item in records if item.get("historical_intelligence_status") == "relapsing"][:5],
-        "top_persistent_pressure_repos": [item for item in records if item.get("historical_intelligence_status") == "persistent-pressure"][:5],
-        "top_improving_repos": [item for item in records if item.get("historical_intelligence_status") == "improving-after-intervention"][:5],
-        "top_holding_repos": [item for item in records if item.get("historical_intelligence_status") == "holding-steady"][:5],
+        "top_relapsing_repos": [
+            item
+            for item in records
+            if item.get("historical_intelligence_status") == "relapsing"
+        ][:5],
+        "top_persistent_pressure_repos": [
+            item
+            for item in records
+            if item.get("historical_intelligence_status") == "persistent-pressure"
+        ][:5],
+        "top_improving_repos": [
+            item
+            for item in records
+            if item.get("historical_intelligence_status")
+            == "improving-after-intervention"
+        ][:5],
+        "top_holding_repos": [
+            item
+            for item in records
+            if item.get("historical_intelligence_status") == "holding-steady"
+        ][:5],
     }
 
-    queue_by_repo = {str(item.get("repo") or item.get("repo_name") or ""): item for item in queue}
+    queue_by_repo = {
+        str(item.get("repo") or item.get("repo_name") or ""): item for item in queue
+    }
     for record in records:
         queue_item = queue_by_repo.get(str(record.get("repo") or ""))
         if queue_item is not None:
-            queue_item["historical_intelligence_status"] = record["historical_intelligence_status"]
+            queue_item["historical_intelligence_status"] = record[
+                "historical_intelligence_status"
+            ]
             queue_item["historical_intelligence_summary"] = record["summary"]
             queue_item["historical_intelligence_line"] = (
                 f"Historical Portfolio Intelligence: {record['summary']}"

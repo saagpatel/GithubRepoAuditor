@@ -17,19 +17,35 @@ def _make_results(scores: dict[str, float]) -> list[AnalyzerResult]:
             details = {"config_files": ["pyproject.toml"], "source_dirs": ["src"]}
         if dim == "code_quality":
             details = {"entry_point": "main.py", "total_loc": 500}
-        results.append(AnalyzerResult(dimension=dim, score=score, max_score=1.0, findings=[], details=details))
+        results.append(
+            AnalyzerResult(
+                dimension=dim, score=score, max_score=1.0, findings=[], details=details
+            )
+        )
     return results
 
 
 def _make_metadata(**overrides) -> RepoMetadata:
     defaults = dict(
-        name="test", full_name="user/test", description=None,
-        language="Python", languages={}, private=False, fork=False,
-        archived=False, created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        name="test",
+        full_name="user/test",
+        description=None,
+        language="Python",
+        languages={},
+        private=False,
+        fork=False,
+        archived=False,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=0, forks=0, open_issues=0,
-        size_kb=100, html_url="", clone_url="", topics=[],
+        default_branch="main",
+        stars=0,
+        forks=0,
+        open_issues=0,
+        size_kb=100,
+        html_url="",
+        clone_url="",
+        topics=[],
     )
     defaults.update(overrides)
     return RepoMetadata(**defaults)
@@ -94,13 +110,16 @@ class TestScoringProfiles:
     def test_profile_json_valid(self, tmp_path):
         """Verify profile JSONs sum to ~1.0."""
         from pathlib import Path
+
         profiles_dir = Path("config/scoring-profiles")
         if not profiles_dir.exists():
             return
         for profile_path in profiles_dir.glob("*.json"):
             weights = json.loads(profile_path.read_text())
             total = sum(weights.values())
-            assert abs(total - 1.0) < 0.01, f"{profile_path.name} weights sum to {total}"
+            assert abs(total - 1.0) < 0.01, (
+                f"{profile_path.name} weights sum to {total}"
+            )
 
     def test_flat_profile_loads_weights_without_overrides(self):
         profile, profile_name = _load_scoring_profile("default")
@@ -122,7 +141,11 @@ class TestScoringProfiles:
                     **WEIGHTS,
                     "stale_threshold_days": 1,
                     "grade_thresholds": [[0.9, "A"], [0.0, "F"]],
-                    "completeness_tiers": [["shipped", 0.8], ["functional", 0.7], ["draft", 0.0]],
+                    "completeness_tiers": [
+                        ["shipped", 0.8],
+                        ["functional", 0.7],
+                        ["draft", 0.0],
+                    ],
                 }
             )
         )

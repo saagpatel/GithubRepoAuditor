@@ -573,9 +573,7 @@ def _safe_cli_digest(digest: dict[str, Any]) -> dict[str, Any]:
         "superseded_decisions": [],
         "summary": {
             "contract_version": CONTRACT_VERSION,
-            "decision_queue_count": _safe_count(
-                summary.get("decision_queue_count")
-            ),
+            "decision_queue_count": _safe_count(summary.get("decision_queue_count")),
             "canonical_decision_count": _safe_count(
                 summary.get("canonical_decision_count")
             ),

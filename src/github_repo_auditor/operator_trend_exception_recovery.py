@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any, Callable
 
 
-def _recovery_progress(history_meta: dict[str, Any], trust_recovery_window_runs: int) -> str:
+def _recovery_progress(
+    history_meta: dict[str, Any], trust_recovery_window_runs: int
+) -> str:
     stable_count = int(history_meta.get("stable_policy_run_count", 0) or 0)
     needed = max(int(trust_recovery_window_runs or 0), 1)
     remaining = max(needed - stable_count, 0)
@@ -21,7 +23,10 @@ def trust_recovery_for_target(
     trust_policy_reason: str,
     trust_recovery_window_runs: int,
 ) -> tuple[str, str, str, str]:
-    if target.get("trust_exception_status") in {None, "", "none"} or trust_policy != "verify-first":
+    if (
+        target.get("trust_exception_status") in {None, "", "none"}
+        or trust_policy != "verify-first"
+    ):
         return "none", "", trust_policy, trust_policy_reason
 
     if confidence_calibration.get("confidence_validation_status") != "healthy":
@@ -55,9 +60,7 @@ def trust_recovery_for_target(
         )
     if history_meta.get("stable_policy_run_count", 0) >= trust_recovery_window_runs:
         recovered_policy = "act-with-review"
-        recovered_reason = (
-            "Recent stability has earned this target back from verify-first to act-with-review."
-        )
+        recovered_reason = "Recent stability has earned this target back from verify-first to act-with-review."
         if target.get("lane") == "blocked" and target.get("kind") == "setup":
             recovered_reason = "Recent stability has earned this blocked setup target back to act-with-review, but setup blockers still should not skip review."
         return "earned", recovered_reason, recovered_policy, recovered_reason
@@ -73,7 +76,10 @@ def recovery_pattern_reason(recovery_status: str, recovery_reason: str) -> str:
     if recovery_status == "earned":
         return recovery_reason or "Recent stability has earned stronger trust again."
     if recovery_status == "candidate":
-        return recovery_reason or "This target is stabilizing, but it has not yet earned stronger trust."
+        return (
+            recovery_reason
+            or "This target is stabilizing, but it has not yet earned stronger trust."
+        )
     return recovery_reason or "Trust recovery is still being evaluated."
 
 

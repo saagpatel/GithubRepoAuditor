@@ -94,7 +94,9 @@ def _report_data(**overrides) -> dict:
         "action_runs": [],
         "campaign_history": [],
         "operator_summary": {"counts": {"blocked": 1, "urgent": 1}},
-        "operator_queue": [{"repo": "RepoSecure", "suggested_campaign": "security-review"}],
+        "operator_queue": [
+            {"repo": "RepoSecure", "suggested_campaign": "security-review"}
+        ],
         "campaign_outcomes_summary": {},
     }
     data.update(overrides)
@@ -115,7 +117,11 @@ def _bundle(report_data: dict, **history_overrides) -> dict:
 
 
 def _outcome(bundle: dict, campaign_type: str) -> dict:
-    return next(item for item in bundle["action_sync_outcomes"] if item["campaign_type"] == campaign_type)
+    return next(
+        item
+        for item in bundle["action_sync_outcomes"]
+        if item["campaign_type"] == campaign_type
+    )
 
 
 def test_outcome_is_no_recent_apply_when_campaign_has_not_been_applied() -> None:
@@ -152,7 +158,9 @@ def test_outcome_is_holding_clean_with_two_post_apply_runs() -> None:
         recent_runs=[
             _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=1, urgent=0),
             _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=1, urgent=0),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=3, urgent=1),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=3, urgent=1
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),
@@ -174,7 +182,9 @@ def test_outcome_is_drift_returned_when_drift_reappears_after_apply() -> None:
         recent_runs=[
             _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=2, urgent=1),
             _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=2, urgent=1),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),
@@ -208,7 +218,9 @@ def test_outcome_is_reopened_when_lifecycle_reopens_after_apply() -> None:
         recent_runs=[
             _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=2, urgent=1),
             _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=2, urgent=1),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),
@@ -237,13 +249,20 @@ def test_outcome_is_rollback_watch_when_rollback_gap_or_use_exists() -> None:
         recent_runs=[
             _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=2, urgent=1),
             _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=2, urgent=1),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),
         ],
         recent_action_runs=[
-            _action_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review", rollback_state="partial"),
+            _action_run(
+                "run-apply",
+                "2026-04-12T09:00:00+00:00",
+                "security-review",
+                rollback_state="partial",
+            ),
         ],
     )
     partial_outcome = _outcome(partial_bundle, "security-review")
@@ -255,7 +274,9 @@ def test_outcome_is_rollback_watch_when_rollback_gap_or_use_exists() -> None:
         recent_runs=[
             _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=2, urgent=1),
             _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=2, urgent=1),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),
@@ -285,13 +306,20 @@ def test_outcome_uses_precedence_when_multiple_conditions_are_true() -> None:
         recent_runs=[
             _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=2, urgent=1),
             _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=2, urgent=1),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=2, urgent=1
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),
         ],
         recent_action_runs=[
-            _action_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review", rollback_state="partial"),
+            _action_run(
+                "run-apply",
+                "2026-04-12T09:00:00+00:00",
+                "security-review",
+                rollback_state="partial",
+            ),
         ],
         recent_campaign_history=[
             {
@@ -323,9 +351,15 @@ def test_outcome_holds_clean_even_when_pressure_history_is_missing() -> None:
     bundle = _bundle(
         _report_data(operator_summary={}),
         recent_runs=[
-            _run_snapshot("run-2", "2026-04-12T11:00:00+00:00", blocked=None, urgent=None),
-            _run_snapshot("run-1", "2026-04-12T10:00:00+00:00", blocked=None, urgent=None),
-            _run_snapshot("run-apply", "2026-04-12T09:00:00+00:00", blocked=None, urgent=None),
+            _run_snapshot(
+                "run-2", "2026-04-12T11:00:00+00:00", blocked=None, urgent=None
+            ),
+            _run_snapshot(
+                "run-1", "2026-04-12T10:00:00+00:00", blocked=None, urgent=None
+            ),
+            _run_snapshot(
+                "run-apply", "2026-04-12T09:00:00+00:00", blocked=None, urgent=None
+            ),
         ],
         recent_campaign_runs=[
             _campaign_run("run-apply", "2026-04-12T09:00:00+00:00", "security-review"),

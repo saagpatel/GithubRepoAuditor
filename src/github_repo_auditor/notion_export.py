@@ -3,6 +3,7 @@
 Produces a JSON file matching the NormalizedSignalEvent schema from the
 Notion Operating System's external-signal-sync.ts.
 """
+
 from __future__ import annotations
 
 import json
@@ -65,8 +66,7 @@ def _normalize_audit_event(
     drag_dim, drag_score = _find_biggest_drag(audit)
 
     dim_scores = {
-        r["dimension"]: round(r["score"], 2)
-        for r in audit.get("analyzer_results", [])
+        r["dimension"]: round(r["score"], 2) for r in audit.get("analyzer_results", [])
     }
     machine_data = {
         "schema_version": 2,
@@ -116,8 +116,7 @@ def _lookup_project_mapping(name: str, mapping: dict[str, dict]) -> dict | None:
         if _normalize(mapped_name) == normalized
     ]
     destination_ids = {
-        str(candidate.get("localProjectId") or "").strip()
-        for candidate in candidates
+        str(candidate.get("localProjectId") or "").strip() for candidate in candidates
     }
     if candidates and len(destination_ids) == 1 and "" not in destination_ids:
         return candidates[0]
@@ -130,16 +129,16 @@ def _build_raw_excerpt(
     flags: list[str],
 ) -> str:
     """Build a human-readable raw excerpt that fits Notion size limits."""
-    dim_text = ", ".join(
-        f"{dimension}={score:.2f}" for dimension, score in sorted(dim_scores.items())
-    ) or "none"
+    dim_text = (
+        ", ".join(
+            f"{dimension}={score:.2f}"
+            for dimension, score in sorted(dim_scores.items())
+        )
+        or "none"
+    )
     badges_text = ", ".join(badges[:10]) if badges else "none"
     flags_text = ", ".join(flags[:10]) if flags else "none"
-    excerpt = (
-        f"Dimensions: {dim_text}. "
-        f"Badges: {badges_text}. "
-        f"Flags: {flags_text}."
-    )
+    excerpt = f"Dimensions: {dim_text}. Badges: {badges_text}. Flags: {flags_text}."
     if len(excerpt) > RAW_EXCERPT_LIMIT:
         return excerpt[: RAW_EXCERPT_LIMIT - 3] + "..."
     return excerpt

@@ -40,12 +40,19 @@ def _run_apply_improvements_mode(args, parser) -> None:
     all_results: list[dict] = []
 
     if apply_metadata:
-        results = apply_metadata_updates(client, args.username, file_updates, dry_run=dry_run)
+        results = apply_metadata_updates(
+            client, args.username, file_updates, dry_run=dry_run
+        )
         all_results.extend(results)
         ok_count = sum(
-            1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
+            1
+            for r in results
+            for a in r.get("actions", [])
+            if a.get("ok") or a.get("dry_run")
         )
-        print_info(f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}")
+        print_info(
+            f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}"
+        )
 
     if apply_readmes:
         # Build the merged update list:
@@ -65,9 +72,13 @@ def _run_apply_improvements_mode(args, parser) -> None:
 
         # ── Path A: per-section sub-records (Sprint 8.5) ─────────────────────
         sectioned_packets = load_approved_sectioned_packets(output_dir)
-        sectioned_updates_by_repo: dict[str, tuple[str, str]] = {}  # repo → (packet_id, readme)
+        sectioned_updates_by_repo: dict[
+            str, tuple[str, str]
+        ] = {}  # repo → (packet_id, readme)
         for pid, sections in sectioned_packets.items():
-            repo_name_sec: str = str((sections[0].get("repo_name") or "") if sections else "")
+            repo_name_sec: str = str(
+                (sections[0].get("repo_name") or "") if sections else ""
+            )
             if not repo_name_sec:
                 continue
             assembled = assemble_readme_from_approved_sections(sections)
@@ -76,14 +87,21 @@ def _run_apply_improvements_mode(args, parser) -> None:
                 continue
             pending = [s for s in sections if s.get("state", "pending") == "pending"]
             if pending:
-                print_info(f"sectioned packet {pid} has {len(pending)} pending sections; skipping")
+                print_info(
+                    f"sectioned packet {pid} has {len(pending)} pending sections; skipping"
+                )
                 continue
             sectioned_updates_by_repo[repo_name_sec] = (pid, assembled)
 
         for repo_name_sec, (pid, assembled_readme) in sectioned_updates_by_repo.items():
-            file_names = {(u.get("name") or u.get("repo", "").split("/")[-1]) for u in file_updates}
+            file_names = {
+                (u.get("name") or u.get("repo", "").split("/")[-1])
+                for u in file_updates
+            }
             if repo_name_sec not in file_names:
-                readme_updates.append({"name": repo_name_sec, "readme": assembled_readme})
+                readme_updates.append(
+                    {"name": repo_name_sec, "readme": assembled_readme}
+                )
                 if dry_run:
                     char_count = len(assembled_readme)
                     print_info(
@@ -92,18 +110,27 @@ def _run_apply_improvements_mode(args, parser) -> None:
                     )
 
         # ── Path B: legacy whole-packet records ───────────────────────────────
-        ledger_packets = load_approved_drafts(output_dir, getattr(args, "username", None))
+        ledger_packets = load_approved_drafts(
+            output_dir, getattr(args, "username", None)
+        )
         for pkt in ledger_packets:
             # Convert DraftReadmePacket → shape expected by apply_readme_updates
             # apply_readme_updates expects: {name: str, readme: str}
             # De-duplicate: file-based takes precedence (already present in readme_updates).
-            file_names = {(u.get("name") or u.get("repo", "").split("/")[-1]) for u in file_updates}
+            file_names = {
+                (u.get("name") or u.get("repo", "").split("/")[-1])
+                for u in file_updates
+            }
             if pkt.repo_name not in file_names:
-                readme_updates.append({"name": pkt.repo_name, "readme": pkt.proposed_readme})
+                readme_updates.append(
+                    {"name": pkt.repo_name, "readme": pkt.proposed_readme}
+                )
                 ledger_packets_by_repo[pkt.repo_name] = pkt
 
         if not readme_updates:
-            print_info("README updates: 0 repos to apply (no file and no approved ledger packets).")
+            print_info(
+                "README updates: 0 repos to apply (no file and no approved ledger packets)."
+            )
         else:
             if dry_run:
                 # Print per-repo preview lines for ledger-sourced packets so the operator
@@ -114,7 +141,8 @@ def _run_apply_improvements_mode(args, parser) -> None:
                         (
                             u
                             for u in readme_updates
-                            if (u.get("name") or u.get("repo", "").split("/")[-1]) == pkt_repo
+                            if (u.get("name") or u.get("repo", "").split("/")[-1])
+                            == pkt_repo
                         ),
                         None,
                     )
@@ -124,7 +152,9 @@ def _run_apply_improvements_mode(args, parser) -> None:
                             f"  [dry-run] would push README to {pkt_repo}: {char_count} chars"
                         )
 
-            results = apply_readme_updates(client, args.username, readme_updates, dry_run=dry_run)
+            results = apply_readme_updates(
+                client, args.username, readme_updates, dry_run=dry_run
+            )
             all_results.extend(results)
 
             # State transitions for ledger-sourced packets (live apply only)

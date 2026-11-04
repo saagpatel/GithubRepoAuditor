@@ -1,12 +1,16 @@
 def operator_follow_through_value(data: dict) -> str:
     summary = data.get("operator_summary") or {}
-    return summary.get("follow_through_summary", "") or "No follow-through signal is recorded yet."
+    return (
+        summary.get("follow_through_summary", "")
+        or "No follow-through signal is recorded yet."
+    )
 
 
 def operator_follow_through_details(data: dict) -> tuple[str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     follow_through = (
-        summary.get("follow_through_summary", "") or "No follow-through signal is recorded yet."
+        summary.get("follow_through_summary", "")
+        or "No follow-through signal is recorded yet."
     )
     checkpoint = (
         summary.get("follow_through_checkpoint_summary", "")
@@ -26,7 +30,11 @@ def operator_follow_through_details(data: dict) -> tuple[str, str, str, str, str
         else (
             top_escalation[0]
             if top_escalation
-            else (top_stale[0] if top_stale else (top_unattempted[0] if top_unattempted else {}))
+            else (
+                top_stale[0]
+                if top_stale
+                else (top_unattempted[0] if top_unattempted else {})
+            )
         )
     )
     top_label = (
@@ -45,7 +53,9 @@ def operator_follow_through_details(data: dict) -> tuple[str, str, str, str, str
     )
 
 
-def operator_follow_through_recovery_details(data: dict) -> tuple[str, str, str, str, str, str]:
+def operator_follow_through_recovery_details(
+    data: dict,
+) -> tuple[str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     recovery = (
         summary.get("follow_through_recovery_summary", "")
@@ -66,7 +76,9 @@ def operator_follow_through_recovery_details(data: dict) -> tuple[str, str, str,
     top_item = (
         top_relapsing[0]
         if top_relapsing
-        else (top_retiring[0] if top_retiring else (top_fragile[0] if top_fragile else {}))
+        else (
+            top_retiring[0] if top_retiring else (top_fragile[0] if top_fragile else {})
+        )
     )
     top_label = (
         f"{top_item.get('repo')}: {top_item.get('title')}"
@@ -85,10 +97,19 @@ def operator_follow_through_recovery_details(data: dict) -> tuple[str, str, str,
         if churn_item.get("repo")
         else churn_item.get("title", "")
     ) or "No relapse-churn hotspot"
-    return recovery, persistence, churn, top_label, top_summary or persistence, churn_label
+    return (
+        recovery,
+        persistence,
+        churn,
+        top_label,
+        top_summary or persistence,
+        churn_label,
+    )
 
 
-def operator_follow_through_freshness_details(data: dict) -> tuple[str, str, str, str, str]:
+def operator_follow_through_freshness_details(
+    data: dict,
+) -> tuple[str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     freshness = (
         summary.get("follow_through_recovery_freshness_summary", "")
@@ -149,7 +170,9 @@ def operator_follow_through_rebuild_details(
     top_holding = list(summary.get("top_holding_reacquired_items") or [])
     top_durable = list(summary.get("top_durable_reacquired_items") or [])
     top_softening = list(summary.get("top_softening_reacquired_items") or [])
-    top_fragile_confidence = list(summary.get("top_fragile_reacquisition_confidence_items") or [])
+    top_fragile_confidence = list(
+        summary.get("top_fragile_reacquisition_confidence_items") or []
+    )
     rebuilding_item = top_rebuilding[0] if top_rebuilding else {}
     rebuilding_label = (
         f"{rebuilding_item.get('repo')}: {rebuilding_item.get('title')}"
@@ -198,7 +221,9 @@ def operator_follow_through_rebuild_details(
         if softening_item.get("repo")
         else softening_item.get("title", "")
     ) or "No softening re-acquisition hotspot"
-    fragile_confidence_item = top_fragile_confidence[0] if top_fragile_confidence else {}
+    fragile_confidence_item = (
+        top_fragile_confidence[0] if top_fragile_confidence else {}
+    )
     fragile_confidence_label = (
         f"{fragile_confidence_item.get('repo')}: {fragile_confidence_item.get('title')}"
         if fragile_confidence_item.get("repo")
@@ -234,7 +259,9 @@ def operator_follow_through_reacquisition_retirement_details(
         or "No reacquisition confidence-retirement signal is currently surfaced."
     )
     top_softening = list(summary.get("top_softening_reacquisition_items") or [])
-    top_revalidation = list(summary.get("top_revalidation_needed_reacquisition_items") or [])
+    top_revalidation = list(
+        summary.get("top_revalidation_needed_reacquisition_items") or []
+    )
     top_retired = list(summary.get("top_retired_reacquisition_confidence_items") or [])
     softening_item = top_softening[0] if top_softening else {}
     softening_label = (
@@ -269,12 +296,18 @@ def operator_follow_through_revalidation_recovery_details(
     summary = data.get("operator_summary") or {}
     revalidation_recovery = summary.get(
         "follow_through_reacquisition_revalidation_recovery_summary", ""
-    ) or ("No post-revalidation recovery or confidence re-earning signal is currently surfaced.")
-    top_under_revalidation = list(summary.get("top_under_revalidation_recovery_items") or [])
+    ) or (
+        "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
+    )
+    top_under_revalidation = list(
+        summary.get("top_under_revalidation_recovery_items") or []
+    )
     top_rebuilding = list(summary.get("top_rebuilding_restored_confidence_items") or [])
     top_reearning = list(summary.get("top_reearning_confidence_items") or [])
     top_just_reearned = list(summary.get("top_just_reearned_confidence_items") or [])
-    top_holding_reearned = list(summary.get("top_holding_reearned_confidence_items") or [])
+    top_holding_reearned = list(
+        summary.get("top_holding_reearned_confidence_items") or []
+    )
 
     def _label(item: dict, fallback: str) -> str:
         return (
@@ -293,7 +326,10 @@ def operator_follow_through_revalidation_recovery_details(
             top_rebuilding[0] if top_rebuilding else {},
             "No rebuilding restored-confidence hotspot",
         ),
-        _label(top_reearning[0] if top_reearning else {}, "No confidence re-earning hotspot"),
+        _label(
+            top_reearning[0] if top_reearning else {},
+            "No confidence re-earning hotspot",
+        ),
         _label(
             top_just_reearned[0] if top_just_reearned else {},
             "No just re-earned confidence hotspot",

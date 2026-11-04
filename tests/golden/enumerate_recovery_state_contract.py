@@ -114,7 +114,9 @@ def _pure_status_classifiers(module: ModuleType) -> dict[str, object]:
         if len(params) != 1:
             continue
         (only,) = params
-        if _is_str_annotation(only.annotation) and _is_str_annotation(sig.return_annotation):
+        if _is_str_annotation(only.annotation) and _is_str_annotation(
+            sig.return_annotation
+        ):
             found[name] = fn
     return found
 

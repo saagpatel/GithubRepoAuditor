@@ -18,7 +18,11 @@ def transition_closure_confidence_summary(
         return f"{label} has a pending class signal that has lingered long enough to risk aging out ({score:.2f})."
     if likely_outcome == "blocked":
         reasons = primary_target.get("transition_closure_confidence_reasons") or []
-        return reasons[0] if reasons else f"{label} still has local target instability blocking positive class strengthening."
+        return (
+            reasons[0]
+            if reasons
+            else f"{label} still has local target instability blocking positive class strengthening."
+        )
     if likely_outcome == "insufficient-data":
         return f"{label} still has too little pending-transition history to judge whether the class signal is likely to confirm."
     if pending_debt_hotspots:
@@ -27,7 +31,9 @@ def transition_closure_confidence_summary(
             f"Pending class signals are accumulating unresolved debt most around {hotspot.get('label', 'recent hotspots')}, "
             "so new pending states there should be treated more cautiously."
         )
-    return "No active pending class transition needs closure-confidence scoring right now."
+    return (
+        "No active pending class transition needs closure-confidence scoring right now."
+    )
 
 
 def class_pending_debt_summary(
@@ -90,7 +96,9 @@ def pending_debt_freshness_summary(
     stale_pending_debt_hotspots: list[dict],
     fresh_pending_resolution_hotspots: list[dict],
 ) -> str:
-    freshness_status = primary_target.get("pending_debt_freshness_status", "insufficient-data")
+    freshness_status = primary_target.get(
+        "pending_debt_freshness_status", "insufficient-data"
+    )
     if freshness_status == "fresh":
         return f"{label} still has fresh pending-transition memory, so recent class evidence should carry most of the closure forecast."
     if freshness_status == "mixed-age":
@@ -118,7 +126,9 @@ def pending_debt_decay_summary(
     fresh_pending_resolution_hotspots: list[dict],
     stale_pending_debt_hotspots: list[dict],
 ) -> str:
-    freshness_status = primary_target.get("pending_debt_freshness_status", "insufficient-data")
+    freshness_status = primary_target.get(
+        "pending_debt_freshness_status", "insufficient-data"
+    )
     resolution_rate = primary_target.get("decayed_pending_resolution_rate", 0.0)
     debt_rate = primary_target.get("decayed_pending_debt_rate", 0.0)
     if freshness_status == "fresh" and resolution_rate >= debt_rate:
@@ -139,7 +149,9 @@ def pending_debt_decay_summary(
             f"Stale pending-debt memory is strongest around {hotspot.get('label', 'recent hotspots')}, "
             "so those older caution patterns should keep decaying instead of carrying forward indefinitely."
         )
-    return "No strong pending-debt freshness trend is dominating the closure forecast yet."
+    return (
+        "No strong pending-debt freshness trend is dominating the closure forecast yet."
+    )
 
 
 def closure_forecast_reweighting_summary(

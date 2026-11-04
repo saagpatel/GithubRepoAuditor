@@ -75,7 +75,9 @@ def generate_manifest(report_data: dict[str, Any]) -> list[dict[str, Any]]:
             "needs_description": current_desc is None,
             "needs_topics": len(current_topics) == 0,
             "needs_readme_badges": not readme_details.get("has_badges", False),
-            "needs_readme_install": not readme_details.get("has_install_instructions", False),
+            "needs_readme_install": not readme_details.get(
+                "has_install_instructions", False
+            ),
             "needs_readme_examples": not readme_details.get("has_code_examples", False),
             "needs_readme_overhaul": readme_score < 0.5,
         }
@@ -90,7 +92,9 @@ def generate_manifest(report_data: dict[str, Any]) -> list[dict[str, Any]]:
             "has_cicd": cicd.get("score", 0) > 0.2,
             "has_license": structure.get("details", {}).get("has_license", False),
             "entry_point": code_quality.get("details", {}).get("entry_point", ""),
-            "badges_earned": audit.get("badges", []) if isinstance(audit.get("badges"), list) else audit.get("badges", {}).get("earned", []),
+            "badges_earned": audit.get("badges", [])
+            if isinstance(audit.get("badges"), list)
+            else audit.get("badges", {}).get("earned", []),
             "interest_tier": audit.get("interest_tier", ""),
             "dep_count": deps.get("details", {}).get("dep_count", 0),
         }
@@ -116,7 +120,9 @@ def generate_manifest(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     return manifest
 
 
-def partition_by_tier(manifest: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def partition_by_tier(
+    manifest: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
     """Partition manifest entries by tier for wave-based execution."""
     tiers: dict[str, list[dict[str, Any]]] = {}
     for entry in manifest:
@@ -174,7 +180,9 @@ def apply_metadata_updates(
         desc = update.get("description")
         if desc:
             if dry_run:
-                result["actions"].append({"type": "description", "dry_run": True, "value": desc})
+                result["actions"].append(
+                    {"type": "description", "dry_run": True, "value": desc}
+                )
             else:
                 resp = client.update_repo_metadata(owner, repo_name, description=desc)
                 result["actions"].append(
@@ -185,7 +193,9 @@ def apply_metadata_updates(
         topics = update.get("topics")
         if topics:
             if dry_run:
-                result["actions"].append({"type": "topics", "dry_run": True, "value": topics})
+                result["actions"].append(
+                    {"type": "topics", "dry_run": True, "value": topics}
+                )
             else:
                 resp = client.replace_repo_topics(owner, repo_name, topics)
                 result["actions"].append(
@@ -274,7 +284,9 @@ def apply_file_updates(
 
         sha = client.get_file_sha(owner, repo_name, file_path)
         content_b64 = base64.b64encode(content.encode("utf-8")).decode("ascii")
-        resp = client.update_repo_file(owner, repo_name, file_path, content_b64, message, sha=sha)
+        resp = client.update_repo_file(
+            owner, repo_name, file_path, content_b64, message, sha=sha
+        )
         result["ok"] = resp.get("ok", False)
         results.append(result)
 
@@ -288,9 +300,13 @@ def generate_execution_report(results: list[dict[str, Any]], output_dir: Path) -
 
     summary = {
         "total": len(results),
-        "successful": sum(1 for r in results if r.get("ok", True) and not r.get("dry_run")),
+        "successful": sum(
+            1 for r in results if r.get("ok", True) and not r.get("dry_run")
+        ),
         "dry_run": sum(1 for r in results if r.get("dry_run")),
-        "failed": sum(1 for r in results if not r.get("ok", True) and not r.get("dry_run")),
+        "failed": sum(
+            1 for r in results if not r.get("ok", True) and not r.get("dry_run")
+        ),
         "results": results,
     }
     path.write_text(json.dumps(summary, indent=2))

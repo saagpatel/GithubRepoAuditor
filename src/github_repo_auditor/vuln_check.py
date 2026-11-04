@@ -1,4 +1,5 @@
 """Dependency vulnerability checking via OSV.dev API."""
+
 from __future__ import annotations
 
 import json

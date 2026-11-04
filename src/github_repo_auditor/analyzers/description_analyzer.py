@@ -9,14 +9,28 @@ from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 _LANG_KEYWORDS: dict[str, frozenset[str]] = {
     "Swift": frozenset(
-        ["swift", "ios", "macos", "xcode", "swiftui", "uikit", "appkit", "watchos", "tvos"]
+        [
+            "swift",
+            "ios",
+            "macos",
+            "xcode",
+            "swiftui",
+            "uikit",
+            "appkit",
+            "watchos",
+            "tvos",
+        ]
     ),
     "Python": frozenset(
         ["python", "py", "fastapi", "django", "flask", "cli", "script", "notebook"]
     ),
     "Rust": frozenset(["rust", "cargo", "tauri"]),
-    "JavaScript": frozenset(["javascript", "js", "react", "node", "next", "vue", "angular"]),
-    "TypeScript": frozenset(["typescript", "ts", "react", "next", "node", "vue", "angular"]),
+    "JavaScript": frozenset(
+        ["javascript", "js", "react", "node", "next", "vue", "angular"]
+    ),
+    "TypeScript": frozenset(
+        ["typescript", "ts", "react", "next", "node", "vue", "angular"]
+    ),
     "Go": frozenset(["go", "golang"]),
 }
 
@@ -46,11 +60,18 @@ class DescriptionAnalyzer(BaseAnalyzer):
     name = "description"
 
     def cache_inputs_hash(self, repo_path: Path, metadata: RepoMetadata) -> str:
-        key = str(metadata.description) + str(metadata.language) + str(sorted(metadata.topics))
+        key = (
+            str(metadata.description)
+            + str(metadata.language)
+            + str(sorted(metadata.topics))
+        )
         return hashlib.md5(key.encode()).hexdigest()
 
     def analyze(
-        self, repo_path: Path, metadata: RepoMetadata, github_client: object | None = None
+        self,
+        repo_path: Path,
+        metadata: RepoMetadata,
+        github_client: object | None = None,
     ) -> AnalyzerResult:
         description = (metadata.description or "").lower()
         topics = {t.lower() for t in metadata.topics}

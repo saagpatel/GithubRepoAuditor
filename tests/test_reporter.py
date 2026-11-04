@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from github_repo_auditor.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from github_repo_auditor.models import (
+    AnalyzerResult,
+    AuditReport,
+    RepoAudit,
+    RepoMetadata,
+)
 from github_repo_auditor.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
@@ -70,7 +75,11 @@ def _make_report() -> AuditReport:
 
 class TestSanitizeForJson:
     def test_sanitize_for_json_strips_control_chars(self):
-        data = {"name": "test\x00repo", "items": ["hello\x0bworld"], "nested": {"key": "val\x0cue"}}
+        data = {
+            "name": "test\x00repo",
+            "items": ["hello\x0bworld"],
+            "nested": {"key": "val\x0cue"},
+        }
         result = _sanitize_for_json(data)
         assert result["name"] == "testrepo"
         assert result["items"][0] == "helloworld"
@@ -163,7 +172,12 @@ class TestMarkdownReport:
             "average_score_delta": 0.04,
             "lens_deltas": {"ship_readiness": 0.1},
             "repo_changes": [
-                {"name": "test-repo", "delta": 0.1, "old_tier": "wip", "new_tier": "functional"}
+                {
+                    "name": "test-repo",
+                    "delta": 0.1,
+                    "old_tier": "wip",
+                    "new_tier": "functional",
+                }
             ],
         }
         path = write_markdown_report(report, tmp_path, diff_data=diff_data)
@@ -208,7 +222,11 @@ class TestMarkdownReport:
                 "drift_state": "managed-issue-edited",
             }
         ]
-        report.rollback_preview = {"available": True, "item_count": 1, "fully_reversible_count": 1}
+        report.rollback_preview = {
+            "available": True,
+            "item_count": 1,
+            "fully_reversible_count": 1,
+        }
         path = write_markdown_report(report, tmp_path)
         content = path.read_text()
         assert "Campaign Summary" in content
@@ -350,7 +368,10 @@ class TestMarkdownReport:
         assert "Next Safe Automation Step" in content
         assert "Preview Ready" in content
         assert "recommended target all" in content
-        assert "Security Review should win ties because recent outcomes are proven." in content
+        assert (
+            "Security Review should win ties because recent outcomes are proven."
+            in content
+        )
         assert "test-repo is improving after intervention" in content
         assert (
             "Preview Security Review next; that is the strongest safe automation step right now."
@@ -364,7 +385,10 @@ class TestMarkdownReport:
             "blocking_errors": 0,
             "warnings": 2,
             "checks": [
-                {"category": "github-auth", "summary": "GitHub token is not configured."},
+                {
+                    "category": "github-auth",
+                    "summary": "GitHub token is not configured.",
+                },
             ],
         }
         path = write_markdown_report(report, tmp_path)
@@ -935,20 +959,59 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:" in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness:" in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls:" in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:"
+            in content
+        )
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -969,21 +1032,46 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Freshness Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary"
+            in content
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary" in content
         assert (
-            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary" in content
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary"
+            in content
         )
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary" in content
         assert (
-            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary" in content
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary"
+            in content
         )
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary" in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary"
+            in content
+        )
         assert (
             "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary"
             in content
@@ -993,13 +1081,22 @@ class TestMarkdownReport:
         assert "Reacquisition Softening Decay:" in content
         assert "Reacquisition Confidence Retirement:" in content
         assert "Revalidation Recovery:" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary"
+            in content
+        )
         assert (
             "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary"
             in content
         )
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary"
+            in content
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary"
+            in content
+        )
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content
         assert "Reacquisition Freshness Summary" in content
@@ -1041,7 +1138,11 @@ class TestMarkdownReport:
 class TestRawMetadata:
     def test_writes_preflight_summary_when_present(self, tmp_path):
         report = _make_report()
-        report.preflight_summary = {"status": "warning", "warnings": 1, "blocking_errors": 0}
+        report.preflight_summary = {
+            "status": "warning",
+            "warnings": 1,
+            "blocking_errors": 0,
+        }
         path = write_raw_metadata(report, tmp_path)
         data = json.loads(path.read_text())
         assert data["preflight_summary"]["status"] == "warning"
@@ -1131,7 +1232,10 @@ class TestRawMetadata:
 
         path = write_raw_metadata(report, tmp_path)
         data = json.loads(path.read_text())
-        assert data["portfolio_outcomes_summary"]["summary"] == "Managed action closure is at 50%."
+        assert (
+            data["portfolio_outcomes_summary"]["summary"]
+            == "Managed action closure is at 50%."
+        )
         assert (
             data["operator_effectiveness_summary"]["summary"]
             == "recommendation validation is at 75%."
@@ -1140,7 +1244,9 @@ class TestRawMetadata:
 
 
 class TestPortfolioCatalogMarkdown:
-    def test_includes_portfolio_catalog_and_intent_alignment_when_present(self, tmp_path):
+    def test_includes_portfolio_catalog_and_intent_alignment_when_present(
+        self, tmp_path
+    ):
         report = _make_report()
         report.portfolio_catalog_summary = {
             "summary": "1/1 repos have an explicit catalog contract.",
@@ -1187,12 +1293,20 @@ class TestPortfolioCatalogMarkdown:
         path = write_markdown_report(report, tmp_path)
         content = path.read_text()
 
-        assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
+        assert (
+            "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
+        )
         assert "Operating Paths: Maintain 1" in content
-        assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
+        assert (
+            "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract."
+            in content
+        )
         assert "Catalog: operator-loop | flagship workbook" in content
         assert "Operating Path: Maintain (high confidence)" in content
-        assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
+        assert (
+            "Intent Alignment: aligned: The repo is holding a maintain posture"
+            in content
+        )
 
 
 class TestScorecardsMarkdown:

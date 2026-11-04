@@ -183,6 +183,8 @@ def render_burndown_markdown(report: BurndownReport) -> str:
             extra = entry.affected_repo_count - 4
             repos_label = f"{shown} (+{extra} more)"
 
-        lines.append(f"| {advisory_label} | {severity_label} | {fix_version} | {repos_label} |")
+        lines.append(
+            f"| {advisory_label} | {severity_label} | {fix_version} | {repos_label} |"
+        )
 
     return "\n".join(lines)

@@ -44,7 +44,9 @@ def enrich_control_center_snapshot_from_report(
         base_entry = catalog_entry_for_repo(audit.metadata.to_dict(), catalog_data)
         if not base_entry.get("has_explicit_entry"):
             continue
-        operator_focus = build_operator_focus(queue_by_repo.get(audit.metadata.name, {}))
+        operator_focus = build_operator_focus(
+            queue_by_repo.get(audit.metadata.name, {})
+        )
         intent_alignment, intent_alignment_reason = evaluate_intent_alignment(
             base_entry,
             completeness_tier=audit.completeness_tier,
@@ -60,14 +62,22 @@ def enrich_control_center_snapshot_from_report(
             "operator_focus": operator_focus,
         }
     if any(audit.portfolio_catalog for audit in report.audits):
-        audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+        audit_lookup = {
+            audit.metadata.name: audit.portfolio_catalog for audit in report.audits
+        }
         for item in report.operator_queue:
-            catalog_entry = audit_lookup.get(str(item.get("repo") or item.get("repo_name") or "").strip(), {})
+            catalog_entry = audit_lookup.get(
+                str(item.get("repo") or item.get("repo_name") or "").strip(), {}
+            )
             if catalog_entry:
                 item["portfolio_catalog"] = dict(catalog_entry)
                 item["catalog_line"] = catalog_entry.get("catalog_line", "")
-                item["intent_alignment"] = catalog_entry.get("intent_alignment", "missing-contract")
-                item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
+                item["intent_alignment"] = catalog_entry.get(
+                    "intent_alignment", "missing-contract"
+                )
+                item["intent_alignment_reason"] = catalog_entry.get(
+                    "intent_alignment_reason", ""
+                )
     else:
         report = apply_portfolio_catalog(report, args)
     report = apply_scorecards(report, args)

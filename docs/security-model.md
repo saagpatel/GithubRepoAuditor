@@ -105,13 +105,13 @@ Override the endpoint with `OSSF_SCORECARD_BASE_URL` (useful for test isolation)
 
 ## GitHub SBOM as Dependency Source
 
-Pass `--sbom-source github` to switch `DependenciesAnalyzer` from lockfile parsing to GitHub's dependency-graph SBOM endpoint.
+Pass `--sbom-source github` to switch `DependenciesAnalyzer` from manifest counts to GitHub's dependency-graph SBOM endpoint.
 
 Endpoint: `GET /repos/{owner}/{repo}/dependency-graph/sbom` — returns an SPDX 2.3 document. Required scope: `repo` for private repos (same token used elsewhere).
 
-Failure behavior: a 403 or 404 falls back to lockfile parsing for that repo and continues without raising an exception.
+Failure behavior: a 403 or 404 falls back to manifest counts for that repo and continues without raising an exception.
 
-Advantages over lockfile parsing: catches transitive dependencies that lockfiles omit; does not require a local clone for the dep pass.
+Advantages over manifest counts: includes transitive dependencies absent from manifests; does not require a local clone for the dep pass.
 
 Default is `--sbom-source lockfile`, which preserves existing behavior.
 

@@ -6,16 +6,43 @@ from github_repo_auditor.analyzers.base import BaseAnalyzer
 from github_repo_auditor.models import AnalyzerResult, RepoMetadata
 
 # Binary file extensions to skip when sampling for comments
-BINARY_EXTENSIONS = frozenset({
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
-    ".woff", ".woff2", ".ttf", ".eot",
-    ".pdf", ".zip", ".tar", ".gz", ".bz2",
-    ".exe", ".dll", ".so", ".dylib",
-    ".pyc", ".class", ".o", ".a",
-    ".mp3", ".mp4", ".wav", ".avi",
-    ".db", ".sqlite", ".sqlite3",
-    ".lock", ".lockb",
-})
+BINARY_EXTENSIONS = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".ico",
+        ".svg",
+        ".webp",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".eot",
+        ".pdf",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".exe",
+        ".dll",
+        ".so",
+        ".dylib",
+        ".pyc",
+        ".class",
+        ".o",
+        ".a",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".avi",
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+        ".lock",
+        ".lockb",
+    }
+)
 
 # Comment prefixes by extension
 COMMENT_PREFIXES: dict[str, list[str]] = {
@@ -72,8 +99,12 @@ class DocumentationAnalyzer(BaseAnalyzer):
 
         # CHANGELOG / HISTORY
         changelog_names = (
-            "CHANGELOG.md", "CHANGELOG", "CHANGELOG.txt",
-            "HISTORY.md", "HISTORY", "CHANGES.md",
+            "CHANGELOG.md",
+            "CHANGELOG",
+            "CHANGELOG.txt",
+            "HISTORY.md",
+            "HISTORY",
+            "CHANGES.md",
         )
         has_changelog = any((repo_path / n).is_file() for n in changelog_names)
         if has_changelog:
@@ -132,7 +163,9 @@ class BuildReadinessAnalyzer(BaseAnalyzer):
 
         # Makefile or build script
         has_makefile = (repo_path / "Makefile").is_file()
-        has_justfile = (repo_path / "justfile").is_file() or (repo_path / "Justfile").is_file()
+        has_justfile = (repo_path / "justfile").is_file() or (
+            repo_path / "Justfile"
+        ).is_file()
         if has_makefile or has_justfile:
             score += 0.3
             name = "Makefile" if has_makefile else "justfile"
@@ -142,7 +175,8 @@ class BuildReadinessAnalyzer(BaseAnalyzer):
 
         # .env.example / .env.sample
         env_examples = [
-            n for n in (".env.example", ".env.sample", ".env.template")
+            n
+            for n in (".env.example", ".env.sample", ".env.template")
             if (repo_path / n).is_file()
         ]
         if env_examples:

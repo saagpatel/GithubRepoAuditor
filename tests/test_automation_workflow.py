@@ -18,7 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from github_repo_auditor.automation_executor import AutomationExecutionError, CommandResult
+from github_repo_auditor.automation_executor import (
+    AutomationExecutionError,
+    CommandResult,
+)
 from github_repo_auditor.automation_proposals import (
     ACTION_CATALOG_SEED,
     ACTION_CONTEXT_PR,
@@ -329,15 +332,11 @@ def test_context_pr_plan_rejects_malformed_authority_variants() -> None:
     variants.append(unknown_discarded)
 
     dirty_discarded = _checkout_authority()
-    dirty_discarded["checkouts"][1].update(
-        {"dirty": True, "dirty_path_count": 1}
-    )
+    dirty_discarded["checkouts"][1].update({"dirty": True, "dirty_path_count": 1})
     variants.append(dirty_discarded)
 
     for authority in variants:
-        project = _project(
-            repository_state={"checkout_authority": deepcopy(authority)}
-        )
+        project = _project(repository_state={"checkout_authority": deepcopy(authority)})
         with pytest.raises(
             AutomationExecutionError,
             match="checkout-authority-malformed",

@@ -37,7 +37,9 @@ from github_repo_auditor.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
     checkout_collision_summary,
 )
-from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_provenance import (
+    REQUIRED_PROJECT_PROVENANCE_KEYS,
+)
 from github_repo_auditor.portfolio_truth_types import (
     SCHEMA_VERSION,
     TRUTH_LATEST_FILENAME,

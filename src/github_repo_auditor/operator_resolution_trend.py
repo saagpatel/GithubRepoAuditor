@@ -322,7 +322,9 @@ from github_repo_auditor.operator_trend_support import (
 from github_repo_auditor.operator_trend_topline_payload import (
     build_resolution_trend_topline_payload as _build_resolution_trend_topline_payload_helper,
 )
-from github_repo_auditor.operator_trend_resolution_payload import build_resolution_trend_payload
+from github_repo_auditor.operator_trend_resolution_payload import (
+    build_resolution_trend_payload,
+)
 from github_repo_auditor.operator_trend_transition_closure import (
     apply_transition_closure_control as _apply_transition_closure_control_helper,
 )
@@ -17558,7 +17560,10 @@ def _was_resolved_then_reopened(
 def _attach_portfolio_catalog_context(
     queue: list[dict], report_data: dict
 ) -> list[dict]:
-    from github_repo_auditor.portfolio_catalog import build_catalog_line, evaluate_intent_alignment
+    from github_repo_auditor.portfolio_catalog import (
+        build_catalog_line,
+        evaluate_intent_alignment,
+    )
     from github_repo_auditor.portfolio_pathing import (
         build_operating_path_entry,
         build_operating_path_line,

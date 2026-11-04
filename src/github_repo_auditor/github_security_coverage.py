@@ -1913,7 +1913,9 @@ def collect_security_coverage(
             "expected_count"
         )
         if not isinstance(prior_expected_count, int):
-            raise SecurityCoverageError("prior receipt cohort expected_count is invalid")
+            raise SecurityCoverageError(
+                "prior receipt cohort expected_count is invalid"
+            )
         validate_security_coverage_receipt(
             prior_receipt,
             max_age_hours=24 * 365,
@@ -2587,7 +2589,9 @@ def validate_security_coverage_receipt(
                 "cohort exceeds the bounded contract: "
                 f"observed {repository_count}, max {max_cohort_size}"
             )
-    elif expected_cohort_count is not None and repository_count != expected_cohort_count:
+    elif (
+        expected_cohort_count is not None and repository_count != expected_cohort_count
+    ):
         raise SecurityCoverageError("cohort count contract mismatch")
     if canonical_cohort != tuple(sorted(canonical_cohort, key=str.lower)):
         raise SecurityCoverageError("cohort repositories must be canonically sorted")
@@ -2772,8 +2776,7 @@ def _validate_receipt_cohort_transition(
         )
     if set(incoming) - set(required):
         raise SecurityCoverageError(
-            "cohort transition incoming declares repositories outside the "
-            "required set"
+            "cohort transition incoming declares repositories outside the required set"
         )
     kind = transition.get("kind")
     if kind != derive_transition_kind(incoming, transition_outgoing):
@@ -2782,7 +2785,9 @@ def _validate_receipt_cohort_transition(
         )
     plan_id = transition.get("plan_id")
     if not isinstance(plan_id, str) or not _RECEIPT_ID_RE.fullmatch(plan_id):
-        raise SecurityCoverageError("cohort transition plan_id must be a sha256 identity")
+        raise SecurityCoverageError(
+            "cohort transition plan_id must be a sha256 identity"
+        )
     prior_truth_sha256 = transition.get("prior_truth_sha256")
     if not isinstance(prior_truth_sha256, str) or not _SHA256_RE.fullmatch(
         prior_truth_sha256

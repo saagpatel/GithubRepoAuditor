@@ -12,7 +12,17 @@ VALID_STATUSES = {"active", "recent", "parked", "archived"}
 SEPARATOR_RE = re.compile(r"^\|[\s\-:]+\|")
 
 # Header keywords that indicate a header row (not data)
-HEADER_KEYWORDS = {"project", "status", "tool", "context", "stack", "notes", "category", "metric", "count"}
+HEADER_KEYWORDS = {
+    "project",
+    "status",
+    "tool",
+    "context",
+    "stack",
+    "notes",
+    "category",
+    "metric",
+    "count",
+}
 
 
 def _normalize(name: str) -> str:
@@ -133,19 +143,19 @@ def reconcile(
 
         if registry_name:
             matched_registry_names.add(registry_name)
-            matched.append({
-                "github_name": repo_name,
-                "registry_name": registry_name,
-                "registry_status": registry[registry_name],
-                "audit_tier": audit.completeness_tier,
-                "score": round(audit.overall_score, 3),
-            })
+            matched.append(
+                {
+                    "github_name": repo_name,
+                    "registry_name": registry_name,
+                    "registry_status": registry[registry_name],
+                    "audit_tier": audit.completeness_tier,
+                    "score": round(audit.overall_score, 3),
+                }
+            )
 
     # Unmatched repos (on GitHub but not in registry)
     on_github_not_registry = sorted(
-        name for name in audit_map if not any(
-            m["github_name"] == name for m in matched
-        )
+        name for name in audit_map if not any(m["github_name"] == name for m in matched)
     )
 
     # Unmatched registry entries (in registry but not on GitHub)

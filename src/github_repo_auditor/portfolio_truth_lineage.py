@@ -10,9 +10,7 @@ def resolve_notion_origin(artifact_path: Path) -> str | None:
     return _resolve_notion_origin(artifact_path, visited=set())
 
 
-def _resolve_notion_origin(
-    artifact_path: Path, *, visited: set[Path]
-) -> str | None:
+def _resolve_notion_origin(artifact_path: Path, *, visited: set[Path]) -> str | None:
     resolved_path = artifact_path.resolve()
     if resolved_path in visited:
         return None
@@ -44,10 +42,7 @@ def _resolve_notion_origin(
     )
     if predecessor is None:
         return declared_origin
-    return (
-        _resolve_notion_origin(predecessor, visited=visited)
-        or declared_origin
-    )
+    return _resolve_notion_origin(predecessor, visited=visited) or declared_origin
 
 
 def _find_artifact_by_generated_at(

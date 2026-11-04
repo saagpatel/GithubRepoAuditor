@@ -61,9 +61,7 @@ class ActivityAnalyzer(BaseAnalyzer):
             contributor_stats = github_client.get_contributor_stats(
                 owner, metadata.name
             )
-            total_commits = sum(
-                c.get("total", 0) for c in contributor_stats
-            )
+            total_commits = sum(c.get("total", 0) for c in contributor_stats)
             details["total_commits"] = total_commits
 
             if total_commits > 10:
@@ -76,9 +74,7 @@ class ActivityAnalyzer(BaseAnalyzer):
                 findings.append("Zero or unknown commit count")
 
             # Commits in last 3 months
-            commit_activity = github_client.get_commit_activity(
-                owner, metadata.name
-            )
+            commit_activity = github_client.get_commit_activity(owner, metadata.name)
             recent_commits = _recent_commit_count(commit_activity)
             details["recent_3mo_commits"] = recent_commits
 
@@ -135,13 +131,18 @@ class ActivityAnalyzer(BaseAnalyzer):
                         pub = r.get("published_at") or r.get("created_at")
                         if pub:
                             try:
-                                dates.append(datetime.fromisoformat(pub.replace("Z", "+00:00")))
+                                dates.append(
+                                    datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                                )
                             except (ValueError, TypeError):
                                 # Ignore malformed release timestamps when estimating cadence.
                                 pass
                     if len(dates) >= 2:
                         dates.sort()
-                        gaps = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
+                        gaps = [
+                            (dates[i + 1] - dates[i]).days
+                            for i in range(len(dates) - 1)
+                        ]
                         avg_cadence = sum(gaps) / len(gaps)
                         details["release_cadence_days"] = round(avg_cadence)
             else:

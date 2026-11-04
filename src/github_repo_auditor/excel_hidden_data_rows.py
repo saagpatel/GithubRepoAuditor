@@ -275,12 +275,16 @@ def build_core_hidden_rows(
         for repo_name, scores in extended_score_history.items():
             for run_index, score in enumerate(scores, 1):
                 history_rows.append([repo_name, run_index, score])
-            padded_scores = ([None] * trend_history_window + list(scores))[-trend_history_window:]
+            padded_scores = ([None] * trend_history_window + list(scores))[
+                -trend_history_window:
+            ]
             trend_matrix_rows.append([repo_name] + padded_scores)
 
     if extended_trends:
         for run_index, trend in enumerate(extended_trends, 1):
-            history_rows.append(["__portfolio__", run_index, trend.get("average_score", 0.0)])
+            history_rows.append(
+                ["__portfolio__", run_index, trend.get("average_score", 0.0)]
+            )
             portfolio_history_rows.append(
                 [
                     run_index,
@@ -301,7 +305,9 @@ def build_core_hidden_rows(
 
     for collection_name, collection_data in data.get("collections", {}).items():
         for rank_index, repo_data in enumerate(collection_data.get("repos", []), 1):
-            repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            repo_name = (
+                repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+            )
             reason = repo_data.get("reason", "") if isinstance(repo_data, dict) else ""
             collection_rows.append(
                 [
@@ -361,7 +367,10 @@ def build_core_hidden_rows(
         for lens_name in data.get("lenses", {}):
             selected = [item for item in context.get("ranked_audits", [])]
             scores = [
-                item.get("audit", {}).get("lenses", {}).get(lens_name, {}).get("score", 0.0)
+                item.get("audit", {})
+                .get("lenses", {})
+                .get(lens_name, {})
+                .get("score", 0.0)
                 for item in selected
             ]
             rollup_rows.append(
@@ -407,11 +416,20 @@ def build_core_hidden_rows(
     for lens_name, lens_data in data.get("lenses", {}).items():
         lookup_rows.append(["lens", lens_name, lens_data.get("description", "")])
     for profile_name, profile_data in data.get("profiles", {}).items():
-        lookup_rows.append(["profile", profile_name, profile_data.get("description", "")])
+        lookup_rows.append(
+            ["profile", profile_name, profile_data.get("description", "")]
+        )
     for tier_name in tier_order:
-        lookup_rows.append(["tier", tier_name, str(data.get("tier_distribution", {}).get(tier_name, 0))])
+        lookup_rows.append(
+            [
+                "tier",
+                tier_name,
+                str(data.get("tier_distribution", {}).get(tier_name, 0)),
+            ]
+        )
     for audit in sorted(
-        data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")
+        data.get("audits", []),
+        key=lambda item: item.get("metadata", {}).get("name", ""),
     ):
         repo_name = audit.get("metadata", {}).get("name", "")
         if repo_name:

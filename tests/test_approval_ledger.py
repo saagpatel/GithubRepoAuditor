@@ -48,16 +48,29 @@ def _base_report() -> dict:
 def test_governance_approval_is_ready_for_review_by_default(tmp_path: Path) -> None:
     bundle = load_approval_ledger_bundle(tmp_path, _base_report(), [])
 
-    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "governance:all"
+    )
     assert record["approval_state"] == "ready-for-review"
     assert bundle["next_approval_review"]["approval_id"] == "governance:all"
 
 
-def test_governance_approval_needs_reapproval_when_fingerprint_changes(tmp_path: Path) -> None:
+def test_governance_approval_needs_reapproval_when_fingerprint_changes(
+    tmp_path: Path,
+) -> None:
     original = _base_report()
     bundle = load_approval_ledger_bundle(tmp_path, original, [])
-    ledger_record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "governance:all")
-    save_approval_record(tmp_path, build_approval_record(ledger_record, reviewer="sam", note="Looks good"))
+    ledger_record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "governance:all"
+    )
+    save_approval_record(
+        tmp_path,
+        build_approval_record(ledger_record, reviewer="sam", note="Looks good"),
+    )
 
     changed = _base_report()
     changed["governance_preview"] = {
@@ -65,13 +78,19 @@ def test_governance_approval_needs_reapproval_when_fingerprint_changes(tmp_path:
         "fingerprint": "gov-fingerprint-b",
     }
     changed_bundle = load_approval_ledger_bundle(tmp_path, changed, [])
-    record = next(item for item in changed_bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    record = next(
+        item
+        for item in changed_bundle["approval_ledger"]
+        if item["approval_id"] == "governance:all"
+    )
 
     assert record["approval_state"] == "needs-reapproval"
     assert "needs re-approval" in record["summary"].lower()
 
 
-def test_campaign_approval_stays_blocked_when_nonapproval_blockers_remain(tmp_path: Path) -> None:
+def test_campaign_approval_stays_blocked_when_nonapproval_blockers_remain(
+    tmp_path: Path,
+) -> None:
     report = _base_report()
     report["operator_summary"] = {
         "action_sync_packets": [
@@ -98,7 +117,11 @@ def test_campaign_approval_stays_blocked_when_nonapproval_blockers_remain(tmp_pa
     }
 
     bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
 
     assert record["approval_state"] == "blocked"
     assert "cannot clear the path" in record["summary"].lower()
@@ -139,11 +162,22 @@ def test_campaign_approval_can_become_approved_but_manual(tmp_path: Path) -> Non
     }
 
     first_bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    first_record = next(item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
-    save_approval_record(tmp_path, build_approval_record(first_record, reviewer="sam", note="Approved manually"))
+    first_record = next(
+        item
+        for item in first_bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
+    save_approval_record(
+        tmp_path,
+        build_approval_record(first_record, reviewer="sam", note="Approved manually"),
+    )
 
     second_bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    second_record = next(item for item in second_bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    second_record = next(
+        item
+        for item in second_bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
 
     assert second_record["approval_state"] == "approved-manual"
     assert second_record["manual_apply_command"].endswith("--writeback-apply")
@@ -161,7 +195,9 @@ def test_campaign_approval_can_become_approved_but_manual(tmp_path: Path) -> Non
     )
 
 
-def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(tmp_path: Path) -> None:
+def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(
+    tmp_path: Path,
+) -> None:
     report = _base_report()
     report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
     report["operator_summary"] = {
@@ -197,7 +233,11 @@ def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(tmp_pat
     }
 
     bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:promotion-push")
+    record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:promotion-push"
+    )
 
     assert record["approval_state"] == "ready-for-review"
     assert record["apply_ready_after_approval"] is True
@@ -205,7 +245,9 @@ def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(tmp_pat
     assert bundle["next_approval_review"]["approval_id"] == "campaign:promotion-push"
 
 
-def test_rollback_blocked_campaign_is_reviewable_but_not_approval_ready(tmp_path: Path) -> None:
+def test_rollback_blocked_campaign_is_reviewable_but_not_approval_ready(
+    tmp_path: Path,
+) -> None:
     report = _base_report()
     report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
     report["operator_summary"] = {
@@ -241,14 +283,21 @@ def test_rollback_blocked_campaign_is_reviewable_but_not_approval_ready(tmp_path
     }
 
     bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
 
     assert record["approval_state"] == "ready-for-review"
     assert record["approval_ready"] is False
     assert record["apply_ready_after_approval"] is False
     assert record["approval_command"] == ""
     assert "rollback coverage is clarified" in record["summary"]
-    assert "not ready for approval capture" in bundle["approval_workflow_summary"]["summary"]
+    assert (
+        "not ready for approval capture"
+        in bundle["approval_workflow_summary"]["summary"]
+    )
     assert "do not capture approval" in bundle["next_approval_review"]["summary"]
 
 
@@ -288,18 +337,27 @@ def test_zero_automation_actions_campaign_is_not_approval_ready(tmp_path: Path) 
     }
 
     bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
 
     assert record["approval_state"] == "ready-for-review"
     assert record["approval_ready"] is False
     assert record["apply_ready_after_approval"] is False
     assert record["approval_command"] == ""
     assert "automation-eligible action" in record["summary"]
-    assert "not ready for approval capture" in bundle["approval_workflow_summary"]["summary"]
+    assert (
+        "not ready for approval capture"
+        in bundle["approval_workflow_summary"]["summary"]
+    )
     assert "do not capture approval" in bundle["next_approval_review"]["summary"]
 
 
-def test_apply_manual_campaign_is_visible_but_not_ready_for_approval(tmp_path: Path) -> None:
+def test_apply_manual_campaign_is_visible_but_not_ready_for_approval(
+    tmp_path: Path,
+) -> None:
     report = _base_report()
     report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
     report["operator_summary"] = {
@@ -328,8 +386,14 @@ def test_apply_manual_campaign_is_visible_but_not_ready_for_approval(tmp_path: P
     }
 
     bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
-    ready_bundle = load_approval_ledger_bundle(tmp_path, report, [], approval_view="ready")
+    record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
+    ready_bundle = load_approval_ledger_bundle(
+        tmp_path, report, [], approval_view="ready"
+    )
 
     assert record["approval_state"] == "not-applicable"
     assert record["approval_command"] == ""
@@ -339,7 +403,9 @@ def test_apply_manual_campaign_is_visible_but_not_ready_for_approval(tmp_path: P
     assert ready_bundle["approval_ledger"] == []
 
 
-def test_approved_campaign_suppresses_stale_ready_review_queue_item(tmp_path: Path) -> None:
+def test_approved_campaign_suppresses_stale_ready_review_queue_item(
+    tmp_path: Path,
+) -> None:
     report = _base_report()
     report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
     report["operator_summary"] = {
@@ -376,20 +442,30 @@ def test_approved_campaign_suppresses_stale_ready_review_queue_item(tmp_path: Pa
 
     first_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
     first_record = next(
-        item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:promotion-push"
+        item
+        for item in first_bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:promotion-push"
     )
-    save_approval_record(tmp_path, build_approval_record(first_record, reviewer="sam", note="Approved manually"))
+    save_approval_record(
+        tmp_path,
+        build_approval_record(first_record, reviewer="sam", note="Approved manually"),
+    )
 
     second_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
 
-    assert second_bundle["top_approved_manual_approvals"][0]["approval_id"] == "campaign:promotion-push"
+    assert (
+        second_bundle["top_approved_manual_approvals"][0]["approval_id"]
+        == "campaign:promotion-push"
+    )
     assert all(
         item.get("item_id") != "campaign-ready:promotion-push"
         for item in second_bundle["operator_queue"]
     )
 
 
-def test_overdue_approved_campaign_keeps_ready_review_queue_item(tmp_path: Path) -> None:
+def test_overdue_approved_campaign_keeps_ready_review_queue_item(
+    tmp_path: Path,
+) -> None:
     report = _base_report()
     report["generated_at"] = "2026-04-21T12:00:00+00:00"
     report["run_id"] = "testuser:2026-04-21T12:00:00+00:00"
@@ -427,15 +503,22 @@ def test_overdue_approved_campaign_keeps_ready_review_queue_item(tmp_path: Path)
     ]
     first_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
     first_record = next(
-        item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:promotion-push"
+        item
+        for item in first_bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:promotion-push"
     )
-    approval_record = build_approval_record(first_record, reviewer="sam", note="Approved manually")
+    approval_record = build_approval_record(
+        first_record, reviewer="sam", note="Approved manually"
+    )
     approval_record["approved_at"] = "2026-04-01T12:00:00+00:00"
     save_approval_record(tmp_path, approval_record)
 
     second_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
 
-    assert second_bundle["top_overdue_approval_followups"][0]["approval_id"] == "campaign:promotion-push"
+    assert (
+        second_bundle["top_overdue_approval_followups"][0]["approval_id"]
+        == "campaign:promotion-push"
+    )
     assert any(
         item.get("item_id") == "campaign-ready:promotion-push"
         for item in second_bundle["operator_queue"]
@@ -471,18 +554,31 @@ def test_approved_campaign_can_surface_overdue_follow_up_review(tmp_path: Path) 
     }
 
     first_bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    first_record = next(item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
-    approval_record = build_approval_record(first_record, reviewer="sam", note="Approved manually")
+    first_record = next(
+        item
+        for item in first_bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
+    approval_record = build_approval_record(
+        first_record, reviewer="sam", note="Approved manually"
+    )
     approval_record["approved_at"] = "2026-04-01T12:00:00+00:00"
     save_approval_record(tmp_path, approval_record)
 
     second_bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    second_record = next(item for item in second_bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    second_record = next(
+        item
+        for item in second_bundle["approval_ledger"]
+        if item["approval_id"] == "campaign:security-review"
+    )
 
     assert second_record["follow_up_state"] == "overdue-follow-up"
     assert second_record["stale_approval"] is True
     assert second_record["follow_up_command"].endswith("--review-packet")
-    assert second_bundle["next_approval_review"]["approval_id"] == "campaign:security-review"
+    assert (
+        second_bundle["next_approval_review"]["approval_id"]
+        == "campaign:security-review"
+    )
 
 
 def test_follow_up_event_round_trip_and_due_soon_state(tmp_path: Path) -> None:
@@ -490,13 +586,23 @@ def test_follow_up_event_round_trip_and_due_soon_state(tmp_path: Path) -> None:
     report["generated_at"] = "2026-04-13T12:00:00+00:00"
     report["run_id"] = "testuser:2026-04-13T12:00:00+00:00"
     bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    ledger_record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "governance:all")
-    approval_record = build_approval_record(ledger_record, reviewer="sam", note="Approved locally")
+    ledger_record = next(
+        item
+        for item in bundle["approval_ledger"]
+        if item["approval_id"] == "governance:all"
+    )
+    approval_record = build_approval_record(
+        ledger_record, reviewer="sam", note="Approved locally"
+    )
     approval_record["approved_at"] = "2026-04-07T18:00:00+00:00"
     save_approval_record(tmp_path, approval_record)
 
     approved_bundle = load_approval_ledger_bundle(tmp_path, report, [])
-    approved_record = next(item for item in approved_bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    approved_record = next(
+        item
+        for item in approved_bundle["approval_ledger"]
+        if item["approval_id"] == "governance:all"
+    )
     followup_event = build_approval_followup_record(
         approved_record,
         reviewer="sam",
@@ -509,7 +615,11 @@ def test_follow_up_event_round_trip_and_due_soon_state(tmp_path: Path) -> None:
     refreshed_report["generated_at"] = "2026-04-14T12:00:00+00:00"
     refreshed_report["run_id"] = "testuser:2026-04-14T12:00:00+00:00"
     refreshed_bundle = load_approval_ledger_bundle(tmp_path, refreshed_report, [])
-    refreshed_record = next(item for item in refreshed_bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    refreshed_record = next(
+        item
+        for item in refreshed_bundle["approval_ledger"]
+        if item["approval_id"] == "governance:all"
+    )
     loaded_events = load_approval_followup_events(tmp_path, "testuser")
 
     assert loaded_events[0]["review_note"] == "Still valid"

@@ -38,13 +38,18 @@ from github_repo_auditor.portfolio_truth_publish import (
     PortfolioTruthPublishError,
     publish_portfolio_truth,
 )
-from github_repo_auditor.producer_preflight import ProducerEvidence, producer_evidence_receipt_id
+from github_repo_auditor.producer_preflight import (
+    ProducerEvidence,
+    producer_evidence_receipt_id,
+)
 from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from github_repo_auditor.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
-from github_repo_auditor.portfolio_truth_provenance import REQUIRED_PROJECT_PROVENANCE_KEYS
+from github_repo_auditor.portfolio_truth_provenance import (
+    REQUIRED_PROJECT_PROVENANCE_KEYS,
+)
 from github_repo_auditor.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
@@ -2029,7 +2034,6 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "operant-public": "saagpatel/operant",
         "AIGCCore": None,
         "safelight": None,
-        "operator-os-explainer": None,
     }
     supporting_or_retired = (
         "mcpaudit-web",
@@ -2038,6 +2042,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "cross-system-smoke",
         "continuity",
         "ApplyKit",
+        "operator-os-explainer",
         "portfolio-index",
     )
 
@@ -2095,10 +2100,14 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         "saagpatel/operant": "active-infra",
         "AIGCCore": "active-infra",
         "safelight": "active-product",
-        "operator-os-explainer": "active-product",
     }
+    # ApplyKit and operator-os-explainer were archived on GitHub by the reckoning;
+    # their catalog rows carry the archive contract, so they derive archived
+    # rather than manual-only.
+    archived = {"ApplyKit", "operator-os-explainer"}
     for name in supporting_or_retired:
-        assert by_display_name[name].derived.attention_state == "manual-only"
+        expected = "archived" if name in archived else "manual-only"
+        assert by_display_name[name].derived.attention_state == expected
 
     registry = build_project_registry(
         result.snapshot.to_dict(),
@@ -2157,15 +2166,17 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
         "mcp-trust": "saagpatel/mcp-trust",
         "MCPAudit": "saagpatel/MCPAudit",
         "operant-public": "saagpatel/operant",
-        "operator-os-explainer": "saagpatel/operator-os-explainer",
         "PortfolioCommandCenter": "saagpatel/PortfolioCommandCenter",
         "proof-pr": "saagpatel/proof-pr",
     }
+    # The reckoning archived these on GitHub; their catalog rows carry the archive
+    # contract, so they derive archived and stay outside the cohort.
     excluded_egress_repositories = {
         "cross-provider-egress-guard": (
             "saagpatel/cross-provider-egress-guard-private"
         ),
         "egress-guard-oss": "saagpatel/cross-provider-egress-guard",
+        "operator-os-explainer": "saagpatel/operator-os-explainer",
     }
 
     for name, remote in {
@@ -2212,8 +2223,10 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
         project.identity.display_name: project for project in result.snapshot.projects
     }
 
+    # Every excluded repository was archived on GitHub by the reckoning; each
+    # stays outside the cohort as archived rather than manual-only.
     for name in excluded_egress_repositories:
-        assert by_display_name[name].derived.attention_state == "manual-only"
+        assert by_display_name[name].derived.attention_state == "archived"
     assert (
         by_display_name["egress-guard-oss"].provenance["declared.lifecycle_state"][
             "detail"
@@ -2223,7 +2236,7 @@ def test_live_catalog_resolves_current_eleven_repo_cohort_and_egress_alias(
     for name in ("agent-permission-diff-bot", "proof-pr"):
         assert by_display_name[name].derived.attention_state == "decision-needed"
     assert derive_default_attention_cohort(
-        result.snapshot.to_dict(), expected_count=10
+        result.snapshot.to_dict(), expected_count=9
     ) == tuple(sorted(expected_repositories.values(), key=str.lower))
 
 
@@ -3090,7 +3103,10 @@ def test_bound_security_identity_and_high_findings_reach_decision_queue(
     )
     local_only_path = portfolio_workspace / "SAFELIGHT"
     local_only_path.mkdir()
-    _write(local_only_path / "README.md", "# SAFELIGHT\n\nLocal-only active product fixture.\n")
+    _write(
+        local_only_path / "README.md",
+        "# SAFELIGHT\n\nLocal-only active product fixture.\n",
+    )
     _set_mtime(local_only_path / "README.md", now.timestamp())
     portfolio_catalog.write_text(
         portfolio_catalog.read_text()
@@ -3392,7 +3408,7 @@ def test_empty_security_metadata_cannot_bypass_cohort_identity(
     catalog_path = tmp_path / "portfolio-catalog.yaml"
     catalog_path.write_text("repos: {}\n")
 
-    with pytest.raises(ValueError, match="expected 1, observed 0"):
+    with pytest.raises(ValueError, match="R3 requires.*observation time"):
         build_portfolio_truth_snapshot(
             workspace_root=workspace,
             catalog_path=catalog_path,
@@ -5501,7 +5517,8 @@ def test_publish_failure_leaves_live_files_untouched(
         raise RuntimeError("renderer exploded")
 
     monkeypatch.setattr(
-        "github_repo_auditor.portfolio_truth_publish.render_portfolio_report_markdown", _boom
+        "github_repo_auditor.portfolio_truth_publish.render_portfolio_report_markdown",
+        _boom,
     )
 
     with pytest.raises(RuntimeError):
@@ -6298,7 +6315,9 @@ def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
 
 def test_report_subcommand_parses_security_cohort_count() -> None:
     from github_repo_auditor.cli import build_subcommand_parser
-    from github_repo_auditor.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    from github_repo_auditor.github_security_coverage import (
+        DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
 
     parser = build_subcommand_parser()
     explicit = parser.parse_args(
@@ -6354,7 +6373,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
         "github_repo_auditor.app.portfolio_truth.load_security_coverage_by_full_name",
         fake_security_loader,
     )
-    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr(
+        "github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish
+    )
     monkeypatch.setattr(
         "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
         lambda **kwargs: (
@@ -6396,7 +6417,9 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
     from types import SimpleNamespace
 
     from github_repo_auditor.app.portfolio_truth import run_portfolio_truth_mode
-    from github_repo_auditor.github_security_coverage import SecurityCoverageReceiptBinding
+    from github_repo_auditor.github_security_coverage import (
+        SecurityCoverageReceiptBinding,
+    )
 
     receipt_path = tmp_path / "github-security-coverage-latest.json"
     binding = SecurityCoverageReceiptBinding(
@@ -6429,7 +6452,8 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
         lambda **_kwargs: loaded,
     )
     monkeypatch.setattr(
-        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
+        lambda **_kwargs: {},
     )
 
     def fake_publish(**kwargs):
@@ -6444,7 +6468,9 @@ def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
             report_changed=False,
         )
 
-    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr(
+        "github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish
+    )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     args = SimpleNamespace(
         output_dir=str(tmp_path / "output"),
@@ -6571,9 +6597,12 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
             report_changed=False,
         )
 
-    monkeypatch.setattr("github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
-        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "github_repo_auditor.app.portfolio_truth.publish_portfolio_truth", fake_publish
+    )
+    monkeypatch.setattr(
+        "github_repo_auditor.app.portfolio_truth.load_live_repo_status_by_name",
+        lambda **_kwargs: {},
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
     monkeypatch.setenv("GHRA_PRODUCER_EVIDENCE", str(receipt))

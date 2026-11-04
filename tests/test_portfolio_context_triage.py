@@ -21,7 +21,9 @@ def _entry(
     return {
         "name": "test-repo",
         "analyzers": {
-            "description": {"details": {"description_confidence": description_confidence}},
+            "description": {
+                "details": {"description_confidence": description_confidence}
+            },
             "readme": {"details": {"readme_stale_by_age": readme_stale_by_age}},
         },
         "catalog_completeness": catalog_completeness,
@@ -78,7 +80,9 @@ def test_archived_repo_not_context_flagged():
 
 
 def test_dormant_repo_not_context_flagged():
-    modes = assess_repo_failure_modes(_entry(context_quality="none", lifecycle_state="dormant"))
+    modes = assess_repo_failure_modes(
+        _entry(context_quality="none", lifecycle_state="dormant")
+    )
     assert FailureMode.CONTEXT not in modes
 
 

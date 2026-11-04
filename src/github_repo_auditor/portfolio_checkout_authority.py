@@ -97,9 +97,7 @@ def validate_checkout_authority_envelope(
         raise ValueError("Selected checkout path must equal the representative path.")
     for key in ("reason_code", "reason", "rationale"):
         if not isinstance(selection.get(key), str) or not selection[key].strip():
-            raise ValueError(
-                f"Checkout collision selection {key} must be non-empty."
-            )
+            raise ValueError(f"Checkout collision selection {key} must be non-empty.")
 
     checkouts = authority.get("checkouts")
     discarded = authority.get("discarded_checkouts")
@@ -175,11 +173,7 @@ def validate_checkout_authority_envelope(
                 )
 
     representative_checkout = next(
-        (
-            checkout
-            for checkout in checkouts
-            if checkout["path"] == representative_path
-        ),
+        (checkout for checkout in checkouts if checkout["path"] == representative_path),
         None,
     )
     if (
@@ -196,9 +190,7 @@ def validate_checkout_authority_envelope(
     ):
         raise ValueError("Checkout collision requires one observed representative.")
     expected_discarded = [
-        checkout
-        for checkout in checkouts
-        if checkout["path"] != representative_path
+        checkout for checkout in checkouts if checkout["path"] != representative_path
     ]
     if discarded != expected_discarded:
         raise ValueError("Discarded checkout evidence does not match the checkout set.")
@@ -206,9 +198,7 @@ def validate_checkout_authority_envelope(
     declared_paths = authority.get("declared_checkout_paths")
     unresolved_paths = authority.get("unresolved_declared_paths")
     declared_evidence = authority.get("declared_path_evidence")
-    if not isinstance(declared_paths, list) or not isinstance(
-        unresolved_paths, list
-    ):
+    if not isinstance(declared_paths, list) or not isinstance(unresolved_paths, list):
         raise ValueError("Declared checkout paths must be lists.")
     for path in declared_paths + unresolved_paths:
         _require_relative_path(path, "declared checkout path")

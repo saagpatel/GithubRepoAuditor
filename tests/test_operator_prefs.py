@@ -164,7 +164,9 @@ def test_merge_with_existing_preserves_manual():
     ]
 
     merged = merge_with_existing(existing, new_hints)
-    suppression_keys = {(s["action_type"], s["target_context"]) for s in merged["suppressions"]}
+    suppression_keys = {
+        (s["action_type"], s["target_context"]) for s in merged["suppressions"]
+    }
 
     # Manual entry preserved
     assert ("manual_action", "some_repo") in suppression_keys
@@ -174,7 +176,9 @@ def test_merge_with_existing_preserves_manual():
     assert ("new_auto", "*") in suppression_keys
 
     # Manual flag still True on the preserved entry
-    manual_entry = next(s for s in merged["suppressions"] if s["action_type"] == "manual_action")
+    manual_entry = next(
+        s for s in merged["suppressions"] if s["action_type"] == "manual_action"
+    )
     assert manual_entry["manual"] is True
 
 
@@ -307,7 +311,8 @@ def test_post_process_approval_session_updates_prefs(tmp_path):
     prefs = load_prefs(prefs_path(tmp_path))
     suppressions = prefs.get("suppressions", [])
     assert any(
-        s["action_type"] == "notion_writeback" and s["target_context"] == "*" for s in suppressions
+        s["action_type"] == "notion_writeback" and s["target_context"] == "*"
+        for s in suppressions
     )
 
 

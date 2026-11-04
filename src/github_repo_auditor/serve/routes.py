@@ -680,7 +680,7 @@ def _action_verification_failure(idx: int) -> HTMLResponse:
     return HTMLResponse(
         f'<tr id="action-row-{_escape(idx)}" class="campaign-plan__row--error error" '
         f'role="alert" tabindex="-1"><td colspan="6">Decision verification failed '
-        f'after the ledger write. Reload the plan before relying on this action state.</td></tr>',
+        f"after the ledger write. Reload the plan before relying on this action state.</td></tr>",
         status_code=503,
     )
 
@@ -832,8 +832,8 @@ def _section_verification_failure(record_id: str) -> HTMLResponse:
     return HTMLResponse(
         f'<div id="section-card-{_escape(record_id)}" '
         f'class="section-card section-card--error" role="alert" tabindex="-1">'
-        f'Decision verification failed after the ledger write. Reload the sections '
-        f'before relying on this section state.</div>',
+        f"Decision verification failed after the ledger write. Reload the sections "
+        f"before relying on this section state.</div>",
         status_code=503,
     )
 

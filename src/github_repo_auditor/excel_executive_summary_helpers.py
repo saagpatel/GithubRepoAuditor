@@ -44,8 +44,8 @@ EXECUTIVE_OPERATOR_START_ROW = 22
 def build_executive_operator_context(
     data: dict[str, Any], weekly_pack: dict[str, Any]
 ) -> dict[str, Any]:
-    operator_focus, operator_focus_summary, operator_focus_line = operator_focus_snapshot(
-        weekly_pack
+    operator_focus, operator_focus_summary, operator_focus_line = (
+        operator_focus_snapshot(weekly_pack)
     )
     next_mode, watch_strategy, watch_decision = operator_watch_values(data)
     what_changed, why_it_matters, next_action = operator_handoff_values(data)
@@ -101,17 +101,26 @@ def build_executive_operator_context(
         follow_through_just_reearned_confidence_hotspot,
         follow_through_holding_reearned_confidence_hotspot,
     ) = operator_follow_through_revalidation_recovery_details(data)
-    trend_status, trend_summary, primary_target, resolution_counts = operator_trend_values(data)
-    primary_target_reason, closure_guidance, aging_pressure = operator_accountability_values(data)
+    trend_status, trend_summary, primary_target, resolution_counts = (
+        operator_trend_values(data)
+    )
+    primary_target_reason, closure_guidance, aging_pressure = (
+        operator_accountability_values(data)
+    )
     last_intervention, last_outcome, resolution_evidence, recovery_counts = (
         operator_decision_memory_values(data)
     )
-    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = (
-        operator_confidence_values(data)
+    (
+        primary_confidence,
+        confidence_reason,
+        next_action_confidence,
+        recommendation_quality,
+    ) = operator_confidence_values(data)
+    trust_policy, trust_policy_reason, adaptive_confidence_summary = (
+        operator_trust_values(data)
     )
-    trust_policy, trust_policy_reason, adaptive_confidence_summary = operator_trust_values(data)
-    exception_status, exception_reason, drift_status, drift_summary = operator_exception_values(
-        data
+    exception_status, exception_reason, drift_status, drift_summary = (
+        operator_exception_values(data)
     )
     (
         trust_recovery_status,
@@ -128,9 +137,12 @@ def build_executive_operator_context(
         class_normalization_status,
         trust_normalization_summary,
     ) = operator_class_normalization_values(data)
-    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = (
-        operator_class_memory_values(data)
-    )
+    (
+        class_memory_status,
+        class_memory_reason,
+        class_decay_status,
+        class_decay_summary,
+    ) = operator_class_memory_values(data)
     (
         class_reweight_direction,
         class_reweight_score,
@@ -162,7 +174,10 @@ def build_executive_operator_context(
 
 def build_executive_scenario_rows(preview: dict[str, Any]) -> list[tuple[str, Any]]:
     return [
-        ("Projected Avg Score Delta", preview.get("projected_average_score_delta", 0.0)),
+        (
+            "Projected Avg Score Delta",
+            preview.get("projected_average_score_delta", 0.0),
+        ),
         ("Projected Promotions", preview.get("projected_tier_promotions", 0)),
     ]
 
@@ -221,8 +236,12 @@ def build_executive_story_inputs(
             f"{len(data.get('governance_drift', []) or [])} governance drift signals were captured in this run."
         )
 
-    run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
-    run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
+    run_change_counts = data.get("run_change_counts") or build_run_change_counts(
+        diff_data
+    )
+    run_change_summary = data.get("run_change_summary") or build_run_change_summary(
+        diff_data
+    )
     queue_pressure_summary = resolve_weekly_story_value(
         weekly_pack,
         "why_this_week",
@@ -239,7 +258,9 @@ def build_executive_story_inputs(
         recommended_focus,
         "Start with the highest-pressure queue item, then protect the current leaders.",
     )
-    biggest_opportunity = leaders[0]["name"] if leaders else "Portfolio-wide follow-through"
+    biggest_opportunity = (
+        leaders[0]["name"] if leaders else "Portfolio-wide follow-through"
+    )
 
     return {
         "recommended_focus": recommended_focus,
@@ -260,9 +281,9 @@ def build_executive_ranked_lists(
     top_attention: list[tuple[Any, ...]],
     diff_data: dict[str, Any] | None,
 ) -> tuple[list[list[Any]], list[list[Any]], list[list[Any]] | None]:
-    leader_rows = [[entry["name"], entry["profile_score"], entry["tier"]] for entry in leaders] or [
-        ["No leader", 0, "—"]
-    ]
+    leader_rows = [
+        [entry["name"], entry["profile_score"], entry["tier"]] for entry in leaders
+    ] or [["No leader", 0, "—"]]
     attention_rows = [
         [
             repo,
@@ -313,9 +334,15 @@ def build_executive_narrative_rows(
                 else ""
             ),
         ),
-        ("Run Changes", story_inputs["run_change_summary"] or story_inputs["change_summary"]),
+        (
+            "Run Changes",
+            story_inputs["run_change_summary"] or story_inputs["change_summary"],
+        ),
         ("Queue Pressure", story_inputs["queue_pressure_summary"]),
-        ("What Changed", operator_context["what_changed"] or story_inputs["change_summary"]),
+        (
+            "What Changed",
+            operator_context["what_changed"] or story_inputs["change_summary"],
+        ),
         ("Why It Matters", operator_context["why_it_matters"]),
         ("Top Recommendation", story_inputs["top_recommendation"]),
         ("Portfolio Catalog", build_portfolio_catalog_summary(data)),
@@ -326,14 +353,29 @@ def build_executive_narrative_rows(
         ("Next Checkpoint", operator_context["follow_through_checkpoint"]),
         ("Escalation", operator_context["follow_through_escalation"]),
         ("Recovery / Retirement", operator_context["follow_through_recovery"]),
-        ("Recovery Persistence", operator_context["follow_through_recovery_persistence"]),
+        (
+            "Recovery Persistence",
+            operator_context["follow_through_recovery_persistence"],
+        ),
         ("Relapse Churn", operator_context["follow_through_relapse_churn"]),
         ("Recovery Freshness", operator_context["follow_through_recovery_freshness"]),
-        ("Recovery Memory Reset", operator_context["follow_through_recovery_memory_reset"]),
-        ("Recovery Rebuild Strength", operator_context["follow_through_rebuild_strength"]),
+        (
+            "Recovery Memory Reset",
+            operator_context["follow_through_recovery_memory_reset"],
+        ),
+        (
+            "Recovery Rebuild Strength",
+            operator_context["follow_through_rebuild_strength"],
+        ),
         ("Recovery Reacquisition", operator_context["follow_through_reacquisition"]),
-        ("Reacquisition Durability", operator_context["follow_through_reacquisition_durability"]),
-        ("Reacquisition Confidence", operator_context["follow_through_reacquisition_confidence"]),
+        (
+            "Reacquisition Durability",
+            operator_context["follow_through_reacquisition_durability"],
+        ),
+        (
+            "Reacquisition Confidence",
+            operator_context["follow_through_reacquisition_confidence"],
+        ),
         ("Operator Focus", operator_context["operator_focus"]),
         ("Focus Summary", operator_context["operator_focus_summary"]),
         ("Focus Line", operator_context["operator_focus_line"]),
@@ -348,41 +390,104 @@ def build_executive_narrative_rows(
     ]
     if excel_mode == "standard":
         rows[5:5] = [
-            ("Trend", f"{operator_context['trend_status']} — {operator_context['trend_summary']}"),
+            (
+                "Trend",
+                f"{operator_context['trend_status']} — {operator_context['trend_summary']}",
+            ),
             ("Why Top Target", operator_context["primary_target_reason"]),
             ("Follow-Through Hotspot", operator_context["follow_through_hotspot"]),
-            ("Escalation Hotspot", operator_context["follow_through_escalation_hotspot"]),
+            (
+                "Escalation Hotspot",
+                operator_context["follow_through_escalation_hotspot"],
+            ),
             ("Recovery Hotspot", operator_context["follow_through_relapsing_hotspot"]),
-            ("Retiring Watch Hotspot", operator_context["follow_through_retiring_hotspot"]),
+            (
+                "Retiring Watch Hotspot",
+                operator_context["follow_through_retiring_hotspot"],
+            ),
             ("Churn Hotspot", operator_context["follow_through_churn_hotspot"]),
-            ("Freshness Hotspot", operator_context["follow_through_recovery_freshness_hotspot"]),
-            ("Freshness Detail", operator_context["follow_through_recovery_freshness_hotspot_summary"]),
-            ("Rebuild Hotspot", operator_context["follow_through_recovery_rebuild_hotspot"]),
-            ("Rebuild Strength Hotspot", operator_context["follow_through_rebuild_strength_hotspot"]),
-            ("Reacquiring Hotspot", operator_context["follow_through_reacquiring_hotspot"]),
-            ("Reacquired Hotspot", operator_context["follow_through_reacquired_hotspot"]),
-            ("Fragile Reacquisition Hotspot", operator_context["follow_through_fragile_reacquisition_hotspot"]),
-            ("Just Reacquired Hotspot", operator_context["follow_through_just_reacquired_hotspot"]),
-            ("Holding Reacquired Hotspot", operator_context["follow_through_holding_reacquired_hotspot"]),
-            ("Durable Reacquired Hotspot", operator_context["follow_through_durable_reacquired_hotspot"]),
-            ("Softening Reacquired Hotspot", operator_context["follow_through_softening_reacquired_hotspot"]),
+            (
+                "Freshness Hotspot",
+                operator_context["follow_through_recovery_freshness_hotspot"],
+            ),
+            (
+                "Freshness Detail",
+                operator_context["follow_through_recovery_freshness_hotspot_summary"],
+            ),
+            (
+                "Rebuild Hotspot",
+                operator_context["follow_through_recovery_rebuild_hotspot"],
+            ),
+            (
+                "Rebuild Strength Hotspot",
+                operator_context["follow_through_rebuild_strength_hotspot"],
+            ),
+            (
+                "Reacquiring Hotspot",
+                operator_context["follow_through_reacquiring_hotspot"],
+            ),
+            (
+                "Reacquired Hotspot",
+                operator_context["follow_through_reacquired_hotspot"],
+            ),
+            (
+                "Fragile Reacquisition Hotspot",
+                operator_context["follow_through_fragile_reacquisition_hotspot"],
+            ),
+            (
+                "Just Reacquired Hotspot",
+                operator_context["follow_through_just_reacquired_hotspot"],
+            ),
+            (
+                "Holding Reacquired Hotspot",
+                operator_context["follow_through_holding_reacquired_hotspot"],
+            ),
+            (
+                "Durable Reacquired Hotspot",
+                operator_context["follow_through_durable_reacquired_hotspot"],
+            ),
+            (
+                "Softening Reacquired Hotspot",
+                operator_context["follow_through_softening_reacquired_hotspot"],
+            ),
             (
                 "Fragile Reacquisition Confidence Hotspot",
-                operator_context["follow_through_fragile_reacquisition_confidence_hotspot"],
+                operator_context[
+                    "follow_through_fragile_reacquisition_confidence_hotspot"
+                ],
             ),
-            ("Reacquisition Softening Hotspot", operator_context["follow_through_reacquisition_softening_hotspot"]),
-            ("Revalidation Needed Hotspot", operator_context["follow_through_reacquisition_revalidation_hotspot"]),
+            (
+                "Reacquisition Softening Hotspot",
+                operator_context["follow_through_reacquisition_softening_hotspot"],
+            ),
+            (
+                "Revalidation Needed Hotspot",
+                operator_context["follow_through_reacquisition_revalidation_hotspot"],
+            ),
             (
                 "Retired Confidence Hotspot",
-                operator_context["follow_through_reacquisition_retired_confidence_hotspot"],
+                operator_context[
+                    "follow_through_reacquisition_retired_confidence_hotspot"
+                ],
             ),
-            ("Under Revalidation Hotspot", operator_context["follow_through_under_revalidation_hotspot"]),
+            (
+                "Under Revalidation Hotspot",
+                operator_context["follow_through_under_revalidation_hotspot"],
+            ),
             (
                 "Rebuilding Restored Confidence Hotspot",
-                operator_context["follow_through_rebuilding_restored_confidence_hotspot"],
+                operator_context[
+                    "follow_through_rebuilding_restored_confidence_hotspot"
+                ],
             ),
-            ("Re-Earning Confidence Hotspot", operator_context["follow_through_reearning_confidence_hotspot"]),
-            ("Just Re-Earned Confidence Hotspot", operator_context["follow_through_just_reearned_confidence_hotspot"]),
+            (
+                "Re-Earning Confidence Hotspot",
+                operator_context["follow_through_reearning_confidence_hotspot"],
+            ),
+            (
+                "Just Re-Earned Confidence Hotspot",
+                operator_context["follow_through_just_reearned_confidence_hotspot"],
+            ),
             (
                 "Holding Re-Earned Confidence Hotspot",
                 operator_context["follow_through_holding_reearned_confidence_hotspot"],
@@ -394,15 +499,36 @@ def build_executive_narrative_rows(
             ("Confidence Rationale", operator_context["confidence_reason"]),
             ("Trust Policy", operator_context["trust_policy"]),
             ("Trust Rationale", operator_context["trust_policy_reason"]),
-            ("Trust Exception", f"{operator_context['exception_status']} — {operator_context['exception_reason']}"),
-            ("Trust Recovery", f"{operator_context['trust_recovery_status']} — {operator_context['trust_recovery_reason']}"),
+            (
+                "Trust Exception",
+                f"{operator_context['exception_status']} — {operator_context['exception_reason']}",
+            ),
+            (
+                "Trust Recovery",
+                f"{operator_context['trust_recovery_status']} — {operator_context['trust_recovery_reason']}",
+            ),
             ("Recovery Confidence", operator_context["recovery_confidence"]),
-            ("Exception Retirement", f"{operator_context['retirement_status']} — {operator_context['retirement_reason']}"),
+            (
+                "Exception Retirement",
+                f"{operator_context['retirement_status']} — {operator_context['retirement_reason']}",
+            ),
             ("Retirement Summary", operator_context["retirement_summary"]),
-            ("Policy Debt", f"{operator_context['policy_debt_status']} — {operator_context['policy_debt_reason']}"),
-            ("Class Normalization", f"{operator_context['class_normalization_status']} — {operator_context['trust_normalization_summary']}"),
-            ("Class Memory", f"{operator_context['class_memory_status']} — {operator_context['class_memory_reason']}"),
-            ("Trust Decay", f"{operator_context['class_decay_status']} — {operator_context['class_decay_summary']}"),
+            (
+                "Policy Debt",
+                f"{operator_context['policy_debt_status']} — {operator_context['policy_debt_reason']}",
+            ),
+            (
+                "Class Normalization",
+                f"{operator_context['class_normalization_status']} — {operator_context['trust_normalization_summary']}",
+            ),
+            (
+                "Class Memory",
+                f"{operator_context['class_memory_status']} — {operator_context['class_memory_reason']}",
+            ),
+            (
+                "Trust Decay",
+                f"{operator_context['class_decay_status']} — {operator_context['class_decay_summary']}",
+            ),
             (
                 "Class Reweighting",
                 f"{operator_context['class_reweight_direction']} ({operator_context['class_reweight_score']}) — {operator_context['class_reweight_summary']}",
@@ -414,23 +540,42 @@ def build_executive_narrative_rows(
             ("Transition Summary", operator_context["class_transition_summary"]),
             ("Transition Closure", operator_context["transition_closure_confidence"]),
             ("Transition Resolution", operator_context["class_transition_resolution"]),
-            ("Transition Likely Outcome", operator_context["transition_likely_outcome"]),
+            (
+                "Transition Likely Outcome",
+                operator_context["transition_likely_outcome"],
+            ),
             ("Pending Debt Freshness", operator_context["pending_debt_freshness"]),
             ("Closure Forecast", operator_context["closure_forecast_direction"]),
             (
                 "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
-                operator_context["reset_reentry_rebuild_reentry_restore_rerererestore_persistence"],
+                operator_context[
+                    "reset_reentry_rebuild_reentry_restore_rerererestore_persistence"
+                ],
             ),
             (
                 "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
-                operator_context["reset_reentry_rebuild_reentry_restore_rerererestore_churn"],
+                operator_context[
+                    "reset_reentry_rebuild_reentry_restore_rerererestore_churn"
+                ],
             ),
-            ("Closure Forecast Summary", operator_context["transition_closure_summary"]),
+            (
+                "Closure Forecast Summary",
+                operator_context["transition_closure_summary"],
+            ),
             ("Momentum Summary", operator_context["class_momentum_summary"]),
-            ("Exception Learning", f"{operator_context['exception_pattern_status']} — {operator_context['exception_pattern_summary']}"),
-            ("Recommendation Drift", f"{operator_context['drift_status']} — {operator_context['drift_summary']}"),
+            (
+                "Exception Learning",
+                f"{operator_context['exception_pattern_status']} — {operator_context['exception_pattern_summary']}",
+            ),
+            (
+                "Recommendation Drift",
+                f"{operator_context['drift_status']} — {operator_context['drift_summary']}",
+            ),
             ("Adaptive Confidence", operator_context["adaptive_confidence_summary"]),
-            ("Confidence Validation", f"{operator_context['calibration_status']} — {operator_context['calibration_summary']}"),
+            (
+                "Confidence Validation",
+                f"{operator_context['calibration_status']} — {operator_context['calibration_summary']}",
+            ),
         ]
     return rows
 
@@ -447,14 +592,20 @@ def build_executive_operator_rows(
         ("Headline", operator_summary.get("headline", "")),
         ("Queue Counts", queue_counts),
         ("Source Run", operator_summary.get("source_run_id", "")),
-        ("Next Run", f"{operator_context['next_mode']} via {operator_context['watch_strategy']}"),
+        (
+            "Next Run",
+            f"{operator_context['next_mode']} via {operator_context['watch_strategy']}",
+        ),
         ("Watch Decision", operator_context["watch_decision"]),
         ("What To Do Next", operator_context["next_action"] or fallback_action),
     ]
     if excel_mode == "standard":
         rows.extend(
             [
-                ("Trend", f"{operator_context['trend_status']} — {operator_context['trend_summary']}"),
+                (
+                    "Trend",
+                    f"{operator_context['trend_status']} — {operator_context['trend_summary']}",
+                ),
                 ("Primary Target", operator_context["primary_target"]),
                 ("Resolution Counts", operator_context["resolution_counts"]),
                 ("Why Top Target", operator_context["primary_target_reason"]),
@@ -469,30 +620,92 @@ def build_executive_operator_rows(
                 ("Next Action Confidence", operator_context["next_action_confidence"]),
                 ("Trust Policy", operator_context["trust_policy"]),
                 ("Trust Rationale", operator_context["trust_policy_reason"]),
-                ("Trust Recovery", f"{operator_context['trust_recovery_status']} — {operator_context['trust_recovery_reason']}"),
+                (
+                    "Trust Recovery",
+                    f"{operator_context['trust_recovery_status']} — {operator_context['trust_recovery_reason']}",
+                ),
                 ("Recovery Confidence", operator_context["recovery_confidence"]),
-                ("Recovery Persistence", operator_context["follow_through_recovery_persistence"]),
+                (
+                    "Recovery Persistence",
+                    operator_context["follow_through_recovery_persistence"],
+                ),
                 ("Relapse Churn", operator_context["follow_through_relapse_churn"]),
-                ("Recovery Freshness", operator_context["follow_through_recovery_freshness"]),
-                ("Recovery Memory Reset", operator_context["follow_through_recovery_memory_reset"]),
-                ("Recovery Rebuild Strength", operator_context["follow_through_rebuild_strength"]),
-                ("Recovery Reacquisition", operator_context["follow_through_reacquisition"]),
-                ("Recovery Hotspot", operator_context["follow_through_relapsing_hotspot"]),
-                ("Retiring Watch Hotspot", operator_context["follow_through_retiring_hotspot"]),
+                (
+                    "Recovery Freshness",
+                    operator_context["follow_through_recovery_freshness"],
+                ),
+                (
+                    "Recovery Memory Reset",
+                    operator_context["follow_through_recovery_memory_reset"],
+                ),
+                (
+                    "Recovery Rebuild Strength",
+                    operator_context["follow_through_rebuild_strength"],
+                ),
+                (
+                    "Recovery Reacquisition",
+                    operator_context["follow_through_reacquisition"],
+                ),
+                (
+                    "Recovery Hotspot",
+                    operator_context["follow_through_relapsing_hotspot"],
+                ),
+                (
+                    "Retiring Watch Hotspot",
+                    operator_context["follow_through_retiring_hotspot"],
+                ),
                 ("Churn Hotspot", operator_context["follow_through_churn_hotspot"]),
-                ("Freshness Hotspot", operator_context["follow_through_recovery_freshness_hotspot"]),
-                ("Freshness Detail", operator_context["follow_through_recovery_freshness_hotspot_summary"]),
-                ("Rebuild Hotspot", operator_context["follow_through_recovery_rebuild_hotspot"]),
-                ("Rebuild Strength Hotspot", operator_context["follow_through_rebuild_strength_hotspot"]),
-                ("Reacquiring Hotspot", operator_context["follow_through_reacquiring_hotspot"]),
-                ("Reacquired Hotspot", operator_context["follow_through_reacquired_hotspot"]),
-                ("Fragile Reacquisition Hotspot", operator_context["follow_through_fragile_reacquisition_hotspot"]),
-                ("Exception Retirement", f"{operator_context['retirement_status']} — {operator_context['retirement_reason']}"),
+                (
+                    "Freshness Hotspot",
+                    operator_context["follow_through_recovery_freshness_hotspot"],
+                ),
+                (
+                    "Freshness Detail",
+                    operator_context[
+                        "follow_through_recovery_freshness_hotspot_summary"
+                    ],
+                ),
+                (
+                    "Rebuild Hotspot",
+                    operator_context["follow_through_recovery_rebuild_hotspot"],
+                ),
+                (
+                    "Rebuild Strength Hotspot",
+                    operator_context["follow_through_rebuild_strength_hotspot"],
+                ),
+                (
+                    "Reacquiring Hotspot",
+                    operator_context["follow_through_reacquiring_hotspot"],
+                ),
+                (
+                    "Reacquired Hotspot",
+                    operator_context["follow_through_reacquired_hotspot"],
+                ),
+                (
+                    "Fragile Reacquisition Hotspot",
+                    operator_context["follow_through_fragile_reacquisition_hotspot"],
+                ),
+                (
+                    "Exception Retirement",
+                    f"{operator_context['retirement_status']} — {operator_context['retirement_reason']}",
+                ),
                 ("Retirement Summary", operator_context["retirement_summary"]),
-                ("Policy Debt", f"{operator_context['policy_debt_status']} — {operator_context['policy_debt_reason']}"),
-                ("Class Normalization", f"{operator_context['class_normalization_status']} — {operator_context['trust_normalization_summary']}"),
-                ("Class Memory", f"{operator_context['class_memory_status']} — {operator_context['class_memory_reason']}"),
-                ("Trust Decay", f"{operator_context['class_decay_status']} — {operator_context['class_decay_summary']}"),
+                (
+                    "Policy Debt",
+                    f"{operator_context['policy_debt_status']} — {operator_context['policy_debt_reason']}",
+                ),
+                (
+                    "Class Normalization",
+                    f"{operator_context['class_normalization_status']} — {operator_context['trust_normalization_summary']}",
+                ),
+                (
+                    "Class Memory",
+                    f"{operator_context['class_memory_status']} — {operator_context['class_memory_reason']}",
+                ),
+                (
+                    "Trust Decay",
+                    f"{operator_context['class_decay_status']} — {operator_context['class_decay_summary']}",
+                ),
                 (
                     "Class Reweighting",
                     f"{operator_context['class_reweight_direction']} ({operator_context['class_reweight_score']}) — {operator_context['class_reweight_summary']}",
@@ -501,27 +714,55 @@ def build_executive_operator_rows(
                 ("Class Momentum", operator_context["class_momentum_status"]),
                 ("Reweight Stability", operator_context["class_reweight_stability"]),
                 ("Transition Health", operator_context["class_transition_health"]),
-                ("Transition Resolution", operator_context["class_transition_resolution"]),
+                (
+                    "Transition Resolution",
+                    operator_context["class_transition_resolution"],
+                ),
                 ("Transition Summary", operator_context["class_transition_summary"]),
-                ("Transition Closure", operator_context["transition_closure_confidence"]),
-                ("Transition Likely Outcome", operator_context["transition_likely_outcome"]),
+                (
+                    "Transition Closure",
+                    operator_context["transition_closure_confidence"],
+                ),
+                (
+                    "Transition Likely Outcome",
+                    operator_context["transition_likely_outcome"],
+                ),
                 ("Pending Debt Freshness", operator_context["pending_debt_freshness"]),
                 ("Closure Forecast", operator_context["closure_forecast_direction"]),
                 (
                     "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
-                    operator_context["reset_reentry_rebuild_reentry_restore_rerererestore_persistence"],
+                    operator_context[
+                        "reset_reentry_rebuild_reentry_restore_rerererestore_persistence"
+                    ],
                 ),
                 (
                     "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
-                    operator_context["reset_reentry_rebuild_reentry_restore_rerererestore_churn"],
+                    operator_context[
+                        "reset_reentry_rebuild_reentry_restore_rerererestore_churn"
+                    ],
                 ),
-                ("Closure Forecast Summary", operator_context["transition_closure_summary"]),
+                (
+                    "Closure Forecast Summary",
+                    operator_context["transition_closure_summary"],
+                ),
                 ("Momentum Summary", operator_context["class_momentum_summary"]),
-                ("Exception Learning", f"{operator_context['exception_pattern_status']} — {operator_context['exception_pattern_summary']}"),
-                ("Recommendation Drift", f"{operator_context['drift_status']} — {operator_context['drift_summary']}"),
-                ("Adaptive Confidence", operator_context["adaptive_confidence_summary"]),
+                (
+                    "Exception Learning",
+                    f"{operator_context['exception_pattern_status']} — {operator_context['exception_pattern_summary']}",
+                ),
+                (
+                    "Recommendation Drift",
+                    f"{operator_context['drift_status']} — {operator_context['drift_summary']}",
+                ),
+                (
+                    "Adaptive Confidence",
+                    operator_context["adaptive_confidence_summary"],
+                ),
                 ("Recommendation Quality", operator_context["recommendation_quality"]),
-                ("Confidence Validation", f"{operator_context['calibration_status']} — {operator_context['calibration_summary']}"),
+                (
+                    "Confidence Validation",
+                    f"{operator_context['calibration_status']} — {operator_context['calibration_summary']}",
+                ),
                 (
                     "Calibration Snapshot",
                     f"High-confidence hit rate {operator_context['high_hit_rate']} | {operator_context['reopened_recommendations']}",
@@ -572,10 +813,13 @@ def build_executive_sheet_content(
         build_workbook_rollups=build_workbook_rollups,
     )
     fallback_action = (
-        data.get("operator_queue", [{}])[0].get("recommended_action")
-        if data.get("operator_queue")
-        else ""
-    ) or "Start with the top review queue item, then protect the current profile leaders."
+        (
+            data.get("operator_queue", [{}])[0].get("recommended_action")
+            if data.get("operator_queue")
+            else ""
+        )
+        or "Start with the top review queue item, then protect the current profile leaders."
+    )
     preflight = data.get("preflight_summary") or {}
     return {
         "leaders": leaders,
@@ -616,7 +860,8 @@ def build_executive_sheet_content(
         ),
         "preflight_rows": build_executive_preflight_rows(preflight),
         "show_preflight": bool(
-            preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0))
+            preflight
+            and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0))
         ),
     }
 
@@ -629,9 +874,9 @@ def write_executive_support_sections(
     section_font,
     subheader_font,
 ) -> None:
-    ws.cell(row=EXECUTIVE_SCENARIO_START_ROW, column=1, value="Scenario Preview").font = (
-        section_font
-    )
+    ws.cell(
+        row=EXECUTIVE_SCENARIO_START_ROW, column=1, value="Scenario Preview"
+    ).font = section_font
     for row_index, (label, value) in enumerate(
         content["scenario_rows"], start=EXECUTIVE_SCENARIO_START_ROW + 1
     ):
@@ -639,9 +884,9 @@ def write_executive_support_sections(
         ws.cell(row=row_index, column=2, value=value)
 
     if content["operator_summary"]:
-        ws.cell(row=EXECUTIVE_OPERATOR_START_ROW, column=4, value="Operator Control Center").font = (
-            section_font
-        )
+        ws.cell(
+            row=EXECUTIVE_OPERATOR_START_ROW, column=4, value="Operator Control Center"
+        ).font = section_font
         for row_index, (label, value) in enumerate(
             content["operator_rows"], start=EXECUTIVE_OPERATOR_START_ROW + 1
         ):
@@ -650,9 +895,13 @@ def write_executive_support_sections(
 
     if content["show_preflight"]:
         preflight_row = 59 if excel_mode == "standard" else 33
-        ws.cell(row=preflight_row, column=1, value="Preflight Diagnostics").font = section_font
+        ws.cell(
+            row=preflight_row, column=1, value="Preflight Diagnostics"
+        ).font = section_font
         for offset, (label, value) in enumerate(content["preflight_rows"], start=1):
-            ws.cell(row=preflight_row + offset, column=1, value=label).font = subheader_font
+            ws.cell(
+                row=preflight_row + offset, column=1, value=label
+            ).font = subheader_font
             ws.cell(row=preflight_row + offset, column=2, value=value)
 
 
@@ -737,7 +986,9 @@ def build_executive_summary_sheet(
         write_kpi_card(ws, 10, 1 + offset * 2, label, value, accent)
 
     leader_rows, attention_rows, mover_rows = content["ranked_lists"]
-    write_ranked_list(ws, 14, 1, "Top Profile Leaders", ["Repo", "Profile Score", "Tier"], leader_rows)
+    write_ranked_list(
+        ws, 14, 1, "Top Profile Leaders", ["Repo", "Profile Score", "Tier"], leader_rows
+    )
     write_ranked_list(
         ws,
         14,
@@ -748,7 +999,9 @@ def build_executive_summary_sheet(
     )
 
     if mover_rows:
-        write_ranked_list(ws, 14, 5, "Top Movers", ["Repo", "Delta", "Tier Change"], mover_rows)
+        write_ranked_list(
+            ws, 14, 5, "Top Movers", ["Repo", "Delta", "Tier Change"], mover_rows
+        )
 
     write_executive_support_sections(
         ws,

@@ -58,7 +58,10 @@ def _make_packet(
 
 def _seed_approved_manual(output_dir: Path, goal: str = "add CI to all repos") -> str:
     """Write a packet with status='approved-manual' and return the record_id."""
-    from github_repo_auditor.warehouse import load_approval_records, save_approval_record
+    from github_repo_auditor.warehouse import (
+        load_approval_records,
+        save_approval_record,
+    )
 
     packet = _make_packet(goal)
     record_id = write_packet_to_ledger(packet, output_dir=output_dir, reviewer="tester")
@@ -215,7 +218,9 @@ class TestRejectAction:
 
 
 class TestBackwardCompat:
-    def test_load_approved_campaign_plans_defaults_missing_state_to_pending(self) -> None:
+    def test_load_approved_campaign_plans_defaults_missing_state_to_pending(
+        self,
+    ) -> None:
         """Pre-7B records without 'state' key → CampaignAction.state == 'pending'."""
         from github_repo_auditor.warehouse import save_approval_record
 
@@ -324,7 +329,10 @@ class TestApplyPathGate:
         actions: list[CampaignAction],
         goal: str = "apply gate test",
     ) -> CampaignPlanPacket:
-        from github_repo_auditor.plan_campaign import _goal_subject_key, _packet_record_id
+        from github_repo_auditor.plan_campaign import (
+            _goal_subject_key,
+            _packet_record_id,
+        )
         from github_repo_auditor.warehouse import save_approval_record
 
         generated_at = _recent_generated_at()
@@ -395,7 +403,9 @@ class TestApplyPathGate:
             ]
             self._make_approved_manual_packet(output_dir, actions)
 
-            with patch("github_repo_auditor.plan_campaign.dispatch_action") as mock_dispatch:
+            with patch(
+                "github_repo_auditor.plan_campaign.dispatch_action"
+            ) as mock_dispatch:
                 packets = load_approved_campaign_plans(output_dir)
                 assert len(packets) == 1
                 # Only approved actions should be dispatched — pending ones skip
@@ -448,11 +458,14 @@ class TestApplyPathGate:
                     decided_at="2026-05-12T01:00:00+00:00",
                 ),
             ]
-            packet = self._make_approved_manual_packet(output_dir, actions, goal="all terminal")
+            packet = self._make_approved_manual_packet(
+                output_dir, actions, goal="all terminal"
+            )
 
             # All actions terminal → mark applied should work
             has_pending = any(
-                (getattr(a, "state", "pending") or "pending") == "pending" for a in packet.actions
+                (getattr(a, "state", "pending") or "pending") == "pending"
+                for a in packet.actions
             )
             assert not has_pending
 
@@ -477,10 +490,13 @@ class TestApplyPathGate:
                     state="pending",
                 ),
             ]
-            packet = self._make_approved_manual_packet(output_dir, actions, goal="mixed pending")
+            packet = self._make_approved_manual_packet(
+                output_dir, actions, goal="mixed pending"
+            )
 
             has_pending = any(
-                (getattr(a, "state", "pending") or "pending") == "pending" for a in packet.actions
+                (getattr(a, "state", "pending") or "pending") == "pending"
+                for a in packet.actions
             )
             assert has_pending
 
@@ -559,7 +575,9 @@ class TestPerActionRoutes:
         (od / "portfolio-truth-latest.json").write_text(json.dumps(truth))
         return od
 
-    def test_approve_action_returns_200_with_approved_badge(self, tmp_path: Path) -> None:
+    def test_approve_action_returns_200_with_approved_badge(
+        self, tmp_path: Path
+    ) -> None:
         output_dir = self._make_output_dir(tmp_path)
         record_id = _seed_cp_record_for_routes(output_dir)
 
@@ -612,7 +630,9 @@ class TestPerActionRoutes:
         rec = next(r for r in records if r.get("approval_id") == record_id)
         assert rec["actions"][0]["state"] == "approved"
 
-    def test_reject_action_returns_200_with_rejected_badge(self, tmp_path: Path) -> None:
+    def test_reject_action_returns_200_with_rejected_badge(
+        self, tmp_path: Path
+    ) -> None:
         output_dir = self._make_output_dir(tmp_path)
         record_id = _seed_cp_record_for_routes(output_dir)
 

@@ -9,8 +9,10 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from github_repo_auditor.excel_export import export_excel
-from github_repo_auditor.excel_template import DEFAULT_TEMPLATE_PATH, load_workbook_allowing_native_sparklines
-from github_repo_auditor.excel_workbook_helpers import CORE_VISIBLE_SHEETS
+from github_repo_auditor.excel_template import (
+    DEFAULT_TEMPLATE_PATH,
+    load_workbook_allowing_native_sparklines,
+)
 
 DEFAULT_GATE_DIR = Path("output") / "workbook-gate"
 RESULT_FILENAME = "workbook-gate-result.json"
@@ -43,7 +45,13 @@ def _sample_report_data() -> dict:
                     "security_posture": {"score": 0.82, "summary": "Healthy"},
                 },
                 "security_posture": {"label": "healthy", "score": 0.82},
-                "hotspots": [{"title": "Keep momentum", "severity": 0.2, "category": "finish-line"}],
+                "hotspots": [
+                    {
+                        "title": "Keep momentum",
+                        "severity": 0.2,
+                        "category": "finish-line",
+                    }
+                ],
                 "action_candidates": [{"title": "Protect current momentum"}],
                 "analyzer_results": [],
             },
@@ -66,7 +74,9 @@ def _sample_report_data() -> dict:
                     "security_posture": {"score": 0.66, "summary": "Watch"},
                 },
                 "security_posture": {"label": "watch", "score": 0.66},
-                "hotspots": [{"title": "Finish testing", "severity": 0.54, "category": "quality"}],
+                "hotspots": [
+                    {"title": "Finish testing", "severity": 0.54, "category": "quality"}
+                ],
                 "action_candidates": [{"title": "Finish the remaining delivery work"}],
                 "analyzer_results": [],
             },
@@ -89,7 +99,13 @@ def _sample_report_data() -> dict:
                     "security_posture": {"score": 0.29, "summary": "Risky"},
                 },
                 "security_posture": {"label": "critical", "score": 0.29},
-                "hotspots": [{"title": "Security posture needs attention", "severity": 0.83, "category": "security-debt"}],
+                "hotspots": [
+                    {
+                        "title": "Security posture needs attention",
+                        "severity": 0.83,
+                        "category": "security-debt",
+                    }
+                ],
                 "action_candidates": [{"title": "Preview governance controls"}],
                 "analyzer_results": [],
             },
@@ -99,13 +115,27 @@ def _sample_report_data() -> dict:
         "average_score": 0.63,
         "portfolio_grade": "B",
         "portfolio_health_score": 0.67,
-        "tier_distribution": {"shipped": 1, "functional": 1, "wip": 1, "skeleton": 0, "abandoned": 0},
+        "tier_distribution": {
+            "shipped": 1,
+            "functional": 1,
+            "wip": 1,
+            "skeleton": 0,
+            "abandoned": 0,
+        },
         "language_distribution": {"Python": 2, "TypeScript": 1},
         "collections": {
-            "showcase": {"description": "Best examples", "repos": [{"name": "RepoA", "reason": "Strong showcase"}]},
+            "showcase": {
+                "description": "Best examples",
+                "repos": [{"name": "RepoA", "reason": "Strong showcase"}],
+            },
         },
         "profiles": {"default": {"description": "Balanced"}},
-        "lenses": {"ship_readiness": {"description": "Delivery readiness", "average_score": 0.71}},
+        "lenses": {
+            "ship_readiness": {
+                "description": "Delivery readiness",
+                "average_score": 0.71,
+            }
+        },
         "scenario_summary": {
             "top_levers": [
                 {
@@ -180,7 +210,11 @@ def _sample_report_data() -> dict:
                 "drift_state": "managed-issue-edited",
             }
         ],
-        "rollback_preview": {"available": True, "item_count": 1, "fully_reversible_count": 1},
+        "rollback_preview": {
+            "available": True,
+            "item_count": 1,
+            "fully_reversible_count": 1,
+        },
         "review_summary": {
             "review_id": "sample-review-1",
             "status": "open",
@@ -270,7 +304,9 @@ def _sample_report_data() -> dict:
             "resolution_evidence_summary": "The last intervention was drifted for RepoC: Security posture needs attention, but the item is still open.",
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
-            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "next_action_confidence_reasons": [
+                "The next step is tied directly to the current top target."
+            ],
             "primary_target_trust_policy": "act-with-review",
             "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
             "next_action_trust_policy": "act-with-review",
@@ -678,7 +714,12 @@ def _sample_report_data() -> dict:
             "primary_target_reason": "This urgent item is already being watched across recent runs, so it stays ahead of ready work until it clears.",
             "primary_target_done_criteria": "Complete the recommended action and confirm the item exits the blocked or urgent queue on the next run.",
             "closure_guidance": "Preview governance controls. Treat this as done only when complete the recommended action and confirm the item exits the blocked or urgent queue on the next run.",
-            "attention_age_bands": {"0-1 days": 0, "2-7 days": 1, "8-21 days": 0, "22+ days": 0},
+            "attention_age_bands": {
+                "0-1 days": 0,
+                "2-7 days": 1,
+                "8-21 days": 0,
+                "22+ days": 0,
+            },
             "chronic_item_count": 0,
             "newly_stale_count": 0,
             "longest_persisting_item": {
@@ -844,7 +885,9 @@ def _sample_report_data() -> dict:
     }
 
 
-def _sheet_targets(workbook_path: Path) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+def _sheet_targets(
+    workbook_path: Path,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     with zipfile.ZipFile(workbook_path) as archive:
         workbook_root = ET.fromstring(archive.read("xl/workbook.xml"))
         workbook_rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
@@ -855,9 +898,15 @@ def _sheet_targets(workbook_path: Path) -> tuple[list[tuple[str, str]], list[tup
         }
         visible: list[tuple[str, str]] = []
         hidden: list[tuple[str, str]] = []
-        for sheet in workbook_root.findall("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheets/{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet"):
+        for sheet in workbook_root.findall(
+            "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheets/{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet"
+        ):
             title = sheet.attrib["name"]
-            target = rel_targets[sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]]
+            target = rel_targets[
+                sheet.attrib[
+                    "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                ]
+            ]
             if sheet.attrib.get("state") == "hidden":
                 hidden.append((title, target))
             else:
@@ -876,7 +925,9 @@ def _check_result(name: str, status: str, details: str) -> dict:
 def _section_result(name: str, checks: list[dict]) -> dict:
     return {
         "name": name,
-        "status": "passed" if all(check["status"] == "passed" for check in checks) else "failed",
+        "status": "passed"
+        if all(check["status"] == "passed" for check in checks)
+        else "failed",
         "checks": checks,
     }
 
@@ -907,11 +958,21 @@ def _validate_workbook_artifact(
             )
         )
 
-    hidden_data_sheets = [ws.title for ws in wb.worksheets if ws.title.startswith("Data_")]
+    hidden_data_sheets = [
+        ws.title for ws in wb.worksheets if ws.title.startswith("Data_")
+    ]
     if not hidden_data_sheets:
-        checks.append(_check_result("hidden-data-sheets", "failed", "No hidden Data_* sheets were found."))
+        checks.append(
+            _check_result(
+                "hidden-data-sheets", "failed", "No hidden Data_* sheets were found."
+            )
+        )
     elif any(wb[name].sheet_state != "hidden" for name in hidden_data_sheets):
-        checks.append(_check_result("hidden-data-sheets", "failed", "One or more Data_* sheets are visible."))
+        checks.append(
+            _check_result(
+                "hidden-data-sheets", "failed", "One or more Data_* sheets are visible."
+            )
+        )
     else:
         checks.append(
             _check_result(
@@ -922,7 +983,9 @@ def _validate_workbook_artifact(
         )
 
     visible_targets, hidden_targets = _sheet_targets(workbook_path)
-    hidden_data_targets = [target for title, target in hidden_targets if title.startswith("Data_")]
+    hidden_data_targets = [
+        target for title, target in hidden_targets if title.startswith("Data_")
+    ]
     visible_table_parts: list[str] = []
     hidden_table_parts_ok = False
     with zipfile.ZipFile(workbook_path) as archive:
@@ -1075,7 +1138,11 @@ def _manual_signoff_template(standard_path: Path) -> dict:
 
 
 def _manual_check_lookup(manual_signoff: dict) -> dict[str, dict]:
-    return {item.get("id", ""): item for item in manual_signoff.get("checks", []) if item.get("id")}
+    return {
+        item.get("id", ""): item
+        for item in manual_signoff.get("checks", [])
+        if item.get("id")
+    }
 
 
 def _release_status(result: dict) -> str:
@@ -1113,9 +1180,9 @@ def _write_manual_checklist(output_dir: Path, manual_signoff: dict) -> Path:
                 "",
                 f"- Workbook: `{manual_signoff['workbook']}`",
                 f"- Status: `{manual_signoff['status']}`",
-                *( [f"- Reviewer: `{reviewer}`"] if reviewer else [] ),
-                *( [f"- Reviewed At: `{reviewed_at}`"] if reviewed_at else [] ),
-                *( [f"- Notes: {notes}"] if notes else [] ),
+                *([f"- Reviewer: `{reviewer}`"] if reviewer else []),
+                *([f"- Reviewed At: `{reviewed_at}`"] if reviewed_at else []),
+                *([f"- Notes: {notes}"] if notes else []),
                 "",
                 "## Required Checks",
                 "",
@@ -1163,14 +1230,24 @@ def _write_gate_summary(output_dir: Path, result: dict) -> Path:
             "",
             f"- Status: `{manual.get('status', 'pending')}`",
             f"- Authority: `{manual.get('authority', 'desktop-excel')}`",
-            *( [f"- Reviewer: `{manual.get('reviewer', '')}`"] if manual.get("reviewer") else [] ),
-            *( [f"- Reviewed At: `{manual.get('reviewed_at', '')}`"] if manual.get("reviewed_at") else [] ),
-            *( [f"- Notes: {manual.get('notes', '')}"] if manual.get("notes") else [] ),
+            *(
+                [f"- Reviewer: `{manual.get('reviewer', '')}`"]
+                if manual.get("reviewer")
+                else []
+            ),
+            *(
+                [f"- Reviewed At: `{manual.get('reviewed_at', '')}`"]
+                if manual.get("reviewed_at")
+                else []
+            ),
+            *([f"- Notes: {manual.get('notes', '')}"] if manual.get("notes") else []),
             "",
         ]
     )
     for check in manual.get("checks", []):
-        lines.append(f"- {_format_manual_check_marker(check.get('status', 'pending'))} {check.get('label', '')}")
+        lines.append(
+            f"- {_format_manual_check_marker(check.get('status', 'pending'))} {check.get('label', '')}"
+        )
     history = result.get("manual_signoff_history", []) or []
     if history:
         lines.extend(
@@ -1195,28 +1272,186 @@ def _flatten_failed_checks(sections: list[dict]) -> list[str]:
     for section in sections:
         for check in section.get("checks", []):
             if check.get("status") == "failed":
-                errors.append(f"{section.get('name', 'section')}::{check.get('name', 'check')} - {check.get('details', '')}")
+                errors.append(
+                    f"{section.get('name', 'section')}::{check.get('name', 'check')} - {check.get('details', '')}"
+                )
     return errors
 
 
-def run_workbook_gate(output_dir: Path = DEFAULT_GATE_DIR) -> dict:
+def _sample_reckoning_truth() -> dict[str, Any]:
+    """Use the production truth contract for the synthetic overlay gate."""
+    from github_repo_auditor.demo_portfolio import DemoProject, build_snapshot
+
+    return build_snapshot(
+        datetime(2026, 2, 3, tzinfo=timezone.utc),
+        project_specs=(
+            DemoProject(
+                "LocalOnly", "archive", ("Python",), "archived", "stale", "unknown"
+            ),
+            DemoProject(
+                "LocalMirror",
+                "lab",
+                ("Python",),
+                "decision-needed",
+                "active",
+                "complete",
+                (0, 1, 0, 0, 0, 0, 0),
+            ),
+            DemoProject(
+                "Unassigned", "studio", ("Python",), "manual-only", "recent", "unknown"
+            ),
+        ),
+    )
+
+
+def run_workbook_gate(
+    output_dir: Path = DEFAULT_GATE_DIR,
+    *,
+    synthetic_reckoning_overlay: bool = False,
+) -> dict:
+    from tempfile import TemporaryDirectory
+
+    import yaml
+
+    from github_repo_auditor.excel_portfolio_sheet_helpers import RECKONING_HEADERS
+    from github_repo_auditor.excel_workbook_helpers import (
+        core_visible_sheets_for_overlay,
+    )
+    from github_repo_auditor.reckoning_overlay import load_reckoning_overlay
+    from github_repo_auditor.portfolio_truth_types import truth_latest_path
+
+    if synthetic_reckoning_overlay:
+        output_dir = output_dir / "synthetic-reckoning"
+
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "workbook-gate-report.json"
     report_path.write_text(json.dumps(_sample_report_data(), indent=2))
 
-    standard_path = export_excel(report_path, output_dir / "workbook-gate-standard.xlsx", excel_mode="standard")
-    template_path = export_excel(
-        report_path,
-        output_dir / "workbook-gate-template.xlsx",
-        excel_mode="template",
-        template_path=DEFAULT_TEMPLATE_PATH,
-    )
+    # Synthetic private inputs live only in a temporary directory, never output/.
+    with TemporaryDirectory(prefix="ghra-workbook-inputs-") as temporary:
+        input_dir = Path(temporary)
+        overlay_path = None
+        if synthetic_reckoning_overlay:
+            overlay_path = input_dir / "verdicts.yaml"
+            overlay_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "schema": "reckoning-verdicts/1",
+                        "families": {
+                            "local-family": {
+                                "title": "Local project",
+                                "members": [
+                                    {"key": "archive/localonly"},
+                                    {"key": "lab/localmirror"},
+                                ],
+                                "fate": "archive",
+                                "status": "approved",
+                                "tags": ["strip-for-parts"],
+                            },
+                            "remote-family": {
+                                "title": "Remote-only project",
+                                "members": [{"key": "fixture-owner/remote-only"}],
+                                "fate": "pending",
+                                "status": "proposed",
+                            },
+                        },
+                    }
+                )
+            )
+            truth_latest_path(input_dir).write_text(
+                json.dumps(_sample_reckoning_truth())
+            )
+        overlay = load_reckoning_overlay(overlay_path)
+        present = overlay is not None
+        standard_path = export_excel(
+            report_path,
+            output_dir / "workbook-gate-standard.xlsx",
+            excel_mode="standard",
+            reckoning_overlay=overlay,
+            truth_dir=input_dir,
+        )
+        template_path = export_excel(
+            report_path,
+            output_dir / "workbook-gate-template.xlsx",
+            excel_mode="template",
+            template_path=DEFAULT_TEMPLATE_PATH,
+            reckoning_overlay=overlay,
+            truth_dir=input_dir,
+        )
+
+    expected_visible = core_visible_sheets_for_overlay(present)
+    if present:
+        # Providing saved truth also enables the exporter's existing Risk Summary.
+        expected_visible.add("Risk Summary")
 
     automated_sections = [
-        _validate_workbook_artifact(standard_path, workbook_mode="standard", expected_visible=CORE_VISIBLE_SHEETS),
-        _validate_workbook_artifact(template_path, workbook_mode="template", expected_visible=CORE_VISIBLE_SHEETS),
+        _validate_workbook_artifact(
+            standard_path, workbook_mode="standard", expected_visible=expected_visible
+        ),
+        _validate_workbook_artifact(
+            template_path, workbook_mode="template", expected_visible=expected_visible
+        ),
         _validate_parity(standard_path, template_path),
     ]
+    checks = []
+    workbooks = [
+        load_workbook_allowing_native_sparklines(path)
+        for path in (standard_path, template_path)
+    ]
+    if present:
+        values = [
+            list(wb["Reckoning"].values) if "Reckoning" in wb.sheetnames else []
+            for wb in workbooks
+        ]
+        valid = bool(values[0]) and values[0] == values[1]
+        checks.append(
+            _check_result(
+                "reckoning-parity",
+                "passed" if valid else "failed",
+                "Reckoning cell values must match across both modes.",
+            )
+        )
+        valid = all(
+            "Reckoning" in wb.sheetnames
+            and wb["Reckoning"].sheet_state == "visible"
+            and [cell.value for cell in wb["Reckoning"][5]] == RECKONING_HEADERS
+            and wb["Reckoning"]["A6"].value == "local-family"
+            and wb["Reckoning"]["D6"].value == "archive/localonly, lab/localmirror"
+            and wb["Reckoning"]["E6"].value == "archive"
+            and wb["Reckoning"]["P6"].value == "decision-needed"
+            and wb["Reckoning"]["Q6"].value == "archived, decision-needed"
+            and wb["Reckoning"]["R6"].value == "2026-02-01T00:00:00+00:00"
+            and wb["Reckoning"]["S6"].value == 2
+            and wb["Reckoning"]["T6"].value is None
+            and wb["Reckoning"]["A7"].value == "remote-family"
+            and wb["Reckoning"]["S7"].value == 0
+            and wb["Reckoning"]["T7"].value == "fixture-owner/remote-only"
+            and wb["Reckoning"].auto_filter.ref == "A5:T7"
+            and wb["Reckoning"]["A10"].value == "Unreckoned projects"
+            and wb["Reckoning"]["B11"].value == 1
+            and wb["Reckoning"]["A13"].value == "studio/unassigned"
+            and wb["Reckoning"].max_row == 13
+            for wb in workbooks
+        )
+        checks.append(
+            _check_result(
+                "reckoning-population",
+                "passed" if valid else "failed",
+                "Every synthetic family must appear once with aggregated truth and unmatched members; unreckoned truth projects must appear only below the family table.",
+            )
+        )
+    else:
+        valid = all("Reckoning" not in wb.sheetnames for wb in workbooks)
+        checks.append(
+            _check_result(
+                "reckoning-absent",
+                "passed" if valid else "failed",
+                "No overlay means no Reckoning sheet.",
+            )
+        )
+    for wb in workbooks:
+        wb.close()
+    automated_sections.append(_section_result("reckoning", checks))
     validation_errors = _flatten_failed_checks(automated_sections)
     manual_signoff = _manual_signoff_template(standard_path)
     checklist_path = _write_manual_checklist(output_dir, manual_signoff)
@@ -1236,7 +1471,9 @@ def run_workbook_gate(output_dir: Path = DEFAULT_GATE_DIR) -> dict:
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "workbook_modes": ["standard", "template"],
             "parity_status": automated_sections[2]["status"],
-            "invariant_status": "passed" if all(section["status"] == "passed" for section in automated_sections[:2]) else "failed",
+            "invariant_status": "passed"
+            if all(section["status"] == "passed" for section in automated_sections[:2])
+            else "failed",
         },
         "automated_checks": {
             "status": "passed" if not validation_errors else "failed",
@@ -1257,29 +1494,41 @@ def run_workbook_gate(output_dir: Path = DEFAULT_GATE_DIR) -> dict:
 def _load_gate_result(output_dir: Path) -> dict:
     result_path = output_dir / RESULT_FILENAME
     if not result_path.exists():
-        raise FileNotFoundError("No workbook gate result exists yet. Run workbook-gate first.")
+        raise FileNotFoundError(
+            "No workbook gate result exists yet. Run workbook-gate first."
+        )
     return json.loads(result_path.read_text())
 
 
-def _validate_signoff_args(result: dict, *, reviewer: str, outcome: str, checks: list[str]) -> dict[str, str]:
+def _validate_signoff_args(
+    result: dict, *, reviewer: str, outcome: str, checks: list[str]
+) -> dict[str, str]:
     if result.get("automated_checks", {}).get("status") != "passed":
-        raise ValueError("Workbook signoff cannot be recorded while automated checks are failing.")
+        raise ValueError(
+            "Workbook signoff cannot be recorded while automated checks are failing."
+        )
     if not reviewer.strip():
         raise ValueError("--reviewer is required when recording signoff.")
     if outcome not in MANUAL_SIGNOFF_OUTCOMES:
         raise ValueError(f"--outcome must be one of {sorted(MANUAL_SIGNOFF_OUTCOMES)}.")
     if not checks:
-        raise ValueError("At least one --check entry is required when recording signoff.")
+        raise ValueError(
+            "At least one --check entry is required when recording signoff."
+        )
 
     parsed: dict[str, str] = {}
     for raw in checks:
         if "=" not in raw:
-            raise ValueError(f"Invalid --check value `{raw}`. Use <id>=passed|failed|n/a.")
+            raise ValueError(
+                f"Invalid --check value `{raw}`. Use <id>=passed|failed|n/a."
+            )
         check_id, status = raw.split("=", 1)
         check_id = check_id.strip()
         status = status.strip()
         if not check_id:
-            raise ValueError(f"Invalid --check value `{raw}`. Check id cannot be empty.")
+            raise ValueError(
+                f"Invalid --check value `{raw}`. Check id cannot be empty."
+            )
         if status not in MANUAL_CHECK_STATES:
             raise ValueError(f"Invalid check status `{status}` for `{check_id}`.")
         if check_id in parsed:
@@ -1298,9 +1547,13 @@ def _validate_signoff_args(result: dict, *, reviewer: str, outcome: str, checks:
 
     statuses = list(parsed.values())
     if outcome == "passed" and any(status != "passed" for status in statuses):
-        raise ValueError("A passing signoff requires every manual check to be marked passed.")
+        raise ValueError(
+            "A passing signoff requires every manual check to be marked passed."
+        )
     if outcome == "failed" and "failed" not in statuses:
-        raise ValueError("A failing signoff requires at least one manual check to be marked failed.")
+        raise ValueError(
+            "A failing signoff requires at least one manual check to be marked failed."
+        )
     return parsed
 
 
@@ -1313,7 +1566,9 @@ def record_manual_signoff(
     notes: str = "",
 ) -> dict:
     result = _load_gate_result(output_dir)
-    parsed_checks = _validate_signoff_args(result, reviewer=reviewer, outcome=outcome, checks=checks)
+    parsed_checks = _validate_signoff_args(
+        result, reviewer=reviewer, outcome=outcome, checks=checks
+    )
     reviewed_at = datetime.now(timezone.utc).isoformat()
 
     manual_signoff = dict(result.get("manual_signoff") or {})
@@ -1340,7 +1595,10 @@ def record_manual_signoff(
         "checks": {item["id"]: item["status"] for item in updated_checks},
     }
     result["manual_signoff"] = manual_signoff
-    result["manual_signoff_history"] = [*(result.get("manual_signoff_history") or []), history_entry]
+    result["manual_signoff_history"] = [
+        *(result.get("manual_signoff_history") or []),
+        history_entry,
+    ]
     result["release_status"] = _release_status(result)
 
     checklist_path = _write_manual_checklist(output_dir, manual_signoff)
@@ -1373,7 +1631,9 @@ def format_gate_result(result: dict) -> str:
     elif result.get("release_status") == "ready":
         lines.append("Validation checks passed. Workbook release gate is ready.")
     else:
-        lines.append("Validation checks passed. Final release step: complete the manual desktop Excel checklist.")
+        lines.append(
+            "Validation checks passed. Final release step: complete the manual desktop Excel checklist."
+        )
     return "\n".join(lines)
 
 
@@ -1391,6 +1651,11 @@ def main() -> None:
         "--record-signoff",
         action="store_true",
         help="Record the outcome of the manual desktop Excel signoff against the existing workbook gate artifact.",
+    )
+    parser.add_argument(
+        "--synthetic-reckoning-overlay",
+        action="store_true",
+        help="Check the private Reckoning sheet using temporary synthetic verdicts and truth.",
     )
     parser.add_argument(
         "--reviewer",
@@ -1424,7 +1689,10 @@ def main() -> None:
             notes=args.notes,
         )
     else:
-        result = run_workbook_gate(Path(args.output_dir))
+        result = run_workbook_gate(
+            Path(args.output_dir),
+            synthetic_reckoning_overlay=args.synthetic_reckoning_overlay,
+        )
     print(format_gate_result(result))
     if result["status"] != "ok":
         raise SystemExit(1)

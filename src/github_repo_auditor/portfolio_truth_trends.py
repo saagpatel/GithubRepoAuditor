@@ -144,10 +144,14 @@ def render_movement_summary(ledger: Mapping[str, Any]) -> str:
             clauses.append(f"{count} repo{'s' if count != 1 else ''} {verb}")
         elif kind == "activity_status":
             verb = _movement_verb(previous, current)
-            clauses.append(f"{count} repo{'s' if count != 1 else ''} {verb} {transition}")
+            clauses.append(
+                f"{count} repo{'s' if count != 1 else ''} {verb} {transition}"
+            )
         elif kind == "attention_state":
             verb = _movement_verb(previous, current)
-            clauses.append(f"{count} repo{'s' if count != 1 else ''} {verb} {transition}")
+            clauses.append(
+                f"{count} repo{'s' if count != 1 else ''} {verb} {transition}"
+            )
         elif kind == "risk_tier":
             clauses.append(
                 f"{count} risk-tier change{'s' if count != 1 else ''} {transition}"
@@ -182,7 +186,9 @@ def _with_current_snapshot(
         if isinstance(current_snapshot.get("projects"), list)
         else [],
     }
-    merged = [snapshot for snapshot in snapshots if snapshot["generated_at"] != generated_at]
+    merged = [
+        snapshot for snapshot in snapshots if snapshot["generated_at"] != generated_at
+    ]
     merged.append(current)
     merged.sort(key=lambda item: (item["generated_at"], item["path"]))
     return merged[-max_snapshots:]
@@ -267,7 +273,9 @@ def _build_activity_streaks(
     snapshots: Sequence[Mapping[str, Any]],
     observations: Sequence[dict[str, dict[str, Any]]],
 ) -> list[dict[str, Any]]:
-    keys = sorted({project_key for snapshot in observations for project_key in snapshot})
+    keys = sorted(
+        {project_key for snapshot in observations for project_key in snapshot}
+    )
     streaks: list[dict[str, Any]] = []
     for project_key in keys:
         present = [
@@ -336,13 +344,23 @@ def _transition(
 
 
 def _movement_verb(previous: str, current: str) -> str:
-    if previous in {"active", "recent", "active-product", "active-infra"} and current in {
+    if previous in {
+        "active",
+        "recent",
+        "active-product",
+        "active-infra",
+    } and current in {
         "stale",
         "archived",
         "manual-only",
     }:
         return "slid"
-    if previous in {"stale", "archived", "manual-only", "decision-needed"} and current in {
+    if previous in {
+        "stale",
+        "archived",
+        "manual-only",
+        "decision-needed",
+    } and current in {
         "active",
         "recent",
         "active-product",
