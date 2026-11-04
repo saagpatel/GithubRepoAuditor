@@ -36,7 +36,7 @@ dependencies = [
     "radon>=6.0.1",
     "rich>=13.0",
     "anthropic>=0.40.0",
-    "fpdf2>=2.7.0",
+    "fpdf2>=2.8.8",
     "httpx>=0.27",
 ]
 
@@ -124,6 +124,18 @@ target-version = "py312"
 
 [tool.uv]
 required-version = "==0.13.0"
+constraint-dependencies = [
+    # fpdf2's Pillow range still permits versions affected by GHSA-332p-7hrc-92wf
+    # and the related Pillow advisories.
+    "pillow>=13.0.0",
+    # requests/httpx still permit certifi versions affected by GHSA-6q48-6c7w-9gw2.
+    "certifi>=2026.10.18",
+    # The semantic extra's torch/huggingface-hub parents retain older floors.
+    "filelock>=4.2.1", # GHSA-v4x8-3wr5-3wq8 and related filelock advisories.
+    "fsspec>=2026.6.0", # GHSA-27vj-qcqg-25rc.
+    # shiv/torch permit setuptools versions affected by GHSA-xmj3-9gf7-h52w.
+    "setuptools>=84.1.0",
+]
 
 [tool.ruff.lint]
 ignore = ["E501"]
