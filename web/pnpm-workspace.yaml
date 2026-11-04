@@ -4,7 +4,11 @@ allowBuilds:
 
 overrides:
   postcss: 8.5.25
-  sharp: 0.35.0
+  # GHSA-rgj7-g3m4-5g8c and GHSA-wq5f-xc86-pv6w.
+  sharp: 0.35.5
+  # GHSA-g3hv-75wg-m249: the TypeScript parser supports the named-export API.
+  # Legacy minimatch 3 callers need an upstream plugin migration first.
+  "minimatch@>=10 <11": 11.0.1
   # Transitive under postcss. Patches GHSA-2v37-7h3g-55p8 (nanoid infinite
   # loop when a custom generator is called with size 0). Capped to the 3.x
   # line (^3.3.18) so it stays within postcss@8.5.25's ^3.3.11 constraint;
