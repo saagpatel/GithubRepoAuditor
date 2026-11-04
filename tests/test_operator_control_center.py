@@ -9115,8 +9115,6 @@ def _ack_change(change_key: str) -> dict:
 def test_acknowledgment_filter_keeps_review_target_when_repo_has_remaining_changes(
     tmp_path: Path,
 ):
-    import json
-
     acks = {
         "version": 1,
         "username": "tester",
@@ -9155,8 +9153,6 @@ def test_acknowledgment_filter_keeps_review_target_when_repo_has_remaining_chang
 def test_acknowledgment_filter_drops_review_target_when_repo_fully_acknowledged(
     tmp_path: Path,
 ):
-    import json
-
     acks = {
         "version": 1,
         "username": "tester",

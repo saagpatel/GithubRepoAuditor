@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 
-import github_repo_auditor.portfolio_repository_state as repository_state
 from github_repo_auditor.portfolio_repository_state import (
     _local_from_worktree,
     _observed_result,
@@ -70,7 +69,7 @@ def test_observation_reports_dirty_no_upstream_and_unknown_remote(
     repo = _repo(tmp_path)
     (repo / "dirty.txt").write_text("dirty\n")
 
-    state = repository_state.observe_repository_state(
+    state = observe_repository_state(
         repo, observed_at=datetime(2026, 7, 12, tzinfo=UTC)
     )
 
@@ -127,7 +126,10 @@ def test_configured_local_reuses_one_worktree_observation(
         call_count += 1
         return observation
 
-    monkeypatch.setattr(repository_state, "_observe_working_tree", changing_observation)
+    monkeypatch.setattr(
+        "github_repo_auditor.portfolio_repository_state._observe_working_tree",
+        changing_observation,
+    )
     observed_at = datetime(2026, 7, 12, tzinfo=UTC)
     state = observe_repository_state(
         repo,
@@ -395,7 +397,7 @@ def test_bare_coordinator_selects_unique_clean_remote_default_worktree(
     linked = tmp_path / "linked"
     _git(bare, "worktree", "add", str(linked), "main")
 
-    state = repository_state.observe_repository_state(
+    state = observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),
@@ -418,7 +420,7 @@ def test_multiple_remote_head_candidates_use_default_branch_tiebreak(
     detached = tmp_path / "detached"
     _git(repo, "worktree", "add", "--detach", str(detached), head)
 
-    state = repository_state.observe_repository_state(
+    state = observe_repository_state(
         repo,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),
@@ -452,7 +454,7 @@ def test_recovery_tracking_does_not_impersonate_remote_default(
     )
     _git(repo, "branch", "--set-upstream-to=origin/recovery/repo-main", "main")
 
-    state = repository_state.observe_repository_state(
+    state = observe_repository_state(
         repo,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(remote_head),
@@ -474,7 +476,7 @@ def test_bare_coordinator_missing_remote_evidence_is_precise_unknown(
     linked = tmp_path / "linked"
     _git(bare, "worktree", "add", str(linked), "main")
 
-    state = repository_state.observe_repository_state(
+    state = observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
     )
@@ -576,7 +578,7 @@ def test_ambiguous_remote_default_worktrees_fail_closed(tmp_path: Path) -> None:
     _git(bare, "worktree", "add", "--detach", str(first), head)
     _git(bare, "worktree", "add", "--detach", str(second), head)
 
-    state = repository_state.observe_repository_state(
+    state = observe_repository_state(
         bare,
         observed_at=datetime(2026, 7, 12, tzinfo=UTC),
         remote_default_branch=_remote_default(head),
