@@ -5,20 +5,20 @@ import { fetchReport, ReportError } from "@/lib/api";
 import type { Report } from "@/lib/types";
 import ReportView from "./ReportView";
 
-type State =
-	| { phase: "loading" }
-	| { phase: "done"; report: Report }
-	| { phase: "error"; message: string };
+// A settled result remembers which username it belongs to, so a username change
+// shows the loading state without resetting state inside the effect.
+type Settled =
+	| { phase: "done"; username: string; report: Report }
+	| { phase: "error"; username: string; message: string };
 
 /** Fetches and renders the report for `username` (client-side, with loading UX). */
 export default function ReportLoader({ username }: { username: string }) {
-	const [state, setState] = useState<State>({ phase: "loading" });
+	const [settled, setSettled] = useState<Settled | null>(null);
 
 	useEffect(() => {
 		const controller = new AbortController();
-		setState({ phase: "loading" });
 		fetchReport(username, controller.signal)
-			.then((report) => setState({ phase: "done", report }))
+			.then((report) => setSettled({ phase: "done", username, report }))
 			.catch((err: unknown) => {
 				// Aborted on unmount / username change — drop it silently.
 				if (controller.signal.aborted) return;
@@ -28,12 +28,13 @@ export default function ReportLoader({ username }: { username: string }) {
 				} else {
 					console.error("Unexpected error fetching report:", err);
 				}
-				setState({ phase: "error", message });
+				setSettled({ phase: "error", username, message });
 			});
 		return () => controller.abort();
 	}, [username]);
 
-	if (state.phase === "loading") {
+	const state = settled?.username === username ? settled : null;
+	if (state === null) {
 		return (
 			<div className="loading" role="status" aria-live="polite">
 				<span className="dot" />
