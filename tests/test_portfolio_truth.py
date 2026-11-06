@@ -59,6 +59,7 @@ from github_repo_auditor.portfolio_truth_sources import (
 )
 from github_repo_auditor.portfolio_truth_validate import (
     _path_identity,
+    _snapshot_from_payload,
     _same_repository_path,
     canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
@@ -1141,6 +1142,15 @@ def test_checkout_collision_flows_through_truth_validation_and_report(
     assert group["selection"]["reason_code"] == "conflicting_full_clone_heads"
     assert widget_projects[0].repository_state["checkout_authority"] == group
     validate_truth_snapshot(result.snapshot)
+
+    payload = result.snapshot.to_dict()
+    payload["source_summary"]["workspace_inventory_gap"] = {
+        "baseline_generated_at": payload["generated_at"],
+        "missing_project_keys": ["local:archive-widget"],
+        "missing_project_paths": {"local:archive-widget": "Archive/Widget"},
+    }
+    with pytest.raises(ValueError, match="workspace inventory gap"):
+        validate_truth_snapshot(_snapshot_from_payload(payload))
 
     markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
     assert "## Checkout Authority" in markdown

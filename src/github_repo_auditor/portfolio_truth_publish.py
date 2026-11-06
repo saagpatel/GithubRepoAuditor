@@ -35,7 +35,10 @@ from github_repo_auditor.portfolio_truth_render import (
     render_registry_markdown,
 )
 from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
-from github_repo_auditor.portfolio_truth_sources import workspace_exclusion_reason
+from github_repo_auditor.portfolio_truth_sources import (
+    checkout_collision_paths,
+    workspace_exclusion_reason,
+)
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
 from github_repo_auditor.producer_preflight import (
     ProducerEvidence,
@@ -351,7 +354,9 @@ def _workspace_inventory_gap(
     Missing keys remain gaps while their recorded paths still exist in the
     workspace. A missing path or a path now represented by a different current
     key is treated as a confirmed removal or rename. Unreadable paths and paths
-    outside the workspace retain uncertainty and stay in the gap. The baseline
+    outside the workspace retain uncertainty and stay in the gap. Existing paths
+    that stop qualifying as projects stay uncertain unless discovery's explicit
+    exclusion rules or collision evidence account for them. The baseline
     timestamp marks the start of the continuous unresolved gap chain, so later
     missing keys can share that earlier baseline until the chain fully clears.
     """
@@ -458,7 +463,7 @@ def _workspace_inventory_gap(
             key not in prior_paths
             or (
                 prior_paths[key] not in current_project_paths
-                and not _workspace_path_is_excluded(prior_paths[key])
+                and not _workspace_path_is_excluded(workspace_root, prior_paths[key])
                 and _workspace_path_is_directory(workspace_root, prior_paths[key])
             )
         )
@@ -501,14 +506,21 @@ def _workspace_path_is_directory(workspace_root: Path, relative_path: str) -> bo
     return stat.S_ISDIR(mode)
 
 
-def _workspace_path_is_excluded(relative_path: str) -> bool:
-    """Return true only for a path component explicitly excluded by discovery."""
+def _workspace_path_is_excluded(workspace_root: Path, relative_path: str) -> bool:
+    """Return true only for a path explicitly excluded by workspace discovery."""
     path = Path(relative_path)
-    return (
-        not path.is_absolute()
-        and ".." not in path.parts
-        and any(workspace_exclusion_reason(part) for part in path.parts)
-    )
+    if path.is_absolute() or ".." in path.parts or not path.parts:
+        return False
+    if any(workspace_exclusion_reason(part) for part in path.parts):
+        return True
+    try:
+        root = workspace_root.expanduser().resolve()
+        entry = root / path
+        if not stat.S_ISLNK(entry.lstat().st_mode):
+            return False
+        return entry.resolve().is_relative_to(root)
+    except (OSError, RuntimeError, ValueError):
+        return False
 
 
 def publish_portfolio_truth(
@@ -743,15 +755,26 @@ def _publish_portfolio_truth_locked(
         for project in build_result.snapshot.projects
         if not project.identity.project_key.startswith("supp:")
     }
+    current_project_paths = {
+        project.identity.path
+        for project in build_result.snapshot.projects
+        if not project.identity.project_key.startswith("supp:")
+    }
+    collision_summary = build_result.snapshot.source_summary.get(
+        "checkout_collisions", {}
+    )
+    current_project_paths.update(
+        checkout_collision_paths(
+            collision_summary.get("groups")
+            if isinstance(collision_summary, dict)
+            else None
+        )
+    )
     inventory_gap, inventory_comparison_unavailable = _workspace_inventory_gap(
         latest_path,
         workspace_root=workspace_root,
         current_project_keys=current_project_keys,
-        current_project_paths={
-            project.identity.path
-            for project in build_result.snapshot.projects
-            if not project.identity.project_key.startswith("supp:")
-        },
+        current_project_paths=current_project_paths,
     )
     if inventory_gap is not None:
         build_result.snapshot.source_summary["workspace_inventory_gap"] = inventory_gap

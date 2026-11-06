@@ -48,7 +48,10 @@ from github_repo_auditor.portfolio_truth_provenance import (
     REQUIRED_PROJECT_PROVENANCE_KEYS,
 )
 from github_repo_auditor.portfolio_truth_render import registry_project_labels
-from github_repo_auditor.portfolio_truth_sources import WORKSPACE_EXCLUSION_REASONS
+from github_repo_auditor.portfolio_truth_sources import (
+    WORKSPACE_EXCLUSION_REASONS,
+    checkout_collision_paths,
+)
 from github_repo_auditor.portfolio_truth_types import (
     CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
     DERIVATION_POLICY_VERSION,
@@ -558,6 +561,8 @@ def _validate_snapshot_metadata(
             for project in snapshot.projects
             if not project.identity.project_key.startswith("supp:")
         }
+        collision_groups = summary["checkout_collisions"]["groups"]
+        current_project_paths.update(checkout_collision_paths(collision_groups))
         if (
             not isinstance(missing_project_keys, list)
             or any(not isinstance(key, str) or not key for key in missing_project_keys)
@@ -591,24 +596,17 @@ def _validate_snapshot_metadata(
         "prior_project_key_malformed",
         "prior_inventory_gap_malformed",
     }
-    if workspace_inventory_comparison is not None and (
-        not isinstance(workspace_inventory_comparison, dict)
-        or (
-            set(workspace_inventory_comparison) == {"state"}
-            and workspace_inventory_comparison.get("state") != "first_run"
-        )
-        or (
-            set(workspace_inventory_comparison) != {"state"}
-            and set(workspace_inventory_comparison) != {"state", "reason"}
-        )
-        or (
-            workspace_inventory_comparison.get("state") == "unavailable"
-            and workspace_inventory_comparison.get("reason")
-            not in valid_comparison_reasons
-        )
-        or workspace_inventory_comparison.get("state")
-        not in {"first_run", "unavailable"}
-    ):
+    comparison_valid = workspace_inventory_comparison is None
+    if isinstance(workspace_inventory_comparison, dict):
+        if workspace_inventory_comparison.get("state") == "first_run":
+            comparison_valid = set(workspace_inventory_comparison) == {"state"}
+        elif workspace_inventory_comparison.get("state") == "unavailable":
+            comparison_valid = (
+                set(workspace_inventory_comparison) == {"state", "reason"}
+                and workspace_inventory_comparison.get("reason")
+                in valid_comparison_reasons
+            )
+    if not comparison_valid:
         raise ValueError("PortfolioTruth workspace inventory comparison is malformed.")
     expected_summary = build_source_summary(
         workspace_root=snapshot.workspace_root,

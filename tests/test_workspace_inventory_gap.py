@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -9,10 +10,12 @@ from unittest.mock import patch
 import pytest
 
 from github_repo_auditor.portfolio_truth_publish import (
+    _workspace_path_is_excluded,
     _workspace_path_is_directory,
     _workspace_inventory_gap,
     publish_portfolio_truth,
 )
+from github_repo_auditor.portfolio_truth_sources import checkout_collision_paths
 from github_repo_auditor.portfolio_truth_validate import (
     _snapshot_from_payload,
     validate_truth_snapshot,
@@ -242,7 +245,16 @@ def test_invalid_workspace_inventory_gap_is_rejected(
         validate_truth_snapshot(_snapshot_from_payload(snapshot))
 
 
-def test_invalid_workspace_inventory_comparison_is_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "comparison",
+    [
+        {"state": "complete", "reason": "unknown"},
+        {"state": "first_run", "reason": "arbitrary"},
+    ],
+)
+def test_invalid_workspace_inventory_comparison_is_rejected(
+    tmp_path: Path, comparison: dict[str, str]
+) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     _make_project(workspace, "Alpha")
@@ -251,10 +263,7 @@ def test_invalid_workspace_inventory_comparison_is_rejected(tmp_path: Path) -> N
         tmp_path / "output",
         datetime(2026, 11, 6, 10, tzinfo=timezone.utc),
     )
-    snapshot["source_summary"]["workspace_inventory_comparison"] = {
-        "state": "complete",
-        "reason": "unknown",
-    }
+    snapshot["source_summary"]["workspace_inventory_comparison"] = comparison
 
     with pytest.raises(ValueError, match="workspace inventory comparison"):
         validate_truth_snapshot(_snapshot_from_payload(snapshot))
@@ -317,6 +326,94 @@ def test_workspace_path_rekey_at_same_path_resolves_prior_key(tmp_path: Path) ->
     ) == (None, None)
 
 
+def test_added_same_origin_checkout_resolves_old_identity_from_collision_evidence(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "foo-old").mkdir(parents=True)
+    (workspace / "foo").mkdir()
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(
+        json.dumps(
+            {
+                "workspace_root": str(workspace),
+                "generated_at": "2026-11-06T10:00:00+00:00",
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": "local:foo-old",
+                            "path": "foo-old",
+                        }
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    collisions = [
+        {
+            "origin": "owner/foo",
+            "checkouts": [{"path": "foo"}, {"path": "foo-old"}],
+        }
+    ]
+
+    current_paths = {"foo"} | checkout_collision_paths(collisions)
+    assert _workspace_inventory_gap(
+        latest,
+        workspace_root=workspace,
+        current_project_keys={"repo:owner/foo"},
+        current_project_paths=current_paths,
+    ) == (None, None)
+
+
+def test_adding_same_origin_clone_does_not_create_a_permanent_inventory_gap(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    old_checkout = workspace / "foo-old"
+    old_checkout.mkdir(parents=True)
+    (old_checkout / "README.md").write_text("# foo-old\n")
+    output = tmp_path / "output"
+    generated_at = datetime(2026, 11, 6, 10, tzinfo=timezone.utc)
+
+    baseline = _publish(workspace, output, generated_at)
+    old_key = baseline["projects"][0]["identity"]["project_key"]
+    assert old_key == "foo-old"
+
+    for checkout in (old_checkout, workspace / "foo"):
+        if checkout != old_checkout:
+            checkout.mkdir()
+            (checkout / "README.md").write_text("# foo\n")
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=checkout, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:owner/foo.git"],
+            cwd=checkout,
+            check=True,
+        )
+        subprocess.run(["git", "add", "README.md"], cwd=checkout, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "fixture",
+            ],
+            cwd=checkout,
+            check=True,
+        )
+
+    current = _publish(workspace, output, generated_at.replace(minute=1))
+
+    assert "workspace_inventory_gap" not in current["source_summary"]
+    collision_groups = current["source_summary"]["checkout_collisions"]["groups"]
+    assert checkout_collision_paths(collision_groups) == {"foo", "foo-old"}
+
+
 def test_workspace_path_excluded_by_current_policy_resolves_gap(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     excluded_path = workspace / "smoke-export"
@@ -346,3 +443,51 @@ def test_workspace_path_excluded_by_current_policy_resolves_gap(tmp_path: Path) 
         current_project_keys=set(),
         current_project_paths=set(),
     ) == (None, None)
+
+
+def test_existing_unclassified_directory_keeps_gap_uncertain(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "FormerProject").mkdir(parents=True)
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(
+        json.dumps(
+            {
+                "workspace_root": str(workspace),
+                "generated_at": "2026-11-06T10:00:00+00:00",
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": "local:FormerProject",
+                            "path": "FormerProject",
+                        }
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    gap, comparison = _workspace_inventory_gap(
+        latest,
+        workspace_root=workspace,
+        current_project_keys=set(),
+        current_project_paths=set(),
+    )
+    assert comparison is None
+    assert gap is not None
+    assert gap["missing_project_keys"] == ["local:FormerProject"]
+
+
+def test_in_root_symlink_is_explicitly_excluded_but_outside_symlink_stays_uncertain(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "Target").mkdir(parents=True)
+    (workspace / "LinkedProject").symlink_to(workspace / "Target")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (workspace / "OutsideProject").symlink_to(outside)
+
+    assert _workspace_path_is_excluded(workspace, "LinkedProject")
+    assert not _workspace_path_is_excluded(workspace, "OutsideProject")
+    assert _workspace_path_is_directory(workspace, "OutsideProject")
