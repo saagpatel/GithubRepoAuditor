@@ -873,7 +873,6 @@ class TestRunnerCommandBoundary:
     ) -> None:
         from io import StringIO
 
-        import github_repo_auditor.cli as cli
         from github_repo_auditor.serve import worker
 
         monkeypatch.setattr(
@@ -891,7 +890,8 @@ class TestRunnerCommandBoundary:
         )
         captured: dict[str, list[str]] = {}
         monkeypatch.setattr(
-            cli, "main", lambda: captured.setdefault("argv", list(sys.argv))
+            "github_repo_auditor.cli.main",
+            lambda: captured.setdefault("argv", list(sys.argv)),
         )
 
         worker.main()

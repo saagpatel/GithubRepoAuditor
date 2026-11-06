@@ -4,7 +4,7 @@ import importlib
 import inspect
 import pkgutil
 
-from github_repo_auditor.analyzers import ALL_ANALYZERS
+from github_repo_auditor import analyzers as analyzers_package
 from github_repo_auditor.analyzers.base import BaseAnalyzer
 from github_repo_auditor.scorer import WEIGHTS
 
@@ -29,13 +29,13 @@ def test_scoring_weights_cover_exactly_the_composed_dimensions() -> None:
 
     assert set(WEIGHTS) == expected_scored_dimensions
     assert {
-        analyzer.name for analyzer in ALL_ANALYZERS if analyzer.name in WEIGHTS
+        analyzer.name
+        for analyzer in analyzers_package.ALL_ANALYZERS
+        if analyzer.name in WEIGHTS
     } == set(WEIGHTS)
 
 
 def test_analyzer_classes_do_not_declare_dead_weight_attributes() -> None:
-    import github_repo_auditor.analyzers as analyzers_package
-
     analyzer_classes = [BaseAnalyzer]
     for module_info in pkgutil.iter_modules(analyzers_package.__path__):
         module = importlib.import_module(

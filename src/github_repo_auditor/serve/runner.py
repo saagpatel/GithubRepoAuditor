@@ -135,6 +135,7 @@ class RunSession:
             try:
                 self._proc.stdin.close()
             except OSError:
+                # Best-effort cleanup; the request failure is already buffered above.
                 pass
 
     def read(self, after: int = 0) -> tuple[list[str], int, bool]:
