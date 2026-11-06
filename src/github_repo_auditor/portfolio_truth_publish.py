@@ -35,6 +35,7 @@ from github_repo_auditor.portfolio_truth_render import (
     render_registry_markdown,
 )
 from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
+from github_repo_auditor.portfolio_truth_sources import workspace_exclusion_reason
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
 from github_repo_auditor.producer_preflight import (
     ProducerEvidence,
@@ -357,7 +358,7 @@ def _workspace_inventory_gap(
     try:
         prior = json.loads(latest_path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return None, None
+        return None, "prior_snapshot_missing"
     except (OSError, UnicodeError, json.JSONDecodeError):
         return None, "prior_snapshot_unreadable"
     if not isinstance(prior, dict):
@@ -457,6 +458,7 @@ def _workspace_inventory_gap(
             key not in prior_paths
             or (
                 prior_paths[key] not in current_project_paths
+                and not _workspace_path_is_excluded(prior_paths[key])
                 and _workspace_path_is_directory(workspace_root, prior_paths[key])
             )
         )
@@ -487,16 +489,31 @@ def _workspace_path_is_directory(workspace_root: Path, relative_path: str) -> bo
         return True
     if not stat.S_ISDIR(root_mode):
         return True
+    entry = root / path
     try:
-        candidate = (root / path).resolve()
-        if not candidate.is_relative_to(root):
-            return True
-        mode = candidate.stat().st_mode
+        entry.stat()
     except (FileNotFoundError, NotADirectoryError):
         return False
     except (OSError, RuntimeError, ValueError):
         return True
+    try:
+        candidate = entry.resolve()
+        if not candidate.is_relative_to(root):
+            return True
+        mode = candidate.stat().st_mode
+    except (OSError, RuntimeError, ValueError):
+        return True
     return stat.S_ISDIR(mode)
+
+
+def _workspace_path_is_excluded(relative_path: str) -> bool:
+    """Return true only for a path component explicitly excluded by discovery."""
+    path = Path(relative_path)
+    return (
+        not path.is_absolute()
+        and ".." not in path.parts
+        and any(workspace_exclusion_reason(part) for part in path.parts)
+    )
 
 
 def publish_portfolio_truth(
@@ -743,7 +760,11 @@ def _publish_portfolio_truth_locked(
     )
     if inventory_gap is not None:
         build_result.snapshot.source_summary["workspace_inventory_gap"] = inventory_gap
-    if inventory_comparison_unavailable is not None:
+    if inventory_comparison_unavailable == "prior_snapshot_missing":
+        build_result.snapshot.source_summary["workspace_inventory_comparison"] = {
+            "state": "first_run",
+        }
+    elif inventory_comparison_unavailable is not None:
         build_result.snapshot.source_summary["workspace_inventory_comparison"] = {
             "state": "unavailable",
             "reason": inventory_comparison_unavailable,

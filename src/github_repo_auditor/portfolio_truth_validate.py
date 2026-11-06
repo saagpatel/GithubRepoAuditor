@@ -593,9 +593,21 @@ def _validate_snapshot_metadata(
     }
     if workspace_inventory_comparison is not None and (
         not isinstance(workspace_inventory_comparison, dict)
-        or set(workspace_inventory_comparison) != {"state", "reason"}
-        or workspace_inventory_comparison.get("state") != "unavailable"
-        or workspace_inventory_comparison.get("reason") not in valid_comparison_reasons
+        or (
+            set(workspace_inventory_comparison) == {"state"}
+            and workspace_inventory_comparison.get("state") != "first_run"
+        )
+        or (
+            set(workspace_inventory_comparison) != {"state"}
+            and set(workspace_inventory_comparison) != {"state", "reason"}
+        )
+        or (
+            workspace_inventory_comparison.get("state") == "unavailable"
+            and workspace_inventory_comparison.get("reason")
+            not in valid_comparison_reasons
+        )
+        or workspace_inventory_comparison.get("state")
+        not in {"first_run", "unavailable"}
     ):
         raise ValueError("PortfolioTruth workspace inventory comparison is malformed.")
     expected_summary = build_source_summary(

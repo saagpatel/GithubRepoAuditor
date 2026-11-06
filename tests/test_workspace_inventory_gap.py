@@ -52,6 +52,9 @@ def test_workspace_inventory_gap_tracks_disappearance_recovery_and_root_change(
 
     first = _publish(workspace, output, first_at)
     assert "workspace_inventory_gap" not in first["source_summary"]
+    assert first["source_summary"]["workspace_inventory_comparison"] == {
+        "state": "first_run",
+    }
     beta_key = next(
         project["identity"]["project_key"]
         for project in first["projects"]
@@ -106,6 +109,10 @@ def test_workspace_inventory_gap_tracks_disappearance_recovery_and_root_change(
     _make_project(other_workspace, "Alpha")
     different_root = _publish(other_workspace, output, first_at.replace(minute=5))
     assert "workspace_inventory_gap" not in different_root["source_summary"]
+    assert different_root["source_summary"]["workspace_inventory_comparison"] == {
+        "state": "unavailable",
+        "reason": "workspace_root_changed",
+    }
 
 
 def test_workspace_inventory_gap_excludes_supplementary_keys_and_ignores_bad_prior(
@@ -270,6 +277,9 @@ def test_workspace_path_removal_requires_a_confirmed_missing_path(
     (workspace / "Project").rmdir()
     assert not _workspace_path_is_directory(workspace, "Project")
 
+    (workspace / "DanglingProject").symlink_to(tmp_path / "removed-target")
+    assert not _workspace_path_is_directory(workspace, "DanglingProject")
+
 
 def test_workspace_path_rekey_at_same_path_resolves_prior_key(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
@@ -299,4 +309,35 @@ def test_workspace_path_rekey_at_same_path_resolves_prior_key(tmp_path: Path) ->
         workspace_root=workspace,
         current_project_keys={"repo:new-name"},
         current_project_paths={"Project"},
+    ) == (None, None)
+
+
+def test_workspace_path_excluded_by_current_policy_resolves_gap(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    excluded_path = workspace / "smoke-export"
+    excluded_path.mkdir(parents=True)
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(
+        json.dumps(
+            {
+                "workspace_root": str(workspace),
+                "generated_at": "2026-11-06T10:00:00+00:00",
+                "projects": [
+                    {
+                        "identity": {
+                            "project_key": "repo:old-smoke-project",
+                            "path": "smoke-export",
+                        }
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert _workspace_inventory_gap(
+        latest,
+        workspace_root=workspace,
+        current_project_keys=set(),
+        current_project_paths=set(),
     ) == (None, None)
