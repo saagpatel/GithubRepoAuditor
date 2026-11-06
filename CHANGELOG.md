@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+- Preserve missing workspace project keys as explicit inventory gaps across
+  portfolio truth generations so consumers can surface incomplete scans.
+
 - Stop retrying ambiguous Notion writes, verify weekly-review replacements before
   archival, distinguish async GitHub rate limits, and validate web report payloads.
 - Replace vacuous tier/initiative tests with deterministic checks; pin the
