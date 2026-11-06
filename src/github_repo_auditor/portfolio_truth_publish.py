@@ -4,6 +4,7 @@ import fcntl
 import hashlib
 import json
 import os
+import stat
 import tempfile
 import threading
 from contextlib import contextmanager, nullcontext
@@ -342,50 +343,66 @@ def _workspace_inventory_gap(
     *,
     workspace_root: Path,
     current_project_keys: set[str],
-) -> dict[str, object] | None:
+    current_project_paths: set[str],
+) -> tuple[dict[str, object] | None, str | None]:
     """Describe prior workspace identities absent from this same-root inventory.
 
-    A missing key is only evidence that a previously published project key is
-    absent from this scan. It does not establish why the project disappeared.
+    Missing keys remain gaps while their recorded paths still exist in the
+    workspace. A missing path or a path now represented by a different current
+    key is treated as a confirmed removal or rename. Unreadable paths and paths
+    outside the workspace retain uncertainty and stay in the gap. The baseline
+    timestamp marks the start of the continuous unresolved gap chain, so later
+    missing keys can share that earlier baseline until the chain fully clears.
     """
     try:
         prior = json.loads(latest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, None
     except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
+        return None, "prior_snapshot_unreadable"
     if not isinstance(prior, dict):
-        return None
+        return None, "prior_snapshot_malformed"
 
     prior_root = prior.get("workspace_root")
     if not isinstance(prior_root, str) or not prior_root:
-        return None
+        return None, "prior_workspace_unknown"
     try:
         if (
             Path(prior_root).expanduser().resolve()
             != workspace_root.expanduser().resolve()
         ):
-            return None
+            return None, "workspace_root_changed"
     except (OSError, RuntimeError):
-        return None
+        return None, "workspace_root_unavailable"
 
     generated_at = prior.get("generated_at")
     prior_projects = prior.get("projects")
     if not isinstance(generated_at, str) or not generated_at.strip():
-        return None
+        return None, "prior_generation_time_missing"
     if not isinstance(prior_projects, list):
-        return None
+        return None, "prior_project_inventory_malformed"
 
     prior_keys: set[str] = set()
+    prior_paths: dict[str, str] = {}
     for project in prior_projects:
         if not isinstance(project, dict):
-            return None
+            return None, "prior_project_inventory_malformed"
         identity = project.get("identity")
         if not isinstance(identity, dict):
-            return None
+            return None, "prior_project_identity_malformed"
         key = identity.get("project_key")
         if not isinstance(key, str) or not key:
-            return None
+            return None, "prior_project_key_malformed"
         if not key.startswith("supp:"):
             prior_keys.add(key)
+            path = identity.get("path")
+            if (
+                isinstance(path, str)
+                and path
+                and not Path(path).is_absolute()
+                and ".." not in Path(path).parts
+            ):
+                prior_paths[key] = path
 
     baseline_generated_at = generated_at
     source_summary = prior.get("source_summary")
@@ -396,30 +413,90 @@ def _workspace_inventory_gap(
     )
     if prior_gap is not None:
         if not isinstance(prior_gap, dict):
-            return None
+            return None, "prior_inventory_gap_malformed"
         missing = prior_gap.get("missing_project_keys")
         baseline = prior_gap.get("baseline_generated_at")
+        missing_paths = prior_gap.get("missing_project_paths", {})
         if (
-            set(prior_gap) != {"missing_project_keys", "baseline_generated_at"}
+            set(prior_gap)
+            not in (
+                {"missing_project_keys", "baseline_generated_at"},
+                {
+                    "missing_project_keys",
+                    "baseline_generated_at",
+                    "missing_project_paths",
+                },
+            )
             or not isinstance(missing, list)
             or any(not isinstance(key, str) or not key for key in missing)
             or missing != sorted(set(missing))
             or any(key.startswith("supp:") for key in missing)
             or set(missing).intersection(prior_keys)
+            or not isinstance(missing_paths, dict)
+            or not set(missing_paths).issubset(missing)
+            or any(
+                not isinstance(path, str)
+                or not path
+                or Path(path).is_absolute()
+                or ".." in Path(path).parts
+                for path in missing_paths.values()
+            )
             or not isinstance(baseline, str)
             or not baseline.strip()
         ):
-            return None
-        prior_keys.update(key for key in missing if not key.startswith("supp:"))
+            return None, "prior_inventory_gap_malformed"
+        prior_paths.update(missing_paths)
+        prior_keys.update(missing)
         baseline_generated_at = baseline
 
     missing_keys = sorted(prior_keys - current_project_keys)
+    missing_keys = [
+        key
+        for key in missing_keys
+        if (
+            key not in prior_paths
+            or (
+                prior_paths[key] not in current_project_paths
+                and _workspace_path_is_directory(workspace_root, prior_paths[key])
+            )
+        )
+    ]
     if not missing_keys:
-        return None
-    return {
+        return None, None
+    gap: dict[str, object] = {
         "missing_project_keys": missing_keys,
         "baseline_generated_at": baseline_generated_at,
     }
+    missing_paths = {
+        key: prior_paths[key] for key in missing_keys if key in prior_paths
+    }
+    if missing_paths:
+        gap["missing_project_paths"] = missing_paths
+    return gap, None
+
+
+def _workspace_path_is_directory(workspace_root: Path, relative_path: str) -> bool:
+    """Return false only when a relative workspace path is confirmed absent."""
+    path = Path(relative_path)
+    if path.is_absolute() or ".." in path.parts or not path.parts:
+        return True
+    try:
+        root = workspace_root.expanduser().resolve()
+        root_mode = root.stat().st_mode
+    except (OSError, RuntimeError, ValueError):
+        return True
+    if not stat.S_ISDIR(root_mode):
+        return True
+    try:
+        candidate = (root / path).resolve()
+        if not candidate.is_relative_to(root):
+            return True
+        mode = candidate.stat().st_mode
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except (OSError, RuntimeError, ValueError):
+        return True
+    return stat.S_ISDIR(mode)
 
 
 def publish_portfolio_truth(
@@ -654,13 +731,23 @@ def _publish_portfolio_truth_locked(
         for project in build_result.snapshot.projects
         if not project.identity.project_key.startswith("supp:")
     }
-    inventory_gap = _workspace_inventory_gap(
+    inventory_gap, inventory_comparison_unavailable = _workspace_inventory_gap(
         latest_path,
         workspace_root=workspace_root,
         current_project_keys=current_project_keys,
+        current_project_paths={
+            project.identity.path
+            for project in build_result.snapshot.projects
+            if not project.identity.project_key.startswith("supp:")
+        },
     )
     if inventory_gap is not None:
         build_result.snapshot.source_summary["workspace_inventory_gap"] = inventory_gap
+    if inventory_comparison_unavailable is not None:
+        build_result.snapshot.source_summary["workspace_inventory_comparison"] = {
+            "state": "unavailable",
+            "reason": inventory_comparison_unavailable,
+        }
     validate_truth_snapshot(
         build_result.snapshot,
         security_max_age_hours=security_max_age_hours,

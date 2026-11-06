@@ -82,6 +82,7 @@ def build_source_summary(
     notion_context_carried_forward: bool,
     checkout_collisions: Sequence[dict[str, Any]] = (),
     workspace_inventory_gap: dict[str, Any] | None = None,
+    workspace_inventory_comparison: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build the exact producer summary from bounded inputs and project facts."""
     summary = {
@@ -130,6 +131,8 @@ def build_source_summary(
     }
     if workspace_inventory_gap is not None:
         summary["workspace_inventory_gap"] = workspace_inventory_gap
+    if workspace_inventory_comparison is not None:
+        summary["workspace_inventory_comparison"] = workspace_inventory_comparison
     return summary
 
 

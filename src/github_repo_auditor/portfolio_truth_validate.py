@@ -536,12 +536,25 @@ def _validate_snapshot_metadata(
     if workspace_inventory_gap is not None:
         if not isinstance(workspace_inventory_gap, dict) or set(
             workspace_inventory_gap
-        ) != {"missing_project_keys", "baseline_generated_at"}:
+        ) not in (
+            {"missing_project_keys", "baseline_generated_at"},
+            {
+                "missing_project_keys",
+                "baseline_generated_at",
+                "missing_project_paths",
+            },
+        ):
             raise ValueError("PortfolioTruth workspace inventory gap is malformed.")
         missing_project_keys = workspace_inventory_gap.get("missing_project_keys")
         baseline_generated_at = workspace_inventory_gap.get("baseline_generated_at")
+        missing_project_paths = workspace_inventory_gap.get("missing_project_paths", {})
         current_project_keys = {
             project.identity.project_key
+            for project in snapshot.projects
+            if not project.identity.project_key.startswith("supp:")
+        }
+        current_project_paths = {
+            project.identity.path
             for project in snapshot.projects
             if not project.identity.project_key.startswith("supp:")
         }
@@ -553,8 +566,38 @@ def _validate_snapshot_metadata(
             or current_project_keys.intersection(missing_project_keys)
             or not isinstance(baseline_generated_at, str)
             or not baseline_generated_at.strip()
+            or not isinstance(missing_project_paths, dict)
+            or not set(missing_project_paths).issubset(missing_project_keys)
+            or any(
+                not isinstance(path, str)
+                or not path
+                or Path(path).is_absolute()
+                or ".." in Path(path).parts
+                for path in missing_project_paths.values()
+            )
+            or current_project_paths.intersection(missing_project_paths.values())
         ):
             raise ValueError("PortfolioTruth workspace inventory gap is invalid.")
+    workspace_inventory_comparison = summary.get("workspace_inventory_comparison")
+    valid_comparison_reasons = {
+        "prior_snapshot_unreadable",
+        "prior_snapshot_malformed",
+        "prior_workspace_unknown",
+        "workspace_root_changed",
+        "workspace_root_unavailable",
+        "prior_generation_time_missing",
+        "prior_project_inventory_malformed",
+        "prior_project_identity_malformed",
+        "prior_project_key_malformed",
+        "prior_inventory_gap_malformed",
+    }
+    if workspace_inventory_comparison is not None and (
+        not isinstance(workspace_inventory_comparison, dict)
+        or set(workspace_inventory_comparison) != {"state", "reason"}
+        or workspace_inventory_comparison.get("state") != "unavailable"
+        or workspace_inventory_comparison.get("reason") not in valid_comparison_reasons
+    ):
+        raise ValueError("PortfolioTruth workspace inventory comparison is malformed.")
     expected_summary = build_source_summary(
         workspace_root=snapshot.workspace_root,
         projects=snapshot.projects,
@@ -565,6 +608,7 @@ def _validate_snapshot_metadata(
         notion_context_carried_forward=notion_context_carried_forward,
         checkout_collisions=summary["checkout_collisions"]["groups"],
         workspace_inventory_gap=workspace_inventory_gap,
+        workspace_inventory_comparison=workspace_inventory_comparison,
     )
     if "security_coverage_clock" in summary:
         clock = summary["security_coverage_clock"]
@@ -2073,6 +2117,9 @@ def canonicalize_prior_security_truth_payload(
                 ],
                 checkout_collisions=[],
                 workspace_inventory_gap=summary.get("workspace_inventory_gap"),
+                workspace_inventory_comparison=summary.get(
+                    "workspace_inventory_comparison"
+                ),
             )
             expected_legacy_summary = deepcopy(current_summary)
             expected_legacy_summary.pop("checkout_collisions")
@@ -2138,6 +2185,9 @@ def canonicalize_prior_security_truth_payload(
                 ],
                 checkout_collisions=[],
                 workspace_inventory_gap=summary.get("workspace_inventory_gap"),
+                workspace_inventory_comparison=summary.get(
+                    "workspace_inventory_comparison"
+                ),
             )
             migrated["exclusions"] = build_exclusions(dict(exclusion_counts))
             canonicalize_truth_snapshot_payload(
