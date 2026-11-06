@@ -489,18 +489,13 @@ def _workspace_path_is_directory(workspace_root: Path, relative_path: str) -> bo
         return True
     if not stat.S_ISDIR(root_mode):
         return True
-    entry = root / path
     try:
-        entry.stat()
-    except (FileNotFoundError, NotADirectoryError):
-        return False
-    except (OSError, RuntimeError, ValueError):
-        return True
-    try:
-        candidate = entry.resolve()
+        candidate = (root / path).resolve()
         if not candidate.is_relative_to(root):
             return True
         mode = candidate.stat().st_mode
+    except (FileNotFoundError, NotADirectoryError):
+        return False
     except (OSError, RuntimeError, ValueError):
         return True
     return stat.S_ISDIR(mode)

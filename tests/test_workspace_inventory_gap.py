@@ -277,8 +277,13 @@ def test_workspace_path_removal_requires_a_confirmed_missing_path(
     (workspace / "Project").rmdir()
     assert not _workspace_path_is_directory(workspace, "Project")
 
-    (workspace / "DanglingProject").symlink_to(tmp_path / "removed-target")
+    (workspace / "DanglingProject").symlink_to(workspace / "removed-target")
     assert not _workspace_path_is_directory(workspace, "DanglingProject")
+
+    (workspace / "OutsideDanglingProject").symlink_to(
+        tmp_path / "outside" / "removed-target"
+    )
+    assert _workspace_path_is_directory(workspace, "OutsideDanglingProject")
 
 
 def test_workspace_path_rekey_at_same_path_resolves_prior_key(tmp_path: Path) -> None:
