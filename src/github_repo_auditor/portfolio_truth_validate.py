@@ -48,7 +48,10 @@ from github_repo_auditor.portfolio_truth_provenance import (
     REQUIRED_PROJECT_PROVENANCE_KEYS,
 )
 from github_repo_auditor.portfolio_truth_render import registry_project_labels
-from github_repo_auditor.portfolio_truth_sources import WORKSPACE_EXCLUSION_REASONS
+from github_repo_auditor.portfolio_truth_sources import (
+    WORKSPACE_EXCLUSION_REASONS,
+    checkout_collision_paths,
+)
 from github_repo_auditor.portfolio_truth_types import (
     CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
     DERIVATION_POLICY_VERSION,
@@ -532,6 +535,79 @@ def _validate_snapshot_metadata(
         or not isinstance(notion_context_carried_forward, bool)
     ):
         raise ValueError("PortfolioTruth source summary has invalid bounded inputs.")
+    workspace_inventory_gap = summary.get("workspace_inventory_gap")
+    if workspace_inventory_gap is not None:
+        if not isinstance(workspace_inventory_gap, dict) or set(
+            workspace_inventory_gap
+        ) not in (
+            {"missing_project_keys", "baseline_generated_at"},
+            {
+                "missing_project_keys",
+                "baseline_generated_at",
+                "missing_project_paths",
+            },
+        ):
+            raise ValueError("PortfolioTruth workspace inventory gap is malformed.")
+        missing_project_keys = workspace_inventory_gap.get("missing_project_keys")
+        baseline_generated_at = workspace_inventory_gap.get("baseline_generated_at")
+        missing_project_paths = workspace_inventory_gap.get("missing_project_paths", {})
+        current_project_keys = {
+            project.identity.project_key
+            for project in snapshot.projects
+            if not project.identity.project_key.startswith("supp:")
+        }
+        current_project_paths = {
+            project.identity.path
+            for project in snapshot.projects
+            if not project.identity.project_key.startswith("supp:")
+        }
+        collision_groups = summary["checkout_collisions"]["groups"]
+        current_project_paths.update(checkout_collision_paths(collision_groups))
+        if (
+            not isinstance(missing_project_keys, list)
+            or any(not isinstance(key, str) or not key for key in missing_project_keys)
+            or missing_project_keys != sorted(set(missing_project_keys))
+            or any(key.startswith("supp:") for key in missing_project_keys)
+            or current_project_keys.intersection(missing_project_keys)
+            or not isinstance(baseline_generated_at, str)
+            or not baseline_generated_at.strip()
+            or not isinstance(missing_project_paths, dict)
+            or not set(missing_project_paths).issubset(missing_project_keys)
+            or any(
+                not isinstance(path, str)
+                or not path
+                or Path(path).is_absolute()
+                or ".." in Path(path).parts
+                for path in missing_project_paths.values()
+            )
+            or current_project_paths.intersection(missing_project_paths.values())
+        ):
+            raise ValueError("PortfolioTruth workspace inventory gap is invalid.")
+    workspace_inventory_comparison = summary.get("workspace_inventory_comparison")
+    valid_comparison_reasons = {
+        "prior_snapshot_unreadable",
+        "prior_snapshot_malformed",
+        "prior_workspace_unknown",
+        "workspace_root_changed",
+        "workspace_root_unavailable",
+        "prior_generation_time_missing",
+        "prior_project_inventory_malformed",
+        "prior_project_identity_malformed",
+        "prior_project_key_malformed",
+        "prior_inventory_gap_malformed",
+    }
+    comparison_valid = workspace_inventory_comparison is None
+    if isinstance(workspace_inventory_comparison, dict):
+        if workspace_inventory_comparison.get("state") == "first_run":
+            comparison_valid = set(workspace_inventory_comparison) == {"state"}
+        elif workspace_inventory_comparison.get("state") == "unavailable":
+            comparison_valid = (
+                set(workspace_inventory_comparison) == {"state", "reason"}
+                and workspace_inventory_comparison.get("reason")
+                in valid_comparison_reasons
+            )
+    if not comparison_valid:
+        raise ValueError("PortfolioTruth workspace inventory comparison is malformed.")
     expected_summary = build_source_summary(
         workspace_root=snapshot.workspace_root,
         projects=snapshot.projects,
@@ -541,6 +617,8 @@ def _validate_snapshot_metadata(
         notion_context_rows=notion_context_rows,
         notion_context_carried_forward=notion_context_carried_forward,
         checkout_collisions=summary["checkout_collisions"]["groups"],
+        workspace_inventory_gap=workspace_inventory_gap,
+        workspace_inventory_comparison=workspace_inventory_comparison,
     )
     if "security_coverage_clock" in summary:
         clock = summary["security_coverage_clock"]
@@ -2048,6 +2126,10 @@ def canonicalize_prior_security_truth_payload(
                     "notion_context_carried_forward"
                 ],
                 checkout_collisions=[],
+                workspace_inventory_gap=summary.get("workspace_inventory_gap"),
+                workspace_inventory_comparison=summary.get(
+                    "workspace_inventory_comparison"
+                ),
             )
             expected_legacy_summary = deepcopy(current_summary)
             expected_legacy_summary.pop("checkout_collisions")
@@ -2112,6 +2194,10 @@ def canonicalize_prior_security_truth_payload(
                     "notion_context_carried_forward"
                 ],
                 checkout_collisions=[],
+                workspace_inventory_gap=summary.get("workspace_inventory_gap"),
+                workspace_inventory_comparison=summary.get(
+                    "workspace_inventory_comparison"
+                ),
             )
             migrated["exclusions"] = build_exclusions(dict(exclusion_counts))
             canonicalize_truth_snapshot_payload(

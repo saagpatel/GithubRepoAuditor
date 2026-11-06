@@ -81,9 +81,11 @@ def build_source_summary(
     notion_context_rows: int,
     notion_context_carried_forward: bool,
     checkout_collisions: Sequence[dict[str, Any]] = (),
+    workspace_inventory_gap: dict[str, Any] | None = None,
+    workspace_inventory_comparison: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build the exact producer summary from bounded inputs and project facts."""
-    return {
+    summary = {
         "workspace_root": workspace_root,
         "project_count": len(projects),
         "checkout_collisions": checkout_collision_summary(list(checkout_collisions)),
@@ -127,6 +129,11 @@ def build_source_summary(
             projects
         ),
     }
+    if workspace_inventory_gap is not None:
+        summary["workspace_inventory_gap"] = workspace_inventory_gap
+    if workspace_inventory_comparison is not None:
+        summary["workspace_inventory_comparison"] = workspace_inventory_comparison
+    return summary
 
 
 def build_warnings(

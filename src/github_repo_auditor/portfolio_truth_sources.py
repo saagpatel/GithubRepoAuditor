@@ -414,6 +414,31 @@ def checkout_collision_summary(
     }
 
 
+def checkout_collision_paths(groups: object) -> set[str]:
+    """Return safe workspace-relative paths observed in collision evidence."""
+    if not isinstance(groups, list):
+        return set()
+    paths: set[str] = set()
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        checkouts = group.get("checkouts")
+        if not isinstance(checkouts, list):
+            continue
+        for checkout in checkouts:
+            if not isinstance(checkout, dict):
+                continue
+            path = checkout.get("path")
+            if (
+                isinstance(path, str)
+                and path
+                and not Path(path).is_absolute()
+                and ".." not in Path(path).parts
+            ):
+                paths.add(path)
+    return paths
+
+
 def _checkout_representative(
     group: list[dict[str, Any]], origin_key: str
 ) -> dict[str, Any]:
