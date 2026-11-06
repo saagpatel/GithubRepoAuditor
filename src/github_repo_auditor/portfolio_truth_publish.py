@@ -337,6 +337,91 @@ def _build_project_registry_json(snapshot, *, include_notion: bool) -> str:
     return json.dumps(registry, indent=2) + "\n"
 
 
+def _workspace_inventory_gap(
+    latest_path: Path,
+    *,
+    workspace_root: Path,
+    current_project_keys: set[str],
+) -> dict[str, object] | None:
+    """Describe prior workspace identities absent from this same-root inventory.
+
+    A missing key is only evidence that a previously published project key is
+    absent from this scan. It does not establish why the project disappeared.
+    """
+    try:
+        prior = json.loads(latest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(prior, dict):
+        return None
+
+    prior_root = prior.get("workspace_root")
+    if not isinstance(prior_root, str) or not prior_root:
+        return None
+    try:
+        if (
+            Path(prior_root).expanduser().resolve()
+            != workspace_root.expanduser().resolve()
+        ):
+            return None
+    except (OSError, RuntimeError):
+        return None
+
+    generated_at = prior.get("generated_at")
+    prior_projects = prior.get("projects")
+    if not isinstance(generated_at, str) or not generated_at.strip():
+        return None
+    if not isinstance(prior_projects, list):
+        return None
+
+    prior_keys: set[str] = set()
+    for project in prior_projects:
+        if not isinstance(project, dict):
+            return None
+        identity = project.get("identity")
+        if not isinstance(identity, dict):
+            return None
+        key = identity.get("project_key")
+        if not isinstance(key, str) or not key:
+            return None
+        if not key.startswith("supp:"):
+            prior_keys.add(key)
+
+    baseline_generated_at = generated_at
+    source_summary = prior.get("source_summary")
+    prior_gap = (
+        source_summary.get("workspace_inventory_gap")
+        if isinstance(source_summary, dict)
+        else None
+    )
+    if prior_gap is not None:
+        if not isinstance(prior_gap, dict):
+            return None
+        missing = prior_gap.get("missing_project_keys")
+        baseline = prior_gap.get("baseline_generated_at")
+        if (
+            set(prior_gap) != {"missing_project_keys", "baseline_generated_at"}
+            or not isinstance(missing, list)
+            or any(not isinstance(key, str) or not key for key in missing)
+            or missing != sorted(set(missing))
+            or any(key.startswith("supp:") for key in missing)
+            or set(missing).intersection(prior_keys)
+            or not isinstance(baseline, str)
+            or not baseline.strip()
+        ):
+            return None
+        prior_keys.update(key for key in missing if not key.startswith("supp:"))
+        baseline_generated_at = baseline
+
+    missing_keys = sorted(prior_keys - current_project_keys)
+    if not missing_keys:
+        return None
+    return {
+        "missing_project_keys": missing_keys,
+        "baseline_generated_at": baseline_generated_at,
+    }
+
+
 def publish_portfolio_truth(
     *,
     workspace_root: Path,
@@ -564,6 +649,18 @@ def _publish_portfolio_truth_locked(
         raise CohortR3Error(
             f"{exc} R3 diagnostics: {diagnostics_path}", exc.diagnostics
         ) from exc
+    current_project_keys = {
+        project.identity.project_key
+        for project in build_result.snapshot.projects
+        if not project.identity.project_key.startswith("supp:")
+    }
+    inventory_gap = _workspace_inventory_gap(
+        latest_path,
+        workspace_root=workspace_root,
+        current_project_keys=current_project_keys,
+    )
+    if inventory_gap is not None:
+        build_result.snapshot.source_summary["workspace_inventory_gap"] = inventory_gap
     validate_truth_snapshot(
         build_result.snapshot,
         security_max_age_hours=security_max_age_hours,

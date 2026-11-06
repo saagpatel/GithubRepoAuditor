@@ -532,6 +532,29 @@ def _validate_snapshot_metadata(
         or not isinstance(notion_context_carried_forward, bool)
     ):
         raise ValueError("PortfolioTruth source summary has invalid bounded inputs.")
+    workspace_inventory_gap = summary.get("workspace_inventory_gap")
+    if workspace_inventory_gap is not None:
+        if not isinstance(workspace_inventory_gap, dict) or set(
+            workspace_inventory_gap
+        ) != {"missing_project_keys", "baseline_generated_at"}:
+            raise ValueError("PortfolioTruth workspace inventory gap is malformed.")
+        missing_project_keys = workspace_inventory_gap.get("missing_project_keys")
+        baseline_generated_at = workspace_inventory_gap.get("baseline_generated_at")
+        current_project_keys = {
+            project.identity.project_key
+            for project in snapshot.projects
+            if not project.identity.project_key.startswith("supp:")
+        }
+        if (
+            not isinstance(missing_project_keys, list)
+            or any(not isinstance(key, str) or not key for key in missing_project_keys)
+            or missing_project_keys != sorted(set(missing_project_keys))
+            or any(key.startswith("supp:") for key in missing_project_keys)
+            or current_project_keys.intersection(missing_project_keys)
+            or not isinstance(baseline_generated_at, str)
+            or not baseline_generated_at.strip()
+        ):
+            raise ValueError("PortfolioTruth workspace inventory gap is invalid.")
     expected_summary = build_source_summary(
         workspace_root=snapshot.workspace_root,
         projects=snapshot.projects,
@@ -541,6 +564,7 @@ def _validate_snapshot_metadata(
         notion_context_rows=notion_context_rows,
         notion_context_carried_forward=notion_context_carried_forward,
         checkout_collisions=summary["checkout_collisions"]["groups"],
+        workspace_inventory_gap=workspace_inventory_gap,
     )
     if "security_coverage_clock" in summary:
         clock = summary["security_coverage_clock"]
@@ -2048,6 +2072,7 @@ def canonicalize_prior_security_truth_payload(
                     "notion_context_carried_forward"
                 ],
                 checkout_collisions=[],
+                workspace_inventory_gap=summary.get("workspace_inventory_gap"),
             )
             expected_legacy_summary = deepcopy(current_summary)
             expected_legacy_summary.pop("checkout_collisions")
@@ -2112,6 +2137,7 @@ def canonicalize_prior_security_truth_payload(
                     "notion_context_carried_forward"
                 ],
                 checkout_collisions=[],
+                workspace_inventory_gap=summary.get("workspace_inventory_gap"),
             )
             migrated["exclusions"] = build_exclusions(dict(exclusion_counts))
             canonicalize_truth_snapshot_payload(
