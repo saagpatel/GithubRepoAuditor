@@ -69,7 +69,7 @@ in since-window mode.
 Cursor Cloud builds start from this repository's checkout and must not depend on
 the local `.venv`, sibling repositories, generated `output/` artifacts, or
 credential-bearing files. The checked-in `.python-version` selects Python
-3.12.15; `.cursor/environment.json` pins `uv==0.13.0` and installs the locked
+3.12.15; `.cursor/environment.json` pins `uv==0.13.9` and installs the locked
 runtime and development dependencies with `uv sync --locked`.
 
 Use these repository-local, non-interactive checks in a Cloud build or agent:

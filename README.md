@@ -177,17 +177,7 @@ demo, benchmark, and direct exporter calls require an explicit overlay argument.
 ### Prerequisites
 
 - Python 3.12 to 3.14 (3.15 is not supported yet; pick a supported interpreter, for example `uv python install 3.13`)
-- [uv](https://docs.astral.sh/uv/) exactly 0.13.0 for the `make` targets (`make setup`, `make demo`, `make check`). `pyproject.toml` pins `required-version = "==0.13.0"`, so any other uv fails with a version mismatch. Switch with `uv self update 0.13.0`, or install it fresh with `curl -LsSf https://astral.sh/uv/0.13.0/install.sh | sh`. The plain `pip install` paths below do not need uv.
-
-  If you would rather not change your global uv, install 0.13.0 inside the clone (nothing is written outside it) and put it first on `PATH` for the session:
-
-  ```bash
-  python3 -m venv .uv-tool && .uv-tool/bin/pip install uv==0.13.0
-  export PATH="$PWD/.uv-tool/bin:$PATH"
-  uv --version   # uv 0.13.0
-  ```
-
-  `.uv-tool/` is gitignored. The venv only hosts the uv binary; uv picks its own supported project interpreter (see the Python range above).
+- [uv](https://docs.astral.sh/uv/) 0.13.9 or any later 0.13.x (for example the current Homebrew uv) for the `make` targets (`make setup`, `make demo`, `make check`). `pyproject.toml` sets `required-version = ">=0.13.9,<0.14"`, so uv 0.14 or newer fails with a version mismatch; CI runs exactly 0.13.9. Install or update with `brew install uv` or `curl -LsSf https://astral.sh/uv/0.13.9/install.sh | sh`. uv picks its own supported project interpreter (see the Python range above). The plain `pip install` paths below do not need uv.
 - pnpm and Node (versions pinned in `web/`) for `make setup` and `make check`
 - A GitHub account (public repos work without a token)
 - `GITHUB_TOKEN` env var or `gh` CLI authenticated (for private repos and higher rate limits)
@@ -245,7 +235,7 @@ output is private operator evidence unless it has been intentionally sanitized.
 ```bash
 git clone https://github.com/saagpatel/GithubRepoAuditor.git
 cd GithubRepoAuditor
-uv sync --locked --extra config   # requires uv 0.13.0, see Prerequisites
+uv sync --locked --extra config   # requires uv 0.13.9 or any later 0.13.x, see Prerequisites
 make demo
 ```
 
@@ -376,7 +366,7 @@ frontend uses Next.js 15 and React 19 with pinned Node and pnpm toolchains.
 JSON, Markdown, HTML, workbooks, and Notion payloads share the audit model.
 The canonical local portfolio truth path is `output/portfolio-truth-latest.json`.
 
-For a contributor checkout, install uv 0.13.0 (see Prerequisites), run `make setup`, then `make check` (this is the test command; Python tests alone: `make check-python`). These use
+For a contributor checkout, install uv 0.13.9 or any later 0.13.x (see Prerequisites), run `make setup`, then `make check` (this is the test command; Python tests alone: `make check-python`). These use
 locked dependencies and offline fixtures; semantic-index checks are a separate
 opt-in lane. See [CONTRIBUTING.md](CONTRIBUTING.md) for focused checks.
 
