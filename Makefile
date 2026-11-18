@@ -10,7 +10,7 @@ ARGS ?=
 
 # Setup hints are checked before any tools run. Checks do not regenerate outputs.
 require-tools:
-	@command -v uv >/dev/null 2>&1 || { echo "Missing uv. Install uv 0.13.0, then run make setup."; exit 1; }
+	@command -v uv >/dev/null 2>&1 || { echo "Missing uv. Install uv 0.13.9 or any later 0.13.x, then run make setup."; exit 1; }
 
 setup: require-tools
 	@command -v pnpm >/dev/null 2>&1 || { echo "Missing pnpm. Install the Node and pnpm pins in web/, then run make setup."; exit 1; }
