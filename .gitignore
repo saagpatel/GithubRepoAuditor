@@ -54,3 +54,6 @@ build/
 
 # pytest coverage artifact
 .coverage
+
+# Clone-local uv toolchain (see README Prerequisites)
+.uv-tool/
