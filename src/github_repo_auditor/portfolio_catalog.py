@@ -110,16 +110,14 @@ def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
     try:
         raw = catalog_path.read_text(encoding="utf-8")
         loaded = yaml.load(raw, Loader=UniqueKeyLoader) or {}
-    except (UnicodeDecodeError, OSError) as exc:
-        error = (
-            f"Failed to read portfolio catalog as UTF-8: invalid byte at offset {exc.start}."
-            if isinstance(exc, UnicodeDecodeError)
-            else f"Failed to read portfolio catalog: {type(exc).__name__}."
-        )
+    except UnicodeDecodeError as exc:
         return {
             "path": str(catalog_path),
             "exists": True,
-            "errors": [error],
+            "errors": [
+                "Failed to read portfolio catalog as UTF-8: "
+                f"invalid byte at offset {exc.start}."
+            ],
             "warnings": [],
             "defaults": {},
             "groups": {},
