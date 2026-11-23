@@ -23,7 +23,7 @@ def test_github_archive_status_joins_same_named_repositories_by_owner() -> None:
         source="github_api",
     )
 
-    selected = _select_repo_status_entry(statuses, "first-owner/shared", "shared")
+    selected = _select_repo_status_entry(statuses, "FIRST-Owner/Shared", "shared")
 
     assert selected is not None
     assert selected["archived"] is True

@@ -1598,13 +1598,13 @@ def _build_truth_project(
         raw_project.get("repo_full_name"),
         raw_project["name"],
     )
-    if status_entry and not isinstance(status_entry.get("archived"), bool):
+    if status_entry is not None and not isinstance(status_entry.get("archived"), bool):
         status_entry = None
     remote_status_available = remote_repository.get("state") in {
         "observed",
         "partial",
     } and isinstance(remote_repository.get("archived"), bool)
-    github_archived: bool | None = None
+    github_archived = False
     if status_entry is not None and status_entry.get("source") == "github_api":
         github_archived = status_entry.get("archived") is True
         provenance["github.archived"] = {
@@ -1627,16 +1627,7 @@ def _build_truth_project(
     last_activity = raw_project["last_meaningful_activity_at"]
     activity_status = _activity_status_for(last_activity, now=now)
     # Lifecycle fact, not a recency observation — orthogonal to activity_status.
-    archived = github_archived
-    if declared_values["lifecycle_state"] == "archived":
-        archived = True
-    elif (
-        archived is None
-        and declared_values["lifecycle_state"]
-        and not identity.repo_full_name
-    ):
-        # A local-only project can have an explicit non-archive lifecycle.
-        archived = False
+    archived = github_archived or declared_values["lifecycle_state"] == "archived"
 
     path_entry = build_operating_path_entry(
         {
@@ -1653,7 +1644,7 @@ def _build_truth_project(
             ),
         },
         context_quality=context_quality,
-        archived=archived is True,
+        archived=archived,
     )
     provenance["declared.operating_path"] = {
         "source": "normalized",
@@ -1734,7 +1725,7 @@ def _build_truth_project(
     }
     provenance["derived.archived"] = {
         "source": "derived",
-        "detail": str(archived).lower() if archived is not None else "unknown",
+        "detail": str(archived).lower(),
     }
     provenance["derived.attention_state"] = {
         "source": "derived",
@@ -2093,7 +2084,7 @@ def _activity_status_for(last_activity: datetime | None, *, now: datetime) -> st
     computed by the caller and passed to downstream consumers as its own boolean —
     see the `archived` local in `_build_truth_project`."""
     if last_activity is None:
-        return "unknown"
+        return "stale"
     delta_days = (now - last_activity).days
     if delta_days <= 14:
         return "active"

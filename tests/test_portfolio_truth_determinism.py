@@ -122,6 +122,12 @@ def test_published_truth_bytes_ignore_listing_order(
 
     first_json, first_report = generate(False)
     second_json, second_report = generate(True)
+    for payload in (first_json, second_json):
+        snapshot = json.loads(payload)
+        derived = snapshot["projects"][0]["derived"]
+        assert snapshot["generated_at"] == "2025-01-03T00:00:00+00:00"
+        assert derived["archived"] is True
+        assert derived["activity_status"] == "stale"
+        assert derived["readme_char_count"] == len("text")
     assert first_report == second_report
     assert first_json == second_json
-    assert json.loads(first_json)["projects"][0]["derived"]["archived"] is True
