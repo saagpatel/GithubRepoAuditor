@@ -206,8 +206,8 @@ def render_portfolio_report_markdown(
             "## Coverage Summary",
             "",
             f"- Context coverage: full `{context_counts.get('full', 0)}`, standard `{context_counts.get('standard', 0)}`, minimum-viable `{context_counts.get('minimum-viable', 0)}`, boilerplate `{context_counts.get('boilerplate', 0)}`, none `{context_counts.get('none', 0)}`",
-            f"- Registry status distribution: active `{registry_counts.get('active', 0)}`, recent `{registry_counts.get('recent', 0)}`, parked `{registry_counts.get('parked', 0)}`, archived `{registry_counts.get('archived', 0)}`",
-            f"- Default attention distribution: active-product `{attention_counts.get('active-product', 0)}`, active-infra `{attention_counts.get('active-infra', 0)}`, decision-needed `{attention_counts.get('decision-needed', 0)}`, manual-only `{attention_counts.get('manual-only', 0)}`, experiment `{attention_counts.get('experiment', 0)}`, parked `{attention_counts.get('parked', 0)}`, archived `{attention_counts.get('archived', 0)}`",
+            f"- Registry status distribution: active `{registry_counts.get('active', 0)}`, recent `{registry_counts.get('recent', 0)}`, parked `{registry_counts.get('parked', 0)}`, archived `{registry_counts.get('archived', 0)}`, unknown `{registry_counts.get('unknown', 0)}`",
+            f"- Default attention distribution: active-product `{attention_counts.get('active-product', 0)}`, active-infra `{attention_counts.get('active-infra', 0)}`, decision-needed `{attention_counts.get('decision-needed', 0)}`, manual-only `{attention_counts.get('manual-only', 0)}`, experiment `{attention_counts.get('experiment', 0)}`, parked `{attention_counts.get('parked', 0)}`, archived `{attention_counts.get('archived', 0)}`, unknown `{attention_counts.get('unknown', 0)}`",
             f"- Operating path distribution: maintain `{operating_path_counts.get('maintain', 0)}`, finish `{operating_path_counts.get('finish', 0)}`, archive `{operating_path_counts.get('archive', 0)}`, experiment `{operating_path_counts.get('experiment', 0)}`, unspecified `{operating_path_counts.get('unspecified', 0)}`",
             f"- Investigate overrides currently surfaced: `{override_counts.get('investigate', 0)}`",
             f"- Risk posture: elevated `{risk_tier_counts.get('elevated', 0)}`, moderate `{risk_tier_counts.get('moderate', 0)}`, baseline `{risk_tier_counts.get('baseline', 0)}`, deferred `{risk_tier_counts.get('deferred', 0)}`",
@@ -226,6 +226,7 @@ def render_portfolio_report_markdown(
             f" | Recent `{sum(1 for item in projects if _displayed_status(item) == 'recent')}`"
             f" | Parked `{sum(1 for item in projects if _displayed_status(item) == 'parked')}`"
             f" | Archived `{sum(1 for item in projects if _displayed_status(item) == 'archived')}`"
+            f" | Unknown `{sum(1 for item in projects if _displayed_status(item) == 'unknown')}`"
         )
         lines.append(
             f"- Default attention: active-product `{sum(1 for item in projects if item.derived.attention_state == 'active-product')}`, "
@@ -532,6 +533,7 @@ def _render_summary_section(projects: list[PortfolioTruthProject]) -> list[str]:
         f"| Recent (touched last 30 days) | {status_counts.get('recent', 0)} |",
         f"| Parked (30+ days) | {status_counts.get('parked', 0)} |",
         f"| Archived (legacy, no plans) | {status_counts.get('archived', 0)} |",
+        f"| Unknown activity | {status_counts.get('unknown', 0)} |",
         f"| Projects with full context | {context_counts.get('full', 0)} |",
         f"| Projects with standard context | {context_counts.get('standard', 0)} |",
         f"| Projects with minimum-viable context | {context_counts.get('minimum-viable', 0)} |",

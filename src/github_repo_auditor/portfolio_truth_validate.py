@@ -1983,6 +1983,45 @@ def canonicalize_truth_snapshot_payload(
 _LEGACY_PRIOR_SECURITY_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
 _LEGACY_SECURITY_RISK_LABEL = "open high/critical security alerts"
 _CURRENT_SECURITY_RISK_LABEL = "blocking GitHub security findings"
+_PRIOR_ACTIVITY_STATUSES = {"active", "recent", "stale"}
+_PRIOR_ATTENTION_STATES = {
+    "active-product",
+    "active-infra",
+    "decision-needed",
+    "parked",
+    "archived",
+    "experiment",
+    "evidence-history",
+    "manual-only",
+}
+
+
+def _validate_prior_schema_derived_fields(
+    derived: Mapping[str, Any],
+    *,
+    schema_version: str,
+) -> None:
+    if not isinstance(derived.get("archived"), bool):
+        raise ValueError(
+            f"Prior PortfolioTruth {schema_version} requires a boolean "
+            "derived.archived value."
+        )
+    if (
+        not isinstance(derived.get("activity_status"), str)
+        or derived["activity_status"] not in _PRIOR_ACTIVITY_STATUSES
+    ):
+        raise ValueError(
+            f"Prior PortfolioTruth {schema_version} has invalid "
+            "derived.activity_status."
+        )
+    if (
+        not isinstance(derived.get("attention_state"), str)
+        or derived["attention_state"] not in _PRIOR_ATTENTION_STATES
+    ):
+        raise ValueError(
+            f"Prior PortfolioTruth {schema_version} has invalid "
+            "derived.attention_state."
+        )
 
 
 def _project_decision_for_security_policy(
@@ -2046,27 +2085,33 @@ def canonicalize_prior_security_truth_payload(
             security_max_age_hours=security_max_age_hours,
         )
     except ValueError as strict_error:
-        if payload.get("schema_version") == "0.11.0" and SCHEMA_VERSION == "0.12.0":
+        prior_schema = payload.get("schema_version")
+        if prior_schema in ("0.11.0", "0.12.0") and SCHEMA_VERSION == "0.13.0":
             migrated = deepcopy(dict(payload))
             projects = migrated.get("projects")
             if not isinstance(projects, list):
                 raise ValueError(
-                    "Prior PortfolioTruth 0.11.0 project envelope is invalid."
+                    f"Prior PortfolioTruth {prior_schema} project envelope is invalid."
                 ) from strict_error
             for raw_project in projects:
                 if not isinstance(raw_project, dict) or not isinstance(
                     raw_project.get("derived"), dict
                 ):
                     raise ValueError(
-                        "Prior PortfolioTruth 0.11.0 project envelope is invalid."
+                        f"Prior PortfolioTruth {prior_schema} project envelope is invalid."
                     ) from strict_error
                 derived = raw_project["derived"]
-                if "degraded_dimensions" in derived:
+                if prior_schema == "0.11.0" and "degraded_dimensions" in derived:
                     raise ValueError(
                         "Prior PortfolioTruth 0.11.0 cannot declare "
                         "derived.degraded_dimensions."
                     ) from strict_error
-                derived["degraded_dimensions"] = None
+                _validate_prior_schema_derived_fields(
+                    derived,
+                    schema_version=str(prior_schema),
+                )
+                if prior_schema == "0.11.0":
+                    derived["degraded_dimensions"] = None
             migrated["schema_version"] = SCHEMA_VERSION
             try:
                 return canonicalize_truth_snapshot_payload(

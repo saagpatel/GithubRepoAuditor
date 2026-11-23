@@ -11,13 +11,16 @@ from github_repo_auditor.security_admission import (
     derive_security_admission,
 )
 
-SCHEMA_VERSION = "0.12.0"
+SCHEMA_VERSION = "0.13.0"
 CHECKOUT_COLLISION_SCHEMA_VERSION = "CheckoutCollisionV1"
 CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION = "CheckoutCollisionSummaryV1"
 # 0.12.0: additive opt-in derived.degraded_dimensions overlay names the analyzer
 # dimensions that crashed in the prior audit run (excluded from the score) so a
 # truth consumer can tell "graded low" from "could not grade"; null when no audit
 # overlay was requested. 0.11 readers ignore the additive key.
+# 0.13.0: derived.archived may be null, and derived.activity_status plus
+# derived.attention_state may be "unknown" when their evidence is missing.
+# Prior schema readers retain the original required-value domains.
 # 0.11.0: provenance-bearing GitHub security receipts preserve per-provider
 # states and expose complete/partial/stale/unknown coverage denominators.
 # Additive 0.11.0 fields bind normalized provider reason codes, completed-zero
@@ -30,7 +33,14 @@ CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION = "CheckoutCollisionSummaryV1"
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
 # activity_status); derived.archived added as a first-class lifecycle boolean;
 # source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
-LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}
+LEGACY_SCHEMA_VERSIONS = {
+    "0.7.0",
+    "0.8.0",
+    "0.9.0",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+}
 DERIVATION_POLICY_VERSION = "portfolio_attention.v3"
 
 # The published "latest" portfolio-truth artifact. The producer
@@ -47,8 +57,9 @@ def truth_latest_path(output_dir: Path) -> Path:
 VALID_CONTEXT_QUALITY = {"full", "standard", "minimum-viable", "boilerplate", "none"}
 # Pure recency observation. Lifecycle intent (archived) is a separate axis —
 # see DerivedFields.archived and display_activity_status() below.
-VALID_ACTIVITY_STATUS = {"active", "recent", "stale"}
+VALID_ACTIVITY_STATUS = {"active", "recent", "stale", "unknown"}
 VALID_ATTENTION_STATES = {
+    "unknown",
     "active-product",
     "active-infra",
     "decision-needed",
@@ -86,7 +97,7 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     return value.isoformat()
 
 
-def display_activity_status(activity_status: str, *, archived: bool) -> str:
+def display_activity_status(activity_status: str, *, archived: bool | None) -> str:
     """The single legitimate place `stale` (an observation) is relabeled `parked` (a
     lifecycle judgment) for human-facing surfaces. `archived` is a stored lifecycle fact,
     not a relabel, and always wins. Every renderer/report that used to read
@@ -162,11 +173,11 @@ class DerivedFields:
     known_risks_present: bool = False
     next_recommended_move_present: bool = False
     last_meaningful_activity_at: datetime | None = None
-    activity_status: str = "stale"
+    activity_status: str = "unknown"
     # Lifecycle fact, not a recency observation: github_archived OR declared
     # lifecycle_state == "archived". Orthogonal to activity_status.
-    archived: bool = False
-    attention_state: str = "parked"
+    archived: bool | None = None
+    attention_state: str = "unknown"
     path_override: str = ""
     path_confidence: str = "legacy"
     path_rationale: str = ""

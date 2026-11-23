@@ -36,7 +36,7 @@ from github_repo_auditor.producer_preflight import inspect_canonical_producer
 
 OPERATOR_COMMIT = "b" * 40
 ARTIFACTS = (
-    ("portfolio-truth.json", "application/json", "ghra.portfolio_truth@0.12.0"),
+    ("portfolio-truth.json", "application/json", "ghra.portfolio_truth@0.13.0"),
     ("decision-queue-v2.json", "application/json", "portfolio_decision_digest_v2"),
     ("portfolio-digest.md", "text/markdown", "portfolio_digest_markdown_v1"),
 )

@@ -21,10 +21,10 @@
     "project_count": 4,
     "security_evidence_semantics": "synthetic-cross-receipt-state-matrix"
   },
-  "portfolio_truth_schema_version": "0.12.0",
+  "portfolio_truth_schema_version": "0.13.0",
   "producer": {
     "artifact_path": "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json",
-    "artifact_sha256": "3a00a034463ecb2aeb4667387da1f84f94303d955f28934788196fd1733b41ec",
+    "artifact_sha256": "aafe84f9577e71087c447dd249c2b445c63820717a78c210176ac47117876e21",
     "generator": "github_repo_auditor.portfolio_truth_contract_fixture:build_contract_fixture",
     "manifest_path": "fixtures/contracts/portfolio-command-center-v1/manifest.json",
     "repository": "saagpatel/GithubRepoAuditor"

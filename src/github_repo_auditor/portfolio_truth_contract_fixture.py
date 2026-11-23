@@ -195,7 +195,7 @@ def _profile_acceptance(profile_id: str) -> dict[str, Any]:
                         "path": "/contract",
                         "value": {
                             "id": "ghra.portfolio_truth",
-                            "version": "0.12.0",
+                            "version": "0.13.0",
                             "compatibility": "additive",
                         },
                     },

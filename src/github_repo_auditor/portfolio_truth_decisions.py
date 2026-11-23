@@ -10,7 +10,7 @@ from github_repo_auditor.portfolio_risk import build_risk_entry
 def derive_attention_state(
     *,
     activity_status: str,
-    archived: bool,
+    archived: bool | None,
     lifecycle_state: str,
     operating_path: str,
     category: str,
@@ -46,7 +46,7 @@ def derive_attention_state(
         return "manual-only"
     if activity_status in {"active", "recent"}:
         return "manual-only"
-    return "parked"
+    return "unknown"
 
 
 def build_project_decision(
@@ -56,7 +56,7 @@ def build_project_decision(
     path_override: str,
     context_quality: str,
     activity_status: str,
-    archived: bool,
+    archived: bool | None,
     lifecycle_state: str,
     category: str,
     criticality: str,
@@ -74,7 +74,7 @@ def build_project_decision(
         path_override=path_override,
         context_quality=context_quality,
         activity_status=activity_status,
-        archived=archived,
+        archived=archived is True,
         criticality=criticality,
         doctor_standard=doctor_standard,
         known_risks_present=known_risks_present,

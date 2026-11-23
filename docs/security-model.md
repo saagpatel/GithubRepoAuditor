@@ -84,9 +84,8 @@ visible even when another provider is unavailable, but the evidence stays
 unadmitted and the decision queue withholds actionability until the complete
 evidence contract is restored.
 
-This is a consumer-semantics convergence, not a PortfolioTruth schema migration:
-the producer remains at `0.11.0`, existing compatibility count fields remain, and
-the legacy Dependabot-only `open_high_critical` project field is retained for old
+PortfolioTruth retains the compatibility counts and the legacy Dependabot-only
+`open_high_critical` project field for old
 readers. Risk/attention, the strict gate, portfolio rollups, registry/report
 rendering, the decision digest, and the weekly command-center security posture use
 the combined admission result.

@@ -759,6 +759,9 @@ def test_prior_security_loader_accepts_immediate_additive_schema_predecessor(
     payload["schema_version"] = "0.11.0"
     for project in payload["projects"]:
         project["derived"].pop("degraded_dimensions")
+        if project["derived"]["archived"] is None:
+            project["derived"]["archived"] = False
+            project["provenance"]["derived.archived"]["detail"] = "false"
     latest = tmp_path / "portfolio-truth-latest.json"
     latest.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -994,7 +997,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.12.0"
+    assert result.snapshot.schema_version == "0.13.0"
     assert result.snapshot.derivation_policy_version == "portfolio_attention.v3"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
@@ -1819,7 +1822,7 @@ repos:
     )
     monkeypatch.setattr(
         "github_repo_auditor.portfolio_truth_reconcile.load_safe_notion_project_context",
-        lambda: {
+        lambda *, now: {
             "repo": {
                 "portfolio_call": "Maintain",
                 "momentum": "Stable",
@@ -2153,7 +2156,8 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     assert personal_ops.identity.group_label == "Operator Infrastructure"
     assert personal_ops.identity.section_marker == "Supplementary Projects"
     assert personal_ops.identity.section_label == "Operator OS"
-    assert personal_ops.derived.activity_status == "stale"
+    assert personal_ops.derived.last_meaningful_activity_at is None
+    assert personal_ops.derived.activity_status == "unknown"
     assert personal_ops.derived.attention_state == "active-infra"
     assert personal_ops.security.cohort_member is False
     assert (

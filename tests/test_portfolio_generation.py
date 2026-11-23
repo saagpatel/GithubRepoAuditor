@@ -77,7 +77,7 @@ class PortfolioGenerationTests(unittest.TestCase):
         truth.write_text(
             json.dumps(
                 {
-                    "schema_version": "0.12.0",
+                    "schema_version": "0.13.0",
                     "marker": marker,
                     "inputs": {
                         "github_security": {
@@ -102,7 +102,7 @@ class PortfolioGenerationTests(unittest.TestCase):
                 "portfolio-truth.json",
                 truth,
                 "application/json",
-                "ghra.portfolio_truth@0.12.0",
+                "ghra.portfolio_truth@0.13.0",
             ),
             ArtifactInput(
                 "decision-queue-v2.json",
@@ -223,7 +223,7 @@ class PortfolioGenerationTests(unittest.TestCase):
         for value in (None, True, "invalid", [], {}):
             cases.append(
                 (
-                    json.dumps({"schema_version": "0.12.0", "inputs": value}).encode(),
+                    json.dumps({"schema_version": "0.13.0", "inputs": value}).encode(),
                     "inputs(\\.github_security)? must be a JSON object",
                 )
             )
@@ -231,14 +231,14 @@ class PortfolioGenerationTests(unittest.TestCase):
                 (
                     json.dumps(
                         {
-                            "schema_version": "0.12.0",
+                            "schema_version": "0.13.0",
                             "inputs": {"github_security": value},
                         }
                     ).encode(),
                     "(must be a JSON object|receipt_id is invalid)",
                 )
             )
-        cases.append((b'{"schema_version":"0.12.0"}', "inputs must be a JSON object"))
+        cases.append((b'{"schema_version":"0.13.0"}', "inputs must be a JSON object"))
         for index, (content, message) in enumerate(cases):
             with self.subTest(content=content):
                 root = self.base / f"malformed-{index}"
@@ -260,19 +260,19 @@ class PortfolioGenerationTests(unittest.TestCase):
             (
                 None,
                 "application/json",
-                "ghra.portfolio_truth@0.12.0",
+                "ghra.portfolio_truth@0.13.0",
                 "artifact is required",
             ),
             (
                 "truth.json",
                 "application/json",
-                "ghra.portfolio_truth@0.12.0",
+                "ghra.portfolio_truth@0.13.0",
                 "artifact is required",
             ),
             (
                 "portfolio-truth.json",
                 "text/plain",
-                "ghra.portfolio_truth@0.12.0",
+                "ghra.portfolio_truth@0.13.0",
                 "contract mismatch",
             ),
             (

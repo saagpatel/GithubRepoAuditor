@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.12.0",
+  "schema_version": "0.13.0",
   "generated_at": "2026-07-22T05:07:43.502563+00:00",
   "derivation_policy_version": "portfolio_attention.v3",
   "producer": {},

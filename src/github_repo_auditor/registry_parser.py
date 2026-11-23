@@ -6,7 +6,7 @@ from pathlib import Path
 
 from github_repo_auditor.models import RepoAudit
 
-VALID_STATUSES = {"active", "recent", "parked", "archived"}
+VALID_STATUSES = {"active", "recent", "parked", "archived", "unknown"}
 
 # Separator row pattern: |---|---|...|
 SEPARATOR_RE = re.compile(r"^\|[\s\-:]+\|")
