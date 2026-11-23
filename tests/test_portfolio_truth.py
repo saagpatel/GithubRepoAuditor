@@ -775,6 +775,37 @@ def test_prior_security_loader_accepts_immediate_additive_schema_predecessor(
     assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
 
 
+def test_prior_security_loader_accepts_012_legacy_discovery_envelope(
+    tmp_path: Path,
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    from github_repo_auditor import portfolio_truth_publish as publish_mod
+
+    payload, metadata, _ = _legacy_prior_security_payload(
+        portfolio_workspace=portfolio_workspace,
+        portfolio_catalog=portfolio_catalog,
+        legacy_registry=legacy_registry,
+    )
+    payload["schema_version"] = "0.12.0"
+    for project in payload["projects"]:
+        if project["derived"]["archived"] is None:
+            project["derived"]["archived"] = False
+            project["provenance"]["derived.archived"]["detail"] = "false"
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(json.dumps(payload), encoding="utf-8")
+
+    evidence = publish_mod._load_prior_security_alerts(
+        latest,
+        current_security_metadata=metadata,
+        security_max_age_hours=24,
+    )
+
+    assert evidence.final_cohort_repositories == ("d/Alpha",)
+    assert evidence.alerts_by_full_name["d/Alpha"]["dependabot_high"] == 1
+
+
 def test_immediate_additive_schema_predecessor_rejects_new_field(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
@@ -4795,6 +4826,47 @@ def test_rendered_registry_round_trips_through_parser(
     assert parsed["Alpha"] in {"active", "recent", "parked", "archived"}
     assert "## Portfolio Summary" in markdown
     assert "## Cowork Task Notes" in markdown
+
+
+def test_unknown_status_registry_row_preserves_legacy_fields_across_refreshes(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "sample"
+    project.mkdir(parents=True)
+    (project / "sample.bin").touch()
+    registry_path = tmp_path / "project-registry.md"
+    registry_path.write_text(
+        """
+# Project Registry
+
+## Standalone Projects
+
+| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |
+|---------|--------|------|-----------------|-------|---------------|----------|-------|
+| sample | parked | codex | standard | unknown | unknown | infrastructure | Keep handoff note |
+"""
+    )
+
+    def refresh():
+        return build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=tmp_path / "missing-catalog.yaml",
+            legacy_registry_path=registry_path,
+            include_notion=False,
+            now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        ).snapshot
+
+    first_markdown = render_registry_markdown(refresh())
+    assert "| sample | unknown |" in first_markdown
+    assert "| infrastructure | Keep handoff note |" in first_markdown
+    registry_path.write_text(first_markdown)
+
+    (sample,) = refresh().projects
+    assert (sample.declared.category, sample.declared.notes) == (
+        "infrastructure",
+        "Keep handoff note",
+    )
 
 
 def test_registry_validation_does_not_write_temp_markdown(

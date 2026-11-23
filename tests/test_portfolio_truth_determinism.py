@@ -10,6 +10,7 @@ from github_repo_auditor.portfolio_truth_publish import publish_portfolio_truth
 from github_repo_auditor.portfolio_truth_reconcile import (
     MaterializationContext,
     build_portfolio_truth_snapshot,
+    load_prior_notion_context,
 )
 from github_repo_auditor.portfolio_truth_render import _group_projects
 from github_repo_auditor.portfolio_truth_sources import _dedupe_checkouts_by_origin
@@ -19,6 +20,10 @@ from github_repo_auditor.portfolio_truth_types import (
     DerivedFields,
     IdentityFields,
     PortfolioTruthProject,
+)
+from github_repo_auditor.portfolio_truth_validate import (
+    canonicalize_truth_snapshot_payload,
+    canonicalize_prior_security_truth_payload,
 )
 from github_repo_auditor.portfolio_truth_status import (
     load_repo_status_from_audit_by_name,
@@ -170,6 +175,50 @@ def test_case_only_checkout_ties_have_stable_order() -> None:
     assert collision([upper, lower]) == collision([lower, upper])
 
 
+def test_notion_title_collisions_preserve_exact_advisories_in_both_orders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    for parent, title in (("one", "Widget"), ("two", "widget"), ("three", "WIDGET")):
+        project = workspace / parent / title
+        project.mkdir(parents=True)
+        (project / "README.md").write_text("# Fixture\n")
+
+    rows = [
+        ("Widget", {"portfolio_call": "Maintain"}),
+        ("widget", {"portfolio_call": "Archive"}),
+    ]
+    expected = {"Widget": "Maintain", "widget": "Archive", "WIDGET": ""}
+    loader = "github_repo_auditor.portfolio_truth_sources.load_notion_project_context"
+    for ordered in (rows, rows[::-1]):
+        monkeypatch.setattr(loader, lambda _: dict(ordered))
+        snapshot = build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=tmp_path / "absent.yaml",
+            include_notion=True,
+        ).snapshot
+        assert {
+            row.identity.display_name: row.advisory.notion_portfolio_call
+            for row in snapshot.projects
+        } == expected
+
+        prior = tmp_path / "prior.json"
+        prior.write_text(json.dumps(snapshot.to_dict()))
+        monkeypatch.setattr(loader, lambda _: {})
+        monkeypatch.delenv("GHRA_NOTION_SNAPSHOT_PATH", raising=False)
+        refreshed = build_portfolio_truth_snapshot(
+            workspace_root=workspace,
+            catalog_path=tmp_path / "absent.yaml",
+            include_notion=True,
+            notion_context_fallback=load_prior_notion_context(prior),
+            prior_notion_generated_at=snapshot.generated_at,
+        ).snapshot
+        assert {
+            row.identity.display_name: row.advisory.notion_portfolio_call
+            for row in refreshed.projects
+        } == expected
+
+
 def test_case_only_project_and_notion_rows_have_stable_order(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -218,3 +267,54 @@ def test_case_only_project_and_notion_rows_have_stable_order(
         ]
 
     assert ordered_rows([upper, lower]) == ordered_rows([lower, upper])
+
+
+@pytest.fixture
+def case_only_snapshot(tmp_path: Path) -> dict:
+    workspace = tmp_path / "workspace"
+    for parent, name in (("one", "Widget"), ("two", "widget")):
+        project = workspace / parent / name
+        project.mkdir(parents=True)
+        (project / "README.md").write_text(f"# {name}\n")
+
+    return build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=tmp_path / "absent.yaml",
+        include_notion=False,
+        repo_status_by_name={
+            "Widget": {"archived": False},
+            "widget": {"archived": False},
+        },
+    ).snapshot.to_dict()
+
+
+def test_current_truth_rejects_reversed_case_only_project_order(
+    case_only_snapshot: dict,
+) -> None:
+    canonicalize_truth_snapshot_payload(case_only_snapshot)
+    case_only_snapshot["projects"].reverse()
+    with pytest.raises(ValueError, match="producer ordering"):
+        canonicalize_truth_snapshot_payload(case_only_snapshot)
+
+
+@pytest.mark.parametrize("envelope", ["v3", "v2"])
+def test_prior_truth_migration_orders_case_only_ties(
+    case_only_snapshot: dict, envelope: str
+) -> None:
+    payload = case_only_snapshot
+    payload["schema_version"] = "0.12.0"
+    if envelope == "v2":
+        payload["source_summary"].pop("checkout_collisions")
+        payload["exclusions"]["policy_version"] = "workspace_discovery.v2"
+    payload["projects"].reverse()
+
+    canonical = canonicalize_prior_security_truth_payload(payload)
+    assert [p["identity"]["display_name"] for p in canonical["projects"]] == [
+        "Widget",
+        "widget",
+    ]
+
+    # The old producer allowed ties, but still required lowercase name order.
+    payload["projects"][0]["identity"]["display_name"] = "Zulu"
+    with pytest.raises(ValueError, match="producer ordering"):
+        canonicalize_prior_security_truth_payload(payload)
