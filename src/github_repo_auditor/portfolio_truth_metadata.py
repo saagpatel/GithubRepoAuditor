@@ -107,7 +107,8 @@ def build_source_summary(
             )
         ),
         "archived_count": sum(
-            _field(_section(project, "derived"), "archived") for project in projects
+            _field(_section(project, "derived"), "archived") is True
+            for project in projects
         ),
         "attention_state_counts": dict(
             Counter(
@@ -176,11 +177,14 @@ def build_input_envelope(
     security_coverage_metadata: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     resolved_catalog = Path(str(catalog_path or ""))
-    catalog_hash = (
-        hashlib.sha256(resolved_catalog.read_bytes()).hexdigest()
-        if resolved_catalog.is_file()
-        else None
-    )
+    try:
+        catalog_hash = (
+            hashlib.sha256(resolved_catalog.read_bytes()).hexdigest()
+            if resolved_catalog.is_file()
+            else None
+        )
+    except OSError:
+        catalog_hash = None
     if not include_notion or notion_context_rows == 0:
         notion_mode = "unavailable"
         notion_observed_at = None
