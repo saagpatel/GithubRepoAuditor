@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -73,3 +74,41 @@ def test_pinned_publication_clock_controls_cached_notion_freshness(
         for payload, _ in publications
     ] == [1, 1]
     assert publications[0] == publications[1]
+
+
+def test_naive_notion_snapshot_timestamp_is_invalid_in_every_timezone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    projects = [{"title": "sample", "portfolio_call": "Maintain"}]
+    snapshot = tmp_path / "advisory.json"
+    snapshot.write_text(
+        json.dumps(
+            {
+                "schema_version": "2.0.0",
+                "generated_at": "2025-02-01T00:00:00",
+                "project_count": 1,
+                "projects": projects,
+                "content_sha256": hashlib.sha256(
+                    json.dumps(projects, separators=(",", ":")).encode()
+                ).hexdigest(),
+                "live_read_receipt": {"state": "verified", "page_count": 1},
+                "attention_authority_receipt": {"state": "verified"},
+            }
+        )
+    )
+
+    accepted = []
+    try:
+        with monkeypatch.context() as patch:
+            for zone in ("UTC", "America/Los_Angeles"):
+                patch.setenv("TZ", zone)
+                time.tzset()
+                accepted.append(
+                    portfolio_truth_sources.verified_notion_snapshot(
+                        snapshot, now=datetime(2025, 2, 1, tzinfo=timezone.utc)
+                    )
+                    is not None
+                )
+    finally:
+        time.tzset()
+    assert accepted == [False, False]

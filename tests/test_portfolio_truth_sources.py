@@ -8,6 +8,7 @@ so they don't inflate the project count and pollute catalog-completeness.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -767,6 +768,24 @@ def test_discovery_recognizes_conventional_bare_coordinator(tmp_path) -> None:
     assert project["_checkout_observation"]["bare"] is True
 
 
+def test_invalid_git_marker_does_not_claim_repository_identity(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    project_path = workspace / "InvalidRepo"
+    project_path.mkdir(parents=True)
+    (project_path / ".git").mkdir()
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=tmp_path / "missing.yaml",
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    project = next(iter(result.snapshot.projects))
+    assert project.identity.has_git is False
+    assert project.repository_state["state"] == "not_a_repository"
+
+
 def test_discovery_observes_dirty_worktree_inside_excluded_container(
     tmp_path: Path,
 ) -> None:
@@ -901,6 +920,62 @@ def test_discovery_preserves_opaque_external_linked_worktree_evidence(
     assert summary["group_count"] == 1
     assert summary["ambiguous_group_count"] == 1
     assert summary["discarded_checkout_count"] == 1
+
+
+def test_prunable_worktree_is_not_published_as_independent_clone(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    primary = workspace / "Repo"
+    primary.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=primary, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:owner/Repo.git"],
+        cwd=primary,
+        check=True,
+    )
+    (primary / "README.md").write_text("# Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=primary, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        cwd=primary,
+        check=True,
+    )
+    prunable_path = workspace / "Prunable"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature", str(prunable_path), "HEAD"],
+        cwd=primary,
+        check=True,
+    )
+    shutil.rmtree(prunable_path)
+
+    collisions: list[dict] = []
+    discover_workspace_projects(
+        workspace,
+        catalog_data={},
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        checkout_collisions=collisions,
+    )
+
+    collision = collisions[0]
+    checkout = next(
+        item for item in collision["checkouts"] if item["path"] == "Prunable"
+    )
+    assert checkout["relation"] == "linked_worktree"
+    assert collision["full_clone_count"] == 1
+    assert checkout["state"] == "unknown"
+    assert checkout["prunable"] is True
 
 
 def test_bare_coordinator_uses_worktree_inside_excluded_container(

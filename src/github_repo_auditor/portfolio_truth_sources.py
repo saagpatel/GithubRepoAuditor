@@ -281,7 +281,7 @@ def _dedupe_checkouts_by_origin(
                 checkout_collisions.append(collision)
         canonical.append(canonical_project)
 
-    canonical.sort(key=lambda p: str(p.get("name", "")).lower())
+    canonical.sort(key=lambda p: (p["name"].lower(), p["name"], p["path"]))
     return canonical
 
 
@@ -300,7 +300,9 @@ def _checkout_topology_group(
 
     resolved_root = workspace_root.resolve()
     expanded = list(group)
-    known_paths = {Path(str(project["project_path"])).resolve() for project in group}
+    known_paths = {
+        Path(str(project["project_path"])).resolve(): project for project in group
+    }
     published_paths = {str(project.get("path") or "") for project in group}
     external_worktree_count = 0
     for source_project in group:
@@ -315,11 +317,18 @@ def _checkout_topology_group(
         ):
             source_project["_worktree_enumeration_failed"] = True
             continue
-        for worktree_path in worktree_paths:
+        for worktree_path, prunable in worktree_paths.items():
             resolved_path = worktree_path.resolve()
             if resolved_path in known_paths:
+                known = known_paths[resolved_path]
+                if (
+                    known is not source_project
+                    and _checkout_observation(known).get("state") != "observed"
+                    and _checkout_observation(source_project).get("state") == "observed"
+                ):
+                    known["_registered_clone"] = _checkout_clone_key(source_project)
+                    known["_prunable_worktree"] = prunable
                 continue
-            known_paths.add(resolved_path)
             if not _path_is_within(resolved_path, resolved_root):
                 external_worktree_count += 1
                 opaque_path = (
@@ -339,6 +348,7 @@ def _checkout_topology_group(
                         "project_path": resolved_root / opaque_path,
                         "repo_full_name": source_project.get("repo_full_name", ""),
                         "_external_worktree": True,
+                        "_prunable_worktree": prunable,
                         "_checkout_observation": {
                             "state": "unknown",
                             "head": None,
@@ -351,33 +361,44 @@ def _checkout_topology_group(
                         },
                     }
                 )
+                known_paths[resolved_path] = expanded[-1]
                 continue
-            try:
-                linked_project = _inspect_project_dir(
-                    resolved_path,
-                    resolved_root,
-                    catalog_data=catalog_data,
-                    now=now,
+            linked_project = {
+                "name": resolved_path.name,
+                "path": resolved_path.relative_to(resolved_root).as_posix(),
+                "project_path": resolved_path,
+            }
+            if prunable:
+                linked_project["_prunable_worktree"] = True
+            else:
+                try:
+                    linked_project = _inspect_project_dir(
+                        resolved_path, resolved_root, catalog_data=catalog_data, now=now
+                    )
+                except FileNotFoundError:
+                    linked_project["_missing_worktree"] = True
+                except OSError:
+                    pass  # Registered by Git, but individual checkout facts are unknown.
+            if _checkout_observation(linked_project).get("state") != "observed":
+                linked_project["_registered_clone"] = _checkout_clone_key(
+                    source_project
                 )
-            except OSError:
-                linked_project = {
-                    "name": resolved_path.name,
-                    "path": resolved_path.relative_to(resolved_root).as_posix(),
-                    "project_path": resolved_path,
-                    "_checkout_observation": _checkout_observation({}),
-                }
             linked_project["repo_full_name"] = source_project.get("repo_full_name", "")
             expanded.append(linked_project)
+            known_paths[resolved_path] = linked_project
     return expanded
 
 
-def _git_worktree_paths(project_path: Path) -> list[Path]:
-    output = _git_read(project_path, "worktree", "list", "--porcelain")
-    paths = [
-        Path(line.removeprefix("worktree "))
-        for line in output.splitlines()
-        if line.startswith("worktree ")
-    ]
+def _git_worktree_paths(project_path: Path) -> dict[Path, bool]:
+    """Map registered paths to Git's prunable flag, retaining missing members."""
+    output = _git_read(project_path, "worktree", "list", "--porcelain", "-z")
+    paths = {}
+    for record in output.split("\0\0"):
+        first, *attributes = record.split("\0")
+        if first.startswith("worktree "):
+            paths[Path(first.removeprefix("worktree "))] = any(
+                field.partition(" ")[0] == "prunable" for field in attributes
+            )
     if not paths:
         raise ValueError("git worktree list returned no worktrees")
     return paths
@@ -387,7 +408,9 @@ def checkout_collision_summary(
     collisions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Build the stable portfolio-level collision summary without adding projects."""
-    groups = sorted(collisions, key=lambda item: str(item["origin"]).lower())
+    groups = sorted(
+        collisions, key=lambda item: (item["origin"].lower(), item["origin"])
+    )
     ambiguous_group_count = sum(
         item["selection"]["state"] == "unknown" for item in groups
     )
@@ -438,7 +461,7 @@ def _checkout_representative(
     return min(
         group,
         key=lambda project: (
-            project.get("_external_worktree") is True,
+            project.get("_external_worktree") is True or "_registered_clone" in project,
             _checkout_observation(project).get("state") != "observed",
             _checkout_observation(project).get("bare") is True,
             "_archive" in Path(str(project.get("path", ""))).parts,
@@ -446,6 +469,7 @@ def _checkout_representative(
             len(Path(str(project.get("path", ""))).parts),
             len(str(project.get("path", ""))),
             str(project.get("path", "")).lower(),
+            str(project.get("path", "")),
         ),
     )
 
@@ -463,6 +487,7 @@ def _checkout_identity_project(
             len(Path(str(project.get("path", ""))).parts),
             len(str(project.get("path", ""))),
             str(project.get("path", "")).lower(),
+            str(project.get("path", "")),
         ),
     )
 
@@ -497,7 +522,8 @@ def _checkout_collision_record(
     representative_clone = _checkout_clone_key(representative)
     declarations, unresolved_declarations = _declared_checkout_evidence(group)
     declared_checkout_paths = sorted(
-        {item["target_checkout_path"] for item in declarations}, key=str.lower
+        {item["target_checkout_path"] for item in declarations},
+        key=lambda path: (path.lower(), path),
     )
     representative_path = str(representative.get("path") or "")
 
@@ -599,7 +625,9 @@ def _checkout_collision_record(
             representative=representative,
             representative_clone=representative_clone,
         )
-        for project in sorted(group, key=lambda item: str(item.get("path", "")).lower())
+        for project in sorted(
+            group, key=lambda item: (item["path"].lower(), item["path"])
+        )
     ]
     discarded = [
         checkout for checkout in checkouts if checkout["path"] != representative_path
@@ -631,6 +659,8 @@ def _checkout_collision_record(
 
 
 def _checkout_clone_key(project: dict[str, Any]) -> str:
+    if registered_clone := project.get("_registered_clone"):
+        return str(registered_clone)
     observation = _checkout_observation(project)
     common_dir = str(observation.get("git_common_dir") or "")
     if common_dir and (
@@ -668,7 +698,10 @@ def _published_checkout(
     representative_path = str(representative.get("path") or "")
     if path == representative_path:
         relation = "representative"
-    elif _checkout_clone_key(project) == representative_clone:
+    elif (
+        "_registered_clone" in project
+        or _checkout_clone_key(project) == representative_clone
+    ):
         relation = "linked_worktree"
     else:
         relation = "independent_full_clone"
@@ -676,6 +709,8 @@ def _published_checkout(
         "path": path,
         "state": str(observation.get("state") or "unknown"),
         "relation": relation,
+        **({"prunable": True} if project.get("_prunable_worktree") else {}),
+        **({"missing": True} if project.get("_missing_worktree") else {}),
         "head": observation.get("head"),
         "branch": observation.get("branch"),
         "dirty": observation.get("dirty"),
@@ -725,9 +760,11 @@ def _declared_checkout_evidence(
             key=lambda item: (
                 item["source_path"].lower(),
                 item["target_checkout_path"].lower(),
+                item["source_path"],
+                item["target_checkout_path"],
             ),
         ),
-        sorted(unresolved, key=str.lower),
+        sorted(unresolved, key=lambda path: (path.lower(), path)),
     )
 
 
@@ -923,6 +960,8 @@ def verified_notion_snapshot(
             str(payload.get("generated_at", "")).replace("Z", "+00:00")
         )
     except ValueError:
+        return None
+    if generated_at.tzinfo is None:
         return None
     age_hours = (
         (now or datetime.now(timezone.utc)) - generated_at.astimezone(timezone.utc)
@@ -1136,8 +1175,7 @@ def _read_small_json(path: Path) -> dict[str, Any]:
 
 
 def _gather_git_facts(project_path: Path) -> dict[str, Any]:
-    git_dir = project_path / ".git"
-    if not git_dir.exists() and not _is_bare_repository_root(project_path):
+    if not _is_repository_root(project_path):
         return {
             "has_git": False,
             "last_commit_at": None,
@@ -1319,7 +1357,11 @@ def _declared_canonical_paths(
     }
     return sorted(
         unique.values(),
-        key=lambda item: (item["source_file"], item["absolute_path"].lower()),
+        key=lambda item: (
+            item["source_file"],
+            item["absolute_path"].lower(),
+            item["absolute_path"],
+        ),
     )
 
 
@@ -1331,32 +1373,17 @@ def _path_is_within(candidate: Path, root: Path) -> bool:
         return False
 
 
-def _is_bare_repository_root(project_path: Path) -> bool:
-    """Recognize a conventional bare repository without climbing into parents."""
+def _is_repository_root(project_path: Path) -> bool:
+    """Verify the local Git marker (or bare directory) without searching ancestors."""
+    marker = project_path / ".git"
+    git_dir = marker if marker.exists() else project_path
     try:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(project_path),
-                "rev-parse",
-                "--is-bare-repository",
-                "--absolute-git-dir",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
+        _git_read(
+            project_path, "rev-parse", "--resolve-git-dir", str(git_dir.resolve())
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return False
-    lines = result.stdout.splitlines()
-    if result.returncode != 0 or len(lines) != 2 or lines[0].strip() != "true":
-        return False
-    try:
-        return Path(lines[1].strip()).resolve() == project_path.resolve()
-    except OSError:
-        return False
+    return True
 
 
 def _git_default_branch(project_path: Path) -> str:

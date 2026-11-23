@@ -215,7 +215,7 @@ def validate_checkout_authority_envelope(
             raise ValueError("Declared checkout target is not in the collision group.")
     expected_declared_paths = sorted(
         {item["target_checkout_path"] for item in declared_evidence},
-        key=str.lower,
+        key=lambda path: (path.lower(), path),
     )
     if declared_paths != expected_declared_paths:
         raise ValueError("Declared checkout paths do not match declared path evidence.")
