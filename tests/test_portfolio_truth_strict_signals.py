@@ -399,3 +399,22 @@ def test_security_alerts_picks_latest_by_mtime(tmp_path: Path) -> None:
     result = load_security_alerts_by_name(output_dir=tmp_path, username="saagpatel")
     assert result is not None
     assert result["MyRepo"]["dependabot"]["high"] == 1
+
+
+def test_unreadable_archive_evidence_leaves_status_unknown(tmp_path: Path) -> None:
+    from github_repo_auditor.portfolio_truth_status import (
+        load_repo_status_from_audit_by_name,
+    )
+
+    cached_report = tmp_path / "audit-report-fixture-date.json"
+    for content in (
+        "{",
+        "null",
+        "[]",
+        '{"audits":42}',
+        '{"audits":[null, {"metadata":{}}]}',
+    ):
+        cached_report.write_text(content)
+        assert not load_repo_status_from_audit_by_name(
+            output_dir=tmp_path, username="fixture"
+        )
