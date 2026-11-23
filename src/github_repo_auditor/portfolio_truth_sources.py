@@ -101,6 +101,7 @@ IGNORE_PROJECT_DIR_NAMES = frozenset(
         "sweep-reports",
         "_fable-worktrees",
         "_codex-worktrees",
+        "_claude-worktrees",
     }
 )
 IGNORE_NESTED_PROJECT_DIR_NAMES = frozenset({"packets", "prompts"})
@@ -156,7 +157,7 @@ def workspace_exclusion_reason(name: str, *, nested: bool = False) -> str | None
         return "scratch-container"
     if lowered == "sweep-reports":
         return "generated-reports"
-    if lowered in {"_fable-worktrees", "_codex-worktrees"}:
+    if lowered in {"_fable-worktrees", "_codex-worktrees", "_claude-worktrees"}:
         return "linked-worktree-container"
     if nested and lowered in IGNORE_NESTED_PROJECT_DIR_NAMES:
         return "nested-content"
@@ -185,33 +186,14 @@ def discover_workspace_projects(
     exclusion_counts: dict[str, int] | None = None,
     checkout_collisions: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    discovered: list[dict[str, Any]] = []
     now = now or datetime.now(timezone.utc)
-
-    for child in sorted(workspace_root.iterdir(), key=lambda item: item.name.lower()):
-        if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
-            continue
-        exclusion_reason = workspace_exclusion_reason(child.name)
-        if exclusion_reason is not None:
-            _record_exclusion(exclusion_counts, exclusion_reason)
-            continue
-        if child.name != "_archive" and _is_project_dir(child):
-            discovered.append(
-                _inspect_project_dir(
-                    child, workspace_root, catalog_data=catalog_data, now=now
-                )
-            )
-            continue
-        discovered.extend(
-            _discover_nested_projects(
-                child,
-                workspace_root,
-                catalog_data=catalog_data,
-                now=now,
-                depth=2,
-                exclusion_counts=exclusion_counts,
-            )
-        )
+    discovered = _discover_nested_projects(
+        workspace_root,
+        workspace_root,
+        catalog_data=catalog_data,
+        now=now,
+        exclusion_counts=exclusion_counts,
+    )
     return _dedupe_checkouts_by_origin(
         discovered,
         checkout_collisions=checkout_collisions,
@@ -238,18 +220,28 @@ def _dedupe_checkouts_by_origin(
 
     Keep one compatibility representative per origin without claiming checkout
     authority when independent full clones disagree. Every non-representative
-    checkout remains visible in ``CheckoutCollisionV1`` evidence. Projects without
-    an origin are local-only and are never collapsed. Result is sorted by name
-    (case-insensitive), matching the prior discovery ordering.
+    checkout remains visible in ``CheckoutCollisionV1`` evidence. Local-only
+    repositories collapse only when Git reports the same common directory, which
+    identifies linked worktrees without merging independent local repositories.
+    Result is sorted by name (case-insensitive), matching prior discovery ordering.
     """
     by_origin: dict[str, list[dict[str, Any]]] = {}
+    by_local_common_dir: dict[str, list[dict[str, Any]]] = {}
     canonical: list[dict[str, Any]] = []
     for project in discovered:
         origin = str(project.get("repo_full_name", "") or "").strip()
         if origin:
             by_origin.setdefault(origin.lower(), []).append(project)
         else:
-            canonical.append(project)
+            common_dir = _checkout_observation(project).get("git_common_dir")
+            if common_dir:
+                common_dir_key = os.path.normcase(str(Path(str(common_dir)).resolve()))
+                by_local_common_dir.setdefault(common_dir_key, []).append(project)
+            else:
+                canonical.append(project)
+
+    for group in by_local_common_dir.values():
+        canonical.append(_checkout_representative(group, ""))
 
     for origin_key, group in by_origin.items():
         identity_project = _checkout_identity_project(group, origin_key)
@@ -577,12 +569,25 @@ def _checkout_collision_record(
             state = "unknown"
             reason_code = "full_clone_local_work_present"
             reason = "an independent same-origin clone contains local work"
+        elif declared_checkout_paths == [representative_path]:
+            reason_code = "declared_checkout_path"
+            reason = "the canonical path declaration identifies the representative"
         else:
-            reason_code = "equivalent_full_clones"
-            reason = (
-                "independent same-origin clones have equivalent observed heads; "
-                "the deterministic compatibility representative is selected"
-            )
+            usable_clones = [
+                project
+                for project in clone_representatives
+                if _checkout_observation(project).get("bare") is False
+            ]
+            if len(usable_clones) == 1:
+                reason_code = "only_usable_full_clone"
+                reason = "only one independent same-origin clone has a working tree"
+            else:
+                state = "unknown"
+                reason_code = "equivalent_full_clones_unresolved_authority"
+                reason = (
+                    "independent same-origin clones have equivalent observed heads, "
+                    "but no canonical checkout is declared"
+                )
     elif any(_checkout_observation(project).get("dirty") is True for project in group):
         state = "unknown"
         reason_code = "linked_worktree_local_work_present"
@@ -732,35 +737,44 @@ def _discover_nested_projects(
     *,
     catalog_data: dict[str, Any],
     now: datetime,
-    depth: int,
     exclusion_counts: dict[str, int] | None = None,
+    git_only: bool = False,
 ) -> list[dict[str, Any]]:
-    if depth <= 0:
-        return []
-
     discovered: list[dict[str, Any]] = []
-    for child in sorted(root.iterdir(), key=lambda item: item.name.lower()):
-        if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
+    nested = root != workspace_root
+    for child in sorted(
+        root.iterdir(), key=lambda item: (item.name.lower(), item.name)
+    ):
+        if (
+            child.name.startswith(".")
+            or child.name in SKIP_DIRS
+            or child.is_symlink()
+            or not child.is_dir()
+        ):
             continue
-        exclusion_reason = workspace_exclusion_reason(child.name, nested=True)
+        exclusion_reason = workspace_exclusion_reason(child.name, nested=nested)
         if exclusion_reason is not None:
             _record_exclusion(exclusion_counts, exclusion_reason)
             continue
-        if _is_project_dir(child):
+        if git_only:
+            # Source and documentation directories inside a project are not separate projects.
+            is_project = (child / ".git").exists()
+        else:
+            is_project = (nested or child.name != "_archive") and _is_project_dir(child)
+        if is_project:
             discovered.append(
                 _inspect_project_dir(
                     child, workspace_root, catalog_data=catalog_data, now=now
                 )
             )
-            continue
         discovered.extend(
             _discover_nested_projects(
                 child,
                 workspace_root,
                 catalog_data=catalog_data,
                 now=now,
-                depth=depth - 1,
                 exclusion_counts=exclusion_counts,
+                git_only=git_only or is_project,
             )
         )
     return discovered
@@ -820,6 +834,8 @@ def load_legacy_registry_rows(path: Path | None) -> dict[str, dict[str, str]]:
 def load_safe_notion_project_context(
     config_dir: Path = Path("config"),
     snapshot_path: Path | None = None,
+    *,
+    now: datetime | None = None,
 ) -> dict[str, dict[str, str]]:
     raw_context = load_notion_project_context(config_dir)
     source_mode = "live"
@@ -828,7 +844,7 @@ def load_safe_notion_project_context(
         configured_snapshot = snapshot_path or _notion_snapshot_path_from_environment()
         if configured_snapshot:
             raw_context, observed_at = _load_verified_notion_snapshot_context(
-                configured_snapshot
+                configured_snapshot, now=now
             )
             source_mode = "verified-snapshot"
         else:
@@ -859,6 +875,8 @@ def _notion_snapshot_path_from_environment() -> Path | None:
 
 def verified_notion_snapshot(
     snapshot_path: Path,
+    *,
+    now: datetime | None = None,
 ) -> tuple[list[Any], datetime] | None:
     """Return a Notion snapshot's projects only if the whole receipt verifies.
 
@@ -907,7 +925,7 @@ def verified_notion_snapshot(
     except ValueError:
         return None
     age_hours = (
-        datetime.now(timezone.utc) - generated_at.astimezone(timezone.utc)
+        (now or datetime.now(timezone.utc)) - generated_at.astimezone(timezone.utc)
     ).total_seconds() / 3600
     if age_hours < -(5 / 60) or age_hours > MAX_NOTION_SNAPSHOT_AGE_HOURS:
         return None
@@ -921,8 +939,10 @@ def verified_notion_snapshot(
 
 def _load_verified_notion_snapshot_context(
     snapshot_path: Path,
+    *,
+    now: datetime | None = None,
 ) -> tuple[dict[str, dict[str, str]], str | None]:
-    verified = verified_notion_snapshot(snapshot_path)
+    verified = verified_notion_snapshot(snapshot_path, now=now)
     if verified is None:
         return {}, None
     projects, generated_at = verified
