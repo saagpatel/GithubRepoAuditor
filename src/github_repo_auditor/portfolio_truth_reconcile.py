@@ -22,6 +22,7 @@ from github_repo_auditor.portfolio_catalog import (
     group_entry_for_path,
     load_portfolio_catalog,
 )
+from github_repo_auditor.portfolio_checkout_authority import checkout_authority_blocker
 from github_repo_auditor.portfolio_context_contract import (
     has_substantive_readme_support,
 )
@@ -1004,6 +1005,38 @@ def derive_candidate_cohort(
     )
 
 
+def _final_checkout_blocker(
+    project: PortfolioTruthProject, workspace_root: Path
+) -> str | None:
+    blocker = checkout_authority_blocker(project, workspace_root=workspace_root)
+    if blocker:
+        return blocker
+
+    # A clean count alone cannot distinguish a replaced worktree or a new HEAD.
+    state = project.repository_state
+    discovery = {
+        (workspace_root / member["path"]).resolve(): member
+        for member in state["checkout_authority"]["checkouts"]
+        if member["relation"] in {"representative", "linked_worktree"}
+    }
+    observed = {
+        Path(tree["path"]).resolve(): tree for tree in state.get("worktrees", [])
+    }
+    if discovery.keys() != observed.keys():
+        return "checkout-authority-topology-mismatch"
+    for path, member in discovery.items():
+        tree = observed[path]
+        # Git's porcelain entry for a bare coordinator only reports its kind.
+        fields = (
+            ("bare",)
+            if tree["bare"]
+            else ("bare", "head", "branch", "dirty", "dirty_path_count")
+        )
+        if any(tree.get(key) != member.get(key) for key in fields):
+            return "checkout-observation-changed"
+    return None
+
+
 def build_portfolio_truth_snapshot(
     *,
     workspace_root: Path,
@@ -1126,8 +1159,25 @@ def build_portfolio_truth_snapshot(
         key=lambda item: (
             item.identity.section_marker.lower(),
             item.identity.display_name.lower(),
+            item.identity.section_marker,
+            item.identity.display_name,
+            item.identity.path,
         )
     )
+
+    # Discovery shares each collision envelope between its project and summary.
+    # Reconcile that selection once against the final row (after the candidate pass).
+    for project in projects:
+        authority = project.repository_state.get("checkout_authority")
+        if authority and authority["selection"]["state"] == "selected":
+            blocker = _final_checkout_blocker(project, workspace_root)
+            if blocker:
+                authority["selection"].update(
+                    state="unknown",
+                    selected_path=None,
+                    reason_code="repository_topology_disagreement",
+                    reason=f"Final repository observation blocks checkout selection: {blocker}",
+                )
 
     source_summary = build_source_summary(
         workspace_root=workspace_root.as_posix(),
@@ -1882,6 +1932,8 @@ def _build_truth_project(
             },
         }
     )
+    if identity.has_git and repository_state["state"] == "not_a_repository":
+        identity = replace(identity, has_git=False)
     checkout_authority = raw_project.get("checkout_authority")
     if isinstance(checkout_authority, dict):
         repository_state = {

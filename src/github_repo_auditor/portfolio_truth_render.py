@@ -72,6 +72,8 @@ def _security_attention_items(
             -(item[1].total_open_critical + item[1].total_open_secrets),
             -item[1].total_open_high,
             item[0].identity.display_name.lower(),
+            item[0].identity.display_name,
+            item[0].identity.path,
         )
     )
     return [project for project, _ in flagged[:MAX_SECURITY_ATTENTION_ITEMS]]
@@ -392,11 +394,21 @@ def _group_projects(
     ordered = dict(
         sorted(
             grouped.items(),
-            key=lambda item: (item[0] != "Standalone Projects", item[0].lower()),
+            key=lambda item: (
+                item[0] != "Standalone Projects",
+                item[0].lower(),
+                item[0],
+            ),
         )
     )
-    for marker, members in ordered.items():
-        members.sort(key=lambda item: item.identity.display_name.lower())
+    for members in ordered.values():
+        members.sort(
+            key=lambda item: (
+                item.identity.display_name.lower(),
+                item.identity.display_name,
+                item.identity.path,
+            )
+        )
     return ordered
 
 

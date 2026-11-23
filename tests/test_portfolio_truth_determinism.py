@@ -7,6 +7,19 @@ from pathlib import Path
 import pytest
 
 from github_repo_auditor.portfolio_truth_publish import publish_portfolio_truth
+from github_repo_auditor.portfolio_truth_reconcile import (
+    MaterializationContext,
+    build_portfolio_truth_snapshot,
+)
+from github_repo_auditor.portfolio_truth_render import _group_projects
+from github_repo_auditor.portfolio_truth_sources import _dedupe_checkouts_by_origin
+from github_repo_auditor.portfolio_truth_types import (
+    AdvisoryFields,
+    DeclaredFields,
+    DerivedFields,
+    IdentityFields,
+    PortfolioTruthProject,
+)
 from github_repo_auditor.portfolio_truth_status import (
     load_repo_status_from_audit_by_name,
 )
@@ -125,3 +138,83 @@ def test_published_truth_bytes_ignore_listing_order(
     assert first_report == second_report
     assert first_json == second_json
     assert json.loads(first_json)["projects"][0]["derived"]["archived"] is True
+
+
+def test_case_only_checkout_ties_have_stable_order() -> None:
+    def checkout(name: str, head: str, common_dir: str) -> dict:
+        return {
+            "name": name,
+            "repo_full_name": "fixture/repo",
+            "path": name,
+            "project_path": Path("/workspace") / name,
+            "_checkout_observation": {
+                "state": "observed",
+                "head": head,
+                "branch": "main",
+                "dirty": False,
+                "dirty_path_count": 0,
+                "git_common_dir": common_dir,
+                "bare": False,
+                "declared_paths": [],
+            },
+        }
+
+    upper = checkout("Repo", "1" * 40, "/git/upper/.git")
+    lower = checkout("repo", "2" * 40, "/git/lower/.git")
+
+    def collision(discovered: list[dict]) -> dict:
+        collisions: list[dict] = []
+        _dedupe_checkouts_by_origin(discovered, checkout_collisions=collisions)
+        return collisions[0]
+
+    assert collision([upper, lower]) == collision([lower, upper])
+
+
+def test_case_only_project_and_notion_rows_have_stable_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def project(name: str, portfolio_call: str) -> PortfolioTruthProject:
+        return PortfolioTruthProject(
+            identity=IdentityFields(
+                project_key=name,
+                display_name=name,
+                path=name,
+                top_level_dir=name,
+                group_key="standalone",
+                group_label="Standalone Projects",
+                section_marker="Standalone Projects",
+                section_label="Standalone Projects",
+                has_git=False,
+            ),
+            declared=DeclaredFields(),
+            derived=DerivedFields(),
+            advisory=AdvisoryFields(notion_portfolio_call=portfolio_call),
+        )
+
+    upper = project("Widget", "upper Notion row")
+    lower = project("widget", "lower Notion row")
+
+    def ordered_rows(
+        projects: list[PortfolioTruthProject],
+    ) -> list[tuple[str, str]]:
+        monkeypatch.setattr(
+            MaterializationContext,
+            "materialize_projects",
+            lambda *a, **kw: projects.copy(),
+        )
+        result = build_portfolio_truth_snapshot(
+            workspace_root=tmp_path,
+            catalog_path=tmp_path / "absent.yaml",
+            include_notion=False,
+        )
+        assert [row.identity.path for row in result.snapshot.projects] == [
+            "Widget",
+            "widget",
+        ]
+        members = _group_projects(projects)["Standalone Projects"]
+        return [
+            (item.identity.display_name, item.advisory.notion_portfolio_call)
+            for item in members
+        ]
+
+    assert ordered_rows([upper, lower]) == ordered_rows([lower, upper])
