@@ -110,14 +110,16 @@ def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
     try:
         raw = catalog_path.read_text(encoding="utf-8")
         loaded = yaml.load(raw, Loader=UniqueKeyLoader) or {}
-    except UnicodeDecodeError as exc:
+    except (UnicodeDecodeError, OSError) as exc:
+        error = (
+            f"Failed to read portfolio catalog as UTF-8: invalid byte at offset {exc.start}."
+            if isinstance(exc, UnicodeDecodeError)
+            else f"Failed to read portfolio catalog: {type(exc).__name__}."
+        )
         return {
             "path": str(catalog_path),
             "exists": True,
-            "errors": [
-                "Failed to read portfolio catalog as UTF-8: "
-                f"invalid byte at offset {exc.start}."
-            ],
+            "errors": [error],
             "warnings": [],
             "defaults": {},
             "groups": {},
@@ -522,7 +524,9 @@ def catalog_entry_for_repo(
     basename_matches = [
         entry
         for key, entry in repos.items()
-        if "/" in key and key.rsplit("/", 1)[-1] == normalized_repo_name
+        if not normalized_project_path
+        and "/" in key
+        and key.rsplit("/", 1)[-1] == normalized_repo_name
     ]
     if normalized_repo_name and len(basename_matches) == 1:
         return {
