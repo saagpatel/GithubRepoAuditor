@@ -277,6 +277,8 @@ def _dedupe_checkouts_by_origin(
         origin = str(project.get("repo_full_name", "") or "").strip()
         if origin:
             by_origin.setdefault(origin.lower(), []).append(project)
+        elif project.get("_remote_probe_failed"):
+            canonical.append(project)
         else:
             common_dir = _checkout_observation(project).get("git_common_dir")
             if common_dir:
@@ -291,12 +293,14 @@ def _dedupe_checkouts_by_origin(
             continue
         identity_project = _local_checkout_identity(group, catalog_data or {})
         representative = _checkout_representative(group, "")
-        canonical.append(
-            _canonical_checkout_project(
-                identity_project=identity_project,
-                representative=representative,
-            )
+        canonical_project = _canonical_checkout_project(
+            identity_project=identity_project,
+            representative=representative,
         )
+        canonical_project["collapsed_local_worktrees"] = sorted(
+            project["path"] for project in group if project is not identity_project
+        )
+        canonical.append(canonical_project)
 
     for origin_key, group in by_origin.items():
         identity_project = _checkout_identity_project(group, origin_key)
@@ -543,8 +547,8 @@ def _local_checkout_identity(
         )
         return (
             not catalog_entry_for_repo(project, catalog_data).get("has_explicit_entry"),
-            not project.get("group_entry", {}).get("has_explicit_entry"),
             not primary,
+            not project.get("group_entry", {}).get("has_explicit_entry"),
             path.lower(),
             path,
         )
@@ -846,6 +850,16 @@ def _declared_checkout_evidence(
     )
 
 
+def _record_unreadable_directory(
+    path: Path, workspace_root: Path, counts: dict[str, int] | None
+) -> None:
+    _record_exclusion(counts, UNREADABLE_DIRECTORY)
+    logging.getLogger(__name__).warning(
+        "Workspace discovery incomplete: could not inspect %s",
+        path.relative_to(workspace_root),
+    )
+
+
 def _discover_nested_projects(
     root: Path,
     workspace_root: Path,
@@ -857,6 +871,7 @@ def _discover_nested_projects(
 ) -> list[dict[str, Any]]:
     discovered: list[dict[str, Any]] = []
     nested = root != workspace_root
+    unreadable_children: set[Path] = set()
     try:
         children = sorted(
             root.iterdir(), key=lambda item: (item.name.lower(), item.name)
@@ -868,8 +883,10 @@ def _discover_nested_projects(
             is_project = (
                 nested
                 and root != workspace_root / "_archive"
-                and _is_project_dir(children)
+                and _is_project_dir(children, unreadable_children=unreadable_children)
             )
+        for child in unreadable_children:
+            _record_unreadable_directory(child, workspace_root, exclusion_counts)
         if is_project:
             discovered.append(
                 _inspect_project_dir(
@@ -879,20 +896,21 @@ def _discover_nested_projects(
     except OSError:
         if not nested:
             raise
-        _record_exclusion(exclusion_counts, UNREADABLE_DIRECTORY)
-        logging.getLogger(__name__).warning(
-            "Workspace discovery incomplete: could not inspect %s",
-            root.relative_to(workspace_root),
-        )
+        _record_unreadable_directory(root, workspace_root, exclusion_counts)
         return discovered
 
     for child in children:
         if (
-            child.name.startswith(".")
+            child in unreadable_children
+            or child.name.startswith(".")
             or child.name in SKIP_DIRS
-            or child.is_symlink()
-            or not child.is_dir()
         ):
+            continue
+        try:
+            if child.is_symlink() or not child.is_dir():
+                continue
+        except OSError:
+            _record_unreadable_directory(child, workspace_root, exclusion_counts)
             continue
         exclusion_reason = workspace_exclusion_reason(child.name, nested=nested)
         if exclusion_reason is not None:
@@ -1162,11 +1180,12 @@ def _inspect_project_dir(
         "_checkout_observation": checkout_observation,
         "now": now,
         "_git_probe_failed": bool(git_facts.get("_git_probe_failed")),
+        "_remote_probe_failed": bool(git_facts.get("_remote_probe_failed")),
         "_git_dir": git_facts.get("_git_dir"),
     }
 
 
-def _is_project_dir(children: list[Path]) -> bool:
+def _is_project_dir(children: list[Path], *, unreadable_children: set[Path]) -> bool:
     names = {child.name for child in children}
     if ".git" in names:
         return True
@@ -1174,12 +1193,16 @@ def _is_project_dir(children: list[Path]) -> bool:
         return True
     if any(name.endswith((".xcodeproj", ".xcworkspace")) for name in names):
         return True
-    visible_files = [
-        child
-        for child in children
-        if child.is_file() and not child.name.startswith(".")
-    ]
-    return bool(visible_files)
+    has_visible_file = False
+    for child in children:
+        if child.name.startswith("."):
+            continue
+        try:
+            if child.is_file():
+                has_visible_file = True
+        except OSError:
+            unreadable_children.add(child)
+    return has_visible_file
 
 
 def _collect_context_files(project_path: Path) -> list[str]:
@@ -1292,10 +1315,12 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
             base.update(has_git=True, _git_probe_failed=True)
         return base
 
+    repo_full_name = _git_remote_full_name(project_path)
     base.update(
         has_git=True,
         _git_dir=git_dir,
-        repo_full_name=_git_remote_full_name(project_path),
+        repo_full_name=repo_full_name or "",
+        _remote_probe_failed=repo_full_name is None,
         default_branch=_git_default_branch(project_path),
     )
     try:
@@ -1511,14 +1536,19 @@ def _git_default_branch(project_path: Path) -> str:
     return result.stdout.strip().partition("/")[2].strip()
 
 
-def _git_remote_full_name(project_path: Path) -> str:
+def _git_remote_full_name(project_path: Path) -> str | None:
+    """Return None for an unavailable probe, or an empty name for no GitHub remote."""
     remotes = _git_github_remotes(project_path)
+    if remotes is None:
+        return None
     if not remotes:
         return ""
     return _select_portfolio_identity_remote(project_path.name, remotes)
 
 
-def _git_github_remotes(project_path: Path) -> list[tuple[str, str]]:
+def _git_github_remotes(
+    project_path: Path,
+) -> list[tuple[str, str]] | None:
     try:
         result = subprocess.run(
             ["git", "-C", str(project_path), "remote", "-v"],
@@ -1527,11 +1557,11 @@ def _git_github_remotes(project_path: Path) -> list[tuple[str, str]]:
             timeout=5,
             check=False,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
     if result.returncode != 0:
-        return []
+        return None
 
     seen: set[tuple[str, str]] = set()
     remotes: list[tuple[str, str]] = []

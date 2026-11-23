@@ -42,6 +42,7 @@ from github_repo_auditor.portfolio_truth_metadata import (
     build_exclusions,
     build_source_summary,
     build_warnings,
+    workspace_inventory_paths,
 )
 from github_repo_auditor.portfolio_truth_precedence import PRECEDENCE_MATRIX
 from github_repo_auditor.portfolio_truth_provenance import (
@@ -51,7 +52,6 @@ from github_repo_auditor.portfolio_truth_render import registry_project_labels
 from github_repo_auditor.portfolio_truth_sources import (
     UNREADABLE_DIRECTORY,
     WORKSPACE_EXCLUSION_REASONS,
-    checkout_collision_paths,
 )
 from github_repo_auditor.portfolio_truth_types import (
     CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
@@ -531,6 +531,7 @@ def _validate_snapshot_metadata(
         or not isinstance(notion_context_carried_forward, bool)
     ):
         raise ValueError("PortfolioTruth source summary has invalid bounded inputs.")
+    current_project_paths = workspace_inventory_paths(snapshot)
     workspace_inventory_gap = summary.get("workspace_inventory_gap")
     if workspace_inventory_gap is not None:
         if not isinstance(workspace_inventory_gap, dict) or set(
@@ -552,13 +553,6 @@ def _validate_snapshot_metadata(
             for project in snapshot.projects
             if not project.identity.project_key.startswith("supp:")
         }
-        current_project_paths = {
-            project.identity.path
-            for project in snapshot.projects
-            if not project.identity.project_key.startswith("supp:")
-        }
-        collision_groups = summary["checkout_collisions"]["groups"]
-        current_project_paths.update(checkout_collision_paths(collision_groups))
         if (
             not isinstance(missing_project_keys, list)
             or any(not isinstance(key, str) or not key for key in missing_project_keys)
@@ -613,6 +607,7 @@ def _validate_snapshot_metadata(
         notion_context_rows=notion_context_rows,
         notion_context_carried_forward=notion_context_carried_forward,
         checkout_collisions=summary["checkout_collisions"]["groups"],
+        collapsed_local_worktrees=summary.get("collapsed_local_worktrees"),
         workspace_inventory_gap=workspace_inventory_gap,
         workspace_inventory_comparison=workspace_inventory_comparison,
     )
@@ -2062,6 +2057,49 @@ def _project_decision_for_security_policy(
     return risk, attention
 
 
+def _upgrade_prior_checkout_path_order(snapshot: PortfolioTruthSnapshot) -> None:
+    """Normalize prior declaration paths after validating their old ordering."""
+    summary = snapshot.source_summary.get("checkout_collisions")
+    if not isinstance(summary, dict):
+        return
+    groups = summary.get("groups")
+    if not isinstance(groups, list):
+        return
+
+    projects_by_origin = {
+        project.identity.repo_full_name.lower(): project
+        for project in snapshot.projects
+        if project.identity.repo_full_name
+    }
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        declared_paths = group.get("declared_checkout_paths")
+        if not isinstance(declared_paths, list):
+            continue
+        if any(not isinstance(path, str) for path in declared_paths):
+            raise ValueError("Prior checkout declaration paths are invalid.")
+        if declared_paths != sorted(declared_paths, key=str.lower):
+            raise ValueError(
+                "Prior checkout declaration paths differ from producer ordering."
+            )
+        project = projects_by_origin.get(str(group.get("origin", "")).lower())
+        if project is None:
+            continue
+        authority = project.repository_state.get("checkout_authority")
+        if not isinstance(authority, dict):
+            continue
+        if authority != group:
+            raise ValueError(
+                "Prior project checkout authority differs from collision summary."
+            )
+        # Preserve every entry. Current validation will also reject duplicate
+        # or missing paths when it compares the list against the evidence.
+        normalized = sorted(declared_paths, key=lambda path: (path.lower(), path))
+        group["declared_checkout_paths"] = normalized
+        authority["declared_checkout_paths"] = normalized.copy()
+
+
 def canonicalize_prior_security_truth_payload(
     payload: Mapping[str, Any],
     *,
@@ -2077,6 +2115,15 @@ def canonicalize_prior_security_truth_payload(
     """
     prior_schema = payload.get("schema_version")
     if prior_schema in ("0.11.0", "0.12.0") and SCHEMA_VERSION == "0.13.0":
+        payload = deepcopy(payload)
+        prior_summary = payload.get("source_summary")
+        if (
+            isinstance(prior_summary, Mapping)
+            and "collapsed_local_worktrees" in prior_summary
+        ):
+            raise ValueError(
+                f"Prior PortfolioTruth {prior_schema} cannot declare collapsed local worktrees."
+            )
         projects = payload.get("projects")
         if not isinstance(projects, list):
             raise ValueError(
@@ -2103,6 +2150,7 @@ def canonicalize_prior_security_truth_payload(
         counts = snapshot.exclusions.get("counts")
         if isinstance(counts, Mapping) and UNREADABLE_DIRECTORY in counts:
             raise ValueError("Prior PortfolioTruth exclusion counts are invalid.")
+        _upgrade_prior_checkout_path_order(snapshot)
         prior_order = [project_order_key(project)[:2] for project in snapshot.projects]
         if prior_order != sorted(prior_order):
             raise ValueError(

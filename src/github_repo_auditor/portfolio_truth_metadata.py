@@ -12,8 +12,10 @@ from typing import Any
 from github_repo_auditor.portfolio_truth_coverage import ProjectLike
 from github_repo_auditor.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
+    checkout_collision_paths,
     checkout_collision_summary,
 )
+from github_repo_auditor.portfolio_truth_types import PortfolioTruthSnapshot
 
 
 def _section(project: ProjectLike, name: str) -> Any:
@@ -81,6 +83,7 @@ def build_source_summary(
     notion_context_rows: int,
     notion_context_carried_forward: bool,
     checkout_collisions: Sequence[dict[str, Any]] = (),
+    collapsed_local_worktrees: dict[str, list[str]] | None = None,
     workspace_inventory_gap: dict[str, Any] | None = None,
     workspace_inventory_comparison: dict[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -130,11 +133,50 @@ def build_source_summary(
             projects
         ),
     }
+    if collapsed_local_worktrees:
+        summary["collapsed_local_worktrees"] = collapsed_local_worktrees
     if workspace_inventory_gap is not None:
         summary["workspace_inventory_gap"] = workspace_inventory_gap
     if workspace_inventory_comparison is not None:
         summary["workspace_inventory_comparison"] = workspace_inventory_comparison
     return summary
+
+
+def workspace_inventory_paths(snapshot: PortfolioTruthSnapshot) -> set[str]:
+    """Include paths accounted for by recorded checkout discovery at publication."""
+    paths = {
+        project.identity.path
+        for project in snapshot.projects
+        if not project.identity.project_key.startswith("supp:")
+    }
+    groups = snapshot.source_summary.get("collapsed_local_worktrees", {})
+    local_keys = {
+        project.identity.project_key
+        for project in snapshot.projects
+        if not project.identity.repo_full_name
+    }
+    if not isinstance(groups, dict) or not groups.keys() <= local_keys:
+        raise ValueError("Invalid collapsed local worktree identities.")
+    for members in groups.values():
+        if (
+            not isinstance(members, list)
+            or not members
+            or any(
+                not isinstance(path, str)
+                or not Path(path).parts
+                or Path(path).is_absolute()
+                or ".." in Path(path).parts
+                or Path(path).as_posix() != path
+                for path in members
+            )
+            or members != sorted(set(members))
+            or paths.intersection(members)
+        ):
+            raise ValueError("Invalid collapsed local worktree paths.")
+        paths.update(members)
+    collision_groups = snapshot.source_summary["checkout_collisions"]["groups"]
+    paths.update(checkout_collision_paths(collision_groups))
+    return paths
 
 
 def build_warnings(

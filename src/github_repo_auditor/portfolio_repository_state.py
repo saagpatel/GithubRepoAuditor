@@ -28,7 +28,16 @@ def observe_repository_state(
             ),
         }
     )
-    repository_kind = _repository_kind(path)
+    try:
+        repository_kind = _repository_kind(path)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return {
+            "state": "unknown",
+            "observed_at": observed_at.astimezone(UTC).isoformat(),
+            "reason_code": "repository_observation_failed",
+            "reason": "the local Git repository kind could not be observed",
+            "remote_default_branch": remote,
+        }
     if repository_kind is None:
         return {
             "state": "not_a_repository",
@@ -121,7 +130,15 @@ def observe_repository_state(
 def _repository_kind(path: Path) -> str | None:
     try:
         is_bare = _git(path, "rev-parse", "--is-bare-repository")
-    except (OSError, subprocess.CalledProcessError):
+    except subprocess.CalledProcessError:
+        # A failed command alone cannot revoke an earlier discovery. Confirm
+        # marker removal, including the marker files of a bare repository.
+        try:
+            names = {entry.name for entry in path.iterdir()}
+        except (FileNotFoundError, NotADirectoryError):
+            return None
+        if ".git" in names or {"HEAD", "objects"} <= names:
+            raise
         return None
     if is_bare == "true":
         return "bare_coordinator"

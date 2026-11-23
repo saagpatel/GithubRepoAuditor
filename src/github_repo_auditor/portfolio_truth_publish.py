@@ -35,10 +35,8 @@ from github_repo_auditor.portfolio_truth_render import (
     render_registry_markdown,
 )
 from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
-from github_repo_auditor.portfolio_truth_sources import (
-    checkout_collision_paths,
-    workspace_exclusion_reason,
-)
+from github_repo_auditor.portfolio_truth_metadata import workspace_inventory_paths
+from github_repo_auditor.portfolio_truth_sources import workspace_exclusion_reason
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
 from github_repo_auditor.producer_preflight import (
     ProducerEvidence,
@@ -755,26 +753,11 @@ def _publish_portfolio_truth_locked(
         for project in build_result.snapshot.projects
         if not project.identity.project_key.startswith("supp:")
     }
-    current_project_paths = {
-        project.identity.path
-        for project in build_result.snapshot.projects
-        if not project.identity.project_key.startswith("supp:")
-    }
-    collision_summary = build_result.snapshot.source_summary.get(
-        "checkout_collisions", {}
-    )
-    current_project_paths.update(
-        checkout_collision_paths(
-            collision_summary.get("groups")
-            if isinstance(collision_summary, dict)
-            else None
-        )
-    )
     inventory_gap, inventory_comparison_unavailable = _workspace_inventory_gap(
         latest_path,
         workspace_root=workspace_root,
         current_project_keys=current_project_keys,
-        current_project_paths=current_project_paths,
+        current_project_paths=workspace_inventory_paths(build_result.snapshot),
     )
     if inventory_gap is not None:
         build_result.snapshot.source_summary["workspace_inventory_gap"] = inventory_gap

@@ -840,6 +840,7 @@ class MaterializationContext:
                 catalog_data=self.catalog_data,
                 legacy_rows=self.legacy_rows,
                 notion_context=self.notion_context,
+                notion_source_mode=self.notion_source_mode,
                 now=self.now,
                 workspace_root=self.workspace_root,
                 release_count_by_name=self.release_count_by_name,
@@ -937,7 +938,11 @@ def build_materialization_context(
             "from the prior portfolio-truth artifact.",
             len(notion_context),
         )
-    if notion_context and not isinstance(notion_context, NotionProjectContext):
+    if (
+        notion_context
+        and notion_source_mode != "carried-forward"
+        and not isinstance(notion_context, NotionProjectContext)
+    ):
         notion_context = NotionProjectContext(
             notion_context,
             source_mode=notion_source_mode,
@@ -1191,6 +1196,11 @@ def build_portfolio_truth_snapshot(
         notion_context_rows=len(notion_context),
         notion_context_carried_forward=context.notion_context_carried_forward,
         checkout_collisions=context.checkout_collisions,
+        collapsed_local_worktrees={
+            project["path"]: project["collapsed_local_worktrees"]
+            for project in context.workspace_projects
+            if "collapsed_local_worktrees" in project
+        },
     )
     if cohort_transition is not None and (
         cohort_transition.pending_security_coverage or cohort_transition.clock_departed
@@ -1354,13 +1364,13 @@ def _merge_supplementary_discoveries(
 
 
 def load_prior_notion_context(latest_path: Path) -> Mapping[str, dict[str, str]]:
-    """Reconstruct prior advisory rows using the same title index as live Notion.
+    """Reconstruct prior advisory rows keyed by their published project paths.
 
     Used to carry advisory context forward on a headless refresh when a live
     Notion token is unavailable, rather than overwriting local truth with zero
-    rows. Only projects that actually carried Notion advisory are returned, so
-    the resulting row count reflects real carried context. Returns an empty map
-    when the artifact is missing or malformed.
+    rows. Exact project paths prevent context from moving to another project
+    with the same display name. Returns an empty map when the artifact is
+    missing or malformed.
     """
     try:
         data = json.loads(latest_path.read_text())
@@ -1377,20 +1387,22 @@ def load_prior_notion_context(latest_path: Path) -> Mapping[str, dict[str, str]]
         advisory = project.get("advisory")
         if not isinstance(identity, dict) or not isinstance(advisory, dict):
             continue
-        display_name = str(identity.get("display_name", "")).strip()
+        project_key = identity.get("project_key")
         portfolio_call = str(advisory.get("notion_portfolio_call", "")).strip()
         momentum = str(advisory.get("notion_momentum", "")).strip()
         current_state = str(advisory.get("notion_current_state", "")).strip()
-        if not display_name or not (portfolio_call or momentum or current_state):
+        if (
+            not isinstance(project_key, str)
+            or not project_key
+            or not (portfolio_call or momentum or current_state)
+        ):
             continue
-        context[display_name] = {
+        context[project_key] = {
             "portfolio_call": portfolio_call,
             "momentum": momentum,
             "current_state": current_state,
         }
-    return NotionProjectContext(
-        context, source_mode="carried-forward", observed_at=None
-    )
+    return context
 
 
 def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
@@ -1522,6 +1534,7 @@ def _build_truth_project(
     catalog_data: dict[str, Any],
     legacy_rows: dict[str, dict[str, str]],
     notion_context: Mapping[str, dict[str, str]],
+    notion_source_mode: str,
     now: datetime,
     workspace_root: Path,
     release_count_by_name: dict[str, int] | None = None,
@@ -1543,7 +1556,12 @@ def _build_truth_project(
         catalog_data,
     )
     legacy = legacy_rows.get(_normalize(raw_project["name"]), {})
-    notion = notion_context.get(raw_project["name"], {})
+    notion_lookup_key = (
+        raw_project["path"]
+        if notion_source_mode == "carried-forward"
+        else raw_project["name"]
+    )
+    notion = notion_context.get(notion_lookup_key, {})
 
     warnings: list[str] = []
     provenance: dict[str, dict[str, str]] = {}
@@ -1687,6 +1705,9 @@ def _build_truth_project(
         archived is None
         and declared_values["lifecycle_state"]
         and not identity.repo_full_name
+        and not raw_project.get("_git_probe_failed")
+        and not raw_project.get("_remote_probe_failed")
+        and remote_repository.get("state") != "unknown"
     ):
         # A local-only project can have an explicit non-archive lifecycle.
         archived = False
