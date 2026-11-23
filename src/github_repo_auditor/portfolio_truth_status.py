@@ -21,11 +21,8 @@ from github_repo_auditor.github_security_coverage import (
 def load_release_count_by_name(
     *, output_dir: Path, username: str
 ) -> dict[str, int] | None:
-    audit_files = sorted(
-        output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda path: path.stat().st_mtime,
-    )
-    if not audit_files:
+    audit_path = latest_audit_report_path(output_dir=output_dir, username=username)
+    if audit_path is None:
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-release-count requires a prior audit run; "
             "no audit-report-%s-*.json found in %s — skipping release_count overlay",
@@ -34,12 +31,12 @@ def load_release_count_by_name(
         )
         return None
     try:
-        with audit_files[-1].open() as fh:
+        with audit_path.open() as fh:
             data = json.load(fh)
     except Exception as exc:  # noqa: BLE001
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-release-count: could not read %s: %s — skipping",
-            audit_files[-1],
+            audit_path,
             exc,
         )
         return None
@@ -62,11 +59,8 @@ def load_release_count_by_name(
 def load_degraded_dimensions_by_name(
     *, output_dir: Path, username: str
 ) -> dict[str, list[str]] | None:
-    audit_files = sorted(
-        output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda path: path.stat().st_mtime,
-    )
-    if not audit_files:
+    audit_path = latest_audit_report_path(output_dir=output_dir, username=username)
+    if audit_path is None:
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-degraded-dimensions requires a prior audit run; "
             "no audit-report-%s-*.json found in %s — skipping degraded_dimensions overlay",
@@ -75,12 +69,12 @@ def load_degraded_dimensions_by_name(
         )
         return None
     try:
-        with audit_files[-1].open() as fh:
+        with audit_path.open() as fh:
             data = json.load(fh)
     except Exception as exc:  # noqa: BLE001
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-degraded-dimensions: could not read %s: %s — skipping",
-            audit_files[-1],
+            audit_path,
             exc,
         )
         return None
@@ -100,11 +94,11 @@ def load_degraded_dimensions_by_name(
 
 
 def latest_audit_report_path(*, output_dir: Path, username: str) -> Path | None:
-    audit_files = sorted(
+    return max(
         output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda path: path.stat().st_mtime,
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        default=None,
     )
-    return audit_files[-1] if audit_files else None
 
 
 def _repo_status_entries_from_metadata(
@@ -112,16 +106,14 @@ def _repo_status_entries_from_metadata(
 ) -> dict[str, dict]:
     result: dict[str, dict] = {}
     for metadata in repo_metadata:
-        name = str(metadata.get("name") or "").strip()
         full_name = str(metadata.get("full_name") or "").strip()
         archived = metadata.get("archived")
-        if not name or not isinstance(archived, bool):
-            continue
-        entry = {"archived": archived, "full_name": full_name, "source": source}
-        result[name] = entry
-        repo_name = full_name.rsplit("/", 1)[-1] if full_name else ""
-        if repo_name:
-            result.setdefault(repo_name, entry)
+        if "/" in full_name and isinstance(archived, bool):
+            result[full_name.casefold()] = {
+                "archived": archived,
+                "full_name": full_name,
+                "source": source,
+            }
     return result
 
 
@@ -157,10 +149,13 @@ def load_repo_status_from_audit_by_name(
             exc,
         )
         return None
+    if not isinstance(data, dict) or not isinstance(data.get("audits"), list):
+        return None
     repo_metadata = [
         metadata
-        for audit in data.get("audits") or []
-        if isinstance(metadata := audit.get("metadata") or {}, dict)
+        for audit in data["audits"]
+        if isinstance(audit, dict)
+        and isinstance(metadata := audit.get("metadata"), dict)
     ]
     return _repo_status_entries_from_metadata(repo_metadata, source="audit_report")
 
