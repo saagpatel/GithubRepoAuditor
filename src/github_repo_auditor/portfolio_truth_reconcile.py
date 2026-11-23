@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,7 @@ from github_repo_auditor.portfolio_truth_sources import (
     discover_workspace_projects,
     load_legacy_registry_rows,
     load_safe_notion_project_context,
+    report_clock_utc,
 )
 from github_repo_auditor.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
@@ -909,9 +910,7 @@ def build_materialization_context(
     prior_notion_generated_at: str | None = None,
 ) -> MaterializationContext:
     """Load catalog, registry, Notion context, and workspace discovery once."""
-    now = (
-        now.astimezone(timezone.utc) if now is not None else datetime.now(timezone.utc)
-    )
+    now = report_clock_utc(now)
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
     notion_context = load_safe_notion_project_context(now=now) if include_notion else {}

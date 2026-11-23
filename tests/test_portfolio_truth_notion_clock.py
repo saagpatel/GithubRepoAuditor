@@ -7,10 +7,15 @@ import pytest
 
 from github_repo_auditor import portfolio_truth_sources
 from github_repo_auditor.portfolio_truth_publish import publish_portfolio_truth
+from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 
 
+@pytest.mark.parametrize("minutes_ahead", [0, 1], ids=["current", "future"])
 def test_pinned_publication_clock_controls_cached_notion_freshness(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    minutes_ahead: int,
 ) -> None:
     clock = datetime(2025, 2, 1, tzinfo=timezone.utc)
     workspace = tmp_path / "workspace"
@@ -23,7 +28,7 @@ def test_pinned_publication_clock_controls_cached_notion_freshness(
         json.dumps(
             {
                 "schema_version": "2.0.0",
-                "generated_at": clock.isoformat(),
+                "generated_at": (clock + timedelta(minutes=minutes_ahead)).isoformat(),
                 "project_count": 1,
                 "projects": projects,
                 "content_sha256": hashlib.sha256(
@@ -68,8 +73,34 @@ def test_pinned_publication_clock_controls_cached_notion_freshness(
             )
         )
 
-    assert [
-        json.loads(payload)["source_summary"]["notion_context_rows"]
-        for payload, _ in publications
-    ] == [1, 1]
     assert publications[0] == publications[1]
+    published = json.loads(publications[0][0])
+    if minutes_ahead:
+        assert published["inputs"]["notion"]["mode"] == "unavailable"
+        assert published["source_summary"]["notion_context_rows"] == 0
+        assert "after the report clock" in caplog.text
+    else:
+        assert published["inputs"]["notion"]["mode"] == "verified-snapshot"
+        assert published["source_summary"]["notion_context_rows"] == 1
+
+
+def test_snapshot_builder_rejects_naive_clock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "github_repo_auditor.portfolio_truth_reconcile.load_portfolio_catalog",
+        lambda _: pytest.fail("loaded catalog before validating report clock"),
+    )
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_portfolio_truth_snapshot(
+            workspace_root=tmp_path, now=datetime(2025, 2, 1)
+        )
+
+
+def test_notion_verifier_rejects_naive_clock_before_loading_receipt(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        portfolio_truth_sources.verified_notion_snapshot(
+            tmp_path / "missing.json", now=datetime(2025, 2, 1)
+        )
