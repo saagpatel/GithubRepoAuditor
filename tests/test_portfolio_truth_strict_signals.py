@@ -17,6 +17,10 @@ from github_repo_auditor.portfolio_truth_reconcile import (
     _derive_has_tests,
     _derive_readme_char_count,
 )
+from github_repo_auditor.portfolio_truth_status import (
+    load_degraded_dimensions_by_name,
+    load_release_count_by_name,
+)
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -243,6 +247,55 @@ def test_release_count_absent_for_missing_project(tmp_path: Path) -> None:
     assert result is not None
     assert "UnknownRepo" not in result
     assert result.get("KnownRepo") == 5
+
+
+@pytest.mark.parametrize(
+    ("loader", "expected_value"),
+    [
+        (load_release_count_by_name, 3),
+        (load_degraded_dimensions_by_name, ["testing"]),
+    ],
+    ids=["release-count", "degraded-dimensions"],
+)
+@pytest.mark.parametrize(
+    "report",
+    [
+        None,
+        {"audits": [None]},
+        {
+            "audits": [
+                None,
+                {"metadata": "invalid"},
+                {
+                    "metadata": {"name": "sample"},
+                    "analyzer_results": [
+                        {"dimension": "activity", "details": {"release_count": 3}}
+                    ],
+                    "degraded_dimensions": ["testing"],
+                },
+            ]
+        },
+    ],
+    ids=["null-report", "null-row", "mixed-rows"],
+)
+def test_opt_in_audit_overlay_skips_invalid_data(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, loader, expected_value, report
+) -> None:
+    path = tmp_path / "audit-report-fixture-latest.json"
+    path.write_text(json.dumps(report))
+
+    result = loader(output_dir=tmp_path, username="fixture")
+
+    if report is None:
+        assert result is None
+        assert any(
+            record.levelno == logging.WARNING and path.name in record.message
+            for record in caplog.records
+        )
+    elif report["audits"] == [None]:
+        assert result == {}
+    else:
+        assert result == {"sample": expected_value}
 
 
 # ── degraded_dimensions (opt-in, via audit JSON overlay) ─────────────────────

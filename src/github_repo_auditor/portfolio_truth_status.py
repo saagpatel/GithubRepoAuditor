@@ -18,6 +18,27 @@ from github_repo_auditor.github_security_coverage import (
 )
 
 
+def _load_audit_rows(audit_path: Path, *, overlay: str) -> list[dict] | None:
+    try:
+        with audit_path.open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).warning(
+            "%s: could not read %s: %s — skipping", overlay, audit_path, exc
+        )
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("audits"), list):
+        logging.getLogger(__name__).warning(
+            "%s: expected an audits list in %s — skipping", overlay, audit_path
+        )
+        return None
+    return [
+        audit
+        for audit in data["audits"]
+        if isinstance(audit, dict) and isinstance(audit.get("metadata"), dict)
+    ]
+
+
 def load_release_count_by_name(
     *, output_dir: Path, username: str
 ) -> dict[str, int] | None:
@@ -30,26 +51,30 @@ def load_release_count_by_name(
             output_dir,
         )
         return None
-    try:
-        with audit_path.open() as fh:
-            data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        logging.getLogger(__name__).warning(
-            "--portfolio-truth-include-release-count: could not read %s: %s — skipping",
-            audit_path,
-            exc,
-        )
+    rows = _load_audit_rows(
+        audit_path, overlay="--portfolio-truth-include-release-count"
+    )
+    if rows is None:
         return None
     result: dict[str, int] = {}
-    for audit in data.get("audits") or []:
-        name = (audit.get("metadata") or {}).get("name")
-        if not name:
+    for audit in rows:
+        name = audit["metadata"].get("name")
+        analyzer_results = audit.get("analyzer_results")
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(analyzer_results, list)
+        ):
             continue
-        for analyzer_result in audit.get("analyzer_results") or []:
-            if analyzer_result.get("dimension") == "activity":
-                release_count = (analyzer_result.get("details") or {}).get(
-                    "release_count"
-                )
+        for analyzer_result in analyzer_results:
+            if (
+                isinstance(analyzer_result, dict)
+                and analyzer_result.get("dimension") == "activity"
+            ):
+                details = analyzer_result.get("details")
+                if not isinstance(details, dict):
+                    continue
+                release_count = details.get("release_count")
                 if isinstance(release_count, int):
                     result[name] = release_count
                 break
@@ -68,20 +93,15 @@ def load_degraded_dimensions_by_name(
             output_dir,
         )
         return None
-    try:
-        with audit_path.open() as fh:
-            data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        logging.getLogger(__name__).warning(
-            "--portfolio-truth-include-degraded-dimensions: could not read %s: %s — skipping",
-            audit_path,
-            exc,
-        )
+    rows = _load_audit_rows(
+        audit_path, overlay="--portfolio-truth-include-degraded-dimensions"
+    )
+    if rows is None:
         return None
     result: dict[str, list[str]] = {}
-    for audit in data.get("audits") or []:
-        name = (audit.get("metadata") or {}).get("name")
-        if not name:
+    for audit in rows:
+        name = audit["metadata"].get("name")
+        if not isinstance(name, str) or not name:
             continue
         degraded = audit.get("degraded_dimensions")
         if isinstance(degraded, list):
@@ -139,24 +159,10 @@ def load_repo_status_from_audit_by_name(
     audit_path = latest_audit_report_path(output_dir=output_dir, username=username)
     if audit_path is None:
         return None
-    try:
-        with audit_path.open() as fh:
-            data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        logging.getLogger(__name__).warning(
-            "--portfolio-truth: could not read repo status overlay from %s: %s — skipping",
-            audit_path,
-            exc,
-        )
+    rows = _load_audit_rows(audit_path, overlay="--portfolio-truth")
+    if rows is None:
         return None
-    if not isinstance(data, dict) or not isinstance(data.get("audits"), list):
-        return None
-    repo_metadata = [
-        metadata
-        for audit in data["audits"]
-        if isinstance(audit, dict)
-        and isinstance(metadata := audit.get("metadata"), dict)
-    ]
+    repo_metadata = [audit["metadata"] for audit in rows]
     return _repo_status_entries_from_metadata(repo_metadata, source="audit_report")
 
 
