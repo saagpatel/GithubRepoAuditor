@@ -1036,3 +1036,59 @@ def test_discovery_observes_conflicting_full_clones_without_count_inflation(
     assert collision["declared_checkout_paths"] == ["Archive/Widget"]
     assert all(checkout["state"] == "observed" for checkout in collision["checkouts"])
     assert all(len(checkout["head"]) == 40 for checkout in collision["checkouts"])
+
+
+def test_discovery_collapses_linked_local_only_worktrees(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    primary = workspace / "Primary"
+    independent = workspace / "Independent"
+    for repo in (primary, independent):
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(primary),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "fixture",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(primary),
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            str(workspace / "Linked"),
+        ],
+        check=True,
+    )
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=tmp_path / "missing.yaml",
+        include_notion=False,
+        now=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    from github_repo_auditor.portfolio_truth_validate import validate_truth_snapshot
+
+    validate_truth_snapshot(result.snapshot)
+    projects = result.snapshot.projects
+    assert len(projects) == 2
+    assert any(project.identity.path == "Independent" for project in projects)
+    linked = next(
+        project for project in projects if project.identity.path != "Independent"
+    )
+    assert linked.identity.repo_full_name == ""
+    assert linked.repository_state["topology"]["worktree_count"] == 2
+    assert linked.repository_state["topology"]["selection"]["state"] == "unknown"
