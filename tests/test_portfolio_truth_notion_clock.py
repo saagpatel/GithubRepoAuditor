@@ -1,5 +1,8 @@
 import hashlib
 import json
+import os
+import time
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -10,14 +13,45 @@ from github_repo_auditor.portfolio_truth_publish import publish_portfolio_truth
 from github_repo_auditor.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 
 
-@pytest.mark.parametrize("minutes_ahead", [0, 1], ids=["current", "future"])
+@pytest.fixture(autouse=True)
+def _restore_host_timezone() -> Iterator[None]:
+    saved = os.environ.get("TZ")
+    yield
+    if saved is None:
+        os.environ.pop("TZ", None)
+    else:
+        os.environ["TZ"] = saved
+    time.tzset()
+
+
+def _set_host_timezone(name: str) -> None:
+    os.environ["TZ"] = name
+    time.tzset()
+
+
+@pytest.mark.parametrize(
+    ("minutes_ahead", "host_tz", "offsetless"),
+    [
+        (0, "UTC", False),
+        (1, "UTC", False),
+        (0, "UTC", True),
+        (0, "America/Los_Angeles", True),
+    ],
+    ids=["current", "future", "offsetless-utc-host", "offsetless-pacific-host"],
+)
 def test_pinned_publication_clock_controls_cached_notion_freshness(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
     minutes_ahead: int,
+    host_tz: str,
+    offsetless: bool,
 ) -> None:
+    _set_host_timezone(host_tz)
     clock = datetime(2025, 2, 1, tzinfo=timezone.utc)
+    receipt_time = clock + timedelta(minutes=minutes_ahead)
+    if offsetless:
+        receipt_time = receipt_time.replace(tzinfo=None)
     workspace = tmp_path / "workspace"
     project = workspace / "sample"
     project.mkdir(parents=True)
@@ -28,7 +62,7 @@ def test_pinned_publication_clock_controls_cached_notion_freshness(
         json.dumps(
             {
                 "schema_version": "2.0.0",
-                "generated_at": (clock + timedelta(minutes=minutes_ahead)).isoformat(),
+                "generated_at": receipt_time.isoformat(),
                 "project_count": 1,
                 "projects": projects,
                 "content_sha256": hashlib.sha256(
@@ -75,7 +109,10 @@ def test_pinned_publication_clock_controls_cached_notion_freshness(
 
     assert publications[0] == publications[1]
     published = json.loads(publications[0][0])
-    if minutes_ahead:
+    if offsetless:
+        assert published["inputs"]["notion"]["mode"] == "unavailable"
+        assert published["source_summary"]["notion_context_rows"] == 0
+    elif minutes_ahead:
         assert published["inputs"]["notion"]["mode"] == "unavailable"
         assert published["source_summary"]["notion_context_rows"] == 0
         assert "after the report clock" in caplog.text

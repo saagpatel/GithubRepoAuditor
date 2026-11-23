@@ -922,6 +922,9 @@ def verified_notion_snapshot(
         )
     except ValueError:
         return None
+    if generated_at.utcoffset() is None:
+        # astimezone() would read an offsetless time in the host time zone.
+        return None
     age_hours = (clock - generated_at.astimezone(timezone.utc)).total_seconds() / 3600
     # Only the wall-clock verifier allows skew. A report has a fixed evidence cutoff.
     if now is not None and age_hours < 0:
