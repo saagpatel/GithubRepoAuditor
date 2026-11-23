@@ -6167,7 +6167,6 @@ def test_publish_refuses_to_drop_existing_notion_context(
 
 def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> None:
     from github_repo_auditor.portfolio_truth_reconcile import load_prior_notion_context
-    from github_repo_auditor.registry_parser import _normalize
 
     latest_path = tmp_path / "portfolio-truth-latest.json"
     latest_path.write_text(
@@ -6176,7 +6175,10 @@ def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> Non
                 "source_summary": {"notion_context_rows": 2},
                 "projects": [
                     {
-                        "identity": {"display_name": "CryptForge"},
+                        "identity": {
+                            "project_key": "group/CryptForge",
+                            "display_name": "CryptForge",
+                        },
                         "advisory": {
                             "notion_portfolio_call": "Finish",
                             "notion_momentum": "Post-Build Review Done",
@@ -6184,7 +6186,10 @@ def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> Non
                         },
                     },
                     {
-                        "identity": {"display_name": "NoNotion"},
+                        "identity": {
+                            "project_key": "group/NoNotion",
+                            "display_name": "NoNotion",
+                        },
                         "advisory": {
                             "notion_portfolio_call": "",
                             "notion_momentum": "",
@@ -6199,12 +6204,13 @@ def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> Non
 
     context = load_prior_notion_context(latest_path)
 
-    assert context[_normalize("CryptForge")] == {
+    assert context["group/CryptForge"] == {
         "portfolio_call": "Finish",
         "momentum": "Post-Build Review Done",
         "current_state": "Parked",
     }
-    assert _normalize("NoNotion") not in context
+    assert context.get("group/NoNotion") is None
+    assert context.get("CryptForge") is None
     assert len(context) == 1
 
 
@@ -6298,7 +6304,13 @@ def test_publish_allow_empty_notion_carries_forward_prior_context(
         legacy_registry_path=legacy_registry,
         include_notion=False,
     )
-    target_name = discovered.snapshot.projects[0].identity.display_name
+    prior_target = discovered.snapshot.projects[0].identity
+    target_name = prior_target.display_name
+    target_key = prior_target.project_key
+    duplicate_key = f"same-name/{target_name}"
+    duplicate_project = portfolio_workspace / duplicate_key
+    duplicate_project.mkdir(parents=True)
+    (duplicate_project / "README.md").write_text("# Duplicate fixture\n")
 
     # Seed the prior artifact with the per-project advisory a tokened run produced.
     latest_path = output_dir / "portfolio-truth-latest.json"
@@ -6308,7 +6320,10 @@ def test_publish_allow_empty_notion_carries_forward_prior_context(
                 "source_summary": {"notion_context_rows": 1},
                 "projects": [
                     {
-                        "identity": {"display_name": target_name},
+                        "identity": {
+                            "project_key": target_key,
+                            "display_name": target_name,
+                        },
                         "advisory": {
                             "notion_portfolio_call": "Ship",
                             "notion_momentum": "Active",
@@ -6339,10 +6354,17 @@ def test_publish_allow_empty_notion_carries_forward_prior_context(
     target = next(
         item
         for item in published["projects"]
-        if item["identity"]["display_name"] == target_name
+        if item["identity"]["project_key"] == target_key
     )
     assert target["advisory"]["notion_portfolio_call"] == "Ship"
     assert target["advisory"]["notion_current_state"] == "Building"
+    duplicate = next(
+        item
+        for item in published["projects"]
+        if item["identity"]["project_key"] == duplicate_key
+    )
+    assert duplicate["identity"]["display_name"] == target_name
+    assert duplicate["advisory"]["notion_portfolio_call"] == ""
 
 
 def test_publish_without_allow_empty_notion_still_guards(
@@ -6734,7 +6756,10 @@ def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
         legacy_registry_path=legacy_registry,
         include_notion=False,
     )
-    target_name = discovered.snapshot.projects[0].identity.display_name
+    target = discovered.snapshot.projects[0].identity
+    new_checkout = portfolio_workspace / "new" / target.display_name.swapcase()
+    new_checkout.mkdir(parents=True)
+    (new_checkout / "README.md").write_text("# New checkout\n")
 
     (output_dir / "portfolio-truth-latest.json").write_text(
         json.dumps(
@@ -6742,7 +6767,10 @@ def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
                 "source_summary": {"notion_context_rows": 1},
                 "projects": [
                     {
-                        "identity": {"display_name": target_name},
+                        "identity": {
+                            "project_key": target.project_key,
+                            "display_name": target.display_name,
+                        },
                         "advisory": {
                             "notion_portfolio_call": "Ship",
                             "notion_momentum": "Active",
@@ -6784,6 +6812,12 @@ def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
     published = json.loads((output_dir / "portfolio-truth-latest.json").read_text())
     assert published["source_summary"]["notion_context_rows"] == 1
     assert published["source_summary"]["notion_context_carried_forward"] is True
+    calls = {
+        row["identity"]["project_key"]: row["advisory"]["notion_portfolio_call"]
+        for row in published["projects"]
+    }
+    assert calls[target.project_key] == "Ship"
+    assert calls[new_checkout.relative_to(portfolio_workspace).as_posix()] == ""
 
 
 def test_publish_allow_empty_notion_without_prior_context_publishes_zero(

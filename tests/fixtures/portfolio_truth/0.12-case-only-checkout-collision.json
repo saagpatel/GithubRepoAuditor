@@ -1,0 +1,64 @@
+{
+  "canonical_project_path": "Repo",
+  "checkout_count": 2,
+  "checkouts": [
+    {
+      "bare": false,
+      "branch": "main",
+      "dirty": false,
+      "dirty_path_count": 0,
+      "head": "1111111111111111111111111111111111111111",
+      "path": "repo",
+      "relation": "linked_worktree",
+      "state": "observed"
+    },
+    {
+      "bare": false,
+      "branch": "main",
+      "dirty": false,
+      "dirty_path_count": 0,
+      "head": "1111111111111111111111111111111111111111",
+      "path": "Repo",
+      "relation": "representative",
+      "state": "observed"
+    }
+  ],
+  "declared_checkout_paths": [
+    "repo",
+    "Repo"
+  ],
+  "declared_path_evidence": [
+    {
+      "source_path": "repo/AGENTS.md",
+      "target_checkout_path": "repo"
+    },
+    {
+      "source_path": "Repo/AGENTS.md",
+      "target_checkout_path": "Repo"
+    }
+  ],
+  "discarded_checkouts": [
+    {
+      "bare": false,
+      "branch": "main",
+      "dirty": false,
+      "dirty_path_count": 0,
+      "head": "1111111111111111111111111111111111111111",
+      "path": "repo",
+      "relation": "linked_worktree",
+      "state": "observed"
+    }
+  ],
+  "full_clone_count": 1,
+  "origin": "fixture/repo",
+  "schema_version": "CheckoutCollisionV1",
+  "selection": {
+    "rationale": "Compatibility representative prefers a fully observed non-bare checkout, then an origin-basename match, followed by the shallowest, shortest, alphabetic workspace-relative path.",
+    "reason": "canonical path declarations resolve to multiple checkouts",
+    "reason_code": "conflicting_declared_checkout_paths",
+    "representative_path": "Repo",
+    "selected_path": null,
+    "state": "unknown"
+  },
+  "unresolved_declared_paths": []
+}

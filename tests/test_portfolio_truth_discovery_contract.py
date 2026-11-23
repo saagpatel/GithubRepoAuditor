@@ -200,6 +200,39 @@ def test_unreadable_descendant_is_reported_and_siblings_continue(
         )
 
 
+@pytest.mark.parametrize("probe", ["is_file", "is_symlink", "is_dir"])
+def test_unreadable_category_child_does_not_hide_sibling_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, probe: str
+) -> None:
+    workspace = tmp_path / "workspace"
+    category = workspace / "Category"
+    restricted = category / "Restricted"
+    sibling = category / "Sibling"
+    category.mkdir(parents=True)
+    _make_repository(restricted)
+    _make_repository(sibling)
+
+    original = getattr(Path, probe)
+
+    def guarded_probe(path: Path) -> bool:
+        if path == restricted:
+            raise PermissionError("synthetic category child metadata denial")
+        return original(path)
+
+    monkeypatch.setattr(Path, probe, guarded_probe)
+    exclusions: dict[str, int] = {}
+
+    projects = discover_workspace_projects(
+        workspace,
+        catalog_data={},
+        now=datetime(2026, 11, 23, tzinfo=timezone.utc),
+        exclusion_counts=exclusions,
+    )
+
+    assert [project["path"] for project in projects] == ["Category/Sibling"]
+    assert exclusions == {"unreadable-directory": 1}
+
+
 @pytest.mark.parametrize(
     "probe_error",
     [
