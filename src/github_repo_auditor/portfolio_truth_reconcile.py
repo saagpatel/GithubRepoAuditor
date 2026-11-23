@@ -155,7 +155,7 @@ def _derive_readme_char_count(project_path: Path | None, has_git: bool) -> int:
         if candidate.is_file():
             return len(candidate.read_text(errors="replace"))
     # Case-insensitive fallback
-    for candidate in project_path.iterdir():
+    for candidate in sorted(project_path.iterdir(), key=lambda item: item.name):
         if candidate.is_file() and candidate.name.lower().startswith("readme"):
             return len(candidate.read_text(errors="replace"))
     return 0
@@ -909,10 +909,12 @@ def build_materialization_context(
     prior_notion_generated_at: str | None = None,
 ) -> MaterializationContext:
     """Load catalog, registry, Notion context, and workspace discovery once."""
-    now = now or datetime.now(timezone.utc)
+    now = (
+        now.astimezone(timezone.utc) if now is not None else datetime.now(timezone.utc)
+    )
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
-    notion_context = load_safe_notion_project_context() if include_notion else {}
+    notion_context = load_safe_notion_project_context(now=now) if include_notion else {}
     notion_source_mode = str(getattr(notion_context, "source_mode", "live") or "live")
     notion_observed_at = getattr(notion_context, "observed_at", None)
     notion_context_carried_forward = False
@@ -1438,9 +1440,27 @@ def _select_security_entry(
 def _select_repo_status_entry(
     lookup: dict[str, dict], repo_full_name: str | None, display_name: str
 ) -> dict | None:
-    """Join GitHub repo metadata by remote repo name, then local display name."""
+    """Join GitHub metadata by full repository identity before safe aliases."""
+    if repo_full_name:
+        exact = lookup.get(repo_full_name.casefold()) or lookup.get(repo_full_name)
+        if exact is not None:
+            return exact
+
+    # Older callers can provide explicitly name-keyed overlays.
     repo_name = (repo_full_name or "").rsplit("/", 1)[-1]
-    return lookup.get(repo_name) or lookup.get(display_name)
+    for alias in (repo_name, display_name):
+        entry = lookup.get(alias)
+        if entry is None:
+            continue
+        entry_full_name = str(entry.get("full_name") or "").strip()
+        if (
+            repo_full_name
+            and entry_full_name
+            and entry_full_name.casefold() != repo_full_name.casefold()
+        ):
+            continue
+        return entry
+    return None
 
 
 def _build_truth_project(
@@ -1578,14 +1598,14 @@ def _build_truth_project(
         raw_project.get("repo_full_name"),
         raw_project["name"],
     )
-    live_status_available = bool(
-        status_entry and status_entry.get("source") == "github_api"
-    )
+    if status_entry and not isinstance(status_entry.get("archived"), bool):
+        status_entry = None
     remote_status_available = remote_repository.get("state") in {
         "observed",
         "partial",
     } and isinstance(remote_repository.get("archived"), bool)
-    if live_status_available:
+    github_archived: bool | None = None
+    if status_entry is not None and status_entry.get("source") == "github_api":
         github_archived = status_entry.get("archived") is True
         provenance["github.archived"] = {
             "source": "github_api",
@@ -1597,18 +1617,26 @@ def _build_truth_project(
             "source": str(remote_repository.get("source") or "github_security"),
             "detail": str(github_archived).lower(),
         }
-    else:
-        github_archived = bool(status_entry and status_entry.get("archived") is True)
-        if status_entry is not None:
-            provenance["github.archived"] = {
-                "source": str(status_entry.get("source") or "audit_report"),
-                "detail": str(github_archived).lower(),
-            }
+    elif status_entry is not None:
+        github_archived = status_entry["archived"]
+        provenance["github.archived"] = {
+            "source": str(status_entry.get("source") or "audit_report"),
+            "detail": str(github_archived).lower(),
+        }
 
     last_activity = raw_project["last_meaningful_activity_at"]
     activity_status = _activity_status_for(last_activity, now=now)
     # Lifecycle fact, not a recency observation — orthogonal to activity_status.
-    archived = github_archived or declared_values["lifecycle_state"] == "archived"
+    archived = github_archived
+    if declared_values["lifecycle_state"] == "archived":
+        archived = True
+    elif (
+        archived is None
+        and declared_values["lifecycle_state"]
+        and not identity.repo_full_name
+    ):
+        # A local-only project can have an explicit non-archive lifecycle.
+        archived = False
 
     path_entry = build_operating_path_entry(
         {
@@ -1625,7 +1653,7 @@ def _build_truth_project(
             ),
         },
         context_quality=context_quality,
-        archived=archived,
+        archived=archived is True,
     )
     provenance["declared.operating_path"] = {
         "source": "normalized",
@@ -1706,7 +1734,7 @@ def _build_truth_project(
     }
     provenance["derived.archived"] = {
         "source": "derived",
-        "detail": str(archived).lower(),
+        "detail": str(archived).lower() if archived is not None else "unknown",
     }
     provenance["derived.attention_state"] = {
         "source": "derived",
@@ -2065,7 +2093,7 @@ def _activity_status_for(last_activity: datetime | None, *, now: datetime) -> st
     computed by the caller and passed to downstream consumers as its own boolean —
     see the `archived` local in `_build_truth_project`."""
     if last_activity is None:
-        return "stale"
+        return "unknown"
     delta_days = (now - last_activity).days
     if delta_days <= 14:
         return "active"
