@@ -2,22 +2,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
+from collections.abc import Iterator, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from github_repo_auditor.notion_registry import load_notion_project_context
-from github_repo_auditor.portfolio_catalog import group_entry_for_path
+from github_repo_auditor.portfolio_catalog import (
+    catalog_entry_for_repo,
+    group_entry_for_path,
+)
 from github_repo_auditor.portfolio_context_contract import analyze_project_context
 from github_repo_auditor.portfolio_truth_types import (
     CHECKOUT_COLLISION_SCHEMA_VERSION,
     CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
 )
-from github_repo_auditor.registry_parser import _normalize
+from github_repo_auditor.registry_parser import VALID_STATUSES, _normalize
 
 MAX_CONTEXT_DEPTH = 2
 MAX_CONTEXT_BYTES = 32_000
@@ -112,6 +117,7 @@ ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"
 
 
 WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v3"
+UNREADABLE_DIRECTORY = "unreadable-directory"
 WORKSPACE_EXCLUSION_REASONS = frozenset(
     {
         "backup-container",
@@ -134,16 +140,55 @@ _MARKDOWN_HEADING = re.compile(r"^(?P<marks>#{1,6})\s+\S")
 _ABSOLUTE_CODE_PATH = re.compile(r"`(?P<path>/[^`\r\n]+)`")
 
 
-class NotionProjectContext(dict[str, dict[str, str]]):
+class NotionProjectContext(Mapping[str, dict[str, str]]):
+    """Look up exact titles first, then unambiguous normalized aliases."""
+
     def __init__(
         self,
+        titles: Mapping[str, dict[str, str]],
         *,
         source_mode: str,
         observed_at: str | None,
+        title_aliases: dict[str, str] | None = None,
     ) -> None:
-        super().__init__()
         self.source_mode = source_mode
         self.observed_at = observed_at
+        self._titles = dict(titles)
+        self._aliases: dict[str, dict[str, str] | None] = {}
+        for title, advisory in titles.items():
+            self._add_alias(_normalize(title), advisory)
+
+        # Configured aliases may only fill names without a source title.
+        source_keys = set(self._aliases)
+        configured: list[tuple[str, dict[str, str]]] = []
+        for title, target in (title_aliases or {}).items():
+            key = _normalize(target)
+            source_row = self.get(title)
+            if key not in source_keys and source_row is not None:
+                configured.append((key, source_row))
+        for key, advisory in configured:
+            self._add_alias(key, advisory)
+        for key, row in self._aliases.items():
+            if key not in source_keys and row is not None:
+                self._titles.setdefault(key, row)
+
+    def _add_alias(self, key: str, advisory: dict[str, str]) -> None:
+        if self._aliases.setdefault(key, advisory) != advisory:
+            self._aliases[key] = None
+
+    def __getitem__(self, title: str) -> dict[str, str]:
+        if title in self._titles:
+            return self._titles[title]
+        advisory = self._aliases.get(_normalize(title))
+        if advisory is None:
+            raise KeyError(title)
+        return advisory
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._titles)
+
+    def __len__(self) -> int:
+        return len(self._titles)
 
 
 def workspace_exclusion_reason(name: str, *, nested: bool = False) -> str | None:
@@ -241,7 +286,17 @@ def _dedupe_checkouts_by_origin(
                 canonical.append(project)
 
     for group in by_local_common_dir.values():
-        canonical.append(_checkout_representative(group, ""))
+        if len(group) == 1:
+            canonical.extend(group)
+            continue
+        identity_project = _local_checkout_identity(group, catalog_data or {})
+        representative = _checkout_representative(group, "")
+        canonical.append(
+            _canonical_checkout_project(
+                identity_project=identity_project,
+                representative=representative,
+            )
+        )
 
     for origin_key, group in by_origin.items():
         identity_project = _checkout_identity_project(group, origin_key)
@@ -472,6 +527,29 @@ def _checkout_representative(
             str(project.get("path", "")),
         ),
     )
+
+
+def _local_checkout_identity(
+    group: list[dict[str, Any]], catalog_data: dict[str, Any]
+) -> dict[str, Any]:
+    def rank(project: dict[str, Any]) -> tuple:
+        path = project["path"]
+        # A linked worktree has its own Git directory inside the common directory.
+        common_dir = _checkout_observation(project)["git_common_dir"]
+        git_dir = project.get("_git_dir")
+        primary = (
+            git_dir is not None
+            and Path(git_dir).resolve() == Path(common_dir).resolve()
+        )
+        return (
+            not catalog_entry_for_repo(project, catalog_data).get("has_explicit_entry"),
+            not project.get("group_entry", {}).get("has_explicit_entry"),
+            not primary,
+            path.lower(),
+            path,
+        )
+
+    return min(group, key=rank)
 
 
 def _checkout_identity_project(
@@ -779,9 +857,36 @@ def _discover_nested_projects(
 ) -> list[dict[str, Any]]:
     discovered: list[dict[str, Any]] = []
     nested = root != workspace_root
-    for child in sorted(
-        root.iterdir(), key=lambda item: (item.name.lower(), item.name)
-    ):
+    try:
+        children = sorted(
+            root.iterdir(), key=lambda item: (item.name.lower(), item.name)
+        )
+        # Inside an identified project only Git-marked descendants are projects.
+        if git_only:
+            is_project = (root / ".git").exists()
+        else:
+            is_project = (
+                nested
+                and root != workspace_root / "_archive"
+                and _is_project_dir(children)
+            )
+        if is_project:
+            discovered.append(
+                _inspect_project_dir(
+                    root, workspace_root, catalog_data=catalog_data, now=now
+                )
+            )
+    except OSError:
+        if not nested:
+            raise
+        _record_exclusion(exclusion_counts, UNREADABLE_DIRECTORY)
+        logging.getLogger(__name__).warning(
+            "Workspace discovery incomplete: could not inspect %s",
+            root.relative_to(workspace_root),
+        )
+        return discovered
+
+    for child in children:
         if (
             child.name.startswith(".")
             or child.name in SKIP_DIRS
@@ -793,17 +898,6 @@ def _discover_nested_projects(
         if exclusion_reason is not None:
             _record_exclusion(exclusion_counts, exclusion_reason)
             continue
-        if git_only:
-            # Source and documentation directories inside a project are not separate projects.
-            is_project = (child / ".git").exists()
-        else:
-            is_project = (nested or child.name != "_archive") and _is_project_dir(child)
-        if is_project:
-            discovered.append(
-                _inspect_project_dir(
-                    child, workspace_root, catalog_data=catalog_data, now=now
-                )
-            )
         discovered.extend(
             _discover_nested_projects(
                 child,
@@ -848,7 +942,7 @@ def load_legacy_registry_rows(path: Path | None) -> dict[str, dict[str, str]]:
 
         row = dict(zip(header, cols))
         status = row.get("status", "").lower()
-        if status not in {"active", "recent", "parked", "archived"}:
+        if status not in VALID_STATUSES:
             continue
         project = row.get("project", "").strip()
         if not project:
@@ -873,7 +967,7 @@ def load_safe_notion_project_context(
     snapshot_path: Path | None = None,
     *,
     now: datetime | None = None,
-) -> dict[str, dict[str, str]]:
+) -> NotionProjectContext:
     raw_context = load_notion_project_context(config_dir)
     source_mode = "live"
     observed_at: str | None = None
@@ -886,21 +980,20 @@ def load_safe_notion_project_context(
             source_mode = "verified-snapshot"
         else:
             raw_context = {}
-    sanitized = NotionProjectContext(
-        source_mode=source_mode,
-        observed_at=observed_at,
-    )
-    for name, context in raw_context.items():
-        sanitized[_normalize(name)] = {
+    titles = {
+        name: {
             "portfolio_call": str(context.get("portfolio_call", "") or "").strip(),
             "momentum": str(context.get("momentum", "") or "").strip(),
             "current_state": str(context.get("current_state", "") or "").strip(),
         }
-    for raw_alias, target in _load_notion_title_aliases(config_dir).items():
-        alias_context = sanitized.get(_normalize(raw_alias))
-        if alias_context:
-            sanitized.setdefault(_normalize(target), alias_context)
-    return sanitized
+        for name, context in raw_context.items()
+    }
+    return NotionProjectContext(
+        titles,
+        source_mode=source_mode,
+        observed_at=observed_at,
+        title_aliases=_load_notion_title_aliases(config_dir),
+    )
 
 
 def _notion_snapshot_path_from_environment() -> Path | None:
@@ -1028,11 +1121,14 @@ def _inspect_project_dir(
     context_files = _collect_context_files(project_path)
     stack = _detect_stack(project_path)
     git_facts = _gather_git_facts(project_path)
-    checkout_observation = (
-        _observe_checkout(project_path, workspace_root=workspace_root)
-        if git_facts.get("has_git")
-        else {}
-    )
+    if git_facts.get("_git_probe_failed"):
+        checkout_observation = {"state": "unknown"}
+    elif git_facts.get("has_git"):
+        checkout_observation = _observe_checkout(
+            project_path, workspace_root=workspace_root
+        )
+    else:
+        checkout_observation = {}
     last_activity = git_facts.get("last_commit_at") or _latest_meaningful_mtime(
         project_path
     )
@@ -1065,14 +1161,12 @@ def _inspect_project_dir(
         ),
         "_checkout_observation": checkout_observation,
         "now": now,
+        "_git_probe_failed": bool(git_facts.get("_git_probe_failed")),
+        "_git_dir": git_facts.get("_git_dir"),
     }
 
 
-def _is_project_dir(path: Path) -> bool:
-    try:
-        children = list(path.iterdir())
-    except OSError:
-        return False
+def _is_project_dir(children: list[Path]) -> bool:
     names = {child.name for child in children}
     if ".git" in names:
         return True
@@ -1175,23 +1269,35 @@ def _read_small_json(path: Path) -> dict[str, Any]:
 
 
 def _gather_git_facts(project_path: Path) -> dict[str, Any]:
-    if not _is_repository_root(project_path):
-        return {
-            "has_git": False,
-            "last_commit_at": None,
-            "repo_full_name": "",
-            "default_branch": "",
-        }
-
-    # Computed once; ``last_commit_at`` is the only field the git-log probe below
-    # can refine, so every error path returns this base unchanged.
-    base = {
-        "has_git": True,
+    base: dict[str, Any] = {
+        "has_git": False,
         "last_commit_at": None,
-        "repo_full_name": _git_remote_full_name(project_path),
-        "default_branch": _git_default_branch(project_path),
+        "repo_full_name": "",
+        "default_branch": "",
     }
+    marker = project_path / ".git"
+    # Resolve this marker (or bare directory) without searching ancestor repos.
+    try:
+        candidate = marker if marker.exists() else project_path
+        git_dir = _git_read(
+            project_path, "rev-parse", "--resolve-git-dir", str(candidate.resolve())
+        )
+    except subprocess.CalledProcessError:
+        return base
+    except (OSError, subprocess.TimeoutExpired):
+        looks_bare = (project_path / "HEAD").is_file() and (
+            project_path / "objects"
+        ).is_dir()
+        if marker.exists() or looks_bare:
+            base.update(has_git=True, _git_probe_failed=True)
+        return base
 
+    base.update(
+        has_git=True,
+        _git_dir=git_dir,
+        repo_full_name=_git_remote_full_name(project_path),
+        default_branch=_git_default_branch(project_path),
+    )
     try:
         result = subprocess.run(
             ["git", "-C", str(project_path), "log", "-1", "--format=%cI"],
@@ -1371,19 +1477,6 @@ def _path_is_within(candidate: Path, root: Path) -> bool:
         return True
     except (OSError, ValueError):
         return False
-
-
-def _is_repository_root(project_path: Path) -> bool:
-    """Verify the local Git marker (or bare directory) without searching ancestors."""
-    marker = project_path / ".git"
-    git_dir = marker if marker.exists() else project_path
-    try:
-        _git_read(
-            project_path, "rev-parse", "--resolve-git-dir", str(git_dir.resolve())
-        )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return False
-    return True
 
 
 def _git_default_branch(project_path: Path) -> str:

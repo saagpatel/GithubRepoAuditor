@@ -49,6 +49,7 @@ from github_repo_auditor.portfolio_truth_provenance import (
 )
 from github_repo_auditor.portfolio_truth_render import registry_project_labels
 from github_repo_auditor.portfolio_truth_sources import (
+    UNREADABLE_DIRECTORY,
     WORKSPACE_EXCLUSION_REASONS,
     checkout_collision_paths,
 )
@@ -71,6 +72,7 @@ from github_repo_auditor.portfolio_truth_types import (
     PortfolioTruthProject,
     RiskFields,
     SecurityFields,
+    project_order_key,
 )
 from github_repo_auditor.producer_preflight import ProducerEvidence
 from github_repo_auditor.registry_parser import _normalize, parse_registry_markdown
@@ -95,13 +97,7 @@ def validate_truth_snapshot(
         )
     _validate_contract_envelope(snapshot.to_dict())
     _validate_checkout_collisions(snapshot)
-    expected_order = sorted(
-        snapshot.projects,
-        key=lambda project: (
-            project.identity.section_marker.lower(),
-            project.identity.display_name.lower(),
-        ),
-    )
+    expected_order = sorted(snapshot.projects, key=project_order_key)
     if [project.identity.project_key for project in snapshot.projects] != [
         project.identity.project_key for project in expected_order
     ]:
@@ -944,7 +940,7 @@ def _validate_snapshot_exclusions(exclusions: Any) -> None:
     counts = exclusions.get("counts")
     if not isinstance(counts, dict) or any(
         not isinstance(key, str)
-        or key not in WORKSPACE_EXCLUSION_REASONS
+        or (key not in WORKSPACE_EXCLUSION_REASONS and key != UNREADABLE_DIRECTORY)
         or not isinstance(value, int)
         or isinstance(value, bool)
         or value <= 0
@@ -2079,52 +2075,53 @@ def canonicalize_prior_security_truth_payload(
     reconstructs only its named metadata in memory before running the complete
     current validator.
     """
+    prior_schema = payload.get("schema_version")
+    if prior_schema in ("0.11.0", "0.12.0") and SCHEMA_VERSION == "0.13.0":
+        projects = payload.get("projects")
+        if not isinstance(projects, list):
+            raise ValueError(
+                f"Prior PortfolioTruth {prior_schema} project envelope is invalid."
+            )
+        for project in projects:
+            if not isinstance(project, Mapping) or not isinstance(
+                project.get("derived"), Mapping
+            ):
+                raise ValueError(
+                    f"Prior PortfolioTruth {prior_schema} project envelope is invalid."
+                )
+            derived = project["derived"]
+            if prior_schema == "0.11.0" and "degraded_dimensions" in derived:
+                raise ValueError(
+                    "Prior PortfolioTruth 0.11.0 cannot declare derived.degraded_dimensions."
+                )
+            _validate_prior_schema_derived_fields(derived, schema_version=prior_schema)
+
+        # Hydration supplies the absent 0.11 degraded_dimensions default. Verify
+        # the old ordering before applying the new tie-breakers to its valid ties.
+        snapshot = _snapshot_from_payload(payload)
+        _validate_runtime_dataclass(snapshot, "snapshot")
+        counts = snapshot.exclusions.get("counts")
+        if isinstance(counts, Mapping) and UNREADABLE_DIRECTORY in counts:
+            raise ValueError("Prior PortfolioTruth exclusion counts are invalid.")
+        prior_order = [project_order_key(project)[:2] for project in snapshot.projects]
+        if prior_order != sorted(prior_order):
+            raise ValueError(
+                f"Prior PortfolioTruth {prior_schema} projects differ from producer ordering."
+            )
+        snapshot.projects.sort(key=project_order_key)
+        payload = {**snapshot.to_dict(), "schema_version": SCHEMA_VERSION}
+
     try:
         return canonicalize_truth_snapshot_payload(
             payload,
             security_max_age_hours=security_max_age_hours,
         )
     except ValueError as strict_error:
-        prior_schema = payload.get("schema_version")
-        if prior_schema in ("0.11.0", "0.12.0") and SCHEMA_VERSION == "0.13.0":
-            migrated = deepcopy(dict(payload))
-            projects = migrated.get("projects")
-            if not isinstance(projects, list):
-                raise ValueError(
-                    f"Prior PortfolioTruth {prior_schema} project envelope is invalid."
-                ) from strict_error
-            for raw_project in projects:
-                if not isinstance(raw_project, dict) or not isinstance(
-                    raw_project.get("derived"), dict
-                ):
-                    raise ValueError(
-                        f"Prior PortfolioTruth {prior_schema} project envelope is invalid."
-                    ) from strict_error
-                derived = raw_project["derived"]
-                if prior_schema == "0.11.0" and "degraded_dimensions" in derived:
-                    raise ValueError(
-                        "Prior PortfolioTruth 0.11.0 cannot declare "
-                        "derived.degraded_dimensions."
-                    ) from strict_error
-                _validate_prior_schema_derived_fields(
-                    derived,
-                    schema_version=str(prior_schema),
-                )
-                if prior_schema == "0.11.0":
-                    derived["degraded_dimensions"] = None
-            migrated["schema_version"] = SCHEMA_VERSION
-            try:
-                return canonicalize_truth_snapshot_payload(
-                    migrated,
-                    security_max_age_hours=security_max_age_hours,
-                )
-            except ValueError as migration_error:
-                raise migration_error from strict_error
-
         summary = payload.get("source_summary")
         exclusions = payload.get("exclusions")
         is_bounded_legacy_payload = (
-            isinstance(summary, Mapping)
+            payload.get("schema_version") == SCHEMA_VERSION
+            and isinstance(summary, Mapping)
             and "checkout_collisions" not in summary
             and isinstance(exclusions, Mapping)
             and exclusions.get("policy_version")
@@ -2195,8 +2192,10 @@ def canonicalize_prior_security_truth_payload(
                 )
 
             exclusion_counts = exclusions.get("counts")
-            if set(exclusions) != {"policy_version", "counts"} or not isinstance(
-                exclusion_counts, Mapping
+            if (
+                set(exclusions) != {"policy_version", "counts"}
+                or not isinstance(exclusion_counts, Mapping)
+                or UNREADABLE_DIRECTORY in exclusion_counts
             ):
                 raise ValueError(
                     "Legacy prior PortfolioTruth exclusions envelope is invalid."

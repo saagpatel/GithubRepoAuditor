@@ -296,6 +296,20 @@ class PortfolioTruthProject:
         }
 
 
+def project_order_key(
+    project: PortfolioTruthProject,
+) -> tuple[str, str, str, str, str]:
+    """Return the canonical stable ordering key for truth projects."""
+    identity = project.identity
+    return (
+        identity.section_marker.lower(),
+        identity.display_name.lower(),
+        identity.section_marker,
+        identity.display_name,
+        identity.path,
+    )
+
+
 @dataclass(frozen=True)
 class PortfolioTruthRollups:
     """Portfolio-level aggregates derived from the project list, emitted so

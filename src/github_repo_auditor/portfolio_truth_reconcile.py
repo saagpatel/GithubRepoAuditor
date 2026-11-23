@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,6 +39,7 @@ from github_repo_auditor.portfolio_truth_metadata import (
 )
 from github_repo_auditor.portfolio_truth_precedence import build_precedence_matrix
 from github_repo_auditor.portfolio_truth_sources import (
+    NotionProjectContext,
     discover_workspace_projects,
     load_legacy_registry_rows,
     load_safe_notion_project_context,
@@ -54,6 +56,7 @@ from github_repo_auditor.portfolio_truth_types import (
     RiskFields,
     SecurityFields,
     display_activity_status,
+    project_order_key,
 )
 from github_repo_auditor.project_registry import DEFAULT_SUPPLEMENTARY
 from github_repo_auditor.registry_parser import _normalize
@@ -815,7 +818,7 @@ class MaterializationContext:
     now: datetime
     catalog_data: dict[str, Any]
     legacy_rows: dict[str, dict[str, str]]
-    notion_context: dict[str, dict[str, str]]
+    notion_context: Mapping[str, dict[str, str]]
     notion_source_mode: str
     notion_observed_at: str | None
     notion_context_carried_forward: bool
@@ -903,7 +906,7 @@ def build_materialization_context(
     catalog_path: Path | None = None,
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
-    notion_context_fallback: dict[str, dict[str, str]] | None = None,
+    notion_context_fallback: Mapping[str, dict[str, str]] | None = None,
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     degraded_dimensions_by_name: dict[str, list[str]] | None = None,
@@ -915,7 +918,9 @@ def build_materialization_context(
     )
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
-    notion_context = load_safe_notion_project_context(now=now) if include_notion else {}
+    notion_context: Mapping[str, dict[str, str]] = (
+        load_safe_notion_project_context(now=now) if include_notion else {}
+    )
     notion_source_mode = str(getattr(notion_context, "source_mode", "live") or "live")
     notion_observed_at = getattr(notion_context, "observed_at", None)
     notion_context_carried_forward = False
@@ -931,6 +936,12 @@ def build_materialization_context(
             "Live Notion context unavailable; carrying forward %d project rows "
             "from the prior portfolio-truth artifact.",
             len(notion_context),
+        )
+    if notion_context and not isinstance(notion_context, NotionProjectContext):
+        notion_context = NotionProjectContext(
+            notion_context,
+            source_mode=notion_source_mode,
+            observed_at=notion_observed_at,
         )
 
     exclusion_counts: dict[str, int] = {}
@@ -1043,7 +1054,7 @@ def build_portfolio_truth_snapshot(
     catalog_path: Path | None = None,
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
-    notion_context_fallback: dict[str, dict[str, str]] | None = None,
+    notion_context_fallback: Mapping[str, dict[str, str]] | None = None,
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     degraded_dimensions_by_name: dict[str, list[str]] | None = None,
@@ -1155,15 +1166,7 @@ def build_portfolio_truth_snapshot(
             else project
             for project in projects
         ]
-    projects.sort(
-        key=lambda item: (
-            item.identity.section_marker.lower(),
-            item.identity.display_name.lower(),
-            item.identity.section_marker,
-            item.identity.display_name,
-            item.identity.path,
-        )
-    )
+    projects.sort(key=project_order_key)
 
     # Discovery shares each collision envelope between its project and summary.
     # Reconcile that selection once against the final row (after the candidate pass).
@@ -1350,10 +1353,8 @@ def _merge_supplementary_discoveries(
     return merged
 
 
-def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
-    """Reconstruct a Notion project-context map from a previously published
-    portfolio-truth artifact, keyed identically to live Notion context
-    (``_normalize(display_name)`` -> ``{portfolio_call, momentum, current_state}``).
+def load_prior_notion_context(latest_path: Path) -> Mapping[str, dict[str, str]]:
+    """Reconstruct prior advisory rows using the same title index as live Notion.
 
     Used to carry advisory context forward on a headless refresh when a live
     Notion token is unavailable, rather than overwriting local truth with zero
@@ -1382,12 +1383,14 @@ def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
         current_state = str(advisory.get("notion_current_state", "")).strip()
         if not display_name or not (portfolio_call or momentum or current_state):
             continue
-        context[_normalize(display_name)] = {
+        context[display_name] = {
             "portfolio_call": portfolio_call,
             "momentum": momentum,
             "current_state": current_state,
         }
-    return context
+    return NotionProjectContext(
+        context, source_mode="carried-forward", observed_at=None
+    )
 
 
 def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
@@ -1518,7 +1521,7 @@ def _build_truth_project(
     *,
     catalog_data: dict[str, Any],
     legacy_rows: dict[str, dict[str, str]],
-    notion_context: dict[str, dict[str, str]],
+    notion_context: Mapping[str, dict[str, str]],
     now: datetime,
     workspace_root: Path,
     release_count_by_name: dict[str, int] | None = None,
@@ -1540,7 +1543,7 @@ def _build_truth_project(
         catalog_data,
     )
     legacy = legacy_rows.get(_normalize(raw_project["name"]), {})
-    notion = notion_context.get(_normalize(raw_project["name"]), {})
+    notion = notion_context.get(raw_project["name"], {})
 
     warnings: list[str] = []
     provenance: dict[str, dict[str, str]] = {}
@@ -1648,7 +1651,7 @@ def _build_truth_project(
         raw_project.get("repo_full_name"),
         raw_project["name"],
     )
-    if status_entry and not isinstance(status_entry.get("archived"), bool):
+    if status_entry is not None and not isinstance(status_entry.get("archived"), bool):
         status_entry = None
     remote_status_available = remote_repository.get("state") in {
         "observed",
@@ -1910,15 +1913,19 @@ def _build_truth_project(
         if security_entry is not None
         else None
     )
-    repository_state = (
-        observe_repository_state(
+    if (
+        project_path is not None
+        and has_git
+        and not raw_project.get("_git_probe_failed")
+    ):
+        repository_state = observe_repository_state(
             project_path,
             observed_at=now,
             remote_default_branch=remote_default_branch,
             workspace_root=workspace_root,
         )
-        if project_path is not None and has_git
-        else {
+    else:
+        repository_state = {
             "state": "not_a_repository",
             "observed_at": now.isoformat(),
             "remote_default_branch": remote_default_branch
@@ -1931,7 +1938,12 @@ def _build_truth_project(
                 ),
             },
         }
-    )
+        if raw_project.get("_git_probe_failed"):
+            repository_state.update(
+                state="unknown",
+                reason_code="repository_observation_failed",
+                reason="the local Git marker probe could not complete",
+            )
     if identity.has_git and repository_state["state"] == "not_a_repository":
         identity = replace(identity, has_git=False)
     checkout_authority = raw_project.get("checkout_authority")
