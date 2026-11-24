@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
@@ -18,6 +19,8 @@ from github_repo_auditor.portfolio_truth_types import (
     CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
 )
 from github_repo_auditor.registry_parser import _normalize
+
+logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_DEPTH = 2
 MAX_CONTEXT_BYTES = 32_000
@@ -820,6 +823,8 @@ def load_legacy_registry_rows(path: Path | None) -> dict[str, dict[str, str]]:
 def load_safe_notion_project_context(
     config_dir: Path = Path("config"),
     snapshot_path: Path | None = None,
+    *,
+    now: datetime | None = None,
 ) -> dict[str, dict[str, str]]:
     raw_context = load_notion_project_context(config_dir)
     source_mode = "live"
@@ -828,7 +833,7 @@ def load_safe_notion_project_context(
         configured_snapshot = snapshot_path or _notion_snapshot_path_from_environment()
         if configured_snapshot:
             raw_context, observed_at = _load_verified_notion_snapshot_context(
-                configured_snapshot
+                configured_snapshot, now=now
             )
             source_mode = "verified-snapshot"
         else:
@@ -857,8 +862,16 @@ def _notion_snapshot_path_from_environment() -> Path | None:
     return Path(configured).expanduser()
 
 
+def normalize_report_clock(now: datetime) -> datetime:
+    if now.utcoffset() is None:
+        raise ValueError("The report clock must be timezone-aware.")
+    return now.astimezone(timezone.utc)
+
+
 def verified_notion_snapshot(
     snapshot_path: Path,
+    *,
+    now: datetime | None = None,
 ) -> tuple[list[Any], datetime] | None:
     """Return a Notion snapshot's projects only if the whole receipt verifies.
 
@@ -872,6 +885,9 @@ def verified_notion_snapshot(
     Callers that only enrich descriptive text may read the file directly; anything
     deriving a write target (a Notion page id) must come through here.
     """
+    clock = (
+        normalize_report_clock(now) if now is not None else datetime.now(timezone.utc)
+    )
     try:
         payload = json.loads(snapshot_path.read_text())
     except (OSError, json.JSONDecodeError):
@@ -906,9 +922,14 @@ def verified_notion_snapshot(
         )
     except ValueError:
         return None
-    age_hours = (
-        datetime.now(timezone.utc) - generated_at.astimezone(timezone.utc)
-    ).total_seconds() / 3600
+    if generated_at.utcoffset() is None:
+        # astimezone() would read an offsetless time in the host time zone.
+        return None
+    age_hours = (clock - generated_at.astimezone(timezone.utc)).total_seconds() / 3600
+    # Only the wall-clock verifier allows skew. A report has a fixed evidence cutoff.
+    if now is not None and age_hours < 0:
+        logger.warning("Skipping Notion snapshot dated after the report clock.")
+        return None
     if age_hours < -(5 / 60) or age_hours > MAX_NOTION_SNAPSHOT_AGE_HOURS:
         return None
     content_bytes = json.dumps(
@@ -921,8 +942,10 @@ def verified_notion_snapshot(
 
 def _load_verified_notion_snapshot_context(
     snapshot_path: Path,
+    *,
+    now: datetime | None = None,
 ) -> tuple[dict[str, dict[str, str]], str | None]:
-    verified = verified_notion_snapshot(snapshot_path)
+    verified = verified_notion_snapshot(snapshot_path, now=now)
     if verified is None:
         return {}, None
     projects, generated_at = verified
