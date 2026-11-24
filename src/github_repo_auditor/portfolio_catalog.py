@@ -522,7 +522,9 @@ def catalog_entry_for_repo(
     basename_matches = [
         entry
         for key, entry in repos.items()
-        if "/" in key and key.rsplit("/", 1)[-1] == normalized_repo_name
+        if not normalized_project_path
+        and "/" in key
+        and key.rsplit("/", 1)[-1] == normalized_repo_name
     ]
     if normalized_repo_name and len(basename_matches) == 1:
         return {
