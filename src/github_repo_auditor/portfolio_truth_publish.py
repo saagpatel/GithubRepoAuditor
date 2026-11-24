@@ -803,7 +803,9 @@ def _publish_portfolio_truth_locked(
         allow_empty_notion=allow_empty_notion,
     )
     latest_name = latest_path.name
-    snapshot_json = json.dumps(build_result.snapshot.to_dict(), indent=2) + "\n"
+    snapshot_json = (
+        json.dumps(build_result.snapshot.to_dict(), indent=2, sort_keys=True) + "\n"
+    )
     project_registry_json = _build_project_registry_json(
         build_result.snapshot, include_notion=include_notion
     )
