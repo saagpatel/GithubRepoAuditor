@@ -29,6 +29,8 @@ def test_tied_audit_reports_choose_the_same_path(tmp_path, monkeypatch):
             latest_audit_report_path(output_dir=tmp_path, username="fixture") == newer
         )
         args = {"output_dir": tmp_path, "username": "fixture"}
-        assert load_repo_status_from_audit_by_name(**args)["example"]["archived"] is True
+        assert (
+            load_repo_status_from_audit_by_name(**args)["example"]["archived"] is True
+        )
         assert load_release_count_by_name(**args) == {"example": 7}
         assert load_degraded_dimensions_by_name(**args) == {"example": ["testing"]}
