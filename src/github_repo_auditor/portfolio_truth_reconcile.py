@@ -910,6 +910,9 @@ def build_materialization_context(
 ) -> MaterializationContext:
     """Load catalog, registry, Notion context, and workspace discovery once."""
     now = now or datetime.now(timezone.utc)
+    if now.utcoffset() is None:
+        raise ValueError("The report clock must be timezone-aware.")
+    now = now.astimezone(timezone.utc)
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
     notion_context = load_safe_notion_project_context() if include_notion else {}
