@@ -21,11 +21,8 @@ from github_repo_auditor.github_security_coverage import (
 def load_release_count_by_name(
     *, output_dir: Path, username: str
 ) -> dict[str, int] | None:
-    audit_files = sorted(
-        output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda path: path.stat().st_mtime,
-    )
-    if not audit_files:
+    audit_path = latest_audit_report_path(output_dir=output_dir, username=username)
+    if audit_path is None:
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-release-count requires a prior audit run; "
             "no audit-report-%s-*.json found in %s — skipping release_count overlay",
@@ -34,12 +31,12 @@ def load_release_count_by_name(
         )
         return None
     try:
-        with audit_files[-1].open() as fh:
+        with audit_path.open() as fh:
             data = json.load(fh)
     except Exception as exc:  # noqa: BLE001
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-release-count: could not read %s: %s — skipping",
-            audit_files[-1],
+            audit_path,
             exc,
         )
         return None
@@ -62,11 +59,8 @@ def load_release_count_by_name(
 def load_degraded_dimensions_by_name(
     *, output_dir: Path, username: str
 ) -> dict[str, list[str]] | None:
-    audit_files = sorted(
-        output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda path: path.stat().st_mtime,
-    )
-    if not audit_files:
+    audit_path = latest_audit_report_path(output_dir=output_dir, username=username)
+    if audit_path is None:
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-degraded-dimensions requires a prior audit run; "
             "no audit-report-%s-*.json found in %s — skipping degraded_dimensions overlay",
@@ -75,12 +69,12 @@ def load_degraded_dimensions_by_name(
         )
         return None
     try:
-        with audit_files[-1].open() as fh:
+        with audit_path.open() as fh:
             data = json.load(fh)
     except Exception as exc:  # noqa: BLE001
         logging.getLogger(__name__).warning(
             "--portfolio-truth-include-degraded-dimensions: could not read %s: %s — skipping",
-            audit_files[-1],
+            audit_path,
             exc,
         )
         return None
