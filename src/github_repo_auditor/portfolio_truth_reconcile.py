@@ -896,6 +896,12 @@ def _projects_at_clock(
     return result
 
 
+def normalize_report_clock(now: datetime) -> datetime:
+    if now.utcoffset() is None:
+        raise ValueError("The report clock must be timezone-aware.")
+    return now.astimezone(timezone.utc)
+
+
 def build_materialization_context(
     *,
     workspace_root: Path,
@@ -909,7 +915,7 @@ def build_materialization_context(
     prior_notion_generated_at: str | None = None,
 ) -> MaterializationContext:
     """Load catalog, registry, Notion context, and workspace discovery once."""
-    now = now or datetime.now(timezone.utc)
+    now = normalize_report_clock(now or datetime.now(timezone.utc))
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
     notion_context = load_safe_notion_project_context() if include_notion else {}
