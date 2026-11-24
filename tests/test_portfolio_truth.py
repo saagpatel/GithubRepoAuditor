@@ -1819,7 +1819,7 @@ repos:
     )
     monkeypatch.setattr(
         "github_repo_auditor.portfolio_truth_reconcile.load_safe_notion_project_context",
-        lambda: {
+        lambda *, now: {
             "repo": {
                 "portfolio_call": "Maintain",
                 "momentum": "Stable",

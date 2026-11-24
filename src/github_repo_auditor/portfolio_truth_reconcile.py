@@ -40,6 +40,7 @@ from github_repo_auditor.portfolio_truth_sources import (
     discover_workspace_projects,
     load_legacy_registry_rows,
     load_safe_notion_project_context,
+    normalize_report_clock,
 )
 from github_repo_auditor.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
@@ -896,12 +897,6 @@ def _projects_at_clock(
     return result
 
 
-def normalize_report_clock(now: datetime) -> datetime:
-    if now.utcoffset() is None:
-        raise ValueError("The report clock must be timezone-aware.")
-    return now.astimezone(timezone.utc)
-
-
 def build_materialization_context(
     *,
     workspace_root: Path,
@@ -918,7 +913,7 @@ def build_materialization_context(
     now = normalize_report_clock(now or datetime.now(timezone.utc))
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
-    notion_context = load_safe_notion_project_context() if include_notion else {}
+    notion_context = load_safe_notion_project_context(now=now) if include_notion else {}
     notion_source_mode = str(getattr(notion_context, "source_mode", "live") or "live")
     notion_observed_at = getattr(notion_context, "observed_at", None)
     notion_context_carried_forward = False
