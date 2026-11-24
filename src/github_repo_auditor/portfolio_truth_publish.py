@@ -24,26 +24,23 @@ from github_repo_auditor.github_security_coverage import (
 from github_repo_auditor.portfolio_cohort_plan_contract import (
     COHORT_TRANSITION_PROTOCOL,
 )
+from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
 from github_repo_auditor.portfolio_truth_reconcile import (
     CohortR3Error,
     CohortTransitionOutcome,
     build_portfolio_truth_snapshot,
     load_prior_notion_context,
+    normalize_report_clock,
 )
 from github_repo_auditor.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
-from github_repo_auditor.portfolio_truth_lineage import resolve_notion_origin
 from github_repo_auditor.portfolio_truth_sources import (
     checkout_collision_paths,
     workspace_exclusion_reason,
 )
 from github_repo_auditor.portfolio_truth_types import truth_latest_path
-from github_repo_auditor.producer_preflight import (
-    ProducerEvidence,
-    verify_evidence_still_current,
-)
 from github_repo_auditor.portfolio_truth_validate import (
     canonicalize_prior_security_truth_payload,
     validate_portfolio_report_markdown,
@@ -51,11 +48,14 @@ from github_repo_auditor.portfolio_truth_validate import (
     validate_registry_markdown,
     validate_truth_snapshot,
 )
+from github_repo_auditor.producer_preflight import (
+    ProducerEvidence,
+    verify_evidence_still_current,
+)
 from github_repo_auditor.project_registry import (
     build_project_registry,
     load_source_paths,
 )
-
 
 _PORTFOLIO_TRUTH_IN_PROCESS_LOCK = threading.Lock()
 
@@ -548,6 +548,8 @@ def publish_portfolio_truth(
     require_producer_evidence: bool = False,
     now: datetime | None = None,
 ) -> PortfolioTruthPublishResult:
+    if now is not None:
+        now = normalize_report_clock(now)
     if (
         security_coverage_metadata is not None or security_receipt_binding is not None
     ) and now is None:
