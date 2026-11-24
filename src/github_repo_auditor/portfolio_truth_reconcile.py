@@ -155,7 +155,7 @@ def _derive_readme_char_count(project_path: Path | None, has_git: bool) -> int:
         if candidate.is_file():
             return len(candidate.read_text(errors="replace"))
     # Case-insensitive fallback
-    for candidate in project_path.iterdir():
+    for candidate in sorted(project_path.iterdir(), key=lambda item: item.name):
         if candidate.is_file() and candidate.name.lower().startswith("readme"):
             return len(candidate.read_text(errors="replace"))
     return 0
