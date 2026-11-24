@@ -100,11 +100,11 @@ def load_degraded_dimensions_by_name(
 
 
 def latest_audit_report_path(*, output_dir: Path, username: str) -> Path | None:
-    audit_files = sorted(
+    return max(
         output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda path: path.stat().st_mtime,
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        default=None,
     )
-    return audit_files[-1] if audit_files else None
 
 
 def _repo_status_entries_from_metadata(
