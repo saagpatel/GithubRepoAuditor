@@ -293,6 +293,8 @@ def _read_bridge_names(bridge_db_path: Path | None) -> list[str]:
 
 def _read_notion_projects(
     notion_snapshot_path: Path | None,
+    *,
+    now: datetime | None = None,
 ) -> list[tuple[str, str | None]]:
     """Read ``(title, page_id)`` for every row of the live Notion snapshot.
 
@@ -312,23 +314,27 @@ def _read_notion_projects(
     """
     if notion_snapshot_path is None or not notion_snapshot_path.exists():
         return []
-    try:
-        data = json.loads(notion_snapshot_path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return []
-    # Local import: portfolio_truth_sources reaches the catalog and context
-    # machinery, which sits on the other side of this module in the import graph.
     from github_repo_auditor.portfolio_truth_sources import verified_notion_snapshot
 
-    ids_are_trustworthy = verified_notion_snapshot(notion_snapshot_path) is not None
+    verified = verified_notion_snapshot(notion_snapshot_path, now=now)
+    if verified is not None:
+        projects, _ = verified
+    else:
+        try:
+            data = json.loads(notion_snapshot_path.read_text())
+        except (ValueError, OSError):
+            return []
+        if not isinstance(data, dict) or not isinstance(data.get("projects"), list):
+            return []
+        projects = data["projects"]
     rows: list[tuple[str, str | None]] = []
-    for project in data.get("projects", []):
+    for project in projects:
         if not isinstance(project, dict):
             continue
         title = project.get("title")
         if not title:
             continue
-        page_id = project.get("page_id") if ids_are_trustworthy else None
+        page_id = project.get("page_id") if verified is not None else None
         page_id = (
             page_id.strip() if isinstance(page_id, str) and page_id.strip() else None
         )
@@ -560,7 +566,7 @@ def build_project_registry(
     # The verified live snapshot is the only source of a row's page id. The
     # hand-maintained static map that used to fill the gaps now serves only
     # notion_export's repo-name keyspace and is not read here.
-    for title, page_id in _read_notion_projects(notion_snapshot_path):
+    for title, page_id in _read_notion_projects(notion_snapshot_path, now=generated_at):
         entry = resolve_entry(title, refuse_ambiguous=True)
         if entry is not None:
             entry.notion_local_title = title
